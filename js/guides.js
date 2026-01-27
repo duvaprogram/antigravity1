@@ -1,0 +1,580 @@
+// ========================================
+// Guides Module (Async - Supabase)
+// ========================================
+
+const GuidesModule = {
+    currentGuideItems: [],
+
+    init() {
+        this.bindEvents();
+    },
+
+    bindEvents() {
+        // New guide button
+        document.getElementById('btnNewGuide').addEventListener('click', () => {
+            this.openGuideModal();
+        });
+
+        // Guide form submission
+        document.getElementById('formGuide').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveGuide();
+        });
+
+        // Client selection change
+        document.getElementById('guideClient').addEventListener('change', (e) => {
+            this.onClientSelect(e.target.value);
+        });
+
+        // Add product to guide
+        document.getElementById('btnAddProductToGuide').addEventListener('click', () => {
+            this.addProductToGuide();
+        });
+
+        // Search guides
+        document.getElementById('searchGuides').addEventListener('input',
+            Utils.debounce(() => this.filterGuides(), 300)
+        );
+
+        // Filter by status
+        document.getElementById('filterGuideStatus').addEventListener('change', () => {
+            this.filterGuides();
+        });
+
+        // Modal close buttons
+        document.querySelectorAll('[data-close="modalGuide"]').forEach(btn => {
+            btn.addEventListener('click', () => Utils.closeModal('modalGuide'));
+        });
+
+        document.querySelectorAll('[data-close="modalGuideDetails"]').forEach(btn => {
+            btn.addEventListener('click', () => Utils.closeModal('modalGuideDetails'));
+        });
+
+        // Print guide
+        document.getElementById('btnPrintGuide').addEventListener('click', () => {
+            this.printGuide();
+        });
+    },
+
+    async render() {
+        await this.filterGuides();
+    },
+
+    async filterGuides() {
+        const searchQuery = document.getElementById('searchGuides').value.toLowerCase();
+        const statusFilter = document.getElementById('filterGuideStatus').value;
+
+        let guides = await Database.getGuides();
+
+        // Sort by date (newest first)
+        guides.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        // Apply filters
+        if (searchQuery) {
+            guides = guides.filter(g => {
+                return g.guideNumber.toLowerCase().includes(searchQuery) ||
+                    (g.clientName && g.clientName.toLowerCase().includes(searchQuery));
+            });
+        }
+
+        if (statusFilter) {
+            guides = guides.filter(g => g.status === statusFilter);
+        }
+
+        this.renderTable(guides);
+    },
+
+    renderTable(guides) {
+        const tbody = document.getElementById('guidesTable');
+
+        if (guides.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        No se encontraron guías
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = guides.map(guide => {
+            const cityClass = guide.city.toLowerCase();
+            const statusClass = Utils.getStatusClass(guide.status);
+
+            return `
+                <tr>
+                    <td>
+                        <strong style="color: var(--primary);">${guide.guideNumber}</strong>
+                    </td>
+                    <td>${Utils.formatDate(guide.createdAt)}</td>
+                    <td>${guide.clientName ? Utils.escapeHtml(guide.clientName) : 'Cliente eliminado'}</td>
+                    <td><span class="city-badge ${cityClass}">${guide.city}</span></td>
+                    <td>${guide.itemsCount || 0} items</td>
+                    <td>${Utils.formatCurrency(guide.totalAmount)}</td>
+                    <td>
+                        <span class="status-badge ${statusClass}">${guide.status}</span>
+                    </td>
+                    <td>
+                        <button class="btn btn-icon btn-secondary" onclick="GuidesModule.viewGuide('${guide.id}')" title="Ver detalles">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                        ${guide.status === 'Pendiente' ? `
+                            <button class="btn btn-icon btn-secondary" onclick="GuidesModule.changeStatus('${guide.id}', 'En ruta')" title="Marcar en ruta">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
+                            </button>
+                        ` : ''}
+                        ${guide.status === 'En ruta' ? `
+                            <button class="btn btn-icon btn-secondary" onclick="GuidesModule.changeStatus('${guide.id}', 'Entregado')" title="Marcar entregado" style="color: var(--success);">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    async openGuideModal(clientId = null) {
+        const form = document.getElementById('formGuide');
+        form.reset();
+        document.getElementById('guideId').value = '';
+        this.currentGuideItems = [];
+
+        // Reset client info display
+        document.getElementById('selectedClientInfo').style.display = 'none';
+
+        // Populate clients dropdown
+        const clientSelect = document.getElementById('guideClient');
+        const clients = await Database.getClients();
+
+        clientSelect.innerHTML = '<option value="">Seleccionar cliente existente...</option>';
+        clients.forEach(client => {
+            clientSelect.innerHTML += `<option value="${client.id}">${client.fullName} - ${client.city}</option>`;
+        });
+
+        // If clientId provided, select it
+        if (clientId) {
+            clientSelect.value = clientId;
+            await this.onClientSelect(clientId);
+        }
+
+        // Populate products dropdown (will be filtered by city when client is selected)
+        await this.updateProductsDropdown();
+        this.updateGuideProductsTable();
+
+        Utils.openModal('modalGuide');
+    },
+
+    async createGuideForClient(clientId) {
+        await this.openGuideModal(clientId);
+        // Navigate to guides section
+        App.navigateTo('guides');
+    },
+
+    async onClientSelect(clientId) {
+        const infoDiv = document.getElementById('selectedClientInfo');
+
+        if (!clientId) {
+            infoDiv.style.display = 'none';
+            return;
+        }
+
+        const client = await Database.getClient(clientId);
+        if (client) {
+            infoDiv.style.display = 'block';
+            document.getElementById('infoClientName').textContent = client.fullName;
+            document.getElementById('infoClientPhone').textContent = client.phone;
+            document.getElementById('infoClientAddress').textContent = client.address;
+            document.getElementById('infoClientCity').textContent = client.city;
+
+            // Update products dropdown filtered by city
+            await this.updateProductsDropdown(client.city);
+        }
+    },
+
+    async updateProductsDropdown(city = null) {
+        const productSelect = document.getElementById('guideProductSelect');
+        const products = await Database.getProducts();
+        const activeProducts = products.filter(p => p.active);
+
+        productSelect.innerHTML = '<option value="">Seleccionar producto...</option>';
+
+        for (const product of activeProducts) {
+            let stock = 0;
+            if (city) {
+                const inventory = await Database.getInventoryByProduct(product.id, city);
+                stock = inventory ? inventory.available : 0;
+            }
+            const stockLabel = city ? ` (Stock: ${stock})` : '';
+            const disabled = city && stock === 0 ? 'disabled' : '';
+
+            productSelect.innerHTML += `
+                <option value="${product.id}" ${disabled} data-price="${product.price}" data-stock="${stock}">
+                    ${product.name}${stockLabel}
+                </option>
+            `;
+        }
+    },
+
+    async addProductToGuide() {
+        const productSelect = document.getElementById('guideProductSelect');
+        const productId = productSelect.value;
+        const quantity = parseInt(document.getElementById('guideProductQty').value) || 1;
+        const clientId = document.getElementById('guideClient').value;
+
+        if (!productId) {
+            Utils.showToast('Seleccione un producto', 'warning');
+            return;
+        }
+
+        if (!clientId) {
+            Utils.showToast('Primero seleccione un cliente', 'warning');
+            return;
+        }
+
+        const client = await Database.getClient(clientId);
+        const product = await Database.getProduct(productId);
+        const inventory = await Database.getInventoryByProduct(productId, client.city);
+        const availableStock = inventory ? inventory.available : 0;
+
+        // Check if product already in list
+        const existingIndex = this.currentGuideItems.findIndex(i => i.productId === productId);
+        const currentQty = existingIndex >= 0 ? this.currentGuideItems[existingIndex].quantity : 0;
+
+        if (quantity + currentQty > availableStock) {
+            Utils.showToast(`Stock insuficiente. Disponible: ${availableStock - currentQty}`, 'error');
+            return;
+        }
+
+        if (existingIndex >= 0) {
+            this.currentGuideItems[existingIndex].quantity += quantity;
+            this.currentGuideItems[existingIndex].subtotal =
+                this.currentGuideItems[existingIndex].quantity * this.currentGuideItems[existingIndex].unitPrice;
+        } else {
+            this.currentGuideItems.push({
+                productId,
+                productName: product.name,
+                quantity,
+                unitPrice: product.price,
+                subtotal: product.price * quantity
+            });
+        }
+
+        document.getElementById('guideProductQty').value = 1;
+        productSelect.value = '';
+        this.updateGuideProductsTable();
+        Utils.showToast('Producto agregado', 'success');
+    },
+
+    removeProductFromGuide(index) {
+        this.currentGuideItems.splice(index, 1);
+        this.updateGuideProductsTable();
+    },
+
+    updateGuideProductsTable() {
+        const tbody = document.getElementById('guideProductsTable');
+        const totalEl = document.getElementById('guideTotal');
+
+        if (this.currentGuideItems.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-muted);">
+                        No hay productos agregados
+                    </td>
+                </tr>
+            `;
+            totalEl.textContent = Utils.formatCurrency(0);
+            return;
+        }
+
+        tbody.innerHTML = this.currentGuideItems.map((item, index) => `
+            <tr>
+                <td>${Utils.escapeHtml(item.productName)}</td>
+                <td>${item.quantity}</td>
+                <td>${Utils.formatCurrency(item.unitPrice)}</td>
+                <td>${Utils.formatCurrency(item.subtotal)}</td>
+                <td>
+                    <button type="button" class="btn btn-icon btn-secondary" onclick="GuidesModule.removeProductFromGuide(${index})">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        const total = this.currentGuideItems.reduce((sum, item) => sum + item.subtotal, 0);
+        totalEl.textContent = Utils.formatCurrency(total);
+    },
+
+    async saveGuide() {
+        const clientId = document.getElementById('guideClient').value;
+        const observations = document.getElementById('guideObservations').value.trim();
+
+        if (!clientId) {
+            Utils.showToast('Seleccione un cliente', 'error');
+            return;
+        }
+
+        if (this.currentGuideItems.length === 0) {
+            Utils.showToast('Agregue al menos un producto', 'error');
+            return;
+        }
+
+        try {
+            const client = await Database.getClient(clientId);
+            const totalAmount = this.currentGuideItems.reduce((sum, item) => sum + item.subtotal, 0);
+
+            // Create guide
+            const guide = await Database.saveGuide({
+                clientId,
+                city: client.city,
+                totalAmount,
+                observations
+            });
+
+            // Save guide items and decrease stock
+            for (const item of this.currentGuideItems) {
+                await Database.saveGuideItem({
+                    guideId: guide.id,
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice
+                });
+
+                // Decrease stock
+                await Database.decreaseStock(item.productId, client.city, item.quantity);
+            }
+
+            Utils.closeModal('modalGuide');
+            Utils.showToast(`Guía ${guide.guideNumber} creada correctamente`, 'success');
+            await this.render();
+            await InventoryModule.render();
+            App.updateDashboard();
+        } catch (error) {
+            console.error('Error saving guide:', error);
+            Utils.showToast('Error al crear la guía', 'error');
+        }
+    },
+
+    async viewGuide(guideId) {
+        const guide = await Database.getGuide(guideId);
+        if (!guide) return;
+
+        const client = await Database.getClient(guide.clientId);
+        const items = await Database.getGuideItems(guideId);
+        const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+        document.getElementById('detailGuideNumber').textContent = guide.guideNumber;
+
+        const content = document.getElementById('guideDetailsContent');
+        content.innerHTML = `
+            <div class="guide-details-header">
+                <div class="guide-details-info">
+                    <h4>Fecha</h4>
+                    <p>${Utils.formatDate(guide.createdAt, true)}</p>
+                </div>
+                <div class="guide-details-info">
+                    <h4>Ciudad</h4>
+                    <p><span class="city-badge ${guide.city.toLowerCase()}">${guide.city}</span></p>
+                </div>
+                <div class="guide-details-info">
+                    <h4>Estado</h4>
+                    <p><span class="status-badge ${Utils.getStatusClass(guide.status)}">${guide.status}</span></p>
+                </div>
+            </div>
+
+            <div class="guide-details-section">
+                <h3>Cliente</h3>
+                <div class="client-info">
+                    <p><strong>Nombre:</strong> ${client ? Utils.escapeHtml(client.fullName) : 'No disponible'}</p>
+                    <p><strong>Teléfono:</strong> ${client ? Utils.escapeHtml(client.phone) : '-'}</p>
+                    <p><strong>Dirección:</strong> ${client ? Utils.escapeHtml(client.address) : '-'}</p>
+                    ${client && client.reference ? `<p><strong>Referencia:</strong> ${Utils.escapeHtml(client.reference)}</p>` : ''}
+                </div>
+            </div>
+
+            <div class="guide-details-section">
+                <h3>Productos</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Producto</th>
+                            <th>Cantidad</th>
+                            <th>Precio Unit.</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(item => `
+                            <tr>
+                                <td>${Utils.escapeHtml(item.productName || 'Producto')}</td>
+                                <td>${item.quantity}</td>
+                                <td>${Utils.formatCurrency(item.unitPrice)}</td>
+                                <td>${Utils.formatCurrency(item.subtotal)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3"><strong>TOTAL</strong></td>
+                            <td><strong>${Utils.formatCurrency(total)}</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            ${guide.observations ? `
+                <div class="guide-details-section">
+                    <h3>Observaciones</h3>
+                    <p>${Utils.escapeHtml(guide.observations)}</p>
+                </div>
+            ` : ''}
+
+            <div class="guide-details-section">
+                <h3>Cambiar Estado</h3>
+                <div class="guide-status-actions">
+                    <button class="status-btn ${guide.status === 'Pendiente' ? 'active' : ''}" 
+                            onclick="GuidesModule.changeStatus('${guide.id}', 'Pendiente')">
+                        Pendiente
+                    </button>
+                    <button class="status-btn ${guide.status === 'En ruta' ? 'active' : ''}" 
+                            onclick="GuidesModule.changeStatus('${guide.id}', 'En ruta')">
+                        En ruta
+                    </button>
+                    <button class="status-btn ${guide.status === 'Entregado' ? 'active' : ''}" 
+                            onclick="GuidesModule.changeStatus('${guide.id}', 'Entregado')">
+                        Entregado
+                    </button>
+                    <button class="status-btn ${guide.status === 'Cancelado' ? 'active' : ''}" 
+                            onclick="GuidesModule.changeStatus('${guide.id}', 'Cancelado')">
+                        Cancelado
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Store current guide ID for printing
+        this.currentViewingGuideId = guideId;
+        Utils.openModal('modalGuideDetails');
+    },
+
+    async changeStatus(guideId, newStatus) {
+        try {
+            await Database.updateGuideStatus(guideId, newStatus);
+            Utils.showToast(`Estado actualizado a "${newStatus}"`, 'success');
+
+            // Refresh the view if modal is open
+            if (document.getElementById('modalGuideDetails').classList.contains('active')) {
+                await this.viewGuide(guideId);
+            }
+
+            await this.render();
+            App.updateDashboard();
+        } catch (error) {
+            console.error('Error changing status:', error);
+            Utils.showToast('Error al cambiar el estado', 'error');
+        }
+    },
+
+    async printGuide() {
+        if (!this.currentViewingGuideId) return;
+
+        const guide = await Database.getGuide(this.currentViewingGuideId);
+        const client = await Database.getClient(guide.clientId);
+        const items = await Database.getGuideItems(this.currentViewingGuideId);
+        const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+
+        // Use jsPDF to generate PDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        // Header
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.text('GUÍA DE DESPACHO', 105, 20, { align: 'center' });
+
+        doc.setFontSize(14);
+        doc.text(guide.guideNumber, 105, 30, { align: 'center' });
+
+        // Guide info
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Fecha: ${Utils.formatDate(guide.createdAt, true)}`, 20, 45);
+        doc.text(`Ciudad: ${guide.city}`, 20, 52);
+        doc.text(`Estado: ${guide.status}`, 20, 59);
+
+        // Client info
+        doc.setFont('helvetica', 'bold');
+        doc.text('CLIENTE:', 20, 75);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Nombre: ${client ? client.fullName : 'N/A'}`, 20, 82);
+        doc.text(`Teléfono: ${client ? client.phone : 'N/A'}`, 20, 89);
+        doc.text(`Dirección: ${client ? client.address : 'N/A'}`, 20, 96);
+        if (client && client.reference) {
+            doc.text(`Referencia: ${client.reference}`, 20, 103);
+        }
+
+        // Products table
+        let yPos = 120;
+        doc.setFont('helvetica', 'bold');
+        doc.text('PRODUCTOS:', 20, yPos);
+        yPos += 10;
+
+        // Table header
+        doc.setFillColor(240, 240, 240);
+        doc.rect(20, yPos - 5, 170, 8, 'F');
+        doc.text('Producto', 22, yPos);
+        doc.text('Cant.', 120, yPos);
+        doc.text('P. Unit.', 140, yPos);
+        doc.text('Subtotal', 165, yPos);
+        yPos += 10;
+
+        // Table rows
+        doc.setFont('helvetica', 'normal');
+        items.forEach(item => {
+            doc.text((item.productName || 'Producto').substring(0, 40), 22, yPos);
+            doc.text(item.quantity.toString(), 125, yPos);
+            doc.text(`$${item.unitPrice.toFixed(2)}`, 140, yPos);
+            doc.text(`$${item.subtotal.toFixed(2)}`, 165, yPos);
+            yPos += 8;
+        });
+
+        // Total
+        yPos += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.text('TOTAL:', 140, yPos);
+        doc.text(`$${total.toFixed(2)}`, 165, yPos);
+
+        // Observations
+        if (guide.observations) {
+            yPos += 15;
+            doc.setFont('helvetica', 'bold');
+            doc.text('OBSERVACIONES:', 20, yPos);
+            doc.setFont('helvetica', 'normal');
+            doc.text(guide.observations, 20, yPos + 7);
+        }
+
+        // Footer
+        doc.setFontSize(8);
+        doc.setTextColor(128);
+        doc.text('Sistema de Domicilios - Quito & Guayaquil', 105, 285, { align: 'center' });
+
+        // Save PDF
+        doc.save(`guia_${guide.guideNumber}.pdf`);
+        Utils.showToast('PDF generado correctamente', 'success');
+    }
+};
+
+// Make module available globally
+window.GuidesModule = GuidesModule;

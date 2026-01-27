@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Domicilios - Quito & Guayaquil</title>
+    <meta name="description" content="Sistema de gestión de domicilios para Quito y Guayaquil">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <span class="logo-icon">📦</span>
+                <span class="logo-text">Domicilios</span>
+            </div>
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#dashboard" class="nav-item active" data-section="dashboard">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+                <span>Dashboard</span>
+            </a>
+            <a href="#products" class="nav-item" data-section="products">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                    </path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+                <span>Productos</span>
+            </a>
+            <a href="#inventory" class="nav-item" data-section="inventory">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                </svg>
+                <span>Inventario</span>
+            </a>
+            <a href="#clients" class="nav-item" data-section="clients">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>Clientes</span>
+            </a>
+            <a href="#guides" class="nav-item" data-section="guides">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                <span>Guías de Despacho</span>
+            </a>
+            <a href="#confirmation" class="nav-item" data-section="confirmation">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 11l3 3L22 4"></path>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                <span>Confirmación</span>
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="city-selector">
+                <label>Ciudad activa:</label>
+                <select id="activeCity">
+                    <option value="all">Todas</option>
+                    <option value="Quito">Quito</option>
+                    <option value="Guayaquil">Guayaquil</option>
+                </select>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <header class="top-header">
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+            <h1 id="pageTitle">Dashboard</h1>
+            <div class="header-actions">
+                <button class="btn btn-icon theme-toggle" id="themeToggle" title="Cambiar tema">
+                    <!-- Sun Icon (for dark mode) -->
+                    <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" style="display: none;">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <!-- Moon Icon (for light mode) -->
+                    <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </button>
+                <span class="current-time" id="currentTime"></span>
+            </div>
+        </header>
+
+        <!-- Dashboard Section -->
+        <section class="content-section active" id="section-dashboard">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon products">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                            </path>
+                        </svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="statProducts">0</span>
+                        <span class="stat-label">Productos</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon inventory">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="statInventory">0</span>
+                        <span class="stat-label">Unidades en Stock</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon clients">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                        </svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="statClients">0</span>
+                        <span class="stat-label">Clientes</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon guides">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                        </svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="statGuides">0</span>
+                        <span class="stat-label">Guías de Hoy</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="card recent-guides">
+                    <div class="card-header">
+                        <h3>Guías Recientes</h3>
+                        <a href="#guides" class="btn btn-text" data-section="guides">Ver todas</a>
+                    </div>
+                    <div class="card-body">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Nº Guía</th>
+                                    <th>Cliente</th>
+                                    <th>Ciudad</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentGuidesTable">
+                                <!-- Dynamic content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card low-stock">
+                    <div class="card-header">
+                        <h3>Stock Bajo</h3>
+                        <a href="#inventory" class="btn btn-text" data-section="inventory">Ver inventario</a>
+                    </div>
+                    <div class="card-body">
+                        <ul class="stock-list" id="lowStockList">
+                            <!-- Dynamic content -->
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="card city-stats">
+                    <div class="card-header">
+                        <h3>Despachos por Ciudad</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="city-chart">
+                            <div class="city-bar">
+                                <span class="city-name">Quito</span>
+                                <div class="bar-container">
+                                    <div class="bar quito" id="quitoBar" style="width: 0%"></div>
+                                </div>
+                                <span class="city-count" id="quitoCount">0</span>
+                            </div>
+                            <div class="city-bar">
+                                <span class="city-name">Guayaquil</span>
+                                <div class="bar-container">
+                                    <div class="bar guayaquil" id="guayaquilBar" style="width: 0%"></div>
+                                </div>
+                                <span class="city-count" id="guayaquilCount">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Products Section -->
+        <section class="content-section" id="section-products">
+            <div class="section-header">
+                <div class="search-bar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="searchProducts" placeholder="Buscar productos...">
+                </div>
+                <button class="btn btn-primary" id="btnNewProduct">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Nuevo Producto
+                </button>
+            </div>
+
+            <div class="filters-bar">
+                <select id="filterCategory">
+                    <option value="">Todas las categorías</option>
+                    <option value="Electrónica">Electrónica</option>
+                    <option value="Ropa">Ropa</option>
+                    <option value="Hogar">Hogar</option>
+                    <option value="Alimentos">Alimentos</option>
+                    <option value="Salud">Salud</option>
+                    <option value="Otros">Otros</option>
+                </select>
+                <select id="filterStatus">
+                    <option value="">Todos los estados</option>
+                    <option value="true">Activos</option>
+                    <option value="false">Inactivos</option>
+                </select>
+            </div>
+
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Nombre</th>
+                            <th>Categoría</th>
+                            <th>Precio</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="productsTable">
+                        <!-- Dynamic content -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Inventory Section -->
+        <section class="content-section" id="section-inventory">
+            <div class="section-header">
+                <div class="city-tabs">
+                    <button class="city-tab active" data-city="all">Todos</button>
+                    <button class="city-tab" data-city="Quito">Quito</button>
+                    <button class="city-tab" data-city="Guayaquil">Guayaquil</button>
+                </div>
+                <button class="btn btn-primary" id="btnUpdateStock">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="1 4 1 10 7 10"></polyline>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                    </svg>
+                    Actualizar Stock
+                </button>
+            </div>
+
+            <div class="inventory-grid" id="inventoryGrid">
+                <!-- Dynamic content -->
+            </div>
+        </section>
+
+        <!-- Clients Section -->
+        <section class="content-section" id="section-clients">
+            <div class="section-header">
+                <div class="search-bar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="searchClients" placeholder="Buscar por nombre o teléfono...">
+                </div>
+                <button class="btn btn-primary" id="btnNewClient">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Nuevo Cliente
+                </button>
+            </div>
+
+            <div class="clients-grid" id="clientsGrid">
+                <!-- Dynamic content -->
+            </div>
+        </section>
+
+        <!-- Guides Section -->
+        <section class="content-section" id="section-guides">
+            <div class="section-header">
+                <div class="search-bar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="searchGuides" placeholder="Buscar guías...">
+                </div>
+                <div class="header-buttons">
+                    <select id="filterGuideStatus">
+                        <option value="">Todos los estados</option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="En ruta">En ruta</option>
+                        <option value="Entregado">Entregado</option>
+                        <option value="Cancelado">Cancelado</option>
+                    </select>
+                    <button class="btn btn-primary" id="btnNewGuide">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Nueva Guía
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Nº Guía</th>
+                            <th>Fecha</th>
+                            <th>Cliente</th>
+                            <th>Ciudad</th>
+                            <th>Productos</th>
+                            <th>Total</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="guidesTable">
+                        <!-- Dynamic content -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Confirmation Section -->
+        <section class="content-section" id="section-confirmation">
+            <div class="section-header">
+                <h2>Confirmación de Pedidos</h2>
+            </div>
+
+            <div class="dashboard-grid">
+                <!-- Registration Form -->
+                <div class="card" style="grid-row: span 2;">
+                    <div class="card-header">
+                        <h3>Nuevo Registro Diario</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="formConfirmation">
+                            <div class="form-grid">
+                                <div class="form-group full-width">
+                                    <label for="confDate">Fecha</label>
+                                    <input type="date" id="confDate" required>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label for="confPage">Página / Origen</label>
+                                    <select id="confPage" required>
+                                        <option value="">Seleccionar...</option>
+                                        <option value="Colombia">Colombia</option>
+                                        <option value="Ecuador">Ecuador</option>
+                                        <option value="Venezuela">Venezuela</option>
+                                    </select>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label for="confTotal">Cantidad de Pedidos (Total)</label>
+                                    <input type="number" id="confTotal" min="1" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="confConfirmed">Confirmados</label>
+                                    <input type="number" id="confConfirmed" min="0" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="confDuplicates">Duplicados</label>
+                                    <input type="number" id="confDuplicates" min="0" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="confCancelled">Cancelados (Cobertura)</label>
+                                    <input type="number" id="confCancelled" min="0" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="confCancelledClient">Cancelados (Cliente)</label>
+                                    <input type="number" id="confCancelledClient" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="form-actions" style="margin-top: 1rem;">
+                                <button type="submit" class="btn btn-primary" style="width: 100%;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
+                                        </path>
+                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                        <polyline points="7 3 7 8 15 8"></polyline>
+                                    </svg>
+                                    Guardar Registro
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Live Stats -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Métricas de Efectividad</h3>
+                    </div>
+                    <div class="card-body" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                        <div style="text-align: center;">
+                            <span
+                                style="font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Confirmación
+                                Bruta</span>
+                            <div style="font-size: 2.5rem; font-weight: 700; color: var(--primary);"
+                                id="confPercentageValue">0%</div>
+                            <p style="font-size: 0.875rem; color: var(--text-muted);" id="confStatsDetail">0 / 0
+                                Confirmados</p>
+                        </div>
+                        <div style="height: 1px; background: var(--border);"></div>
+                        <div style="text-align: center;">
+                            <span
+                                style="font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Efectividad
+                                Neta</span>
+                            <div style="font-size: 2.5rem; font-weight: 700; color: var(--success);"
+                                id="confNetPercentageValue">0%</div>
+                            <p style="font-size: 0.75rem; color: var(--text-muted);">(Excluye Dupli. y Cancel.
+                                Lineamiento)</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent History -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Historial Reciente</h3>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <div class="table-container" style="border: none; border-radius: 0;">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Página</th>
+                                        <th>% Conf.</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="confPreviewTable">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Full History Table -->
+            <div class="card" style="margin-top: var(--space-lg);">
+                <div class="card-header">
+                    <h3>Registro Completo</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Página</th>
+                                    <th>Total</th>
+                                    <th>Conf.</th>
+                                    <th>Dupli.</th>
+                                    <th>C. Cob.</th>
+                                    <th>C. Cli.</th>
+                                    <th>% Bruta</th>
+                                    <th>% Neta</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="confHistoryTable">
+                                <!-- Dynamic content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal: Product Form -->
+    <div class="modal" id="modalProduct">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalProductTitle">Nuevo Producto</h2>
+                <button class="modal-close" data-close="modalProduct">&times;</button>
+            </div>
+            <form id="formProduct">
+                <input type="hidden" id="productId">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="productName">Nombre del Producto *</label>
+                        <input type="text" id="productName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="productSku">SKU / Código *</label>
+                        <input type="text" id="productSku" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="productDescription">Descripción</label>
+                        <textarea id="productDescription" rows="3"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="productCategory">Categoría *</label>
+                        <select id="productCategory" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="Electrónica">Electrónica</option>
+                            <option value="Ropa">Ropa</option>
+                            <option value="Hogar">Hogar</option>
+                            <option value="Alimentos">Alimentos</option>
+                            <option value="Salud">Salud</option>
+                            <option value="Otros">Otros</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="productPrice">Precio ($) *</label>
+                        <input type="number" id="productPrice" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="productActive">Estado</label>
+                        <label class="switch">
+                            <input type="checkbox" id="productActive" checked>
+                            <span class="slider"></span>
+                            <span class="switch-label">Activo</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalProduct">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Producto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Client Form -->
+    <div class="modal" id="modalClient">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalClientTitle">Nuevo Cliente</h2>
+                <button class="modal-close" data-close="modalClient">&times;</button>
+            </div>
+            <form id="formClient">
+                <input type="hidden" id="clientId">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="clientName">Nombre Completo *</label>
+                        <input type="text" id="clientName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientPhone">Teléfono *</label>
+                        <input type="tel" id="clientPhone" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientCity">Ciudad *</label>
+                        <select id="clientCity" required>
+                            <option value="">Seleccionar...</option>
+                            <option value="Quito">Quito</option>
+                            <option value="Guayaquil">Guayaquil</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="clientAddress">Dirección Completa *</label>
+                        <textarea id="clientAddress" rows="2" required></textarea>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="clientReference">Referencias</label>
+                        <input type="text" id="clientReference" placeholder="Ej: Casa blanca, junto al parque">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalClient">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cliente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Stock Update -->
+    <div class="modal" id="modalStock">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Actualizar Stock</h2>
+                <button class="modal-close" data-close="modalStock">&times;</button>
+            </div>
+            <form id="formStock">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="stockProduct">Producto *</label>
+                        <select id="stockProduct" required>
+                            <option value="">Seleccionar producto...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="stockCity">Ciudad *</label>
+                        <select id="stockCity" required>
+                            <option value="">Seleccionar ciudad...</option>
+                            <option value="Quito">Quito</option>
+                            <option value="Guayaquil">Guayaquil</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="stockQuantity">Cantidad a agregar *</label>
+                        <input type="number" id="stockQuantity" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="stockMinimum">Stock mínimo</label>
+                        <input type="number" id="stockMinimum" min="0" value="5">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalStock">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Actualizar Stock</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: New Guide -->
+    <div class="modal modal-large" id="modalGuide">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalGuideTitle">Nueva Guía de Despacho</h2>
+                <button class="modal-close" data-close="modalGuide">&times;</button>
+            </div>
+            <form id="formGuide">
+                <input type="hidden" id="guideId">
+                <div class="guide-form-layout">
+                    <div class="guide-section">
+                        <h3>Información del Cliente</h3>
+                        <div class="form-group">
+                            <label for="guideClient">Seleccionar Cliente</label>
+                            <select id="guideClient">
+                                <option value="">Seleccionar cliente existente...</option>
+                            </select>
+                        </div>
+                        <div class="client-info" id="selectedClientInfo" style="display: none;">
+                            <p><strong>Nombre:</strong> <span id="infoClientName"></span></p>
+                            <p><strong>Teléfono:</strong> <span id="infoClientPhone"></span></p>
+                            <p><strong>Dirección:</strong> <span id="infoClientAddress"></span></p>
+                            <p><strong>Ciudad:</strong> <span id="infoClientCity"></span></p>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <h3>Productos</h3>
+                        <div class="add-product-row">
+                            <select id="guideProductSelect">
+                                <option value="">Seleccionar producto...</option>
+                            </select>
+                            <input type="number" id="guideProductQty" min="1" value="1" placeholder="Cant.">
+                            <button type="button" class="btn btn-secondary" id="btnAddProductToGuide">Agregar</button>
+                        </div>
+                        <div class="guide-products-list">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto</th>
+                                        <th>Cantidad</th>
+                                        <th>Precio</th>
+                                        <th>Subtotal</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="guideProductsTable">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                                <tfoot>
+                                    <tr>
+                                        <td colspan="3"><strong>TOTAL</strong></td>
+                                        <td colspan="2"><strong id="guideTotal">$0.00</strong></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="guide-section">
+                        <div class="form-group full-width">
+                            <label for="guideObservations">Observaciones</label>
+                            <textarea id="guideObservations" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalGuide">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Crear Guía</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Guide Details -->
+    <div class="modal modal-large" id="modalGuideDetails">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Guía de Despacho <span id="detailGuideNumber"></span></h2>
+                <button class="modal-close" data-close="modalGuideDetails">&times;</button>
+            </div>
+            <div class="guide-details" id="guideDetailsContent">
+                <!-- Dynamic content -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" data-close="modalGuideDetails">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="btnPrintGuide">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                        <rect x="6" y="14" width="12" height="8"></rect>
+                    </svg>
+                    Imprimir / PDF
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/supabase-config.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/database.js"></script>
+    <script src="js/products.js"></script>
+    <script src="js/inventory.js"></script>
+    <script src="js/clients.js"></script>
+    <script src="js/guides.js"></script>
+    <script src="js/confirmation.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
