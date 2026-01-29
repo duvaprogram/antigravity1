@@ -81,6 +81,14 @@
                 </svg>
                 <span>Confirmación</span>
             </a>
+            <a href="#purchases" class="nav-item" data-section="purchases">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="9" cy="21" r="1"></circle>
+                    <circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+                <span>Compras</span>
+            </a>
         </nav>
 
         <div class="sidebar-footer">
@@ -678,6 +686,140 @@
                 </div>
             </div>
         </section>
+
+        <!-- Purchases Section -->
+        <section class="content-section" id="section-purchases">
+            <div class="section-header">
+                <h2>Compras a Proveedores</h2>
+                <button class="btn btn-primary" onclick="PurchasesModule.openPurchaseModal()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    Nueva Compra
+                </button>
+            </div>
+
+            <!-- Summary Stats -->
+            <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: var(--primary-light); color: var(--primary);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="9" cy="21" r="1"></circle>
+                            <circle cx="20" cy="21" r="1"></circle>
+                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="totalPurchases">0</span>
+                        <span class="stat-label">Total Compras</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: var(--success-light); color: var(--success);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="totalSpent">$0</span>
+                        <span class="stat-label">Total Gastado (COP)</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: var(--warning-light); color: var(--warning);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="monthlySpent">$0</span>
+                        <span class="stat-label">Este Mes (COP)</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: var(--info-light); color: var(--info);">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="9" cy="7" r="4"></circle>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                        </svg>
+                    </div>
+                    <div class="stat-info">
+                        <span class="stat-value" id="uniqueProviders">0</span>
+                        <span class="stat-label">Proveedores</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter Section -->
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div class="card-header">
+                    <h3>Filtros</h3>
+                </div>
+                <div class="card-body">
+                    <div class="filter-row" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+                        <div class="form-group" style="flex: 1; min-width: 150px;">
+                            <label for="purchaseFilterDateFrom">Desde</label>
+                            <input type="date" id="purchaseFilterDateFrom" class="form-control">
+                        </div>
+                        <div class="form-group" style="flex: 1; min-width: 150px;">
+                            <label for="purchaseFilterDateTo">Hasta</label>
+                            <input type="date" id="purchaseFilterDateTo" class="form-control">
+                        </div>
+                        <div class="form-group" style="flex: 1; min-width: 150px;">
+                            <label for="purchaseFilterProvider">Proveedor</label>
+                            <select id="purchaseFilterProvider" class="form-control">
+                                <option value="">Todos</option>
+                            </select>
+                        </div>
+                        <div class="filter-buttons" style="display: flex; gap: 0.5rem;">
+                            <button type="button" class="btn btn-primary"
+                                onclick="PurchasesModule.applyFilters()">Filtrar</button>
+                            <button type="button" class="btn btn-secondary"
+                                onclick="PurchasesModule.clearFilters()">Limpiar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Purchases Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Historial de Compras</h3>
+                    <span id="purchaseRecordCount" style="font-size: 0.875rem; color: var(--text-muted);"></span>
+                </div>
+                <div class="card-body">
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Proveedor</th>
+                                    <th>Descripción</th>
+                                    <th>Cantidad</th>
+                                    <th>Monto (COP)</th>
+                                    <th>Método Pago</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="purchasesTable">
+                                <!-- Dynamic content -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- Modal: Product Form -->
@@ -916,6 +1058,72 @@
         </div>
     </div>
 
+    <!-- Modal: Purchase Form -->
+    <div class="modal" id="modalPurchase">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalPurchaseTitle">Nueva Compra</h2>
+                <button class="modal-close" data-close="modalPurchase">&times;</button>
+            </div>
+            <form id="formPurchase">
+                <input type="hidden" id="purchaseId">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="purchaseDate">Fecha *</label>
+                        <input type="date" id="purchaseDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchaseProvider">Proveedor *</label>
+                        <input type="text" id="purchaseProvider" required placeholder="Nombre del proveedor">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="purchaseDescription">Descripción *</label>
+                        <input type="text" id="purchaseDescription" required placeholder="Qué compraste">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchaseQuantity">Cantidad</label>
+                        <input type="number" id="purchaseQuantity" min="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchaseAmount">Monto (COP) *</label>
+                        <input type="number" id="purchaseAmount" required min="0" step="100" placeholder="50000">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchasePaymentMethod">Método de Pago</label>
+                        <select id="purchasePaymentMethod">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Nequi">Nequi</option>
+                            <option value="Daviplata">Daviplata</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="Crédito">Crédito (A pagar)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="purchaseCategory">Categoría</label>
+                        <select id="purchaseCategory">
+                            <option value="Mercancía">Mercancía</option>
+                            <option value="Insumos">Insumos</option>
+                            <option value="Empaque">Empaque</option>
+                            <option value="Publicidad">Publicidad</option>
+                            <option value="Transporte">Transporte</option>
+                            <option value="Servicios">Servicios</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="purchaseNotes">Notas adicionales</label>
+                        <textarea id="purchaseNotes" rows="2" placeholder="Observaciones..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalPurchase">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Compra</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
@@ -931,6 +1139,7 @@
     <script src="js/clients.js"></script>
     <script src="js/guides.js"></script>
     <script src="js/confirmation.js"></script>
+    <script src="js/purchases.js"></script>
     <script src="js/app.js"></script>
 </body>
 

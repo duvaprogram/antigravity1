@@ -26,6 +26,7 @@ const App = {
             ClientsModule.init();
             GuidesModule.init();
             ConfirmationModule.init();
+            PurchasesModule.init();
 
             // Bind navigation events
             this.bindNavigation();
@@ -131,7 +132,8 @@ const App = {
             'inventory': 'Inventario',
             'clients': 'Clientes',
             'guides': 'Guías de Despacho',
-            'confirmation': 'Confirmación de Pedidos'
+            'confirmation': 'Confirmación de Pedidos',
+            'purchases': 'Compras a Proveedores'
         };
         document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
 
@@ -178,6 +180,9 @@ const App = {
                 break;
             case 'confirmation':
                 await ConfirmationModule.render();
+                break;
+            case 'purchases':
+                await PurchasesModule.render();
                 break;
         }
     },
