@@ -27,6 +27,7 @@ const App = {
             GuidesModule.init();
             ConfirmationModule.init();
             PurchasesModule.init();
+            UsersModule.init();
 
             // Bind navigation events
             this.bindNavigation();
@@ -133,7 +134,8 @@ const App = {
             'clients': 'Clientes',
             'guides': 'Guías de Despacho',
             'confirmation': 'Confirmación de Pedidos',
-            'purchases': 'Compras a Proveedores'
+            'purchases': 'Compras a Proveedores',
+            'users': 'Administración de Usuarios'
         };
         document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
 
@@ -183,6 +185,9 @@ const App = {
                 break;
             case 'purchases':
                 await PurchasesModule.render();
+                break;
+            case 'users':
+                await UsersModule.render();
                 break;
         }
     },
@@ -322,8 +327,8 @@ const App = {
     }
 };
 
-// Initialize app when DOM is ready
-document.addEventListener('DOMContentLoaded', () => App.init());
+// App.init() is now called by AuthModule after login
+// Do NOT auto-initialize here
 
 // Make App available globally
 window.App = App;

@@ -13,814 +13,948 @@
 </head>
 
 <body>
-    <!-- Sidebar Navigation -->
-    <aside class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <div class="logo">
-                <span class="logo-icon">📦</span>
-                <span class="logo-text">Domicilios</span>
+    <!-- Login Screen -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-container">
+            <div class="login-header">
+                <span class="login-logo">📦</span>
+                <h1>Sistema de Domicilios</h1>
+                <p>Ingresa tus credenciales para continuar</p>
             </div>
-            <button class="sidebar-toggle" id="sidebarToggle">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
-            </button>
-        </div>
-
-        <nav class="sidebar-nav">
-            <a href="#dashboard" class="nav-item active" data-section="dashboard">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="14" width="7" height="7"></rect>
-                    <rect x="3" y="14" width="7" height="7"></rect>
-                </svg>
-                <span>Dashboard</span>
-            </a>
-            <a href="#products" class="nav-item" data-section="products">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path
-                        d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
-                    </path>
-                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                </svg>
-                <span>Productos</span>
-            </a>
-            <a href="#inventory" class="nav-item" data-section="inventory">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                </svg>
-                <span>Inventario</span>
-            </a>
-            <a href="#clients" class="nav-item" data-section="clients">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="9" cy="7" r="4"></circle>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                </svg>
-                <span>Clientes</span>
-            </a>
-            <a href="#guides" class="nav-item" data-section="guides">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                </svg>
-                <span>Guías de Despacho</span>
-            </a>
-            <a href="#confirmation" class="nav-item" data-section="confirmation">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 11l3 3L22 4"></path>
-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                </svg>
-                <span>Confirmación</span>
-            </a>
-            <a href="#purchases" class="nav-item" data-section="purchases">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="9" cy="21" r="1"></circle>
-                    <circle cx="20" cy="21" r="1"></circle>
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                </svg>
-                <span>Compras</span>
-            </a>
-        </nav>
-
-        <div class="sidebar-footer">
-            <div class="city-selector">
-                <label>Ciudad activa:</label>
-                <select id="activeCity">
-                    <option value="all">Todas</option>
-                    <option value="Quito">Quito</option>
-                    <option value="Guayaquil">Guayaquil</option>
-                </select>
-            </div>
-        </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-content">
-        <header class="top-header">
-            <button class="mobile-menu-btn" id="mobileMenuBtn">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
-            </button>
-            <h1 id="pageTitle">Dashboard</h1>
-            <div class="header-actions">
-                <button class="btn btn-icon theme-toggle" id="themeToggle" title="Cambiar tema">
-                    <!-- Sun Icon (for dark mode) -->
-                    <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2" style="display: none;">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="loginUsername">Usuario</label>
+                    <input type="text" id="loginUsername" required placeholder="Tu usuario" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Contraseña</label>
+                    <input type="password" id="loginPassword" required placeholder="Tu contraseña"
+                        autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-full">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                        <polyline points="10 17 15 12 10 7"></polyline>
+                        <line x1="15" y1="12" x2="3" y2="12"></line>
                     </svg>
-                    <!-- Moon Icon (for light mode) -->
-                    <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                        stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    Iniciar Sesión
+                </button>
+                <div id="loginError" class="login-error" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- App Container (hidden until login) -->
+    <div class="app-container" id="appContainer" style="display: none;">
+
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <span class="logo-icon">📦</span>
+                    <span class="logo-text">Domicilios</span>
+                </div>
+                <button class="sidebar-toggle" id="sidebarToggle">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
                     </svg>
                 </button>
-                <span class="current-time" id="currentTime"></span>
-            </div>
-        </header>
-
-        <!-- Dashboard Section -->
-        <section class="content-section active" id="section-dashboard">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon products">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path
-                                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
-                            </path>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="statProducts">0</span>
-                        <span class="stat-label">Productos</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon inventory">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="statInventory">0</span>
-                        <span class="stat-label">Unidades en Stock</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon clients">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="statClients">0</span>
-                        <span class="stat-label">Clientes</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon guides">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="statGuides">0</span>
-                        <span class="stat-label">Guías de Hoy</span>
-                    </div>
-                </div>
             </div>
 
-            <div class="dashboard-grid">
-                <div class="card recent-guides">
-                    <div class="card-header">
-                        <h3>Guías Recientes</h3>
-                        <a href="#guides" class="btn btn-text" data-section="guides">Ver todas</a>
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-item active" data-section="dashboard">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#products" class="nav-item" data-section="products">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path
+                            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                        </path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                    <span>Productos</span>
+                </a>
+                <a href="#inventory" class="nav-item" data-section="inventory">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                    </svg>
+                    <span>Inventario</span>
+                </a>
+                <a href="#clients" class="nav-item" data-section="clients">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Clientes</span>
+                </a>
+                <a href="#guides" class="nav-item" data-section="guides">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    <span>Guías de Despacho</span>
+                </a>
+                <a href="#confirmation" class="nav-item" data-section="confirmation">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"></path>
+                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                    </svg>
+                    <span>Confirmación</span>
+                </a>
+                <a href="#purchases" class="nav-item" data-section="purchases">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="9" cy="21" r="1"></circle>
+                        <circle cx="20" cy="21" r="1"></circle>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                    </svg>
+                    <span>Compras</span>
+                </a>
+                <!-- Admin only: Users management -->
+                <a href="#users" class="nav-item nav-admin-only" data-section="users" style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <span>Usuarios</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <!-- User info -->
+                <div class="user-info" id="userInfo"
+                    style="margin-bottom: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: var(--radius-md);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div
+                            style="width: 32px; height: 32px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600;">
+                            <span id="userInitial">A</span>
+                        </div>
+                        <div style="flex: 1;">
+                            <div id="userDisplayName" style="font-size: 0.875rem; font-weight: 500;">Admin</div>
+                            <div id="userRole" style="font-size: 0.7rem; color: var(--text-muted);">Administrador</div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Nº Guía</th>
-                                    <th>Cliente</th>
-                                    <th>Ciudad</th>
-                                    <th>Estado</th>
-                                </tr>
-                            </thead>
-                            <tbody id="recentGuidesTable">
+                </div>
+                <button class="btn btn-secondary btn-full" onclick="AuthModule.logout()" style="margin-bottom: 0.5rem;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    Cerrar Sesión
+                </button>
+                <div class="city-selector">
+                    <label>Ciudad activa:</label>
+                    <select id="activeCity">
+                        <option value="all">Todas</option>
+                        <option value="Quito">Quito</option>
+                        <option value="Guayaquil">Guayaquil</option>
+                    </select>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <button class="mobile-menu-btn" id="mobileMenuBtn">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <h1 id="pageTitle">Dashboard</h1>
+                <div class="header-actions">
+                    <button class="btn btn-icon theme-toggle" id="themeToggle" title="Cambiar tema">
+                        <!-- Sun Icon (for dark mode) -->
+                        <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" style="display: none;">
+                            <circle cx="12" cy="12" r="5"></circle>
+                            <line x1="12" y1="1" x2="12" y2="3"></line>
+                            <line x1="12" y1="21" x2="12" y2="23"></line>
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                            <line x1="1" y1="12" x2="3" y2="12"></line>
+                            <line x1="21" y1="12" x2="23" y2="12"></line>
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                        </svg>
+                        <!-- Moon Icon (for light mode) -->
+                        <svg class="icon-moon" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                        </svg>
+                    </button>
+                    <span class="current-time" id="currentTime"></span>
+                </div>
+            </header>
+
+            <!-- Dashboard Section -->
+            <section class="content-section active" id="section-dashboard">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon products">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                                </path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statProducts">0</span>
+                            <span class="stat-label">Productos</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon inventory">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statInventory">0</span>
+                            <span class="stat-label">Unidades en Stock</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon clients">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statClients">0</span>
+                            <span class="stat-label">Clientes</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon guides">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statGuides">0</span>
+                            <span class="stat-label">Guías de Hoy</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="card recent-guides">
+                        <div class="card-header">
+                            <h3>Guías Recientes</h3>
+                            <a href="#guides" class="btn btn-text" data-section="guides">Ver todas</a>
+                        </div>
+                        <div class="card-body">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº Guía</th>
+                                        <th>Cliente</th>
+                                        <th>Ciudad</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentGuidesTable">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card low-stock">
+                        <div class="card-header">
+                            <h3>Stock Bajo</h3>
+                            <a href="#inventory" class="btn btn-text" data-section="inventory">Ver inventario</a>
+                        </div>
+                        <div class="card-body">
+                            <ul class="stock-list" id="lowStockList">
                                 <!-- Dynamic content -->
-                            </tbody>
-                        </table>
+                            </ul>
+                        </div>
                     </div>
-                </div>
 
-                <div class="card low-stock">
-                    <div class="card-header">
-                        <h3>Stock Bajo</h3>
-                        <a href="#inventory" class="btn btn-text" data-section="inventory">Ver inventario</a>
-                    </div>
-                    <div class="card-body">
-                        <ul class="stock-list" id="lowStockList">
-                            <!-- Dynamic content -->
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="card city-stats">
-                    <div class="card-header">
-                        <h3>Despachos por Ciudad</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="city-chart">
-                            <div class="city-bar">
-                                <span class="city-name">Quito</span>
-                                <div class="bar-container">
-                                    <div class="bar quito" id="quitoBar" style="width: 0%"></div>
+                    <div class="card city-stats">
+                        <div class="card-header">
+                            <h3>Despachos por Ciudad</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="city-chart">
+                                <div class="city-bar">
+                                    <span class="city-name">Quito</span>
+                                    <div class="bar-container">
+                                        <div class="bar quito" id="quitoBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="city-count" id="quitoCount">0</span>
                                 </div>
-                                <span class="city-count" id="quitoCount">0</span>
-                            </div>
-                            <div class="city-bar">
-                                <span class="city-name">Guayaquil</span>
-                                <div class="bar-container">
-                                    <div class="bar guayaquil" id="guayaquilBar" style="width: 0%"></div>
+                                <div class="city-bar">
+                                    <span class="city-name">Guayaquil</span>
+                                    <div class="bar-container">
+                                        <div class="bar guayaquil" id="guayaquilBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="city-count" id="guayaquilCount">0</span>
                                 </div>
-                                <span class="city-count" id="guayaquilCount">0</span>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </section>
+            </section>
 
-        <!-- Products Section -->
-        <section class="content-section" id="section-products">
-            <div class="section-header">
-                <div class="search-bar">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <input type="text" id="searchProducts" placeholder="Buscar productos...">
-                </div>
-                <button class="btn btn-primary" id="btnNewProduct">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    Nuevo Producto
-                </button>
-            </div>
-
-            <div class="filters-bar">
-                <select id="filterCategory">
-                    <option value="">Todas las categorías</option>
-                    <option value="Electrónica">Electrónica</option>
-                    <option value="Ropa">Ropa</option>
-                    <option value="Hogar">Hogar</option>
-                    <option value="Alimentos">Alimentos</option>
-                    <option value="Salud">Salud</option>
-                    <option value="Otros">Otros</option>
-                </select>
-                <select id="filterStatus">
-                    <option value="">Todos los estados</option>
-                    <option value="true">Activos</option>
-                    <option value="false">Inactivos</option>
-                </select>
-            </div>
-
-            <div class="table-container">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>SKU</th>
-                            <th>Nombre</th>
-                            <th>Categoría</th>
-                            <th>Precio</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="productsTable">
-                        <!-- Dynamic content -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
-
-        <!-- Inventory Section -->
-        <section class="content-section" id="section-inventory">
-            <div class="section-header">
-                <div class="city-tabs">
-                    <button class="city-tab active" data-city="all">Todos</button>
-                    <button class="city-tab" data-city="Quito">Quito</button>
-                    <button class="city-tab" data-city="Guayaquil">Guayaquil</button>
-                </div>
-                <button class="btn btn-primary" id="btnUpdateStock">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="1 4 1 10 7 10"></polyline>
-                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                    </svg>
-                    Actualizar Stock
-                </button>
-            </div>
-
-            <div class="inventory-grid" id="inventoryGrid">
-                <!-- Dynamic content -->
-            </div>
-        </section>
-
-        <!-- Clients Section -->
-        <section class="content-section" id="section-clients">
-            <div class="section-header">
-                <div class="search-bar">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <input type="text" id="searchClients" placeholder="Buscar por nombre o teléfono...">
-                </div>
-                <button class="btn btn-primary" id="btnNewClient">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    Nuevo Cliente
-                </button>
-            </div>
-
-            <div class="clients-grid" id="clientsGrid">
-                <!-- Dynamic content -->
-            </div>
-        </section>
-
-        <!-- Guides Section -->
-        <section class="content-section" id="section-guides">
-            <div class="section-header">
-                <div class="search-bar">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <input type="text" id="searchGuides" placeholder="Buscar guías...">
-                </div>
-                <div class="header-buttons">
-                    <select id="filterGuideStatus">
-                        <option value="">Todos los estados</option>
-                        <option value="Pendiente">Pendiente</option>
-                        <option value="En ruta">En ruta</option>
-                        <option value="Entregado">Entregado</option>
-                        <option value="Cancelado">Cancelado</option>
-                    </select>
-                    <button class="btn btn-primary" id="btnNewGuide">
+            <!-- Products Section -->
+            <section class="content-section" id="section-products">
+                <div class="section-header">
+                    <div class="search-bar">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="searchProducts" placeholder="Buscar productos...">
+                    </div>
+                    <button class="btn btn-primary" id="btnNewProduct">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
                             <line x1="5" y1="12" x2="19" y2="12"></line>
                         </svg>
-                        Nueva Guía
+                        Nuevo Producto
                     </button>
                 </div>
-            </div>
 
-            <div class="table-container">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Nº Guía</th>
-                            <th>Fecha</th>
-                            <th>Cliente</th>
-                            <th>Ciudad</th>
-                            <th>Productos</th>
-                            <th>Total</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody id="guidesTable">
-                        <!-- Dynamic content -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                <div class="filters-bar">
+                    <select id="filterCategory">
+                        <option value="">Todas las categorías</option>
+                        <option value="Electrónica">Electrónica</option>
+                        <option value="Ropa">Ropa</option>
+                        <option value="Hogar">Hogar</option>
+                        <option value="Alimentos">Alimentos</option>
+                        <option value="Salud">Salud</option>
+                        <option value="Otros">Otros</option>
+                    </select>
+                    <select id="filterStatus">
+                        <option value="">Todos los estados</option>
+                        <option value="true">Activos</option>
+                        <option value="false">Inactivos</option>
+                    </select>
+                </div>
 
-        <!-- Confirmation Section -->
-        <section class="content-section" id="section-confirmation">
-            <div class="section-header">
-                <h2>Confirmación de Pedidos</h2>
-            </div>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Nombre</th>
+                                <th>Categoría</th>
+                                <th>Precio</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productsTable">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
-            <!-- Single Stats Panel with Calendar Filters -->
-            <div class="card stats-main-panel" style="margin-bottom: 1.5rem;">
-                <div class="card-header"
-                    style="background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
-                    <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+            <!-- Inventory Section -->
+            <section class="content-section" id="section-inventory">
+                <div class="section-header">
+                    <div class="city-tabs">
+                        <button class="city-tab active" data-city="all">Todos</button>
+                        <button class="city-tab" data-city="Quito">Quito</button>
+                        <button class="city-tab" data-city="Guayaquil">Guayaquil</button>
+                    </div>
+                    <button class="btn btn-primary" id="btnUpdateStock">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
-                            <line x1="18" y1="20" x2="18" y2="10"></line>
-                            <line x1="12" y1="20" x2="12" y2="4"></line>
-                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
                         </svg>
-                        Métricas de Efectividad
-                    </h3>
+                        Actualizar Stock
+                    </button>
                 </div>
-                <div class="card-body">
-                    <!-- Date Filter Row -->
-                    <div class="period-filter-row"
-                        style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
-                        <div class="form-group" style="flex: 1; min-width: 140px;">
-                            <label for="statDateFrom"
-                                style="font-size: 0.75rem; color: var(--text-muted);">Desde</label>
-                            <input type="date" id="statDateFrom" class="form-control">
-                        </div>
-                        <div class="form-group" style="flex: 1; min-width: 140px;">
-                            <label for="statDateTo" style="font-size: 0.75rem; color: var(--text-muted);">Hasta</label>
-                            <input type="date" id="statDateTo" class="form-control">
-                        </div>
-                        <div class="form-group" style="flex: 1; min-width: 140px;">
-                            <label for="statPage" style="font-size: 0.75rem; color: var(--text-muted);">Página</label>
-                            <select id="statPage" class="form-control">
-                                <option value="">Todas</option>
-                                <option value="Colombia">Colombia</option>
-                                <option value="Ecuador">Ecuador</option>
-                                <option value="Venezuela">Venezuela</option>
-                            </select>
-                        </div>
-                        <div class="quick-filters" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <button type="button" class="btn btn-secondary btn-sm"
-                                onclick="ConfirmationModule.setQuickFilter('week')">Esta Semana</button>
-                            <button type="button" class="btn btn-secondary btn-sm"
-                                onclick="ConfirmationModule.setQuickFilter('month')">Este Mes</button>
-                            <button type="button" class="btn btn-secondary btn-sm"
-                                onclick="ConfirmationModule.setQuickFilter('all')">Todo</button>
-                        </div>
-                    </div>
 
-                    <!-- Stats Grid -->
-                    <div class="stats-period-grid"
-                        style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
-                        <div class="stat-item">
-                            <span class="stat-label">Total Pedidos</span>
-                            <span class="stat-value" id="periodTotalOrders">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">Confirmados</span>
-                            <span class="stat-value stat-success" id="periodConfirmed">0</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">% Bruto</span>
-                            <span class="stat-value stat-primary" id="periodGrossPercent">0%</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-label">% Neto</span>
-                            <span class="stat-value stat-accent" id="periodNetPercent">0%</span>
-                        </div>
-                    </div>
-
-                    <!-- Period Info -->
-                    <div class="stat-period-range" id="periodDateRange" style="margin-top: 1rem;">Selecciona un rango de
-                        fechas</div>
+                <div class="inventory-grid" id="inventoryGrid">
+                    <!-- Dynamic content -->
                 </div>
-            </div>
+            </section>
 
-            <div class="dashboard-grid">
-                <!-- Registration Form -->
-                <div class="card" style="grid-row: span 2;">
-                    <div class="card-header">
-                        <h3>Nuevo Registro Diario</h3>
+            <!-- Clients Section -->
+            <section class="content-section" id="section-clients">
+                <div class="section-header">
+                    <div class="search-bar">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="searchClients" placeholder="Buscar por nombre o teléfono...">
+                    </div>
+                    <button class="btn btn-primary" id="btnNewClient">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Nuevo Cliente
+                    </button>
+                </div>
+
+                <div class="clients-grid" id="clientsGrid">
+                    <!-- Dynamic content -->
+                </div>
+            </section>
+
+            <!-- Guides Section -->
+            <section class="content-section" id="section-guides">
+                <div class="section-header">
+                    <div class="search-bar">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="searchGuides" placeholder="Buscar guías...">
+                    </div>
+                    <div class="header-buttons">
+                        <select id="filterGuideStatus">
+                            <option value="">Todos los estados</option>
+                            <option value="Pendiente">Pendiente</option>
+                            <option value="En ruta">En ruta</option>
+                            <option value="Entregado">Entregado</option>
+                            <option value="Cancelado">Cancelado</option>
+                        </select>
+                        <button class="btn btn-primary" id="btnNewGuide">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Nueva Guía
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Nº Guía</th>
+                                <th>Fecha</th>
+                                <th>Cliente</th>
+                                <th>Ciudad</th>
+                                <th>Productos</th>
+                                <th>Total</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="guidesTable">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Confirmation Section -->
+            <section class="content-section" id="section-confirmation">
+                <div class="section-header">
+                    <h2>Confirmación de Pedidos</h2>
+                </div>
+
+                <!-- Single Stats Panel with Calendar Filters -->
+                <div class="card stats-main-panel" style="margin-bottom: 1.5rem;">
+                    <div class="card-header"
+                        style="background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="18" y1="20" x2="18" y2="10"></line>
+                                <line x1="12" y1="20" x2="12" y2="4"></line>
+                                <line x1="6" y1="20" x2="6" y2="14"></line>
+                            </svg>
+                            Métricas de Efectividad
+                        </h3>
                     </div>
                     <div class="card-body">
-                        <form id="formConfirmation">
-                            <div class="form-grid">
-                                <div class="form-group full-width">
-                                    <label for="confDate">Fecha</label>
-                                    <input type="date" id="confDate" required>
-                                </div>
-                                <div class="form-group full-width">
-                                    <label for="confPage">Página / Origen</label>
-                                    <select id="confPage" required>
-                                        <option value="">Seleccionar...</option>
-                                        <option value="Colombia">Colombia</option>
-                                        <option value="Ecuador">Ecuador</option>
-                                        <option value="Venezuela">Venezuela</option>
-                                    </select>
-                                </div>
-                                <div class="form-group full-width">
-                                    <label for="confTotal">Cantidad de Pedidos (Total)</label>
-                                    <input type="number" id="confTotal" min="1" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="confConfirmed">Confirmados</label>
-                                    <input type="number" id="confConfirmed" min="0" required>
-                                </div>
-                                <div class="form-group">
-                                    <label for="confDuplicates">Duplicados</label>
-                                    <input type="number" id="confDuplicates" min="0" value="0">
-                                </div>
-                                <div class="form-group">
-                                    <label for="confCancelled">Cancelados (Cobertura)</label>
-                                    <input type="number" id="confCancelled" min="0" value="0">
-                                </div>
-                                <div class="form-group">
-                                    <label for="confCancelledClient">Cancelados (Cliente)</label>
-                                    <input type="number" id="confCancelledClient" min="0" value="0">
-                                </div>
+                        <!-- Date Filter Row -->
+                        <div class="period-filter-row"
+                            style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                                <label for="statDateFrom"
+                                    style="font-size: 0.75rem; color: var(--text-muted);">Desde</label>
+                                <input type="date" id="statDateFrom" class="form-control">
                             </div>
-                            <div class="form-actions" style="margin-top: 1rem;">
-                                <button type="submit" class="btn btn-primary" style="width: 100%;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                                <label for="statDateTo"
+                                    style="font-size: 0.75rem; color: var(--text-muted);">Hasta</label>
+                                <input type="date" id="statDateTo" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                                <label for="statPage"
+                                    style="font-size: 0.75rem; color: var(--text-muted);">Página</label>
+                                <select id="statPage" class="form-control">
+                                    <option value="">Todas</option>
+                                    <option value="Colombia">Colombia</option>
+                                    <option value="Ecuador">Ecuador</option>
+                                    <option value="Venezuela">Venezuela</option>
+                                </select>
+                            </div>
+                            <div class="quick-filters" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="ConfirmationModule.setQuickFilter('week')">Esta Semana</button>
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="ConfirmationModule.setQuickFilter('month')">Este Mes</button>
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="ConfirmationModule.setQuickFilter('all')">Todo</button>
+                            </div>
+                        </div>
+
+                        <!-- Stats Grid -->
+                        <div class="stats-period-grid"
+                            style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                            <div class="stat-item">
+                                <span class="stat-label">Total Pedidos</span>
+                                <span class="stat-value" id="periodTotalOrders">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Confirmados</span>
+                                <span class="stat-value stat-success" id="periodConfirmed">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">% Bruto</span>
+                                <span class="stat-value stat-primary" id="periodGrossPercent">0%</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">% Neto</span>
+                                <span class="stat-value stat-accent" id="periodNetPercent">0%</span>
+                            </div>
+                        </div>
+
+                        <!-- Period Info -->
+                        <div class="stat-period-range" id="periodDateRange" style="margin-top: 1rem;">Selecciona un
+                            rango de
+                            fechas</div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Registration Form -->
+                    <div class="card" style="grid-row: span 2;">
+                        <div class="card-header">
+                            <h3>Nuevo Registro Diario</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="formConfirmation">
+                                <div class="form-grid">
+                                    <div class="form-group full-width">
+                                        <label for="confDate">Fecha</label>
+                                        <input type="date" id="confDate" required>
+                                    </div>
+                                    <div class="form-group full-width">
+                                        <label for="confPage">Página / Origen</label>
+                                        <select id="confPage" required>
+                                            <option value="">Seleccionar...</option>
+                                            <option value="Colombia">Colombia</option>
+                                            <option value="Ecuador">Ecuador</option>
+                                            <option value="Venezuela">Venezuela</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group full-width">
+                                        <label for="confTotal">Cantidad de Pedidos (Total)</label>
+                                        <input type="number" id="confTotal" min="1" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="confConfirmed">Confirmados</label>
+                                        <input type="number" id="confConfirmed" min="0" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="confDuplicates">Duplicados</label>
+                                        <input type="number" id="confDuplicates" min="0" value="0">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="confCancelled">Cancelados (Cobertura)</label>
+                                        <input type="number" id="confCancelled" min="0" value="0">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="confCancelledClient">Cancelados (Cliente)</label>
+                                        <input type="number" id="confCancelledClient" min="0" value="0">
+                                    </div>
+                                </div>
+                                <div class="form-actions" style="margin-top: 1rem;">
+                                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
+                                            </path>
+                                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                            <polyline points="7 3 7 8 15 8"></polyline>
+                                        </svg>
+                                        Guardar Registro
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Live Stats -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Métricas de Efectividad (En Vivo)</h3>
+                        </div>
+                        <div class="card-body" style="display: flex; flex-direction: column; gap: 1.5rem;">
+                            <div style="text-align: center;">
+                                <span
+                                    style="font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Confirmación
+                                    Bruta</span>
+                                <div style="font-size: 2.5rem; font-weight: 700; color: var(--primary);"
+                                    id="confPercentageValue">0%</div>
+                                <p style="font-size: 0.875rem; color: var(--text-muted);" id="confStatsDetail">0 / 0
+                                    Confirmados</p>
+                            </div>
+                            <div style="height: 1px; background: var(--border);"></div>
+                            <div style="text-align: center;">
+                                <span
+                                    style="font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Efectividad
+                                    Neta</span>
+                                <div style="font-size: 2.5rem; font-weight: 700; color: var(--success);"
+                                    id="confNetPercentageValue">0%</div>
+                                <p style="font-size: 0.75rem; color: var(--text-muted);">(Excluye Dupli. y Cancel.
+                                    Lineamiento)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent History -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Historial Reciente</h3>
+                        </div>
+                        <div class="card-body" style="padding: 0;">
+                            <div class="table-container" style="border: none; border-radius: 0;">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha</th>
+                                            <th>Página</th>
+                                            <th>% Conf.</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="confPreviewTable">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Section -->
+                <div class="card" style="margin-top: var(--space-lg);">
+                    <div class="card-header">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                            </svg>
+                            Filtrar Registros
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="filter-row"
+                            style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="filterDateFrom">Desde</label>
+                                <input type="date" id="filterDateFrom" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="filterDateTo">Hasta</label>
+                                <input type="date" id="filterDateTo" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="filterPage">Página</label>
+                                <select id="filterPage" class="form-control">
+                                    <option value="">Todas</option>
+                                    <option value="Colombia">Colombia</option>
+                                    <option value="Ecuador">Ecuador</option>
+                                    <option value="Venezuela">Venezuela</option>
+                                </select>
+                            </div>
+                            <div class="filter-buttons" style="display: flex; gap: 0.5rem;">
+                                <button type="button" class="btn btn-primary"
+                                    onclick="ConfirmationModule.applyFilters()">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                         stroke-width="2">
-                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
-                                        </path>
-                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                        <polyline points="7 3 7 8 15 8"></polyline>
+                                        <circle cx="11" cy="11" r="8"></circle>
+                                        <path d="m21 21-4.35-4.35"></path>
                                     </svg>
-                                    Guardar Registro
+                                    Filtrar
+                                </button>
+                                <button type="button" class="btn btn-secondary"
+                                    onclick="ConfirmationModule.clearFilters()">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2">
+                                        <path d="M3 6h18"></path>
+                                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                                    </svg>
+                                    Limpiar
                                 </button>
                             </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Live Stats -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Métricas de Efectividad (En Vivo)</h3>
-                    </div>
-                    <div class="card-body" style="display: flex; flex-direction: column; gap: 1.5rem;">
-                        <div style="text-align: center;">
-                            <span
-                                style="font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Confirmación
-                                Bruta</span>
-                            <div style="font-size: 2.5rem; font-weight: 700; color: var(--primary);"
-                                id="confPercentageValue">0%</div>
-                            <p style="font-size: 0.875rem; color: var(--text-muted);" id="confStatsDetail">0 / 0
-                                Confirmados</p>
                         </div>
-                        <div style="height: 1px; background: var(--border);"></div>
-                        <div style="text-align: center;">
-                            <span
-                                style="font-size: 0.875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Efectividad
-                                Neta</span>
-                            <div style="font-size: 2.5rem; font-weight: 700; color: var(--success);"
-                                id="confNetPercentageValue">0%</div>
-                            <p style="font-size: 0.75rem; color: var(--text-muted);">(Excluye Dupli. y Cancel.
-                                Lineamiento)</p>
+                        <!-- Filter Summary -->
+                        <div id="filterSummary" class="filter-summary"
+                            style="display: none; margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: var(--radius-md); font-size: 0.875rem;">
+                            <span id="filterSummaryText"></span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Recent History -->
-                <div class="card">
+                <!-- Full History Table -->
+                <div class="card" style="margin-top: var(--space-lg);">
                     <div class="card-header">
-                        <h3>Historial Reciente</h3>
+                        <h3>Registro Completo</h3>
+                        <span id="recordCount" style="font-size: 0.875rem; color: var(--text-muted);"></span>
                     </div>
-                    <div class="card-body" style="padding: 0;">
-                        <div class="table-container" style="border: none; border-radius: 0;">
+                    <div class="card-body">
+                        <div class="table-container">
                             <table class="table">
                                 <thead>
                                     <tr>
                                         <th>Fecha</th>
                                         <th>Página</th>
-                                        <th>% Conf.</th>
+                                        <th>Total</th>
+                                        <th>Conf.</th>
+                                        <th>Dupli.</th>
+                                        <th>C. Cob.</th>
+                                        <th>C. Cli.</th>
+                                        <th>% Bruta</th>
+                                        <th>% Neta</th>
+                                        <th>Acciones</th>
                                     </tr>
                                 </thead>
-                                <tbody id="confPreviewTable">
+                                <tbody id="confHistoryTable">
                                     <!-- Dynamic content -->
                                 </tbody>
                             </table>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- Filter Section -->
-            <div class="card" style="margin-top: var(--space-lg);">
-                <div class="card-header">
-                    <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+            <!-- Purchases Section -->
+            <section class="content-section" id="section-purchases">
+                <div class="section-header">
+                    <h2>Compras a Proveedores</h2>
+                    <button class="btn btn-primary" onclick="PurchasesModule.openPurchaseModal()">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
-                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
                         </svg>
-                        Filtrar Registros
-                    </h3>
+                        Nueva Compra
+                    </button>
                 </div>
-                <div class="card-body">
-                    <div class="filter-row" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
-                        <div class="form-group" style="flex: 1; min-width: 150px;">
-                            <label for="filterDateFrom">Desde</label>
-                            <input type="date" id="filterDateFrom" class="form-control">
-                        </div>
-                        <div class="form-group" style="flex: 1; min-width: 150px;">
-                            <label for="filterDateTo">Hasta</label>
-                            <input type="date" id="filterDateTo" class="form-control">
-                        </div>
-                        <div class="form-group" style="flex: 1; min-width: 150px;">
-                            <label for="filterPage">Página</label>
-                            <select id="filterPage" class="form-control">
-                                <option value="">Todas</option>
-                                <option value="Colombia">Colombia</option>
-                                <option value="Ecuador">Ecuador</option>
-                                <option value="Venezuela">Venezuela</option>
-                            </select>
-                        </div>
-                        <div class="filter-buttons" style="display: flex; gap: 0.5rem;">
-                            <button type="button" class="btn btn-primary" onclick="ConfirmationModule.applyFilters()">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <circle cx="11" cy="11" r="8"></circle>
-                                    <path d="m21 21-4.35-4.35"></path>
-                                </svg>
-                                Filtrar
-                            </button>
-                            <button type="button" class="btn btn-secondary" onclick="ConfirmationModule.clearFilters()">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M3 6h18"></path>
-                                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
-                                </svg>
-                                Limpiar
-                            </button>
-                        </div>
-                    </div>
-                    <!-- Filter Summary -->
-                    <div id="filterSummary" class="filter-summary"
-                        style="display: none; margin-top: 1rem; padding: 0.75rem; background: var(--bg-secondary); border-radius: var(--radius-md); font-size: 0.875rem;">
-                        <span id="filterSummaryText"></span>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Full History Table -->
-            <div class="card" style="margin-top: var(--space-lg);">
-                <div class="card-header">
-                    <h3>Registro Completo</h3>
-                    <span id="recordCount" style="font-size: 0.875rem; color: var(--text-muted);"></span>
-                </div>
-                <div class="card-body">
-                    <div class="table-container">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Página</th>
-                                    <th>Total</th>
-                                    <th>Conf.</th>
-                                    <th>Dupli.</th>
-                                    <th>C. Cob.</th>
-                                    <th>C. Cli.</th>
-                                    <th>% Bruta</th>
-                                    <th>% Neta</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="confHistoryTable">
-                                <!-- Dynamic content -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Purchases Section -->
-        <section class="content-section" id="section-purchases">
-            <div class="section-header">
-                <h2>Compras a Proveedores</h2>
-                <button class="btn btn-primary" onclick="PurchasesModule.openPurchaseModal()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                    Nueva Compra
-                </button>
-            </div>
-
-            <!-- Summary Stats -->
-            <div class="stats-grid" style="margin-bottom: 1.5rem;">
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: var(--primary-light); color: var(--primary);">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <circle cx="9" cy="21" r="1"></circle>
-                            <circle cx="20" cy="21" r="1"></circle>
-                            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="totalPurchases">0</span>
-                        <span class="stat-label">Total Compras</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: var(--success-light); color: var(--success);">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <line x1="12" y1="1" x2="12" y2="23"></line>
-                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="totalSpent">$0</span>
-                        <span class="stat-label">Total Gastado (COP)</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: var(--warning-light); color: var(--warning);">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="monthlySpent">$0</span>
-                        <span class="stat-label">Este Mes (COP)</span>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: var(--info-light); color: var(--info);">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="9" cy="7" r="4"></circle>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                        </svg>
-                    </div>
-                    <div class="stat-info">
-                        <span class="stat-value" id="uniqueProviders">0</span>
-                        <span class="stat-label">Proveedores</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Filter Section -->
-            <div class="card" style="margin-bottom: 1.5rem;">
-                <div class="card-header">
-                    <h3>Filtros</h3>
-                </div>
-                <div class="card-body">
-                    <div class="filter-row" style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
-                        <div class="form-group" style="flex: 1; min-width: 150px;">
-                            <label for="purchaseFilterDateFrom">Desde</label>
-                            <input type="date" id="purchaseFilterDateFrom" class="form-control">
+                <!-- Summary Stats -->
+                <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: var(--primary-light); color: var(--primary);">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="9" cy="21" r="1"></circle>
+                                <circle cx="20" cy="21" r="1"></circle>
+                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                            </svg>
                         </div>
-                        <div class="form-group" style="flex: 1; min-width: 150px;">
-                            <label for="purchaseFilterDateTo">Hasta</label>
-                            <input type="date" id="purchaseFilterDateTo" class="form-control">
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalPurchases">0</span>
+                            <span class="stat-label">Total Compras</span>
                         </div>
-                        <div class="form-group" style="flex: 1; min-width: 150px;">
-                            <label for="purchaseFilterProvider">Proveedor</label>
-                            <select id="purchaseFilterProvider" class="form-control">
-                                <option value="">Todos</option>
-                            </select>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: var(--success-light); color: var(--success);">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
                         </div>
-                        <div class="filter-buttons" style="display: flex; gap: 0.5rem;">
-                            <button type="button" class="btn btn-primary"
-                                onclick="PurchasesModule.applyFilters()">Filtrar</button>
-                            <button type="button" class="btn btn-secondary"
-                                onclick="PurchasesModule.clearFilters()">Limpiar</button>
+                        <div class="stat-info">
+                            <span class="stat-value" id="totalSpent">$0</span>
+                            <span class="stat-label">Total Gastado (COP)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: var(--warning-light); color: var(--warning);">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="monthlySpent">$0</span>
+                            <span class="stat-label">Este Mes (COP)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: var(--info-light); color: var(--info);">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="9" cy="7" r="4"></circle>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="uniqueProviders">0</span>
+                            <span class="stat-label">Proveedores</span>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Purchases Table -->
-            <div class="card">
-                <div class="card-header">
-                    <h3>Historial de Compras</h3>
-                    <span id="purchaseRecordCount" style="font-size: 0.875rem; color: var(--text-muted);"></span>
-                </div>
-                <div class="card-body">
-                    <div class="table-container">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Fecha</th>
-                                    <th>Proveedor</th>
-                                    <th>Descripción</th>
-                                    <th>Cantidad</th>
-                                    <th>Monto (COP)</th>
-                                    <th>Método Pago</th>
-                                    <th>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="purchasesTable">
-                                <!-- Dynamic content -->
-                            </tbody>
-                        </table>
+                <!-- Filter Section -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h3>Filtros</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="filter-row"
+                            style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="purchaseFilterDateFrom">Desde</label>
+                                <input type="date" id="purchaseFilterDateFrom" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="purchaseFilterDateTo">Hasta</label>
+                                <input type="date" id="purchaseFilterDateTo" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="purchaseFilterProvider">Proveedor</label>
+                                <select id="purchaseFilterProvider" class="form-control">
+                                    <option value="">Todos</option>
+                                </select>
+                            </div>
+                            <div class="filter-buttons" style="display: flex; gap: 0.5rem;">
+                                <button type="button" class="btn btn-primary"
+                                    onclick="PurchasesModule.applyFilters()">Filtrar</button>
+                                <button type="button" class="btn btn-secondary"
+                                    onclick="PurchasesModule.clearFilters()">Limpiar</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
-    </main>
+
+                <!-- Purchases Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Historial de Compras</h3>
+                        <span id="purchaseRecordCount" style="font-size: 0.875rem; color: var(--text-muted);"></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Proveedor</th>
+                                        <th>Descripción</th>
+                                        <th>Cantidad</th>
+                                        <th>Monto (COP)</th>
+                                        <th>Método Pago</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="purchasesTable">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Users Section (Admin Only) -->
+            <section class="content-section" id="section-users">
+                <div class="section-header">
+                    <h2>Administración de Usuarios</h2>
+                </div>
+
+                <!-- Users List -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h3>Usuarios del Sistema</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Usuario</th>
+                                        <th>Nombre</th>
+                                        <th>Rol</th>
+                                        <th>Estado</th>
+                                        <th>Último Acceso</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTable">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Permissions Manager -->
+                <div class="card" id="permissionsCard" style="display: none;">
+                    <div class="card-header">
+                        <h3>Permisos de: <span id="permissionsUserName"></span></h3>
+                    </div>
+                    <div class="card-body">
+                        <p style="color: var(--text-muted); margin-bottom: 1rem;">Habilita o deshabilita el acceso a
+                            cada módulo para este usuario.</p>
+                        <div class="permissions-grid" id="permissionsGrid"
+                            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1rem;">
+                            <!-- Dynamic permissions toggles -->
+                        </div>
+                        <div style="margin-top: 1.5rem; display: flex; gap: 1rem;">
+                            <button class="btn btn-primary" onclick="UsersModule.savePermissions()">Guardar
+                                Permisos</button>
+                            <button class="btn btn-secondary" onclick="UsersModule.closePermissions()">Cancelar</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div><!-- End app-container -->
 
     <!-- Modal: Product Form -->
     <div class="modal" id="modalProduct">
@@ -1140,7 +1274,9 @@
     <script src="js/guides.js"></script>
     <script src="js/confirmation.js"></script>
     <script src="js/purchases.js"></script>
+    <script src="js/users.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/auth.js"></script>
 </body>
 
 </html>
