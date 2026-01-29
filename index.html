@@ -406,121 +406,76 @@
                 <h2>Confirmación de Pedidos</h2>
             </div>
 
-            <!-- Weekly and Monthly Stats Panel -->
-            <div class="stats-period-container"
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-                <!-- Weekly Stats Card -->
-                <div class="card stats-period-card">
-                    <div class="card-header"
-                        style="background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
-                        <h3 style="display: flex; align-items: center; gap: 0.5rem;">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                <line x1="16" y1="2" x2="16" y2="6"></line>
-                                <line x1="8" y1="2" x2="8" y2="6"></line>
-                                <line x1="3" y1="10" x2="21" y2="10"></line>
-                            </svg>
-                            Resumen Semanal
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="stats-period-grid">
-                            <div class="stat-item">
-                                <span class="stat-label">Total Pedidos</span>
-                                <span class="stat-value" id="weeklyTotalOrders">0</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Confirmados</span>
-                                <span class="stat-value stat-success" id="weeklyConfirmed">0</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">% Bruto</span>
-                                <span class="stat-value stat-primary" id="weeklyGrossPercent">0%</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">% Neto</span>
-                                <span class="stat-value stat-accent" id="weeklyNetPercent">0%</span>
-                            </div>
-                        </div>
-                        <div class="stat-period-range" id="weeklyDateRange">-</div>
-                    </div>
+            <!-- Single Stats Panel with Calendar Filters -->
+            <div class="card stats-main-panel" style="margin-bottom: 1.5rem;">
+                <div class="card-header"
+                    style="background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                    <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        Métricas de Efectividad
+                    </h3>
                 </div>
-
-                <!-- Monthly Stats Card -->
-                <div class="card stats-period-card">
-                    <div class="card-header"
-                        style="background: linear-gradient(135deg, var(--accent), #7c3aed); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
-                        <h3 style="display: flex; align-items: center; gap: 0.5rem;">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path
-                                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
-                                </path>
-                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                            </svg>
-                            Resumen Mensual
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="stats-period-grid">
-                            <div class="stat-item">
-                                <span class="stat-label">Total Pedidos</span>
-                                <span class="stat-value" id="monthlyTotalOrders">0</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Confirmados</span>
-                                <span class="stat-value stat-success" id="monthlyConfirmed">0</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">% Bruto</span>
-                                <span class="stat-value stat-primary" id="monthlyGrossPercent">0%</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">% Neto</span>
-                                <span class="stat-value stat-accent" id="monthlyNetPercent">0%</span>
-                            </div>
+                <div class="card-body">
+                    <!-- Date Filter Row -->
+                    <div class="period-filter-row"
+                        style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+                        <div class="form-group" style="flex: 1; min-width: 140px;">
+                            <label for="statDateFrom"
+                                style="font-size: 0.75rem; color: var(--text-muted);">Desde</label>
+                            <input type="date" id="statDateFrom" class="form-control">
                         </div>
-                        <div class="stat-period-range" id="monthlyDateRange">-</div>
-                    </div>
-                </div>
-
-                <!-- Comparison Card -->
-                <div class="card stats-period-card">
-                    <div class="card-header"
-                        style="background: linear-gradient(135deg, var(--success), #059669); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
-                        <h3 style="display: flex; align-items: center; gap: 0.5rem;">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <line x1="18" y1="20" x2="18" y2="10"></line>
-                                <line x1="12" y1="20" x2="12" y2="4"></line>
-                                <line x1="6" y1="20" x2="6" y2="14"></line>
-                            </svg>
-                            Tendencia
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="stats-period-grid">
-                            <div class="stat-item">
-                                <span class="stat-label">Días Registrados</span>
-                                <span class="stat-value" id="totalDaysRecorded">0</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Promedio Diario</span>
-                                <span class="stat-value" id="avgDailyOrders">0</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Mejor Día</span>
-                                <span class="stat-value stat-success" id="bestDayPercent">0%</span>
-                            </div>
-                            <div class="stat-item">
-                                <span class="stat-label">Peor Día</span>
-                                <span class="stat-value stat-danger" id="worstDayPercent">0%</span>
-                            </div>
+                        <div class="form-group" style="flex: 1; min-width: 140px;">
+                            <label for="statDateTo" style="font-size: 0.75rem; color: var(--text-muted);">Hasta</label>
+                            <input type="date" id="statDateTo" class="form-control">
                         </div>
-                        <div class="stat-period-range" id="trendInfo">Análisis general</div>
+                        <div class="form-group" style="flex: 1; min-width: 140px;">
+                            <label for="statPage" style="font-size: 0.75rem; color: var(--text-muted);">Página</label>
+                            <select id="statPage" class="form-control">
+                                <option value="">Todas</option>
+                                <option value="Colombia">Colombia</option>
+                                <option value="Ecuador">Ecuador</option>
+                                <option value="Venezuela">Venezuela</option>
+                            </select>
+                        </div>
+                        <div class="quick-filters" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                onclick="ConfirmationModule.setQuickFilter('week')">Esta Semana</button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                onclick="ConfirmationModule.setQuickFilter('month')">Este Mes</button>
+                            <button type="button" class="btn btn-secondary btn-sm"
+                                onclick="ConfirmationModule.setQuickFilter('all')">Todo</button>
+                        </div>
                     </div>
+
+                    <!-- Stats Grid -->
+                    <div class="stats-period-grid"
+                        style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+                        <div class="stat-item">
+                            <span class="stat-label">Total Pedidos</span>
+                            <span class="stat-value" id="periodTotalOrders">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Confirmados</span>
+                            <span class="stat-value stat-success" id="periodConfirmed">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">% Bruto</span>
+                            <span class="stat-value stat-primary" id="periodGrossPercent">0%</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">% Neto</span>
+                            <span class="stat-value stat-accent" id="periodNetPercent">0%</span>
+                        </div>
+                    </div>
+
+                    <!-- Period Info -->
+                    <div class="stat-period-range" id="periodDateRange" style="margin-top: 1rem;">Selecciona un rango de
+                        fechas</div>
                 </div>
             </div>
 

@@ -1,11 +1,18 @@
 // ========================================
 // Confirmation Module (Async - Supabase)
-// Enhanced with Filters & Period Stats
+// Single Panel with Calendar Filters
 // ========================================
 
 const ConfirmationModule = {
-    // Filter state
-    filters: {
+    // Filter state for stats panel
+    statFilters: {
+        dateFrom: null,
+        dateTo: null,
+        page: ''
+    },
+
+    // Filter state for table
+    tableFilters: {
         dateFrom: null,
         dateTo: null,
         page: ''
@@ -36,7 +43,22 @@ const ConfirmationModule = {
             });
         }
 
-        // Filter events
+        // Stats panel filter events
+        const statDateFrom = document.getElementById('statDateFrom');
+        const statDateTo = document.getElementById('statDateTo');
+        const statPage = document.getElementById('statPage');
+
+        if (statDateFrom) {
+            statDateFrom.addEventListener('change', () => this.updateStatsFromFilters());
+        }
+        if (statDateTo) {
+            statDateTo.addEventListener('change', () => this.updateStatsFromFilters());
+        }
+        if (statPage) {
+            statPage.addEventListener('change', () => this.updateStatsFromFilters());
+        }
+
+        // Table filter events
         const filterDateFrom = document.getElementById('filterDateFrom');
         const filterDateTo = document.getElementById('filterDateTo');
 
@@ -57,8 +79,57 @@ const ConfirmationModule = {
             dateInput.valueAsDate = new Date();
         }
 
+        // Set default filter to current month
+        this.setQuickFilter('month');
         this.calculatePreview();
-        await this.updatePeriodStats();
+    },
+
+    // Quick filter buttons
+    setQuickFilter(period) {
+        const now = new Date();
+        let dateFrom, dateTo;
+
+        if (period === 'week') {
+            // Start of current week (Monday)
+            const day = now.getDay();
+            const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+            dateFrom = new Date(now.getFullYear(), now.getMonth(), diff);
+            dateTo = new Date(now.getFullYear(), now.getMonth(), diff + 6);
+        } else if (period === 'month') {
+            // Current month
+            dateFrom = new Date(now.getFullYear(), now.getMonth(), 1);
+            dateTo = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        } else {
+            // All - no filter
+            dateFrom = null;
+            dateTo = null;
+        }
+
+        // Update input fields
+        const statDateFrom = document.getElementById('statDateFrom');
+        const statDateTo = document.getElementById('statDateTo');
+
+        if (statDateFrom) {
+            statDateFrom.value = dateFrom ? dateFrom.toISOString().split('T')[0] : '';
+        }
+        if (statDateTo) {
+            statDateTo.value = dateTo ? dateTo.toISOString().split('T')[0] : '';
+        }
+
+        // Update stats
+        this.updateStatsFromFilters();
+    },
+
+    updateStatsFromFilters() {
+        const statDateFrom = document.getElementById('statDateFrom');
+        const statDateTo = document.getElementById('statDateTo');
+        const statPage = document.getElementById('statPage');
+
+        this.statFilters.dateFrom = statDateFrom ? statDateFrom.value : null;
+        this.statFilters.dateTo = statDateTo ? statDateTo.value : null;
+        this.statFilters.page = statPage ? statPage.value : '';
+
+        this.updatePeriodStats();
     },
 
     calculatePreview() {
@@ -161,8 +232,8 @@ const ConfirmationModule = {
         // Sort by date desc
         records.sort((a, b) => new Date(b.date) - new Date(a.date) || new Date(b.createdAt) - new Date(a.createdAt));
 
-        // Apply filters
-        const filteredRecords = this.filterRecords(records);
+        // Apply table filters
+        const filteredRecords = this.filterRecordsForTable(records);
 
         // Update record count
         const recordCount = document.getElementById('recordCount');
@@ -217,20 +288,39 @@ const ConfirmationModule = {
         }
     },
 
-    filterRecords(records) {
+    filterRecordsForTable(records) {
         let filtered = [...records];
 
         // Filter by date range
-        if (this.filters.dateFrom) {
-            filtered = filtered.filter(r => r.date >= this.filters.dateFrom);
+        if (this.tableFilters.dateFrom) {
+            filtered = filtered.filter(r => r.date >= this.tableFilters.dateFrom);
         }
-        if (this.filters.dateTo) {
-            filtered = filtered.filter(r => r.date <= this.filters.dateTo);
+        if (this.tableFilters.dateTo) {
+            filtered = filtered.filter(r => r.date <= this.tableFilters.dateTo);
         }
 
         // Filter by page
-        if (this.filters.page) {
-            filtered = filtered.filter(r => r.page === this.filters.page);
+        if (this.tableFilters.page) {
+            filtered = filtered.filter(r => r.page === this.tableFilters.page);
+        }
+
+        return filtered;
+    },
+
+    filterRecordsForStats(records) {
+        let filtered = [...records];
+
+        // Filter by date range
+        if (this.statFilters.dateFrom) {
+            filtered = filtered.filter(r => r.date >= this.statFilters.dateFrom);
+        }
+        if (this.statFilters.dateTo) {
+            filtered = filtered.filter(r => r.date <= this.statFilters.dateTo);
+        }
+
+        // Filter by page
+        if (this.statFilters.page) {
+            filtered = filtered.filter(r => r.page === this.statFilters.page);
         }
 
         return filtered;
@@ -241,9 +331,9 @@ const ConfirmationModule = {
         const dateTo = document.getElementById('filterDateTo');
         const page = document.getElementById('filterPage');
 
-        this.filters.dateFrom = dateFrom ? dateFrom.value : null;
-        this.filters.dateTo = dateTo ? dateTo.value : null;
-        this.filters.page = page ? page.value : '';
+        this.tableFilters.dateFrom = dateFrom ? dateFrom.value : null;
+        this.tableFilters.dateTo = dateTo ? dateTo.value : null;
+        this.tableFilters.page = page ? page.value : '';
 
         // Update filter summary
         this.updateFilterSummary();
@@ -261,7 +351,7 @@ const ConfirmationModule = {
         if (dateTo) dateTo.value = '';
         if (page) page.value = '';
 
-        this.filters = {
+        this.tableFilters = {
             dateFrom: null,
             dateTo: null,
             page: ''
@@ -283,16 +373,16 @@ const ConfirmationModule = {
 
         const parts = [];
 
-        if (this.filters.dateFrom && this.filters.dateTo) {
-            parts.push(`Desde ${this.formatDate(this.filters.dateFrom)} hasta ${this.formatDate(this.filters.dateTo)}`);
-        } else if (this.filters.dateFrom) {
-            parts.push(`Desde ${this.formatDate(this.filters.dateFrom)}`);
-        } else if (this.filters.dateTo) {
-            parts.push(`Hasta ${this.formatDate(this.filters.dateTo)}`);
+        if (this.tableFilters.dateFrom && this.tableFilters.dateTo) {
+            parts.push(`Desde ${this.formatDate(this.tableFilters.dateFrom)} hasta ${this.formatDate(this.tableFilters.dateTo)}`);
+        } else if (this.tableFilters.dateFrom) {
+            parts.push(`Desde ${this.formatDate(this.tableFilters.dateFrom)}`);
+        } else if (this.tableFilters.dateTo) {
+            parts.push(`Hasta ${this.formatDate(this.tableFilters.dateTo)}`);
         }
 
-        if (this.filters.page) {
-            parts.push(`Página: ${this.filters.page}`);
+        if (this.tableFilters.page) {
+            parts.push(`Página: ${this.tableFilters.page}`);
         }
 
         if (parts.length > 0) {
@@ -316,44 +406,31 @@ const ConfirmationModule = {
             return;
         }
 
-        // Get current week and month boundaries
-        const now = new Date();
-        const startOfWeek = this.getStartOfWeek(now);
-        const endOfWeek = this.getEndOfWeek(now);
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        // Filter records based on stat filters
+        const filteredRecords = this.filterRecordsForStats(records);
 
-        // Filter records for each period
-        const weeklyRecords = records.filter(r => {
-            const date = new Date(r.date);
-            return date >= startOfWeek && date <= endOfWeek;
-        });
+        // Calculate stats
+        const stats = this.calculatePeriodTotals(filteredRecords);
 
-        const monthlyRecords = records.filter(r => {
-            const date = new Date(r.date);
-            return date >= startOfMonth && date <= endOfMonth;
-        });
+        // Update UI
+        this.updateStatElement('periodTotalOrders', stats.totalOrders);
+        this.updateStatElement('periodConfirmed', stats.confirmed);
+        this.updateStatElement('periodGrossPercent', `${stats.grossPercent}%`);
+        this.updateStatElement('periodNetPercent', `${stats.netPercent}%`);
 
-        // Calculate weekly stats
-        this.updateWeeklyStats(weeklyRecords, startOfWeek, endOfWeek);
-
-        // Calculate monthly stats
-        this.updateMonthlyStats(monthlyRecords, startOfMonth, endOfMonth);
-
-        // Calculate trend stats
-        this.updateTrendStats(records);
-    },
-
-    getStartOfWeek(date) {
-        const d = new Date(date);
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday as start
-        return new Date(d.setDate(diff));
-    },
-
-    getEndOfWeek(date) {
-        const start = this.getStartOfWeek(new Date(date));
-        return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+        // Update date range display
+        const dateRange = document.getElementById('periodDateRange');
+        if (dateRange) {
+            if (this.statFilters.dateFrom && this.statFilters.dateTo) {
+                dateRange.textContent = `${this.formatDate(this.statFilters.dateFrom)} - ${this.formatDate(this.statFilters.dateTo)} (${filteredRecords.length} registros)`;
+            } else if (this.statFilters.dateFrom) {
+                dateRange.textContent = `Desde ${this.formatDate(this.statFilters.dateFrom)} (${filteredRecords.length} registros)`;
+            } else if (this.statFilters.dateTo) {
+                dateRange.textContent = `Hasta ${this.formatDate(this.statFilters.dateTo)} (${filteredRecords.length} registros)`;
+            } else {
+                dateRange.textContent = `Todos los registros (${filteredRecords.length} registros)`;
+            }
+        }
     },
 
     calculatePeriodTotals(records) {
@@ -369,68 +446,6 @@ const ConfirmationModule = {
         return { totalOrders, confirmed, grossPercent, netPercent };
     },
 
-    updateWeeklyStats(records, startOfWeek, endOfWeek) {
-        const stats = this.calculatePeriodTotals(records);
-
-        this.updateStatElement('weeklyTotalOrders', stats.totalOrders);
-        this.updateStatElement('weeklyConfirmed', stats.confirmed);
-        this.updateStatElement('weeklyGrossPercent', `${stats.grossPercent}%`);
-        this.updateStatElement('weeklyNetPercent', `${stats.netPercent}%`);
-
-        const dateRange = document.getElementById('weeklyDateRange');
-        if (dateRange) {
-            dateRange.textContent = `${this.formatDate(startOfWeek.toISOString().split('T')[0])} - ${this.formatDate(endOfWeek.toISOString().split('T')[0])}`;
-        }
-    },
-
-    updateMonthlyStats(records, startOfMonth, endOfMonth) {
-        const stats = this.calculatePeriodTotals(records);
-
-        this.updateStatElement('monthlyTotalOrders', stats.totalOrders);
-        this.updateStatElement('monthlyConfirmed', stats.confirmed);
-        this.updateStatElement('monthlyGrossPercent', `${stats.grossPercent}%`);
-        this.updateStatElement('monthlyNetPercent', `${stats.netPercent}%`);
-
-        const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-        const dateRange = document.getElementById('monthlyDateRange');
-        if (dateRange) {
-            dateRange.textContent = `${monthNames[startOfMonth.getMonth()]} ${startOfMonth.getFullYear()}`;
-        }
-    },
-
-    updateTrendStats(records) {
-        if (records.length === 0) {
-            this.updateStatElement('totalDaysRecorded', 0);
-            this.updateStatElement('avgDailyOrders', 0);
-            this.updateStatElement('bestDayPercent', '0%');
-            this.updateStatElement('worstDayPercent', '0%');
-            return;
-        }
-
-        // Unique days
-        const uniqueDays = new Set(records.map(r => r.date)).size;
-
-        // Average daily orders
-        const totalOrders = records.reduce((sum, r) => sum + (r.totalOrders || 0), 0);
-        const avgDaily = uniqueDays > 0 ? Math.round(totalOrders / uniqueDays) : 0;
-
-        // Best and worst day (by gross percentage)
-        const sortedByPercentage = [...records].sort((a, b) => (b.grossPercentage || 0) - (a.grossPercentage || 0));
-        const bestDay = sortedByPercentage[0];
-        const worstDay = sortedByPercentage[sortedByPercentage.length - 1];
-
-        this.updateStatElement('totalDaysRecorded', uniqueDays);
-        this.updateStatElement('avgDailyOrders', avgDaily);
-        this.updateStatElement('bestDayPercent', `${bestDay?.grossPercentage || 0}%`);
-        this.updateStatElement('worstDayPercent', `${worstDay?.grossPercentage || 0}%`);
-
-        const trendInfo = document.getElementById('trendInfo');
-        if (trendInfo && bestDay) {
-            trendInfo.textContent = `Mejor: ${bestDay.date} | Peor: ${worstDay.date}`;
-        }
-    },
-
     updateStatElement(id, value) {
         const el = document.getElementById(id);
         if (el) {
@@ -441,16 +456,15 @@ const ConfirmationModule = {
     },
 
     resetPeriodStats() {
-        const elements = [
-            'weeklyTotalOrders', 'weeklyConfirmed', 'weeklyGrossPercent', 'weeklyNetPercent',
-            'monthlyTotalOrders', 'monthlyConfirmed', 'monthlyGrossPercent', 'monthlyNetPercent',
-            'totalDaysRecorded', 'avgDailyOrders', 'bestDayPercent', 'worstDayPercent'
-        ];
+        const elements = ['periodTotalOrders', 'periodConfirmed', 'periodGrossPercent', 'periodNetPercent'];
 
         elements.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.textContent = id.includes('Percent') ? '0%' : '0';
         });
+
+        const dateRange = document.getElementById('periodDateRange');
+        if (dateRange) dateRange.textContent = 'Sin datos';
     },
 
     async deleteRecord(id) {
