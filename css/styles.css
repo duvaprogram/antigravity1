@@ -1519,3 +1519,137 @@ form {
         padding: 20px;
     }
 }
+
+/* ========================================
+   Period Statistics Cards
+   ======================================== */
+.stats-period-card {
+    transition: all var(--transition-normal);
+}
+
+.stats-period-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.stats-period-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+}
+
+.stats-period-grid .stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.stats-period-grid .stat-item:hover {
+    background: var(--surface-hover);
+}
+
+.stats-period-grid .stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.25rem;
+}
+
+.stats-period-grid .stat-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.stats-period-grid .stat-value.stat-success {
+    color: var(--success);
+}
+
+.stats-period-grid .stat-value.stat-primary {
+    color: var(--primary);
+}
+
+.stats-period-grid .stat-value.stat-accent {
+    color: var(--secondary);
+}
+
+.stats-period-grid .stat-value.stat-danger {
+    color: var(--danger);
+}
+
+.stat-period-range {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* Filter Summary */
+.filter-summary {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-secondary);
+}
+
+.filter-summary::before {
+    content: '📊';
+}
+
+/* Responsive adjustments for period stats */
+@media (max-width: 768px) {
+    .stats-period-container {
+        grid-template-columns: 1fr !important;
+    }
+
+    .stats-period-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* Animation for stats update */
+@keyframes statPulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.stat-updated {
+    animation: statPulse 0.3s ease-out;
+}
+
+/* Filter row responsive */
+@media (max-width: 640px) {
+    .filter-row {
+        flex-direction: column !important;
+    }
+
+    .filter-row .form-group {
+        width: 100%;
+    }
+
+    .filter-buttons {
+        width: 100%;
+        justify-content: stretch;
+    }
+
+    .filter-buttons .btn {
+        flex: 1;
+    }
+}
