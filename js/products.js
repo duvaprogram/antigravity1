@@ -159,6 +159,7 @@ const ProductsModule = {
                 document.getElementById('productImportNumber').value = product.import_number || '';
                 document.getElementById('productSku').value = product.sku;
                 document.getElementById('productDescription').value = product.description || '';
+                document.getElementById('productCategory').value = product.category || '';
                 document.getElementById('productPrice').value = product.price;
                 document.getElementById('productActive').checked = product.active;
             }
@@ -194,6 +195,7 @@ const ProductsModule = {
             name: document.getElementById('productName').value.trim(),
             sku: sku,
             description: document.getElementById('productDescription').value.trim(),
+            category: document.getElementById('productCategory').value,
             import_number: parseInt(importNumber),
             price: parseFloat(document.getElementById('productPrice').value),
             active: document.getElementById('productActive').checked
@@ -218,7 +220,6 @@ const ProductsModule = {
             App.updateDashboard();
         } catch (error) {
             console.error('Error saving product:', error);
-            alert('Error detallado: ' + JSON.stringify(error, null, 2));
             const msg = error.message || 'Error al guardar el producto';
             Utils.showToast(msg, 'error');
         }

@@ -103,6 +103,7 @@ const Database = {
                 name: p.name,
                 sku: p.sku,
                 description: p.description,
+                category: p.category,
                 import_number: p.import_number,
                 price: parseFloat(p.price),
                 active: p.active,
@@ -129,6 +130,7 @@ const Database = {
                 name: data.name,
                 sku: data.sku,
                 description: data.description,
+                category: data.category,
                 import_number: data.import_number,
                 price: parseFloat(data.price),
                 active: data.active,
@@ -146,6 +148,7 @@ const Database = {
                 name: product.name,
                 sku: product.sku,
                 description: product.description || null,
+                category: product.category,
                 import_number: product.import_number || null,
                 price: product.price,
                 active: product.active !== false
