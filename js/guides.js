@@ -52,6 +52,31 @@ const GuidesModule = {
             this.filterGuides();
         });
 
+        // Filter by city
+        document.getElementById('filterGuideCity').addEventListener('change', () => {
+            this.filterGuides();
+        });
+
+        // Filter by payment method
+        document.getElementById('filterGuidePayment').addEventListener('change', () => {
+            this.filterGuides();
+        });
+
+        // Filter by date
+        document.getElementById('filterGuideDate').addEventListener('change', () => {
+            this.filterGuides();
+        });
+
+        // Clear all filters
+        document.getElementById('btnClearFilters').addEventListener('click', () => {
+            document.getElementById('searchGuides').value = '';
+            document.getElementById('filterGuideStatus').value = '';
+            document.getElementById('filterGuideCity').value = '';
+            document.getElementById('filterGuidePayment').value = '';
+            document.getElementById('filterGuideDate').value = '';
+            this.filterGuides();
+        });
+
         // Modal close buttons
         document.querySelectorAll('[data-close="modalGuide"]').forEach(btn => {
             btn.addEventListener('click', () => Utils.closeModal('modalGuide'));
@@ -74,13 +99,16 @@ const GuidesModule = {
     async filterGuides() {
         const searchQuery = document.getElementById('searchGuides').value.toLowerCase();
         const statusFilter = document.getElementById('filterGuideStatus').value;
+        const cityFilter = document.getElementById('filterGuideCity').value;
+        const paymentFilter = document.getElementById('filterGuidePayment').value;
+        const dateFilter = document.getElementById('filterGuideDate').value;
 
         let guides = await Database.getGuides();
 
         // Sort by date (newest first)
         guides.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        // Apply filters
+        // Apply search filter
         if (searchQuery) {
             guides = guides.filter(g => {
                 return g.guideNumber.toLowerCase().includes(searchQuery) ||
@@ -88,8 +116,34 @@ const GuidesModule = {
             });
         }
 
+        // Apply status filter
         if (statusFilter) {
             guides = guides.filter(g => g.status === statusFilter);
+        }
+
+        // Apply city filter
+        if (cityFilter) {
+            guides = guides.filter(g => g.city === cityFilter);
+        }
+
+        // Apply payment method filter
+        if (paymentFilter) {
+            guides = guides.filter(g => {
+                if (paymentFilter === 'USD') {
+                    return g.amountUsd && parseFloat(g.amountUsd) > 0;
+                } else if (paymentFilter === 'BS') {
+                    return g.paymentBs && parseFloat(g.paymentBs) > 0;
+                }
+                return true;
+            });
+        }
+
+        // Apply date filter
+        if (dateFilter) {
+            guides = guides.filter(g => {
+                const guideDate = new Date(g.createdAt).toISOString().split('T')[0];
+                return guideDate === dateFilter;
+            });
         }
 
         this.renderTable(guides);

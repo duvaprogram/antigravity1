@@ -435,13 +435,6 @@
                         <input type="text" id="searchGuides" placeholder="Buscar guías...">
                     </div>
                     <div class="header-buttons">
-                        <select id="filterGuideStatus">
-                            <option value="">Todos los estados</option>
-                            <option value="Pendiente">Pendiente</option>
-                            <option value="En ruta">En ruta</option>
-                            <option value="Entregado">Entregado</option>
-                            <option value="Cancelado">Cancelado</option>
-                        </select>
                         <button class="btn btn-primary" id="btnNewGuide">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
@@ -451,6 +444,38 @@
                             Nueva Guía
                         </button>
                     </div>
+                </div>
+
+                <!-- Filters Row -->
+                <div class="filters-bar" style="margin-bottom: 1rem; flex-wrap: wrap;">
+                    <select id="filterGuideCity">
+                        <option value="">Todas las ciudades</option>
+                        <option value="Quito">Quito</option>
+                        <option value="Guayaquil">Guayaquil</option>
+                        <option value="Caracas">Caracas</option>
+                    </select>
+                    <select id="filterGuideStatus">
+                        <option value="">Todos los estados</option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="En ruta">En ruta</option>
+                        <option value="Entregado">Entregado</option>
+                        <option value="Cancelado">Cancelado</option>
+                    </select>
+                    <select id="filterGuidePayment">
+                        <option value="">Todas las monedas</option>
+                        <option value="USD">Divisa (USD)</option>
+                        <option value="BS">Pago Móvil (Bs)</option>
+                    </select>
+                    <input type="date" id="filterGuideDate"
+                        style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                    <button class="btn btn-secondary" id="btnClearFilters" title="Limpiar filtros">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                        Limpiar
+                    </button>
                 </div>
 
                 <div class="table-container">
