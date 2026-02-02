@@ -31,6 +31,17 @@ const GuidesModule = {
             this.addProductToGuide();
         });
 
+        // Product selection change - update price input
+        document.getElementById('guideProductSelect').addEventListener('change', (e) => {
+            const option = e.target.selectedOptions[0];
+            const priceInput = document.getElementById('guideProductPrice');
+            if (option && option.dataset.price) {
+                priceInput.value = option.dataset.price;
+            } else {
+                priceInput.value = '';
+            }
+        });
+
         // Search guides
         document.getElementById('searchGuides').addEventListener('input',
             Utils.debounce(() => this.filterGuides(), 300)
@@ -263,21 +274,35 @@ const GuidesModule = {
             return;
         }
 
+        const manualPrice = parseFloat(document.getElementById('guideProductPrice').value);
+
+        if (isNaN(manualPrice) || manualPrice < 0) {
+            Utils.showToast('Ingrese un precio válido', 'warning');
+            return;
+        }
+
         if (existingIndex >= 0) {
             this.currentGuideItems[existingIndex].quantity += quantity;
+            // Update price only if it's a new entry logic or keep old? 
+            // Better to update logic: usually we add separate lines for different prices, but here we merge.
+            // Let's assume same product same price for simplicity, or update price to latest manual price.
+            // Let's update unit price to the manual one entered now
+            this.currentGuideItems[existingIndex].unitPrice = manualPrice;
             this.currentGuideItems[existingIndex].subtotal =
-                this.currentGuideItems[existingIndex].quantity * this.currentGuideItems[existingIndex].unitPrice;
+                this.currentGuideItems[existingIndex].quantity * manualPrice;
         } else {
             this.currentGuideItems.push({
                 productId,
                 productName: product.name,
                 quantity,
-                unitPrice: product.price,
-                subtotal: product.price * quantity
+                unitPrice: manualPrice,
+                subtotal: manualPrice * quantity
             });
         }
 
+        // Reset inputs
         document.getElementById('guideProductQty').value = 1;
+        document.getElementById('guideProductPrice').value = '';
         productSelect.value = '';
         this.updateGuideProductsTable();
         Utils.showToast('Producto agregado', 'success');
