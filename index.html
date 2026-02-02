@@ -1092,8 +1092,20 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="stockQuantity">Cantidad a agregar *</label>
+                        <label for="stockMovementType">Tipo de Movimiento *</label>
+                        <select id="stockMovementType" required>
+                            <option value="entrada">➕ Entrada (Agregar)</option>
+                            <option value="salida">➖ Salida (Quitar)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="stockQuantity">Cantidad *</label>
                         <input type="number" id="stockQuantity" min="1" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="stockReason">Motivo del Movimiento *</label>
+                        <input type="text" id="stockReason" required
+                            placeholder="Ej: Reposición de mercancía, Venta directa, Daño de producto...">
                     </div>
                     <div class="form-group">
                         <label for="stockMinimum">Stock mínimo</label>
@@ -1102,7 +1114,7 @@
                 </div>
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" data-close="modalStock">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Actualizar Stock</button>
+                    <button type="submit" class="btn btn-primary" id="btnSubmitStock">Registrar Movimiento</button>
                 </div>
             </form>
         </div>

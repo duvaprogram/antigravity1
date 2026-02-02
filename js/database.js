@@ -410,6 +410,34 @@ const Database = {
         }
     },
 
+    async registerInventoryMovement(movement) {
+        try {
+            const cityId = this.getCityId(movement.city);
+            if (!cityId) throw new Error('City not found: ' + movement.city);
+
+            const { data, error } = await supabaseClient
+                .from('inventory_movements')
+                .insert({
+                    product_id: movement.productId,
+                    city_id: cityId,
+                    movement_type: movement.movementType,
+                    quantity: movement.quantity,
+                    previous_stock: movement.previousStock,
+                    new_stock: movement.newStock,
+                    reason: movement.reason,
+                    created_by: 'Usuario' // Later can be replaced with actual user
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error registering inventory movement:', error);
+            throw error;
+        }
+    },
+
     // ========================================
     // CLIENTS
     // ========================================

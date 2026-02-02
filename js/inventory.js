@@ -115,18 +115,58 @@ const InventoryModule = {
     async updateStock() {
         const productId = document.getElementById('stockProduct').value;
         const city = document.getElementById('stockCity').value;
+        const movementType = document.getElementById('stockMovementType').value;
         const quantity = parseInt(document.getElementById('stockQuantity').value);
+        const reason = document.getElementById('stockReason').value.trim();
         const minStock = parseInt(document.getElementById('stockMinimum').value) || 5;
 
-        if (!productId || !city || !quantity) {
+        if (!productId || !city || !quantity || !reason) {
             Utils.showToast('Complete todos los campos requeridos', 'error');
             return;
         }
 
         try {
-            await Database.updateInventory(productId, city, quantity, minStock);
+            // Get current stock
+            const currentInventory = await Database.getInventoryByProduct(productId, city);
+            const previousStock = currentInventory ? currentInventory.available : 0;
+
+            let newStock;
+            let actualQuantity;
+
+            if (movementType === 'entrada') {
+                // Add stock
+                actualQuantity = quantity;
+                newStock = previousStock + quantity;
+                await Database.updateInventory(productId, city, quantity, minStock);
+            } else {
+                // Remove stock
+                if (previousStock < quantity) {
+                    Utils.showToast(`Stock insuficiente. Disponible: ${previousStock}`, 'error');
+                    return;
+                }
+                actualQuantity = -quantity;
+                newStock = previousStock - quantity;
+                await Database.decreaseStock(productId, city, quantity);
+            }
+
+            // Register movement in database (if table exists)
+            try {
+                await Database.registerInventoryMovement({
+                    productId,
+                    city,
+                    movementType,
+                    quantity: Math.abs(quantity),
+                    previousStock,
+                    newStock,
+                    reason
+                });
+            } catch (err) {
+                console.warn('Could not register movement (table may not exist yet):', err);
+            }
+
             Utils.closeModal('modalStock');
-            Utils.showToast('Stock actualizado correctamente', 'success');
+            const action = movementType === 'entrada' ? 'agregado' : 'retirado';
+            Utils.showToast(`Stock ${action} correctamente. ${reason}`, 'success');
             await this.render();
             App.updateDashboard();
         } catch (error) {
