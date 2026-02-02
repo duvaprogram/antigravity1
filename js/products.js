@@ -53,8 +53,8 @@ const ProductsModule = {
         // Generate random number 0-9
         const randomNumber = Math.floor(Math.random() * 10);
 
-        // Generate SKU: format {LetraAleatoria}{NumeroAleatorio}-{NumeroImportacion}
-        skuInput.value = `${randomLetter}${randomNumber}-${importNumber}`;
+        // Generate SKU: format {LetraAleatoria}{NumeroAleatorio}{NumeroImportacion}
+        skuInput.value = `${randomLetter}${randomNumber}${importNumber}`;
     },
 
     async render() {
@@ -223,15 +223,15 @@ const ProductsModule = {
     },
 
     async deleteProduct(productId) {
-        if (confirm('¿Está seguro de desactivar este producto?')) {
+        if (confirm('¿Está seguro de ELIMINAR permanentemente este producto? Esta acción no se puede deshacer.')) {
             try {
                 await Database.deleteProduct(productId);
-                Utils.showToast('Producto desactivado correctamente', 'success');
+                Utils.showToast('Producto eliminado correctamente', 'success');
                 await this.render();
                 App.updateDashboard();
             } catch (error) {
                 console.error('Error deleting product:', error);
-                Utils.showToast('Error al desactivar el producto', 'error');
+                Utils.showToast('Error al eliminar el producto', 'error');
             }
         }
     }

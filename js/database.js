@@ -191,11 +191,12 @@ const Database = {
 
     async deleteProduct(id) {
         try {
-            // Soft delete - just set active to false
+            // Hard delete - actually remove from database
             const { error } = await supabaseClient
                 .from('products')
-                .update({ active: false })
+                .delete()
                 .eq('id', id);
+
             if (error) throw error;
         } catch (error) {
             console.error('Error deleting product:', error);
