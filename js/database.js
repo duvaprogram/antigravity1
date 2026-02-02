@@ -362,6 +362,30 @@ const Database = {
         }
     },
 
+    async increaseStock(productId, city, quantity) {
+        try {
+            const existing = await this.getInventoryByProduct(productId, city);
+            if (!existing) {
+                return await this.updateInventory(productId, city, quantity);
+            }
+
+            const { data, error } = await supabaseClient
+                .from('inventory')
+                .update({
+                    available: existing.available + quantity
+                })
+                .eq('id', existing.id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error increasing stock:', error);
+            throw error;
+        }
+    },
+
     async getLowStockItems() {
         try {
             const { data, error } = await supabaseClient
@@ -687,7 +711,32 @@ const Database = {
 
             if (error) throw error;
         } catch (error) {
+            if (error) throw error;
+        } catch (error) {
             console.error('Error updating guide status:', error);
+            throw error;
+        }
+    },
+
+    async deleteGuide(id) {
+        try {
+            // Delete guide items first (if cascade is not enabled)
+            const { error: errorItems } = await supabaseClient
+                .from('guide_items')
+                .delete()
+                .eq('guide_id', id);
+
+            if (errorItems) throw errorItems;
+
+            // Delete guide
+            const { error } = await supabaseClient
+                .from('guides')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting guide:', error);
             throw error;
         }
     },
