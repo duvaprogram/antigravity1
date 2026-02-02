@@ -40,20 +40,21 @@ const ProductsModule = {
         });
     },
 
-    async generateSku(importNumber) {
+    generateSku(importNumber) {
         const skuInput = document.getElementById('productSku');
         if (!importNumber || importNumber < 1) {
             skuInput.value = '';
             return;
         }
 
-        // Get existing products to find the next available SKU number for this import
-        const products = await Database.getProducts();
-        const importProducts = products.filter(p => p.import_number === parseInt(importNumber));
-        const nextNumber = importProducts.length + 1;
+        // Generate random letter A-Z
+        const randomLetter = String.fromCharCode(65 + Math.floor(Math.random() * 26));
 
-        // Generate SKU: format IMP-{importNumber}-{sequential}
-        skuInput.value = `IMP-${importNumber}-${String(nextNumber).padStart(3, '0')}`;
+        // Generate random number 0-9
+        const randomNumber = Math.floor(Math.random() * 10);
+
+        // Generate SKU: format {LetraAleatoria}{NumeroAleatorio}-{NumeroImportacion}
+        skuInput.value = `${randomLetter}${randomNumber}-${importNumber}`;
     },
 
     async render() {
@@ -89,7 +90,7 @@ const ProductsModule = {
         if (products.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         No se encontraron productos
                     </td>
                 </tr>
@@ -97,7 +98,15 @@ const ProductsModule = {
             return;
         }
 
-        tbody.innerHTML = products.map(product => `
+        tbody.innerHTML = products.map(product => {
+            // Format creation date
+            const createdDate = product.createdAt ? new Date(product.createdAt).toLocaleDateString('es-CO', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            }) : '-';
+
+            return `
             <tr>
                 <td><code style="color: var(--primary);">${Utils.escapeHtml(product.sku)}</code></td>
                 <td>
@@ -106,6 +115,9 @@ const ProductsModule = {
                 </td>
                 <td>${product.import_number || '-'}</td>
                 <td>${Utils.formatCurrency(product.price)}</td>
+                <td>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">${createdDate}</span>
+                </td>
                 <td>
                     <span class="status-badge ${product.active ? 'active' : 'inactive'}">
                         ${product.active ? 'Activo' : 'Inactivo'}
@@ -126,7 +138,7 @@ const ProductsModule = {
                     </button>
                 </td>
             </tr>
-        `).join('');
+        `}).join('');
     },
 
     async openProductModal(productId = null) {
