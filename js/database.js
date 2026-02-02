@@ -299,7 +299,7 @@ const Database = {
         }
     },
 
-    async updateInventory(productId, city, quantity, minStock = 5) {
+    async updateInventory(productId, city, quantity, minStock = 5, isAdjustment = false) {
         try {
             const cityId = this.getCityId(city);
             if (!cityId) throw new Error('City not found: ' + city);
@@ -309,7 +309,10 @@ const Database = {
 
             if (existing) {
                 // Update existing
-                const newAvailable = existing.available + quantity;
+                // If isAdjustment is true, quantity IS the new available stock.
+                // Otherwise, it's added to existing.
+                const newAvailable = isAdjustment ? quantity : (existing.available + quantity);
+
                 const { data, error } = await supabaseClient
                     .from('inventory')
                     .update({
@@ -323,6 +326,7 @@ const Database = {
                 return data;
             } else {
                 // Create new
+                // For new records, quantity is the starting amount regardless of isAdjustment
                 const { data, error } = await supabaseClient
                     .from('inventory')
                     .insert({
@@ -339,6 +343,24 @@ const Database = {
             }
         } catch (error) {
             console.error('Error updating inventory:', error);
+            throw error;
+        }
+    },
+
+    async deleteInventory(productId, city) {
+        try {
+            const cityId = this.getCityId(city);
+            if (!cityId) throw new Error('City not found: ' + city);
+
+            const { error } = await supabaseClient
+                .from('inventory')
+                .delete()
+                .eq('product_id', productId)
+                .eq('city_id', cityId);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting inventory:', error);
             throw error;
         }
     },

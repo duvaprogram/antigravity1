@@ -102,9 +102,31 @@ const InventoryModule = {
                             </span>
                         </div>
                     ` : ''}
+                    <div style="margin-top: 1rem; text-align: right;">
+                        <button class="btn btn-icon btn-secondary" onclick="InventoryModule.deleteInventoryItem('${item.productId}', '${item.city}')" title="Eliminar del inventario" style="color: var(--danger);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
             `;
         }).join('');
+    },
+
+    async deleteInventoryItem(productId, city) {
+        if (confirm(`¿Está seguro de ELIMINAR el inventario de este producto en ${city}? Esta acción no se puede deshacer.`)) {
+            try {
+                await Database.deleteInventory(productId, city);
+                Utils.showToast('Inventario eliminado correctamente', 'success');
+                await this.render();
+                App.updateDashboard();
+            } catch (error) {
+                console.error('Error deleting inventory:', error);
+                Utils.showToast('Error al eliminar el inventario', 'error');
+            }
+        }
     },
 
     async openStockModal() {
@@ -132,8 +154,14 @@ const InventoryModule = {
         const reason = document.getElementById('stockReason').value.trim();
         const minStock = parseInt(document.getElementById('stockMinimum').value) || 5;
 
-        if (!productId || !city || !quantity || !reason) {
+        if (!productId || !city || (isNaN(quantity) && movementType !== 'ajuste') || !reason) {
             Utils.showToast('Complete todos los campos requeridos', 'error');
+            return;
+        }
+
+        // For adjustment, 0 is allowed. For others, must be > 0
+        if (movementType !== 'ajuste' && quantity <= 0) {
+            Utils.showToast('La cantidad debe ser mayor a 0', 'error');
             return;
         }
 
@@ -143,14 +171,14 @@ const InventoryModule = {
             const previousStock = currentInventory ? currentInventory.available : 0;
 
             let newStock;
-            let actualQuantity;
+            let actualQuantity; // This is the delta for history
 
             if (movementType === 'entrada') {
                 // Add stock
                 actualQuantity = quantity;
                 newStock = previousStock + quantity;
-                await Database.updateInventory(productId, city, quantity, minStock);
-            } else {
+                await Database.updateInventory(productId, city, quantity, minStock, false);
+            } else if (movementType === 'salida') {
                 // Remove stock
                 if (previousStock < quantity) {
                     Utils.showToast(`Stock insuficiente. Disponible: ${previousStock}`, 'error');
@@ -159,26 +187,35 @@ const InventoryModule = {
                 actualQuantity = -quantity;
                 newStock = previousStock - quantity;
                 await Database.decreaseStock(productId, city, quantity);
+            } else if (movementType === 'ajuste') {
+                // Fix stock (Set value directly)
+                actualQuantity = quantity - previousStock; // Delta = New - Old
+                newStock = quantity;
+                await Database.updateInventory(productId, city, quantity, minStock, true);
             }
 
-            // Register movement in database (if table exists)
+            // Register movement in database
             try {
                 await Database.registerInventoryMovement({
                     productId,
                     city,
                     movementType,
-                    quantity: Math.abs(quantity),
+                    quantity: Math.abs(actualQuantity),
                     previousStock,
                     newStock,
                     reason
                 });
             } catch (err) {
-                console.warn('Could not register movement (table may not exist yet):', err);
+                console.warn('Could not register movement:', err);
             }
 
             Utils.closeModal('modalStock');
-            const action = movementType === 'entrada' ? 'agregado' : 'retirado';
-            Utils.showToast(`Stock ${action} correctamente. ${reason}`, 'success');
+            let actionText = 'actualizado';
+            if (movementType === 'entrada') actionText = 'agregado';
+            else if (movementType === 'salida') actionText = 'retirado';
+            else if (movementType === 'ajuste') actionText = 'corregido';
+
+            Utils.showToast(`Stock ${actionText} correctamente.`, 'success');
             await this.render();
             App.updateDashboard();
         } catch (error) {
