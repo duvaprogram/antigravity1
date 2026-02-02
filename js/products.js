@@ -218,6 +218,7 @@ const ProductsModule = {
             App.updateDashboard();
         } catch (error) {
             console.error('Error saving product:', error);
+            alert('Error detallado: ' + JSON.stringify(error, null, 2));
             const msg = error.message || 'Error al guardar el producto';
             Utils.showToast(msg, 'error');
         }
