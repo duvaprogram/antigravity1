@@ -345,15 +345,6 @@
                 </div>
 
                 <div class="filters-bar">
-                    <select id="filterCategory">
-                        <option value="">Todas las categorías</option>
-                        <option value="Electrónica">Electrónica</option>
-                        <option value="Ropa">Ropa</option>
-                        <option value="Hogar">Hogar</option>
-                        <option value="Alimentos">Alimentos</option>
-                        <option value="Salud">Salud</option>
-                        <option value="Otros">Otros</option>
-                    </select>
                     <select id="filterStatus">
                         <option value="">Todos los estados</option>
                         <option value="true">Activos</option>
@@ -367,7 +358,7 @@
                             <tr>
                                 <th>SKU</th>
                                 <th>Nombre</th>
-                                <th>Categoría</th>
+                                <th>Nº Import.</th>
                                 <th>Precio</th>
                                 <th>Estado</th>
                                 <th>Acciones</th>
@@ -971,24 +962,17 @@
                         <input type="text" id="productName" required>
                     </div>
                     <div class="form-group">
-                        <label for="productSku">SKU / Código *</label>
-                        <input type="text" id="productSku" required>
+                        <label for="productImportNumber">Número de Importación *</label>
+                        <input type="number" id="productImportNumber" min="1" required placeholder="Ej: 1, 2, 3, 4">
+                    </div>
+                    <div class="form-group">
+                        <label for="productSku">SKU / Código (Automático)</label>
+                        <input type="text" id="productSku" readonly
+                            style="background-color: var(--bg-secondary); cursor: not-allowed;">
                     </div>
                     <div class="form-group full-width">
                         <label for="productDescription">Descripción</label>
                         <textarea id="productDescription" rows="3"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="productCategory">Categoría *</label>
-                        <select id="productCategory" required>
-                            <option value="">Seleccionar...</option>
-                            <option value="Electrónica">Electrónica</option>
-                            <option value="Ropa">Ropa</option>
-                            <option value="Hogar">Hogar</option>
-                            <option value="Alimentos">Alimentos</option>
-                            <option value="Salud">Salud</option>
-                            <option value="Otros">Otros</option>
-                        </select>
                     </div>
                     <div class="form-group">
                         <label for="productPrice">Precio ($) *</label>

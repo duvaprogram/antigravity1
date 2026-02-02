@@ -24,14 +24,14 @@ const ProductsModule = {
             Utils.debounce((e) => this.filterProducts(), 300)
         );
 
-        // Filter by category
-        document.getElementById('filterCategory').addEventListener('change', () => {
-            this.filterProducts();
-        });
-
         // Filter by status
         document.getElementById('filterStatus').addEventListener('change', () => {
             this.filterProducts();
+        });
+
+        // Auto-generate SKU when import number changes
+        document.getElementById('productImportNumber').addEventListener('input', (e) => {
+            this.generateSku(e.target.value);
         });
 
         // Modal close buttons
@@ -40,13 +40,28 @@ const ProductsModule = {
         });
     },
 
+    async generateSku(importNumber) {
+        const skuInput = document.getElementById('productSku');
+        if (!importNumber || importNumber < 1) {
+            skuInput.value = '';
+            return;
+        }
+
+        // Get existing products to find the next available SKU number for this import
+        const products = await Database.getProducts();
+        const importProducts = products.filter(p => p.import_number === parseInt(importNumber));
+        const nextNumber = importProducts.length + 1;
+
+        // Generate SKU: format IMP-{importNumber}-{sequential}
+        skuInput.value = `IMP-${importNumber}-${String(nextNumber).padStart(3, '0')}`;
+    },
+
     async render() {
         await this.filterProducts();
     },
 
     async filterProducts() {
         const searchQuery = document.getElementById('searchProducts').value.toLowerCase();
-        const categoryFilter = document.getElementById('filterCategory').value;
         const statusFilter = document.getElementById('filterStatus').value;
 
         let products = await Database.getProducts();
@@ -55,12 +70,9 @@ const ProductsModule = {
         if (searchQuery) {
             products = products.filter(p =>
                 p.name.toLowerCase().includes(searchQuery) ||
-                p.sku.toLowerCase().includes(searchQuery)
+                p.sku.toLowerCase().includes(searchQuery) ||
+                (p.import_number && p.import_number.toString().includes(searchQuery))
             );
-        }
-
-        if (categoryFilter) {
-            products = products.filter(p => p.category === categoryFilter);
         }
 
         if (statusFilter !== '') {
@@ -92,7 +104,7 @@ const ProductsModule = {
                     <strong>${Utils.escapeHtml(product.name)}</strong>
                     <br><small style="color: var(--text-muted);">${Utils.escapeHtml(product.description || '')}</small>
                 </td>
-                <td>${Utils.escapeHtml(product.category)}</td>
+                <td>${product.import_number || '-'}</td>
                 <td>${Utils.formatCurrency(product.price)}</td>
                 <td>
                     <span class="status-badge ${product.active ? 'active' : 'inactive'}">
@@ -132,9 +144,9 @@ const ProductsModule = {
                 title.textContent = 'Editar Producto';
                 document.getElementById('productId').value = product.id;
                 document.getElementById('productName').value = product.name;
+                document.getElementById('productImportNumber').value = product.import_number || '';
                 document.getElementById('productSku').value = product.sku;
                 document.getElementById('productDescription').value = product.description || '';
-                document.getElementById('productCategory').value = product.category;
                 document.getElementById('productPrice').value = product.price;
                 document.getElementById('productActive').checked = product.active;
             }
@@ -150,12 +162,27 @@ const ProductsModule = {
     },
 
     async saveProduct() {
+        const importNumber = document.getElementById('productImportNumber').value;
+        const sku = document.getElementById('productSku').value.trim();
+
+        // Validate import number is entered
+        if (!importNumber) {
+            Utils.showToast('Ingrese el Número de Importación', 'error');
+            return;
+        }
+
+        // Validate SKU was generated
+        if (!sku) {
+            Utils.showToast('El SKU no se ha generado correctamente', 'error');
+            return;
+        }
+
         const product = {
             id: document.getElementById('productId').value || null,
             name: document.getElementById('productName').value.trim(),
-            sku: document.getElementById('productSku').value.trim(),
+            sku: sku,
             description: document.getElementById('productDescription').value.trim(),
-            category: document.getElementById('productCategory').value,
+            import_number: parseInt(importNumber),
             price: parseFloat(document.getElementById('productPrice').value),
             active: document.getElementById('productActive').checked
         };
