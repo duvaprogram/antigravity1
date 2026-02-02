@@ -711,12 +711,35 @@ const GuidesModule = {
             doc.text('OBSERVACIONES:', 20, yPos);
             doc.setFont('helvetica', 'normal');
             doc.text(guide.observations, 20, yPos + 7);
+            yPos += 15;
+        }
+
+        // Caracas payment info
+        if (guide.city === 'Caracas') {
+            yPos += 10;
+            doc.setFont('helvetica', 'bold');
+            doc.text('INFORMACIÓN DE PAGO:', 20, yPos);
+            doc.setFont('helvetica', 'normal');
+            yPos += 8;
+
+            if (guide.amountUsd) {
+                doc.text(`💵 Monto en Divisa: $${guide.amountUsd} USD`, 20, yPos);
+                yPos += 7;
+            }
+            if (guide.paymentBs) {
+                doc.text(`📱 Pago Móvil: ${guide.paymentBs} Bs`, 20, yPos);
+                yPos += 7;
+            }
+            if (guide.deliveryTime) {
+                doc.text(`🕒 Hora de Entrega: ${guide.deliveryTime}`, 20, yPos);
+                yPos += 7;
+            }
         }
 
         // Footer
         doc.setFontSize(8);
         doc.setTextColor(128);
-        doc.text('Sistema de Domicilios - Quito & Guayaquil', 105, 285, { align: 'center' });
+        doc.text('Sistema de Domicilios - Quito, Guayaquil & Caracas', 105, 285, { align: 'center' });
 
         // Save PDF
         doc.save(`guia_${guide.guideNumber}.pdf`);
