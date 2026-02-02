@@ -555,7 +555,10 @@ const Database = {
                 itemsCount: g.items_count,
                 createdAt: g.created_at,
                 deliveryDate: g.delivery_date,
-                deliveredAt: g.delivered_at
+                deliveredAt: g.delivered_at,
+                amountUsd: g.amount_usd ? parseFloat(g.amount_usd) : null,
+                paymentBs: g.payment_bs ? parseFloat(g.payment_bs) : null,
+                deliveryTime: g.delivery_time
             }));
         } catch (error) {
             console.error('Error fetching guides:', error);
@@ -585,7 +588,10 @@ const Database = {
                 statusColor: data.status_color,
                 totalAmount: parseFloat(data.total_amount),
                 observations: data.observations,
-                createdAt: data.created_at
+                createdAt: data.created_at,
+                amountUsd: data.amount_usd ? parseFloat(data.amount_usd) : null,
+                paymentBs: data.payment_bs ? parseFloat(data.payment_bs) : null,
+                deliveryTime: data.delivery_time
             } : null;
         } catch (error) {
             console.error('Error fetching guide:', error);
@@ -616,7 +622,10 @@ const Database = {
                         city_id: cityId,
                         status_id: statusId,
                         total_amount: guide.totalAmount || 0,
-                        observations: guide.observations || null
+                        observations: guide.observations || null,
+                        amount_usd: guide.amountUsd || null,
+                        payment_bs: guide.paymentBs || null,
+                        delivery_time: guide.deliveryTime || null
                     })
                     .eq('id', guide.id)
                     .select()
@@ -636,7 +645,10 @@ const Database = {
                         city_id: cityId,
                         status_id: statusId,
                         total_amount: guide.totalAmount || 0,
-                        observations: guide.observations || null
+                        observations: guide.observations || null,
+                        amount_usd: guide.amountUsd || null,
+                        payment_bs: guide.paymentBs || null,
+                        delivery_time: guide.deliveryTime || null
                     })
                     .select()
                     .single();

@@ -198,6 +198,14 @@ const GuidesModule = {
 
             // Update products dropdown filtered by city
             await this.updateProductsDropdown(client.city);
+
+            // Show/Hide Caracas specific fields
+            const caracasFields = document.getElementById('caracasFields');
+            if (client.city === 'Caracas') {
+                caracasFields.style.display = 'block';
+            } else {
+                caracasFields.style.display = 'none';
+            }
         }
     },
 
@@ -321,6 +329,11 @@ const GuidesModule = {
         const clientId = document.getElementById('guideClient').value;
         const observations = document.getElementById('guideObservations').value.trim();
 
+        // Caracas specific fields
+        const amountUsd = document.getElementById('guideAmountUsd').value;
+        const paymentBs = document.getElementById('guidePaymentBs').value;
+        const deliveryTime = document.getElementById('guideDeliveryTime').value;
+
         if (!clientId) {
             Utils.showToast('Seleccione un cliente', 'error');
             return;
@@ -336,12 +349,21 @@ const GuidesModule = {
             const totalAmount = this.currentGuideItems.reduce((sum, item) => sum + item.subtotal, 0);
 
             // Create guide
-            const guide = await Database.saveGuide({
+            const guideData = {
                 clientId,
                 city: client.city,
                 totalAmount,
                 observations
-            });
+            };
+
+            // Add Caracas fields if applicable
+            if (client.city === 'Caracas') {
+                if (amountUsd) guideData.amountUsd = parseFloat(amountUsd);
+                if (paymentBs) guideData.paymentBs = parseFloat(paymentBs);
+                if (deliveryTime) guideData.deliveryTime = deliveryTime;
+            }
+
+            const guide = await Database.saveGuide(guideData);
 
             // Save guide items and decrease stock
             for (const item of this.currentGuideItems) {
@@ -438,6 +460,17 @@ const GuidesModule = {
                 <div class="guide-details-section">
                     <h3>Observaciones</h3>
                     <p>${Utils.escapeHtml(guide.observations)}</p>
+                </div>
+            ` : ''}
+
+            ${guide.city === 'Caracas' ? `
+                <div class="guide-details-section">
+                    <h3>Datos Caracas</h3>
+                    <div class="client-info">
+                        ${guide.amountUsd ? `<p><strong>Monto a Cancelar:</strong> $${guide.amountUsd} USD</p>` : ''}
+                        ${guide.paymentBs ? `<p><strong>Pago Móvil:</strong> ${guide.paymentBs} Bs</p>` : ''}
+                        ${guide.deliveryTime ? `<p><strong>Hora Entrega:</strong> ${guide.deliveryTime}</p>` : ''}
+                    </div>
                 </div>
             ` : ''}
 

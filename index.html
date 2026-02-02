@@ -164,6 +164,7 @@
                         <option value="all">Todas</option>
                         <option value="Quito">Quito</option>
                         <option value="Guayaquil">Guayaquil</option>
+                        <option value="Caracas">Caracas</option>
                     </select>
                 </div>
             </div>
@@ -1020,6 +1021,7 @@
                             <option value="">Seleccionar...</option>
                             <option value="Quito">Quito</option>
                             <option value="Guayaquil">Guayaquil</option>
+                            <option value="Caracas">Caracas</option>
                         </select>
                     </div>
                     <div class="form-group full-width">
@@ -1060,6 +1062,7 @@
                             <option value="">Seleccionar ciudad...</option>
                             <option value="Quito">Quito</option>
                             <option value="Guayaquil">Guayaquil</option>
+                            <option value="Caracas">Caracas</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -1139,6 +1142,26 @@
                     </div>
 
                     <div class="guide-section">
+                        <!-- Campos específicos para Caracas -->
+                        <div id="caracasFields"
+                            style="display: none; background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem;">
+                            <h4 style="margin-bottom: 0.5rem; color: var(--primary);">Datos para Caracas</h4>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="guideAmountUsd">Monto a cancelar ($ USD)</label>
+                                    <input type="number" id="guideAmountUsd" min="0" step="0.01">
+                                </div>
+                                <div class="form-group">
+                                    <label for="guidePaymentBs">Pago Móvil (Bolívares)</label>
+                                    <input type="number" id="guidePaymentBs" min="0" step="0.01">
+                                </div>
+                                <div class="form-group">
+                                    <label for="guideDeliveryTime">Hora de entrega</label>
+                                    <input type="time" id="guideDeliveryTime">
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="form-group full-width">
                             <label for="guideObservations">Observaciones</label>
                             <textarea id="guideObservations" rows="2"></textarea>
