@@ -438,6 +438,63 @@ const Database = {
         }
     },
 
+    async getInventoryMovements(filters = {}) {
+        try {
+            let query = supabaseClient
+                .from('inventory_movements')
+                .select(`
+                    *,
+                    products (name, sku),
+                    cities (name)
+                `)
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            if (filters.city) {
+                const cityId = this.getCityId(filters.city);
+                if (cityId) {
+                    query = query.eq('city_id', cityId);
+                }
+            }
+
+            if (filters.movementType) {
+                query = query.eq('movement_type', filters.movementType);
+            }
+
+            if (filters.date) {
+                const startDate = new Date(filters.date);
+                startDate.setHours(0, 0, 0, 0);
+                const endDate = new Date(filters.date);
+                endDate.setHours(23, 59, 59, 999);
+                query = query.gte('created_at', startDate.toISOString())
+                    .lte('created_at', endDate.toISOString());
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+
+            return (data || []).map(m => ({
+                id: m.id,
+                productId: m.product_id,
+                productName: m.products?.name || 'Producto eliminado',
+                sku: m.products?.sku || '',
+                cityId: m.city_id,
+                city: m.cities?.name || '',
+                movementType: m.movement_type,
+                quantity: m.quantity,
+                previousStock: m.previous_stock,
+                newStock: m.new_stock,
+                reason: m.reason,
+                createdBy: m.created_by,
+                createdAt: m.created_at
+            }));
+        } catch (error) {
+            console.error('Error fetching inventory movements:', error);
+            return [];
+        }
+    },
+
     // ========================================
     // CLIENTS
     // ========================================

@@ -382,14 +382,24 @@
                         <button class="city-tab" data-city="Guayaquil">Guayaquil</button>
                         <button class="city-tab" data-city="Caracas">Caracas</button>
                     </div>
-                    <button class="btn btn-primary" id="btnUpdateStock">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <polyline points="1 4 1 10 7 10"></polyline>
-                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                        </svg>
-                        Actualizar Stock
-                    </button>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-secondary" id="btnInventoryHistory">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            Historial
+                        </button>
+                        <button class="btn btn-primary" id="btnUpdateStock">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                            Actualizar Stock
+                        </button>
+                    </div>
                 </div>
 
                 <div class="inventory-grid" id="inventoryGrid">
@@ -1303,6 +1313,53 @@
                     <button type="submit" class="btn btn-primary">Guardar Compra</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal: Inventory History -->
+    <div class="modal modal-large" id="modalInventoryHistory">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Historial de Movimientos de Inventario</h2>
+                <button class="modal-close" data-close="modalInventoryHistory">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <div class="filters-bar" style="margin-bottom: 1rem;">
+                    <select id="filterHistoryCity">
+                        <option value="">Todas las ciudades</option>
+                        <option value="Quito">Quito</option>
+                        <option value="Guayaquil">Guayaquil</option>
+                        <option value="Caracas">Caracas</option>
+                    </select>
+                    <select id="filterHistoryType">
+                        <option value="">Todos los tipos</option>
+                        <option value="entrada">Entradas</option>
+                        <option value="salida">Salidas</option>
+                    </select>
+                    <input type="date" id="filterHistoryDate"
+                        style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                </div>
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Fecha/Hora</th>
+                                <th>Producto</th>
+                                <th>Ciudad</th>
+                                <th>Tipo</th>
+                                <th>Cantidad</th>
+                                <th>Anterior</th>
+                                <th>Nuevo</th>
+                                <th>Motivo</th>
+                                <th>Usuario</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryHistoryTable">
+                            <!-- Dynamic content -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 

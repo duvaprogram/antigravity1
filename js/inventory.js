@@ -25,6 +25,11 @@ const InventoryModule = {
             this.openStockModal();
         });
 
+        // History button
+        document.getElementById('btnInventoryHistory').addEventListener('click', () => {
+            this.openHistoryModal();
+        });
+
         // Stock form submission
         document.getElementById('formStock').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -35,6 +40,13 @@ const InventoryModule = {
         document.querySelectorAll('[data-close="modalStock"]').forEach(btn => {
             btn.addEventListener('click', () => Utils.closeModal('modalStock'));
         });
+
+        document.querySelectorAll('[data-close="modalInventoryHistory"]').forEach(btn => {
+            btn.addEventListener('click', () => Utils.closeModal('modalInventoryHistory'));
+        });
+
+        // History filters
+        this.bindHistoryFilters();
     },
 
     async render() {
@@ -178,6 +190,90 @@ const InventoryModule = {
     async getAvailableStock(productId, city) {
         const inventory = await Database.getInventoryByProduct(productId, city);
         return inventory ? inventory.available : 0;
+    },
+
+    async openHistoryModal() {
+        // Clear filters
+        document.getElementById('filterHistoryCity').value = '';
+        document.getElementById('filterHistoryType').value = '';
+        document.getElementById('filterHistoryDate').value = '';
+
+        // Load history
+        await this.loadHistory();
+        Utils.openModal('modalInventoryHistory');
+    },
+
+    async loadHistory() {
+        const cityFilter = document.getElementById('filterHistoryCity').value;
+        const typeFilter = document.getElementById('filterHistoryType').value;
+        const dateFilter = document.getElementById('filterHistoryDate').value;
+
+        const filters = {};
+        if (cityFilter) filters.city = cityFilter;
+        if (typeFilter) filters.movementType = typeFilter;
+        if (dateFilter) filters.date = dateFilter;
+
+        const movements = await Database.getInventoryMovements(filters);
+        this.renderHistoryTable(movements);
+    },
+
+    renderHistoryTable(movements) {
+        const tbody = document.getElementById('inventoryHistoryTable');
+
+        if (movements.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        No se encontraron movimientos de inventario
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = movements.map(m => {
+            const typeClass = m.movementType === 'entrada' ? 'success' : 'danger';
+            const typeIcon = m.movementType === 'entrada' ? '➕' : '➖';
+            const typeLabel = m.movementType === 'entrada' ? 'Entrada' : 'Salida';
+            const cityClass = m.city.toLowerCase();
+
+            return `
+                <tr>
+                    <td>${Utils.formatDate(m.createdAt, true)}</td>
+                    <td>
+                        <strong>${Utils.escapeHtml(m.productName)}</strong>
+                        <br><small style="color: var(--text-muted);">${Utils.escapeHtml(m.sku)}</small>
+                    </td>
+                    <td><span class="city-badge ${cityClass}">${m.city}</span></td>
+                    <td>
+                        <span style="color: var(--${typeClass}); font-weight: 600;">
+                            ${typeIcon} ${typeLabel}
+                        </span>
+                    </td>
+                    <td><strong>${m.quantity}</strong></td>
+                    <td>${m.previousStock}</td>
+                    <td><strong>${m.newStock}</strong></td>
+                    <td>${Utils.escapeHtml(m.reason || '')}</td>
+                    <td>${Utils.escapeHtml(m.createdBy || 'Sistema')}</td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    bindHistoryFilters() {
+        const filterCity = document.getElementById('filterHistoryCity');
+        const filterType = document.getElementById('filterHistoryType');
+        const filterDate = document.getElementById('filterHistoryDate');
+
+        if (filterCity) {
+            filterCity.addEventListener('change', () => this.loadHistory());
+        }
+        if (filterType) {
+            filterType.addEventListener('change', () => this.loadHistory());
+        }
+        if (filterDate) {
+            filterDate.addEventListener('change', () => this.loadHistory());
+        }
     }
 };
 
