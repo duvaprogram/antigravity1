@@ -711,8 +711,6 @@ const Database = {
 
             if (error) throw error;
         } catch (error) {
-            if (error) throw error;
-        } catch (error) {
             console.error('Error updating guide status:', error);
             throw error;
         }
