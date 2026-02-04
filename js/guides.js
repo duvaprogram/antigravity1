@@ -222,6 +222,14 @@ const GuidesModule = {
                                     </svg>
                                 </button>
                             ` : ''}
+                            ${guide.status === 'Entregado' ? `
+                                <button class="btn btn-icon btn-secondary" onclick="GuidesModule.changeStatus('${guide.id}', 'Pagado')" title="Marcar como pagado" style="color: #8b5cf6;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                        <line x1="1" y1="10" x2="23" y2="10"></line>
+                                    </svg>
+                                </button>
+                            ` : ''}
                             <button class="btn btn-icon btn-secondary" onclick="GuidesModule.deleteGuide('${guide.id}')" title="Eliminar Permanentemente">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="3 6 5 6 21 6"></polyline>
@@ -594,6 +602,10 @@ const GuidesModule = {
                     <button class="status-btn ${guide.status === 'Entregado' ? 'active' : ''}" 
                             onclick="GuidesModule.changeStatus('${guide.id}', 'Entregado')">
                         Entregado
+                    </button>
+                    <button class="status-btn ${guide.status === 'Pagado' ? 'active' : ''}" 
+                            onclick="GuidesModule.changeStatus('${guide.id}', 'Pagado')">
+                        Pagado
                     </button>
                     <button class="status-btn ${guide.status === 'Cancelado' ? 'active' : ''}" 
                             onclick="GuidesModule.changeStatus('${guide.id}', 'Cancelado')">

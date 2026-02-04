@@ -25,6 +25,7 @@ const App = {
             InventoryModule.init();
             ClientsModule.init();
             GuidesModule.init();
+            AnalyticsModule.init();
             ConfirmationModule.init();
             PurchasesModule.init();
             UsersModule.init();
@@ -133,6 +134,7 @@ const App = {
             'inventory': 'Inventario',
             'clients': 'Clientes',
             'guides': 'Guías de Despacho',
+            'analytics': 'Análisis de Datos',
             'confirmation': 'Confirmación de Pedidos',
             'purchases': 'Compras a Proveedores',
             'users': 'Administración de Usuarios'
@@ -179,6 +181,9 @@ const App = {
                 break;
             case 'guides':
                 await GuidesModule.render();
+                break;
+            case 'analytics':
+                await AnalyticsModule.render();
                 break;
             case 'confirmation':
                 await ConfirmationModule.render();

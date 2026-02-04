@@ -108,6 +108,14 @@
                     </svg>
                     <span>Guías de Despacho</span>
                 </a>
+                <a href="#analytics" class="nav-item" data-section="analytics">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="20" x2="18" y2="10"></line>
+                        <line x1="12" y1="20" x2="12" y2="4"></line>
+                        <line x1="6" y1="20" x2="6" y2="14"></line>
+                    </svg>
+                    <span>Análisis de Datos</span>
+                </a>
                 <a href="#confirmation" class="nav-item" data-section="confirmation">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 11l3 3L22 4"></path>
@@ -469,6 +477,7 @@
                         <option value="Pendiente">Pendiente</option>
                         <option value="En ruta">En ruta</option>
                         <option value="Entregado">Entregado</option>
+                        <option value="Pagado">Pagado</option>
                         <option value="Cancelado">Cancelado</option>
                     </select>
                     <select id="filterGuidePayment">
@@ -506,6 +515,372 @@
                             <!-- Dynamic content -->
                         </tbody>
                     </table>
+                </div>
+            </section>
+
+            <!-- Analytics Section -->
+            <section class="content-section" id="section-analytics">
+                <div class="section-header">
+                    <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        Análisis de Datos
+                    </h2>
+                    <button class="btn btn-primary" onclick="AnalyticsModule.refreshData()">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                        </svg>
+                        Actualizar
+                    </button>
+                </div>
+
+                <!-- Filters Panel -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header"
+                        style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                            </svg>
+                            Filtros de Análisis
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="analytics-filters"
+                            style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="analyticsDateFrom"
+                                    style="font-size: 0.75rem; color: var(--text-muted);">Desde</label>
+                                <input type="date" id="analyticsDateFrom" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="analyticsDateTo"
+                                    style="font-size: 0.75rem; color: var(--text-muted);">Hasta</label>
+                                <input type="date" id="analyticsDateTo" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="analyticsCity"
+                                    style="font-size: 0.75rem; color: var(--text-muted);">País/Ciudad</label>
+                                <select id="analyticsCity" class="form-control">
+                                    <option value="">Todos</option>
+                                    <option value="Quito">Ecuador - Quito</option>
+                                    <option value="Guayaquil">Ecuador - Guayaquil</option>
+                                    <option value="Caracas">Venezuela - Caracas</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="analyticsStatus"
+                                    style="font-size: 0.75rem; color: var(--text-muted);">Estado</label>
+                                <select id="analyticsStatus" class="form-control">
+                                    <option value="">Todos</option>
+                                    <option value="Pendiente">Pendiente</option>
+                                    <option value="En ruta">En ruta</option>
+                                    <option value="Entregado">Entregado</option>
+                                    <option value="Pagado">Pagado</option>
+                                    <option value="Cancelado">Cancelado</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 200px;">
+                                <label for="analyticsProduct"
+                                    style="font-size: 0.75rem; color: var(--text-muted);">Producto</label>
+                                <select id="analyticsProduct" class="form-control">
+                                    <option value="">Todos los productos</option>
+                                    <!-- Se llenará dinámicamente -->
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <div class="quick-filters" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="AnalyticsModule.setQuickFilter('week')">Esta Semana</button>
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="AnalyticsModule.setQuickFilter('month')">Este Mes</button>
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="AnalyticsModule.setQuickFilter('year')">Este Año</button>
+                                <button type="button" class="btn btn-secondary btn-sm"
+                                    onclick="AnalyticsModule.setQuickFilter('all')">Todo</button>
+                            </div>
+                            <button type="button" class="btn btn-outline btn-sm"
+                                onclick="AnalyticsModule.clearFilters()" style="margin-left: auto;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                                Limpiar Filtros
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Stats Cards -->
+                <div class="analytics-stats-grid"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsTotal">0</span>
+                            <span class="stat-label">Total Guías</span>
+                        </div>
+                    </div>
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsDelivered">0</span>
+                            <span class="stat-label">Entregadas</span>
+                        </div>
+                    </div>
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                <line x1="1" y1="10" x2="23" y2="10"></line>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsPaid">0</span>
+                            <span class="stat-label">Pagadas</span>
+                        </div>
+                    </div>
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="15" y1="9" x2="9" y2="15"></line>
+                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsCancelled">0</span>
+                            <span class="stat-label">Canceladas</span>
+                        </div>
+                    </div>
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsTotalUsd">$0</span>
+                            <span class="stat-label">Total USD</span>
+                        </div>
+                    </div>
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsTotalBs">0 Bs</span>
+                            <span class="stat-label">Total Bs</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dashboard Grid -->
+                <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr;">
+                    <!-- Guides by City -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Guías por Ciudad</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="city-chart" id="analyticsCityChart">
+                                <div class="city-bar">
+                                    <span class="city-name">Quito</span>
+                                    <div class="bar-container">
+                                        <div class="bar quito" id="analyticsQuitoBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="city-count" id="analyticsQuitoCount">0</span>
+                                </div>
+                                <div class="city-bar">
+                                    <span class="city-name">Guayaquil</span>
+                                    <div class="bar-container">
+                                        <div class="bar guayaquil" id="analyticsGuayaquilBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="city-count" id="analyticsGuayaquilCount">0</span>
+                                </div>
+                                <div class="city-bar">
+                                    <span class="city-name">Caracas</span>
+                                    <div class="bar-container">
+                                        <div class="bar caracas" id="analyticsCaracasBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="city-count" id="analyticsCaracasCount">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Guides by Status -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Guías por Estado</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="status-chart" id="analyticsStatusChart">
+                                <div class="status-bar"
+                                    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                    <span style="width: 80px; font-size: 0.875rem; font-weight: 500;">Pendiente</span>
+                                    <div class="bar-container" style="flex: 1;">
+                                        <div class="bar" id="analyticsPendienteBar"
+                                            style="width: 0%; background: linear-gradient(135deg, #f59e0b, #d97706);">
+                                        </div>
+                                    </div>
+                                    <span class="status-count" style="width: 40px; text-align: right; font-weight: 600;"
+                                        id="analyticsPendienteCount">0</span>
+                                </div>
+                                <div class="status-bar"
+                                    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                    <span style="width: 80px; font-size: 0.875rem; font-weight: 500;">En ruta</span>
+                                    <div class="bar-container" style="flex: 1;">
+                                        <div class="bar" id="analyticsEnRutaBar"
+                                            style="width: 0%; background: linear-gradient(135deg, #3b82f6, #1d4ed8);">
+                                        </div>
+                                    </div>
+                                    <span class="status-count" style="width: 40px; text-align: right; font-weight: 600;"
+                                        id="analyticsEnRutaCount">0</span>
+                                </div>
+                                <div class="status-bar"
+                                    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                    <span style="width: 80px; font-size: 0.875rem; font-weight: 500;">Entregado</span>
+                                    <div class="bar-container" style="flex: 1;">
+                                        <div class="bar" id="analyticsEntregadoBar"
+                                            style="width: 0%; background: linear-gradient(135deg, #10b981, #059669);">
+                                        </div>
+                                    </div>
+                                    <span class="status-count" style="width: 40px; text-align: right; font-weight: 600;"
+                                        id="analyticsEntregadoCount">0</span>
+                                </div>
+                                <div class="status-bar"
+                                    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                    <span style="width: 80px; font-size: 0.875rem; font-weight: 500;">Pagado</span>
+                                    <div class="bar-container" style="flex: 1;">
+                                        <div class="bar" id="analyticsPagadoBar"
+                                            style="width: 0%; background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+                                        </div>
+                                    </div>
+                                    <span class="status-count" style="width: 40px; text-align: right; font-weight: 600;"
+                                        id="analyticsPagadoCount">0</span>
+                                </div>
+                                <div class="status-bar" style="display: flex; align-items: center; gap: 1rem;">
+                                    <span style="width: 80px; font-size: 0.875rem; font-weight: 500;">Cancelado</span>
+                                    <div class="bar-container" style="flex: 1;">
+                                        <div class="bar" id="analyticsCanceladoBar"
+                                            style="width: 0%; background: linear-gradient(135deg, #ef4444, #dc2626);">
+                                        </div>
+                                    </div>
+                                    <span class="status-count" style="width: 40px; text-align: right; font-weight: 600;"
+                                        id="analyticsCanceladoCount">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Guides by Currency -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Guías por Moneda</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="currency-stats"
+                                style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                                <div class="currency-card"
+                                    style="background: var(--surface-hover); padding: 1.25rem; border-radius: var(--radius-lg); text-align: center;">
+                                    <div style="font-size: 2rem; font-weight: 700; color: #10b981;"
+                                        id="analyticsUsdCount">0</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-muted);">Guías con USD</div>
+                                    <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin-top: 0.5rem;"
+                                        id="analyticsUsdAmount">$0.00</div>
+                                </div>
+                                <div class="currency-card"
+                                    style="background: var(--surface-hover); padding: 1.25rem; border-radius: var(--radius-lg); text-align: center;">
+                                    <div style="font-size: 2rem; font-weight: 700; color: #3b82f6;"
+                                        id="analyticsBsCount">0</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-muted);">Guías con Bs</div>
+                                    <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin-top: 0.5rem;"
+                                        id="analyticsBsAmount">0.00 Bs</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Top Selling Products -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Productos Más Vendidos</h3>
+                        </div>
+                        <div class="card-body" style="padding: 0;">
+                            <div class="table-container" style="border: none; border-radius: 0;">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Producto</th>
+                                            <th>Cantidad</th>
+                                            <th>Ingresos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="analyticsTopProducts">
+                                        <!-- Dynamic content -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Table -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <h3>Detalle de Guías Filtradas</h3>
+                        <span id="analyticsRecordCount" style="font-size: 0.875rem; color: var(--text-muted);"></span>
+                    </div>
+                    <div class="card-body" style="padding: 0;">
+                        <div class="table-container"
+                            style="border: none; border-radius: 0; max-height: 400px; overflow-y: auto;">
+                            <table class="table">
+                                <thead style="position: sticky; top: 0; background: var(--surface-hover);">
+                                    <tr>
+                                        <th>Nº Guía</th>
+                                        <th>Fecha</th>
+                                        <th>Cliente</th>
+                                        <th>Ciudad</th>
+                                        <th>Total</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="analyticsGuidesTable">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1388,6 +1763,7 @@
     <script src="js/inventory.js"></script>
     <script src="js/clients.js"></script>
     <script src="js/guides.js"></script>
+    <script src="js/analytics.js"></script>
     <script src="js/confirmation.js"></script>
     <script src="js/purchases.js"></script>
     <script src="js/users.js"></script>
