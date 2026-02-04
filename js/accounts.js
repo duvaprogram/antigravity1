@@ -212,9 +212,19 @@ const AccountsModule = {
 
         tbody.innerHTML = this.transactions.map(t => {
             const isIncome = t.type === 'income';
-            const typeLabel = isIncome ? 'Ingreso' : 'Gasto';
-            const typeColor = isIncome ? 'var(--success)' : 'var(--danger)';
-            const amountPrefix = isIncome ? '+' : '-';
+            const isTransfer = t.type === 'transfer';
+            let typeLabel = isIncome ? 'Ingreso' : (isTransfer ? 'Transferencia' : 'Gasto');
+            let typeColor = isIncome ? 'var(--success)' : (isTransfer ? 'var(--primary)' : 'var(--danger)');
+            let typeBadgeClass = isIncome ? 'entregado' : (isTransfer ? 'en-ruta' : 'cancelado');
+            let amountPrefix = isIncome ? '+' : '-';
+
+            // For transfers, show both accounts
+            let accountDisplay = Utils.escapeHtml(t.account_name || '');
+            if (isTransfer && t.target_account_name) {
+                accountDisplay = `${Utils.escapeHtml(t.account_name)} → ${Utils.escapeHtml(t.target_account_name)}`;
+                amountPrefix = '';
+                typeColor = 'var(--primary)';
+            }
 
             return `
                 <tr>
@@ -222,7 +232,7 @@ const AccountsModule = {
                     <td>
                         <span style="display: inline-flex; align-items: center; gap: 0.5rem;">
                             <span style="width: 10px; height: 10px; border-radius: 50%; background: ${t.account_color || '#6366f1'};"></span>
-                            ${Utils.escapeHtml(t.account_name || '')}
+                            ${accountDisplay}
                         </span>
                     </td>
                     <td>
@@ -233,7 +243,7 @@ const AccountsModule = {
                     </td>
                     <td>${Utils.escapeHtml(t.description || '-')}</td>
                     <td>
-                        <span class="status-badge ${isIncome ? 'entregado' : 'cancelado'}">${typeLabel}</span>
+                        <span class="status-badge ${typeBadgeClass}">${typeLabel}</span>
                     </td>
                     <td style="font-weight: 600; color: ${typeColor};">
                         ${amountPrefix}${this.formatCurrency(t.amount)}
@@ -384,25 +394,66 @@ const AccountsModule = {
     onTransactionTypeChange() {
         const type = document.getElementById('transactionType').value;
         const categorySelect = document.getElementById('transactionCategory');
+        const targetAccountGroup = document.getElementById('targetAccountGroup');
+        const categoryGroup = document.getElementById('categoryGroup');
+        const labelAccount = document.getElementById('labelTransactionAccount');
+        const targetAccountSelect = document.getElementById('transactionTargetAccount');
 
-        const filteredCategories = this.categories.filter(c => c.type === type);
-        categorySelect.innerHTML = filteredCategories.map(c =>
-            `<option value="${c.id}">${Utils.escapeHtml(c.name)}</option>`
-        ).join('');
+        // Show/hide target account for transfers
+        if (type === 'transfer') {
+            targetAccountGroup.style.display = 'block';
+            categoryGroup.style.display = 'none';
+            labelAccount.textContent = 'Cuenta Origen *';
+
+            // Populate target account dropdown
+            targetAccountSelect.innerHTML = this.accounts.map(a =>
+                `<option value="${a.id}">${Utils.escapeHtml(a.name)}</option>`
+            ).join('');
+
+            // Set transfer category automatically
+            const transferCategory = this.categories.find(c => c.type === 'transfer');
+            if (transferCategory) {
+                categorySelect.innerHTML = `<option value="${transferCategory.id}" selected>${Utils.escapeHtml(transferCategory.name)}</option>`;
+            }
+        } else {
+            targetAccountGroup.style.display = 'none';
+            categoryGroup.style.display = 'block';
+            labelAccount.textContent = 'Cuenta *';
+
+            // Filter categories by type
+            const filteredCategories = this.categories.filter(c => c.type === type);
+            categorySelect.innerHTML = filteredCategories.map(c =>
+                `<option value="${c.id}">${Utils.escapeHtml(c.name)}</option>`
+            ).join('');
+        }
     },
 
     async saveTransaction() {
         try {
             const id = document.getElementById('transactionId').value;
+            const type = document.getElementById('transactionType').value;
+
             const transactionData = {
                 account_id: document.getElementById('transactionAccount').value,
                 category_id: document.getElementById('transactionCategory').value,
-                type: document.getElementById('transactionType').value,
+                type: type,
                 amount: parseFloat(document.getElementById('transactionAmount').value),
                 transaction_date: document.getElementById('transactionDate').value,
                 reference: document.getElementById('transactionReference').value || null,
                 description: document.getElementById('transactionDescription').value || null
             };
+
+            // Add target account for transfers
+            if (type === 'transfer') {
+                const targetAccountId = document.getElementById('transactionTargetAccount').value;
+                if (targetAccountId === transactionData.account_id) {
+                    Utils.showToast('La cuenta origen y destino no pueden ser la misma', 'error');
+                    return;
+                }
+                transactionData.target_account_id = targetAccountId;
+            } else {
+                transactionData.target_account_id = null;
+            }
 
             if (id) {
                 // Update
@@ -420,7 +471,9 @@ const AccountsModule = {
                     .insert(transactionData);
 
                 if (error) throw error;
-                Utils.showToast('Transacción registrada', 'success');
+
+                const msgType = type === 'transfer' ? 'Transferencia realizada' : 'Transacción registrada';
+                Utils.showToast(msgType, 'success');
             }
 
             this.closeModal('modalTransaction');
