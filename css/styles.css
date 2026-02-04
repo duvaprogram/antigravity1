@@ -1848,3 +1848,31 @@ form {
     padding: 0.375rem 0.75rem;
     font-size: var(--font-size-xs);
 }
+
+/* Account Cards */
+.account-card {
+    transition: all var(--transition-normal);
+}
+
+.account-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+/* Transaction Type Badges */
+.type-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+}
+
+.type-badge.income {
+    background: var(--success-light);
+    color: var(--success);
+}
+
+.type-badge.expense {
+    background: var(--danger-light);
+    color: var(--danger);
+}

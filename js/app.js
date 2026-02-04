@@ -28,6 +28,7 @@ const App = {
             AnalyticsModule.init();
             ConfirmationModule.init();
             PurchasesModule.init();
+            AccountsModule.init();
             UsersModule.init();
 
             // Bind navigation events
@@ -137,6 +138,7 @@ const App = {
             'analytics': 'Análisis de Datos',
             'confirmation': 'Confirmación de Pedidos',
             'purchases': 'Compras a Proveedores',
+            'accounts': 'Cuentas y Flujo de Efectivo',
             'users': 'Administración de Usuarios'
         };
         document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
@@ -190,6 +192,9 @@ const App = {
                 break;
             case 'purchases':
                 await PurchasesModule.render();
+                break;
+            case 'accounts':
+                await AccountsModule.render();
                 break;
             case 'users':
                 await UsersModule.render();

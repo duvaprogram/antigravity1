@@ -90,8 +90,10 @@ const AuthModule = {
                 inventory: { can_access: true, can_edit: true },
                 clients: { can_access: true, can_edit: true },
                 guides: { can_access: true, can_edit: true },
+                analytics: { can_access: true, can_edit: true },
                 confirmation: { can_access: true, can_edit: true },
                 purchases: { can_access: true, can_edit: true },
+                accounts: { can_access: true, can_edit: true },
                 users: { can_access: true, can_edit: true }
             };
             return;

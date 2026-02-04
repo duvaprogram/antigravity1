@@ -131,6 +131,13 @@
                     </svg>
                     <span>Compras</span>
                 </a>
+                <a href="#accounts" class="nav-item nav-admin-only" data-section="accounts" style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                        <line x1="1" y1="10" x2="23" y2="10"></line>
+                    </svg>
+                    <span>Cuentas</span>
+                </a>
                 <!-- Admin only: Users management -->
                 <a href="#users" class="nav-item nav-admin-only" data-section="users" style="display: none;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1305,6 +1312,174 @@
                 </div>
             </section>
 
+            <!-- Accounts Section (Admin Only) -->
+            <section class="content-section" id="section-accounts">
+                <div class="section-header">
+                    <h2>Cuentas y Flujo de Efectivo</h2>
+                    <div class="header-buttons">
+                        <button class="btn btn-primary" onclick="AccountsModule.showTransactionModal()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Nueva Transacción
+                        </button>
+                        <button class="btn btn-secondary" onclick="AccountsModule.showAccountModal()">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                <line x1="1" y1="10" x2="23" y2="10"></line>
+                            </svg>
+                            Nueva Cuenta
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Accounts Cards -->
+                <div class="accounts-grid" id="accountsGrid"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                    <!-- Dynamic accounts cards -->
+                </div>
+
+                <!-- Summary Stats -->
+                <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="accountsTotalIncome" style="color: var(--success);">$0</span>
+                            <span class="stat-label">Total Ingresos (Mes)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                                <polyline points="17 18 23 18 23 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="accountsTotalExpenses" style="color: var(--danger);">$0</span>
+                            <span class="stat-label">Total Gastos (Mes)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="accountsBalance">$0</span>
+                            <span class="stat-label">Balance Neto (Mes)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(139, 92, 246, 0.1); color: #8b5cf6;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                                <line x1="1" y1="10" x2="23" y2="10"></line>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="accountsTotalBalance" style="color: #8b5cf6;">$0</span>
+                            <span class="stat-label">Saldo Total Cuentas</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Section -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                            </svg>
+                            Filtrar Transacciones
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="filter-row"
+                            style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="accountsFilterDateFrom">Desde</label>
+                                <input type="date" id="accountsFilterDateFrom" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="accountsFilterDateTo">Hasta</label>
+                                <input type="date" id="accountsFilterDateTo" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="accountsFilterAccount">Cuenta</label>
+                                <select id="accountsFilterAccount" class="form-control">
+                                    <option value="">Todas</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="accountsFilterType">Tipo</label>
+                                <select id="accountsFilterType" class="form-control">
+                                    <option value="">Todos</option>
+                                    <option value="income">Ingresos</option>
+                                    <option value="expense">Gastos</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="accountsFilterCategory">Categoría</label>
+                                <select id="accountsFilterCategory" class="form-control">
+                                    <option value="">Todas</option>
+                                </select>
+                            </div>
+                            <div class="filter-buttons" style="display: flex; gap: 0.5rem;">
+                                <button type="button" class="btn btn-primary"
+                                    onclick="AccountsModule.applyFilters()">Filtrar</button>
+                                <button type="button" class="btn btn-secondary"
+                                    onclick="AccountsModule.clearFilters()">Limpiar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transactions Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Historial de Transacciones</h3>
+                        <span id="transactionsRecordCount"
+                            style="font-size: 0.875rem; color: var(--text-muted);"></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Cuenta</th>
+                                        <th>Categoría</th>
+                                        <th>Descripción</th>
+                                        <th>Tipo</th>
+                                        <th>Monto</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactionsTable">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Users Section (Admin Only) -->
             <section class="content-section" id="section-users">
                 <div class="section-header">
@@ -1702,6 +1877,108 @@
         </div>
     </div>
 
+    <!-- Modal: Transaction Form -->
+    <div class="modal" id="modalTransaction">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTransactionTitle">Nueva Transacción</h2>
+                <button class="modal-close" data-close="modalTransaction">&times;</button>
+            </div>
+            <form id="formTransaction">
+                <input type="hidden" id="transactionId">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="transactionType">Tipo *</label>
+                        <select id="transactionType" required onchange="AccountsModule.onTransactionTypeChange()">
+                            <option value="income">Ingreso</option>
+                            <option value="expense">Gasto</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transactionAccount">Cuenta *</label>
+                        <select id="transactionAccount" required>
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transactionCategory">Categoría *</label>
+                        <select id="transactionCategory" required>
+                            <!-- Dynamic options -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="transactionAmount">Monto (COP) *</label>
+                        <input type="number" id="transactionAmount" required min="0" step="100" placeholder="50000">
+                    </div>
+                    <div class="form-group">
+                        <label for="transactionDate">Fecha *</label>
+                        <input type="date" id="transactionDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="transactionReference">Referencia</label>
+                        <input type="text" id="transactionReference" placeholder="Número de factura, recibo, etc.">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="transactionDescription">Descripción</label>
+                        <textarea id="transactionDescription" rows="2"
+                            placeholder="Detalles de la transacción..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalTransaction">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Transacción</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Account Form -->
+    <div class="modal" id="modalAccount">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalAccountTitle">Nueva Cuenta</h2>
+                <button class="modal-close" data-close="modalAccount">&times;</button>
+            </div>
+            <form id="formAccount">
+                <input type="hidden" id="accountId">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="accountName">Nombre de la Cuenta *</label>
+                        <input type="text" id="accountName" required placeholder="Ej: Nequi, Nubank">
+                    </div>
+                    <div class="form-group">
+                        <label for="accountType">Tipo *</label>
+                        <select id="accountType" required>
+                            <option value="billetera">Billetera Digital</option>
+                            <option value="banco">Cuenta Bancaria</option>
+                            <option value="efectivo">Efectivo</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="accountCurrency">Moneda</label>
+                        <select id="accountCurrency">
+                            <option value="COP">COP - Peso Colombiano</option>
+                            <option value="USD">USD - Dólar</option>
+                            <option value="VES">VES - Bolívar</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="accountInitialBalance">Saldo Inicial</label>
+                        <input type="number" id="accountInitialBalance" min="0" step="100" value="0" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="accountColor">Color</label>
+                        <input type="color" id="accountColor" value="#6366f1">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalAccount">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Cuenta</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal: Inventory History -->
     <div class="modal modal-large" id="modalInventoryHistory">
         <div class="modal-content">
@@ -1766,6 +2043,7 @@
     <script src="js/analytics.js"></script>
     <script src="js/confirmation.js"></script>
     <script src="js/purchases.js"></script>
+    <script src="js/accounts.js"></script>
     <script src="js/users.js"></script>
     <script src="js/app.js"></script>
     <script src="js/auth.js"></script>
