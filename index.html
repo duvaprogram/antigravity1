@@ -2089,28 +2089,41 @@
                     <div class="guide-section">
                         <h3>Información del Cliente</h3>
                         <div class="form-group">
-                            <label for="guideClient">Seleccionar Cliente</label>
-                            <select id="guideClient">
-                                <option value="">Seleccionar cliente existente...</option>
-                            </select>
+                            <label for="guideClientSearch">Buscar Cliente</label>
+                            <div class="autocomplete-container">
+                                <input type="text" id="guideClientSearch"
+                                    placeholder="Escriba nombre o teléfono del cliente..." autocomplete="off">
+                                <input type="hidden" id="guideClient">
+                                <div class="autocomplete-suggestions" id="clientSuggestions"></div>
+                            </div>
                         </div>
                         <div class="client-info" id="selectedClientInfo" style="display: none;">
                             <p><strong>Nombre:</strong> <span id="infoClientName"></span></p>
                             <p><strong>Teléfono:</strong> <span id="infoClientPhone"></span></p>
                             <p><strong>Dirección:</strong> <span id="infoClientAddress"></span></p>
                             <p><strong>Ciudad:</strong> <span id="infoClientCity"></span></p>
+                            <button type="button" class="btn btn-sm btn-secondary"
+                                onclick="GuidesModule.clearClientSelection()" style="margin-top: 0.5rem;">
+                                Cambiar cliente
+                            </button>
                         </div>
                     </div>
 
                     <div class="guide-section">
                         <h3>Productos</h3>
-                        <div class="add-product-row">
-                            <select id="guideProductSelect">
-                                <option value="">Seleccionar producto...</option>
-                            </select>
+                        <div class="add-product-row" style="flex-wrap: wrap; gap: 0.5rem;">
+                            <div class="autocomplete-container" style="flex: 1; min-width: 200px;">
+                                <input type="text" id="guideProductSearch" placeholder="Buscar producto..."
+                                    autocomplete="off">
+                                <input type="hidden" id="guideProductSelect">
+                                <div class="autocomplete-suggestions" id="productSuggestions"></div>
+                            </div>
+                            <span id="selectedProductStock"
+                                style="color: var(--text-muted); font-size: 0.85rem; display: none;"></span>
                             <input type="number" id="guideProductPrice" step="0.01" placeholder="Precio"
                                 style="width: 100px;">
-                            <input type="number" id="guideProductQty" min="1" value="1" placeholder="Cant.">
+                            <input type="number" id="guideProductQty" min="1" value="1" placeholder="Cant."
+                                style="width: 70px;">
                             <button type="button" class="btn btn-secondary" id="btnAddProductToGuide">Agregar</button>
                         </div>
                         <div class="guide-products-list">
