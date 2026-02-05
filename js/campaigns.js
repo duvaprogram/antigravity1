@@ -864,7 +864,7 @@ const CampaignsModule = {
         // Map columns - try to identify them automatically
         const columnMap = this.identifyColumns(headers);
 
-        if (!columnMap.campaignName) {
+        if (columnMap.campaignName === null) {
             throw new Error('No se encontró la columna de nombre de campaña');
         }
 
@@ -918,33 +918,73 @@ const CampaignsModule = {
             endDate: null
         };
 
+        console.log('Headers found:', headers);
+
         headers.forEach((header, index) => {
             const h = (header || '').toString().toLowerCase().trim();
 
-            if (h.includes('nombre') && h.includes('campaña') || h === 'nombre de la campaña' || h.includes('campaign name')) {
-                map.campaignName = index;
-            } else if (h.includes('importe gastado') || h.includes('spent') || h.includes('gastado')) {
+            // Campaign name detection - expanded patterns
+            if (map.campaignName === null) {
+                if (h.includes('nombre') && (h.includes('campaña') || h.includes('campana'))) {
+                    map.campaignName = index;
+                } else if (h === 'nombre de la campaña' || h === 'nombre de la campana') {
+                    map.campaignName = index;
+                } else if (h.includes('campaign name') || h === 'campaign') {
+                    map.campaignName = index;
+                } else if (h === 'nombre' || h === 'name' || h === 'campaña' || h === 'campana') {
+                    map.campaignName = index;
+                } else if (h.includes('ad name') || h.includes('nombre del anuncio')) {
+                    map.campaignName = index;
+                }
+            }
+
+            // Spent/Amount detection
+            if (h.includes('importe gastado') || h.includes('amount spent') || h.includes('spent') ||
+                h.includes('gastado') || h.includes('gasto') || h.includes('monto')) {
                 map.spent = index;
-            } else if (h === 'compras' || h === 'purchases' || h === 'conversiones') {
+            }
+
+            // Purchases/Results detection
+            if (h === 'compras' || h === 'purchases' || h === 'conversiones' ||
+                h === 'resultados' || h === 'results' || h.includes('purchase')) {
                 map.purchases = index;
-            } else if (h.includes('cpc') || h.includes('coste por clic') || h.includes('cost per click')) {
+            }
+
+            // CPC detection
+            if (h.includes('cpc') || h.includes('coste por clic') || h.includes('cost per click') ||
+                h.includes('costo por clic')) {
                 map.cpc = index;
-            } else if (h.includes('cpm') || h.includes('coste por 1000') || h.includes('cost per')) {
+            }
+
+            // CPM detection
+            if (h.includes('cpm') || h.includes('coste por 1000') || h.includes('costo por 1000') ||
+                h.includes('cost per 1,000') || h.includes('cost per 1000')) {
                 map.cpm = index;
-            } else if (h.includes('coste por compra') || h.includes('cost per purchase') || h.includes('costo por compra')) {
+            }
+
+            // Cost per purchase detection
+            if (h.includes('coste por compra') || h.includes('cost per purchase') ||
+                h.includes('costo por compra') || h.includes('coste por resultado') ||
+                h.includes('cost per result') || h.includes('costo por resultado')) {
                 map.costPerPurchase = index;
-            } else if (h.includes('inicio') || h.includes('start')) {
+            }
+
+            // Date detection
+            if (h.includes('inicio') || h.includes('start') || h.includes('fecha inicio')) {
                 map.startDate = index;
-            } else if (h.includes('fin') || h.includes('end')) {
+            }
+            if (h.includes('fin') || h.includes('end') || h.includes('fecha fin')) {
                 map.endDate = index;
             }
         });
 
-        // If campaign name not found, assume first column
+        // If campaign name not found, use first column as fallback
         if (map.campaignName === null && headers.length > 0) {
+            console.log('Campaign name column not detected, using first column as fallback');
             map.campaignName = 0;
         }
 
+        console.log('Column mapping:', map);
         return map;
     },
 
