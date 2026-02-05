@@ -119,7 +119,8 @@ const Utils = {
             'En ruta': 'en-ruta',
             'Entregado': 'entregado',
             'Pagado': 'pagado',
-            'Cancelado': 'cancelado'
+            'Cancelado': 'cancelado',
+            'Devolución': 'devolucion'
         };
         return classes[status] || 'pendiente';
     },

@@ -442,6 +442,7 @@ const GuidesModule = {
     async saveGuide() {
         const clientId = document.getElementById('guideClient').value;
         const observations = document.getElementById('guideObservations').value.trim();
+        const shippingCost = document.getElementById('guideShippingCost').value;
 
         // Caracas specific fields
         const amountUsd = document.getElementById('guideAmountUsd').value;
@@ -469,6 +470,11 @@ const GuidesModule = {
                 totalAmount,
                 observations
             };
+
+            // Add shipping cost if provided
+            if (shippingCost) {
+                guideData.shippingCost = parseFloat(shippingCost);
+            }
 
             // Add Caracas fields if applicable
             if (client.city === 'Caracas') {
@@ -563,12 +569,36 @@ const GuidesModule = {
                     </tbody>
                     <tfoot>
                         <tr>
-                            <td colspan="3"><strong>TOTAL</strong></td>
+                            <td colspan="3"><strong>Subtotal Productos</strong></td>
                             <td><strong>${Utils.formatCurrency(total)}</strong></td>
                         </tr>
+                        ${guide.shippingCost ? `
+                        <tr>
+                            <td colspan="3"><strong>🚚 Valor de Flete</strong></td>
+                            <td><strong>${Utils.formatCurrency(guide.shippingCost)}</strong></td>
+                        </tr>
+                        <tr style="background: var(--primary-light);">
+                            <td colspan="3"><strong>TOTAL</strong></td>
+                            <td><strong>${Utils.formatCurrency(total + guide.shippingCost)}</strong></td>
+                        </tr>
+                        ` : ''}
                     </tfoot>
                 </table>
             </div>
+
+            ${guide.shippingCost ? `
+                <div class="guide-details-section" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1)); padding: 1rem; border-radius: var(--radius-md);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                            <rect x="1" y="3" width="15" height="13"></rect>
+                            <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                        </svg>
+                        <span style="font-weight: 600; color: var(--text-primary);">Flete: ${Utils.formatCurrency(guide.shippingCost)}</span>
+                    </div>
+                </div>
+            ` : ''}
 
             ${guide.observations ? `
                 <div class="guide-details-section">
@@ -607,9 +637,13 @@ const GuidesModule = {
                             onclick="GuidesModule.changeStatus('${guide.id}', 'Pagado')">
                         Pagado
                     </button>
-                    <button class="status-btn ${guide.status === 'Cancelado' ? 'active' : ''}" 
+                <button class="status-btn ${guide.status === 'Cancelado' ? 'active' : ''}" 
                             onclick="GuidesModule.changeStatus('${guide.id}', 'Cancelado')">
                         Cancelado
+                    </button>
+                    <button class="status-btn ${guide.status === 'Devolución' ? 'active' : ''}" 
+                            onclick="GuidesModule.changeStatus('${guide.id}', 'Devolución')">
+                        Devolución
                     </button>
                 </div>
             </div>
@@ -647,17 +681,25 @@ const GuidesModule = {
             const guide = await Database.getGuide(guideId);
             if (!guide) return;
 
-            // Logic to return stock if cancelling
-            if (newStatus === 'Cancelado' && guide.status !== 'Cancelado') {
-                if (confirm('¿Seguro de anular la guía? El stock será devuelto al inventario.')) {
+            // Statuses that return stock to inventory
+            const stockReturnStatuses = ['Cancelado', 'Devolución'];
+            const isReturningStock = stockReturnStatuses.includes(newStatus);
+            const wasReturningStock = stockReturnStatuses.includes(guide.status);
+
+            // Logic to return stock if cancelling or returning
+            if (isReturningStock && !wasReturningStock) {
+                const confirmMessage = newStatus === 'Devolución'
+                    ? '¿Seguro de marcar como devolución? El stock será devuelto al inventario.'
+                    : '¿Seguro de anular la guía? El stock será devuelto al inventario.';
+                if (confirm(confirmMessage)) {
                     await this.returnGuideStock(guideId);
                 } else {
                     return; // Abort status change
                 }
             }
 
-            // Logic to deduct stock if un-cancelling (re-activating)
-            if (guide.status === 'Cancelado' && newStatus !== 'Cancelado') {
+            // Logic to deduct stock if un-cancelling or un-returning (re-activating)
+            if (wasReturningStock && !isReturningStock) {
                 // Check if stock available? Complex. For now simply warn or just do it.
                 // We need to re-deduct items.
                 await this.deductGuideStock(guideId);

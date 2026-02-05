@@ -1015,6 +1015,15 @@ table {
     background: #8b5cf6;
 }
 
+.status-badge.devolucion {
+    background: rgba(249, 115, 22, 0.1);
+    color: #f97316;
+}
+
+.status-badge.devolucion::before {
+    background: #f97316;
+}
+
 .status-badge.active {
     background: var(--success-light);
     color: var(--success);

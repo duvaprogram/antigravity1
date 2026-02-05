@@ -495,6 +495,7 @@
                         <option value="Entregado">Entregado</option>
                         <option value="Pagado">Pagado</option>
                         <option value="Cancelado">Cancelado</option>
+                        <option value="Devolución">Devolución</option>
                     </select>
                     <select id="filterGuidePayment">
                         <option value="">Todas las monedas</option>
@@ -2155,6 +2156,22 @@
                                     <input type="time" id="guideDeliveryTime">
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Valor de Flete - Campo general -->
+                        <div class="form-group">
+                            <label for="guideShippingCost">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2"
+                                    style="display: inline; vertical-align: middle; margin-right: 4px;">
+                                    <rect x="1" y="3" width="15" height="13"></rect>
+                                    <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                                    <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                    <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                                </svg>
+                                Valor de Flete
+                            </label>
+                            <input type="number" id="guideShippingCost" min="0" step="0.01" placeholder="0.00">
                         </div>
 
                         <div class="form-group full-width">
