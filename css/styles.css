@@ -676,6 +676,16 @@ table {
     box-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
 }
 
+.btn-danger-light {
+    background: var(--danger-light);
+    color: var(--danger);
+}
+
+.btn-danger-light:hover {
+    background: var(--danger);
+    color: white;
+}
+
 .btn-text {
     background: none;
     color: var(--primary);
