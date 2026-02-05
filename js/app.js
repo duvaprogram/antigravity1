@@ -30,6 +30,7 @@ const App = {
             PurchasesModule.init();
             AccountsModule.init();
             UsersModule.init();
+            CampaignsModule.init();
 
             // Bind navigation events
             this.bindNavigation();
@@ -139,7 +140,8 @@ const App = {
             'confirmation': 'Confirmación de Pedidos',
             'purchases': 'Compras a Proveedores',
             'accounts': 'Cuentas y Flujo de Efectivo',
-            'users': 'Administración de Usuarios'
+            'users': 'Administración de Usuarios',
+            'campaigns': 'Creación de Campañas'
         };
         document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
 
@@ -198,6 +200,9 @@ const App = {
                 break;
             case 'users':
                 await UsersModule.render();
+                break;
+            case 'campaigns':
+                CampaignsModule.init();
                 break;
         }
     },
