@@ -25,8 +25,11 @@ const CampaignsModule = {
     // Products list
     products: [],
 
-    // Campaign counter for unique codes
-    campaignCounter: 0,
+    // Used codes to ensure uniqueness
+    usedCodes: new Set(),
+
+    // Letters for generating codes (excluding confusing ones like O, I, L)
+    codeLetters: 'ABCDEFGHJKMNPQRSTUVWXYZ',
 
     // Initialize the module
     async init() {
@@ -37,47 +40,78 @@ const CampaignsModule = {
         this.initialized = true;
 
         await this.loadProducts();
-        this.loadCampaignCounter();
+        this.loadUsedCodes();
         this.bindEvents();
         this.setDefaultDate();
         this.loadSavedCampaigns();
     },
 
-    // Load campaign counter from localStorage
-    loadCampaignCounter() {
-        const saved = localStorage.getItem('campaignCounter');
+    // Load used codes from localStorage
+    loadUsedCodes() {
+        const saved = localStorage.getItem('usedCampaignCodes');
         if (saved) {
-            this.campaignCounter = parseInt(saved) || 0;
+            try {
+                this.usedCodes = new Set(JSON.parse(saved));
+            } catch (e) {
+                this.usedCodes = new Set();
+            }
         }
     },
 
-    // Save campaign counter to localStorage
-    saveCampaignCounter() {
-        localStorage.setItem('campaignCounter', this.campaignCounter.toString());
+    // Save used codes to localStorage
+    saveUsedCodes() {
+        localStorage.setItem('usedCampaignCodes', JSON.stringify([...this.usedCodes]));
     },
 
-    // Generate next campaign code (3 digits)
+    // Generate a unique campaign code (2 letters + 2 numbers, e.g., XY01)
     generateCampaignCode() {
-        this.campaignCounter++;
-        this.saveCampaignCounter();
-        return String(this.campaignCounter).padStart(3, '0');
+        let code;
+        let attempts = 0;
+        const maxAttempts = 1000;
+
+        do {
+            // Generate 2 random letters
+            const letter1 = this.codeLetters[Math.floor(Math.random() * this.codeLetters.length)];
+            const letter2 = this.codeLetters[Math.floor(Math.random() * this.codeLetters.length)];
+
+            // Generate 2 random numbers (00-99)
+            const numbers = String(Math.floor(Math.random() * 100)).padStart(2, '0');
+
+            code = `${letter1}${letter2}${numbers}`;
+            attempts++;
+        } while (this.usedCodes.has(code) && attempts < maxAttempts);
+
+        // If we couldn't find a unique code, add timestamp suffix
+        if (this.usedCodes.has(code)) {
+            code = code + String(Date.now()).slice(-2);
+        }
+
+        this.usedCodes.add(code);
+        this.saveUsedCodes();
+        return code;
     },
 
-    // Generate ad codes based on campaign code and number of ads
+    // Generate ad codes based on campaign code (no dashes, unique)
     generateAdCodes(campaignCode, numAds) {
         const adCodes = [];
         for (let i = 1; i <= numAds; i++) {
-            adCodes.push(`${campaignCode}-A${i}`);
+            const adCode = `${campaignCode}A${i}`;
+            adCodes.push(adCode);
+            this.usedCodes.add(adCode);
         }
+        this.saveUsedCodes();
         return adCodes;
     },
 
-    // Generate ad set codes based on campaign code and number of ad sets
+    // Generate ad set codes based on campaign code (no dashes, unique)
     generateAdSetCodes(campaignCode, numAdSets) {
         const adSetCodes = [];
         for (let i = 1; i <= numAdSets; i++) {
-            adSetCodes.push(`${campaignCode}-S${i}`);
+            const setCode = `${campaignCode}S${i}`;
+            adSetCodes.push(setCode);
+            this.usedCodes.add(setCode);
         }
+        this.saveUsedCodes();
         return adSetCodes;
     },
 
@@ -177,11 +211,12 @@ const CampaignsModule = {
         if (country && type && date && product.trim()) {
             const formattedDate = this.formatDate(date);
             const formattedProduct = product.toUpperCase().trim().replace(/\s+/g, '-');
-            const nextCode = String(this.campaignCounter + 1).padStart(3, '0');
             const campaignName = `${country}-${type}-${formattedDate}-${formattedProduct}`;
 
             previewTextEl.innerHTML = `
-                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">Código: <strong style="color: var(--primary);">${nextCode}</strong></div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">
+                    Al generar se asignará un código único como: <strong style="color: var(--primary);">XY01</strong>
+                </div>
                 ${campaignName}
             `;
             previewEl.style.display = 'block';
@@ -193,38 +228,21 @@ const CampaignsModule = {
                     const adSetsNum = parseInt(adSets) || 0;
                     const adsNum = parseInt(ads) || 0;
 
-                    let adSetCodesPreview = '';
-                    let adCodesPreview = '';
+                    let infoText = `<div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border);">`;
+                    infoText += `<div style="margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">`;
 
                     if (adSetsNum > 0) {
-                        const sampleCodes = [];
-                        for (let i = 1; i <= Math.min(adSetsNum, 3); i++) {
-                            sampleCodes.push(`${nextCode}-S${i}`);
-                        }
-                        if (adSetsNum > 3) sampleCodes.push('...');
-                        adSetCodesPreview = `<div style="font-size: 0.75rem; color: var(--text-muted);">Conjuntos: ${sampleCodes.join(', ')}</div>`;
+                        infoText += `<span>📊 ${adSetsNum} Conjunto(s) → Códigos: XY01S1, XY01S2...</span>`;
                     }
-
+                    if (adSetsNum > 0 && adsNum > 0) {
+                        infoText += ` · `;
+                    }
                     if (adsNum > 0) {
-                        const sampleCodes = [];
-                        for (let i = 1; i <= Math.min(adsNum, 3); i++) {
-                            sampleCodes.push(`${nextCode}-A${i}`);
-                        }
-                        if (adsNum > 3) sampleCodes.push('...');
-                        adCodesPreview = `<div style="font-size: 0.75rem; color: var(--text-muted);">Anuncios: ${sampleCodes.join(', ')}</div>`;
+                        infoText += `<span>📢 ${adsNum} Anuncio(s) → Códigos: XY01A1, XY01A2...</span>`;
                     }
 
-                    adInfoEl.innerHTML = `
-                        <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border);">
-                            <div style="margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">
-                                ${adSets ? `<span>📊 ${adSets} Conjunto(s)</span>` : ''}
-                                ${adSets && ads ? ' · ' : ''}
-                                ${ads ? `<span>📢 ${ads} Anuncio(s)</span>` : ''}
-                            </div>
-                            ${adSetCodesPreview}
-                            ${adCodesPreview}
-                        </div>
-                    `;
+                    infoText += `</div></div>`;
+                    adInfoEl.innerHTML = infoText;
                 } else {
                     adInfoEl.innerHTML = '';
                 }
@@ -255,7 +273,7 @@ const CampaignsModule = {
         const campaignCode = this.generateCampaignCode();
         const campaignName = `${country}-${type}-${formattedDate}-${formattedProduct}`;
 
-        // Generate ad and ad set codes
+        // Generate ad and ad set codes (no dashes, unique)
         const adSetCodes = this.generateAdSetCodes(campaignCode, adSets);
         const adCodes = this.generateAdCodes(campaignCode, ads);
 
@@ -292,26 +310,32 @@ const CampaignsModule = {
 
         if (resultEl && resultTextEl) {
             resultTextEl.innerHTML = `
-                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-                    Código de Campaña: <strong style="color: #10b981; font-size: 1.25rem;">${campaignCode}</strong>
+                <div style="margin-bottom: 1rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted);">Código Único de Campaña:</span>
+                    <div style="background: linear-gradient(135deg, var(--primary), #8b5cf6); color: white; 
+                                padding: 0.75rem 1.5rem; border-radius: var(--radius-md); display: inline-block;
+                                font-size: 2rem; font-weight: 700; letter-spacing: 2px; margin-top: 0.5rem;
+                                cursor: pointer;" onclick="CampaignsModule.copyCode('${campaignCode}')" title="Clic para copiar">
+                        ${campaignCode}
+                    </div>
                 </div>
-                <div>${campaignName}</div>
+                <div style="font-family: monospace; font-size: 1.1rem; color: var(--text-secondary);">${campaignName}</div>
             `;
 
             // Show ad info in result
             if (resultAdInfoEl) {
                 if (adSets > 0 || ads > 0) {
                     resultAdInfoEl.innerHTML = `
-                        <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 0.75rem;">
+                        <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
                             ${adSets > 0 ? `
-                                <div style="background: var(--primary-light); padding: 0.5rem 1rem; border-radius: var(--radius-md);">
-                                    <span style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">${adSets}</span>
+                                <div style="background: var(--primary-light); padding: 0.75rem 1.5rem; border-radius: var(--radius-md);">
+                                    <span style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${adSets}</span>
                                     <span style="font-size: 0.75rem; color: var(--text-secondary); display: block;">Conjuntos</span>
                                 </div>
                             ` : ''}
                             ${ads > 0 ? `
-                                <div style="background: rgba(139, 92, 246, 0.1); padding: 0.5rem 1rem; border-radius: var(--radius-md);">
-                                    <span style="font-size: 1.25rem; font-weight: 700; color: #8b5cf6;">${ads}</span>
+                                <div style="background: rgba(139, 92, 246, 0.1); padding: 0.75rem 1.5rem; border-radius: var(--radius-md);">
+                                    <span style="font-size: 1.5rem; font-weight: 700; color: #8b5cf6;">${ads}</span>
                                     <span style="font-size: 0.75rem; color: var(--text-secondary); display: block;">Anuncios</span>
                                 </div>
                             ` : ''}
@@ -328,15 +352,18 @@ const CampaignsModule = {
 
                 if (adSetCodes.length > 0) {
                     codesHtml += `
-                        <div style="margin-top: 1rem; padding: 1rem; background: var(--surface-hover); border-radius: var(--radius-md);">
-                            <div style="font-weight: 600; color: var(--primary); margin-bottom: 0.5rem; font-size: 0.85rem;">
-                                📊 Códigos de Conjuntos de Anuncios:
+                        <div style="margin-top: 1.25rem; padding: 1rem; background: var(--surface-hover); border-radius: var(--radius-md); border-left: 4px solid var(--primary);">
+                            <div style="font-weight: 600; color: var(--primary); margin-bottom: 0.75rem; font-size: 0.9rem;">
+                                📊 Códigos de Conjuntos de Anuncios
                             </div>
                             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                                 ${adSetCodes.map(code => `
                                     <span onclick="CampaignsModule.copyCode('${code}')" 
-                                          style="font-family: monospace; padding: 0.25rem 0.5rem; background: var(--primary-light); 
-                                                 color: var(--primary); border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem;"
+                                          style="font-family: monospace; padding: 0.5rem 0.75rem; background: var(--primary-light); 
+                                                 color: var(--primary); border-radius: var(--radius-sm); cursor: pointer; 
+                                                 font-size: 0.95rem; font-weight: 600; transition: all 0.2s;"
+                                          onmouseover="this.style.background='var(--primary)'; this.style.color='white';"
+                                          onmouseout="this.style.background='var(--primary-light)'; this.style.color='var(--primary)';"
                                           title="Clic para copiar">
                                         ${code}
                                     </span>
@@ -348,15 +375,18 @@ const CampaignsModule = {
 
                 if (adCodes.length > 0) {
                     codesHtml += `
-                        <div style="margin-top: 0.75rem; padding: 1rem; background: var(--surface-hover); border-radius: var(--radius-md);">
-                            <div style="font-weight: 600; color: #8b5cf6; margin-bottom: 0.5rem; font-size: 0.85rem;">
-                                📢 Códigos de Anuncios:
+                        <div style="margin-top: 0.75rem; padding: 1rem; background: var(--surface-hover); border-radius: var(--radius-md); border-left: 4px solid #8b5cf6;">
+                            <div style="font-weight: 600; color: #8b5cf6; margin-bottom: 0.75rem; font-size: 0.9rem;">
+                                📢 Códigos de Anuncios
                             </div>
                             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                                 ${adCodes.map(code => `
                                     <span onclick="CampaignsModule.copyCode('${code}')" 
-                                          style="font-family: monospace; padding: 0.25rem 0.5rem; background: rgba(139, 92, 246, 0.1); 
-                                                 color: #8b5cf6; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem;"
+                                          style="font-family: monospace; padding: 0.5rem 0.75rem; background: rgba(139, 92, 246, 0.1); 
+                                                 color: #8b5cf6; border-radius: var(--radius-sm); cursor: pointer; 
+                                                 font-size: 0.95rem; font-weight: 600; transition: all 0.2s;"
+                                          onmouseover="this.style.background='#8b5cf6'; this.style.color='white';"
+                                          onmouseout="this.style.background='rgba(139, 92, 246, 0.1)'; this.style.color='#8b5cf6';"
                                           title="Clic para copiar">
                                         ${code}
                                     </span>
@@ -378,7 +408,7 @@ const CampaignsModule = {
             resultEl.style.animation = 'slideIn 0.3s ease-out';
         }
 
-        Utils.showNotification('¡Nombre de campaña generado con código ' + campaignCode + '!', 'success');
+        Utils.showNotification(`¡Campaña generada! Código: ${campaignCode}`, 'success');
     },
 
     // Copy single code to clipboard
@@ -396,14 +426,16 @@ const CampaignsModule = {
         });
     },
 
-    // Copy to clipboard
+    // Copy to clipboard (campaign name)
     copyToClipboard() {
         const resultTextEl = document.getElementById('campaignResultText');
         if (resultTextEl) {
-            // Get just the campaign name (last div)
-            const campaignName = resultTextEl.querySelector('div:last-child')?.textContent || resultTextEl.textContent;
+            // Get just the campaign name (the monospace div)
+            const campaignNameEl = resultTextEl.querySelector('div:last-child');
+            const campaignName = campaignNameEl?.textContent || '';
+
             navigator.clipboard.writeText(campaignName.trim()).then(() => {
-                Utils.showNotification('¡Copiado al portapapeles!', 'success');
+                Utils.showNotification('¡Nombre copiado al portapapeles!', 'success');
             }).catch(err => {
                 const textArea = document.createElement('textarea');
                 textArea.value = campaignName.trim();
@@ -411,7 +443,7 @@ const CampaignsModule = {
                 textArea.select();
                 document.execCommand('copy');
                 document.body.removeChild(textArea);
-                Utils.showNotification('¡Copiado al portapapeles!', 'success');
+                Utils.showNotification('¡Nombre copiado al portapapeles!', 'success');
             });
         }
     },
@@ -421,14 +453,14 @@ const CampaignsModule = {
         const campaign = this.generatedCampaigns.find(c => c.id === campaignId);
         if (!campaign) return;
 
-        let allCodes = `Campaña: ${campaign.name}\nCódigo: ${campaign.code}\n`;
+        let allCodes = `CAMPAÑA: ${campaign.code}\nNombre: ${campaign.name}\n`;
 
         if (campaign.adSetCodes && campaign.adSetCodes.length > 0) {
-            allCodes += `\nConjuntos de Anuncios:\n${campaign.adSetCodes.join('\n')}`;
+            allCodes += `\nCONJUNTOS DE ANUNCIOS (${campaign.adSetCodes.length}):\n${campaign.adSetCodes.join('\n')}`;
         }
 
         if (campaign.adCodes && campaign.adCodes.length > 0) {
-            allCodes += `\n\nAnuncios:\n${campaign.adCodes.join('\n')}`;
+            allCodes += `\n\nANUNCIOS (${campaign.adCodes.length}):\n${campaign.adCodes.join('\n')}`;
         }
 
         navigator.clipboard.writeText(allCodes).then(() => {
@@ -454,9 +486,9 @@ const CampaignsModule = {
 
         this.generatedCampaigns.unshift(campaign);
 
-        // Keep only last 50 campaigns
-        if (this.generatedCampaigns.length > 50) {
-            this.generatedCampaigns = this.generatedCampaigns.slice(0, 50);
+        // Keep only last 100 campaigns
+        if (this.generatedCampaigns.length > 100) {
+            this.generatedCampaigns = this.generatedCampaigns.slice(0, 100);
         }
 
         this.saveCampaigns();
@@ -497,7 +529,7 @@ const CampaignsModule = {
             return;
         }
 
-        tbody.innerHTML = this.generatedCampaigns.slice(0, 20).map(campaign => {
+        tbody.innerHTML = this.generatedCampaigns.slice(0, 30).map(campaign => {
             const date = new Date(campaign.createdAt);
             const formattedDate = date.toLocaleDateString('es-ES', {
                 day: '2-digit',
@@ -513,13 +545,21 @@ const CampaignsModule = {
 
             return `
                 <tr>
-                    <td style="font-weight: 700; color: var(--primary);">${codeDisplay}</td>
-                    <td style="font-family: monospace; font-size: 0.85rem;">${campaign.name}</td>
+                    <td>
+                        <span onclick="CampaignsModule.copyCode('${codeDisplay}')" 
+                              style="background: linear-gradient(135deg, var(--primary), #8b5cf6); color: white; 
+                                     padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-weight: 700;
+                                     cursor: pointer; font-family: monospace; letter-spacing: 1px;"
+                              title="Clic para copiar">
+                            ${codeDisplay}
+                        </span>
+                    </td>
+                    <td style="font-family: monospace; font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${campaign.name}</td>
                     <td>${this.countries[campaign.country] || campaign.country}</td>
                     <td><span class="badge badge-${campaign.type === 'ABO' ? 'primary' : 'secondary'}">${campaign.type}</span></td>
-                    <td>${campaign.date}</td>
-                    <td style="text-align: center;">${adSetsDisplay}</td>
-                    <td style="text-align: center;">${adsDisplay}</td>
+                    <td style="font-size: 0.85rem;">${campaign.date}</td>
+                    <td style="text-align: center; font-weight: 600;">${adSetsDisplay}</td>
+                    <td style="text-align: center; font-weight: 600;">${adsDisplay}</td>
                     <td style="font-size: 0.75rem; color: var(--text-muted);">${formattedDate}</td>
                     <td>
                         <div style="display: flex; gap: 0.25rem;">
@@ -554,48 +594,55 @@ const CampaignsModule = {
 
         let detailsHtml = `
             <div style="padding: 1.5rem;">
-                <h3 style="margin-bottom: 1rem; color: var(--text-primary);">
-                    <span style="background: var(--primary); color: white; padding: 0.25rem 0.75rem; border-radius: var(--radius-md); margin-right: 0.5rem;">${campaign.code}</span>
-                    Detalles de Campaña
-                </h3>
+                <div style="text-align: center; margin-bottom: 1.5rem;">
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Código de Campaña</div>
+                    <div onclick="CampaignsModule.copyCode('${campaign.code}')"
+                         style="background: linear-gradient(135deg, var(--primary), #8b5cf6); color: white; 
+                                padding: 1rem 2rem; border-radius: var(--radius-md); display: inline-block;
+                                font-size: 2.5rem; font-weight: 700; letter-spacing: 3px; cursor: pointer;"
+                         title="Clic para copiar">
+                        ${campaign.code}
+                    </div>
+                </div>
                 
-                <div style="background: var(--surface-hover); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem;">
-                    <div style="font-family: monospace; font-size: 1.1rem; font-weight: 600; color: var(--primary); word-break: break-all;">
+                <div style="background: var(--surface-hover); padding: 1rem; border-radius: var(--radius-md); margin-bottom: 1rem; text-align: center;">
+                    <div style="font-family: monospace; font-size: 1rem; font-weight: 600; color: var(--text-secondary); word-break: break-all;">
                         ${campaign.name}
                     </div>
                 </div>
                 
-                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom: 1.25rem;">
                     <div style="padding: 0.75rem; background: var(--surface-hover); border-radius: var(--radius-md);">
-                        <div style="font-size: 0.75rem; color: var(--text-muted);">País</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">País</div>
                         <div style="font-weight: 600;">${this.countries[campaign.country] || campaign.country}</div>
                     </div>
                     <div style="padding: 0.75rem; background: var(--surface-hover); border-radius: var(--radius-md);">
-                        <div style="font-size: 0.75rem; color: var(--text-muted);">Tipo</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Tipo</div>
                         <div style="font-weight: 600;">${campaign.type}</div>
                     </div>
                     <div style="padding: 0.75rem; background: var(--surface-hover); border-radius: var(--radius-md);">
-                        <div style="font-size: 0.75rem; color: var(--text-muted);">Fecha Campaña</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Fecha</div>
                         <div style="font-weight: 600;">${campaign.date}</div>
                     </div>
                     <div style="padding: 0.75rem; background: var(--surface-hover); border-radius: var(--radius-md);">
-                        <div style="font-size: 0.75rem; color: var(--text-muted);">Producto</div>
-                        <div style="font-weight: 600;">${campaign.product}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase;">Producto</div>
+                        <div style="font-weight: 600; font-size: 0.9rem;">${campaign.product}</div>
                     </div>
                 </div>
         `;
 
         if (campaign.adSetCodes && campaign.adSetCodes.length > 0) {
             detailsHtml += `
-                <div style="margin-bottom: 1rem;">
-                    <div style="font-weight: 600; color: var(--primary); margin-bottom: 0.5rem;">
-                        📊 Códigos de Conjuntos (${campaign.adSetCodes.length}):
+                <div style="margin-bottom: 1rem; padding: 1rem; background: var(--surface-hover); border-radius: var(--radius-md); border-left: 4px solid var(--primary);">
+                    <div style="font-weight: 600; color: var(--primary); margin-bottom: 0.75rem;">
+                        📊 Códigos de Conjuntos (${campaign.adSetCodes.length})
                     </div>
                     <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                         ${campaign.adSetCodes.map(code => `
                             <span onclick="CampaignsModule.copyCode('${code}')" 
                                   style="font-family: monospace; padding: 0.5rem 0.75rem; background: var(--primary-light); 
-                                         color: var(--primary); border-radius: var(--radius-sm); cursor: pointer;"
+                                         color: var(--primary); border-radius: var(--radius-sm); cursor: pointer;
+                                         font-weight: 600;"
                                   title="Clic para copiar">
                                 ${code}
                             </span>
@@ -607,15 +654,16 @@ const CampaignsModule = {
 
         if (campaign.adCodes && campaign.adCodes.length > 0) {
             detailsHtml += `
-                <div style="margin-bottom: 1rem;">
-                    <div style="font-weight: 600; color: #8b5cf6; margin-bottom: 0.5rem;">
-                        📢 Códigos de Anuncios (${campaign.adCodes.length}):
+                <div style="margin-bottom: 1rem; padding: 1rem; background: var(--surface-hover); border-radius: var(--radius-md); border-left: 4px solid #8b5cf6;">
+                    <div style="font-weight: 600; color: #8b5cf6; margin-bottom: 0.75rem;">
+                        📢 Códigos de Anuncios (${campaign.adCodes.length})
                     </div>
                     <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
                         ${campaign.adCodes.map(code => `
                             <span onclick="CampaignsModule.copyCode('${code}')" 
                                   style="font-family: monospace; padding: 0.5rem 0.75rem; background: rgba(139, 92, 246, 0.1); 
-                                         color: #8b5cf6; border-radius: var(--radius-sm); cursor: pointer;"
+                                         color: #8b5cf6; border-radius: var(--radius-sm); cursor: pointer;
+                                         font-weight: 600;"
                                   title="Clic para copiar">
                                 ${code}
                             </span>
@@ -626,7 +674,7 @@ const CampaignsModule = {
         }
 
         detailsHtml += `
-                <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem;">
+                <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem; justify-content: center;">
                     <button class="btn btn-primary" onclick="CampaignsModule.copyAllCodes(${campaign.id})">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -645,7 +693,7 @@ const CampaignsModule = {
             modal = document.createElement('div');
             modal.id = 'campaignDetailsModal';
             modal.className = 'modal';
-            modal.innerHTML = `<div class="modal-content" style="max-width: 600px;"></div>`;
+            modal.innerHTML = `<div class="modal-content" style="max-width: 550px;"></div>`;
             document.body.appendChild(modal);
 
             // Close on backdrop click
@@ -689,6 +737,14 @@ const CampaignsModule = {
     deleteCampaign(campaignId) {
         const index = this.generatedCampaigns.findIndex(c => c.id === campaignId);
         if (index > -1) {
+            const campaign = this.generatedCampaigns[index];
+
+            // Remove codes from used codes
+            if (campaign.code) this.usedCodes.delete(campaign.code);
+            if (campaign.adSetCodes) campaign.adSetCodes.forEach(c => this.usedCodes.delete(c));
+            if (campaign.adCodes) campaign.adCodes.forEach(c => this.usedCodes.delete(c));
+            this.saveUsedCodes();
+
             this.generatedCampaigns.splice(index, 1);
             this.saveCampaigns();
             this.renderHistory();
@@ -698,7 +754,11 @@ const CampaignsModule = {
 
     // Clear history
     clearHistory() {
-        if (confirm('¿Está seguro de que desea limpiar todo el historial de campañas?')) {
+        if (confirm('¿Está seguro de que desea limpiar todo el historial de campañas? Los códigos serán liberados para reutilización.')) {
+            // Clear all used codes
+            this.usedCodes.clear();
+            this.saveUsedCodes();
+
             this.generatedCampaigns = [];
             this.saveCampaigns();
             this.renderHistory();
