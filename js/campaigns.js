@@ -41,9 +41,11 @@ const CampaignsModule = {
 
         await this.loadProducts();
         this.loadUsedCodes();
+        this.loadPerformanceData();
         this.bindEvents();
         this.setDefaultDate();
         this.loadSavedCampaigns();
+        this.renderPerformanceTable();
     },
 
     // Load used codes from localStorage
@@ -779,6 +781,487 @@ const CampaignsModule = {
     async refreshProducts() {
         await this.loadProducts();
         Utils.showNotification('Lista de productos actualizada', 'success');
+    },
+
+    // ============================================
+    // REPORT UPLOAD FUNCTIONALITY
+    // ============================================
+
+    // Store pending report data
+    pendingReportData: null,
+
+    // Store campaign performance data
+    performanceData: [],
+
+    // Handle report file upload
+    handleReportUpload(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const statusEl = document.getElementById('reportUploadStatus');
+        const previewEl = document.getElementById('reportPreview');
+
+        // Show loading status
+        if (statusEl) {
+            statusEl.style.display = 'block';
+            statusEl.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; background: var(--primary-light); border-radius: var(--radius-md);">
+                    <div class="spinner-small"></div>
+                    <span>Procesando archivo: <strong>${file.name}</strong></span>
+                </div>
+            `;
+        }
+
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+
+                // Get first sheet
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+
+                // Convert to JSON
+                const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+                if (jsonData.length < 2) {
+                    throw new Error('El archivo no contiene datos suficientes');
+                }
+
+                // Process the data
+                this.processReportData(jsonData, file.name);
+
+            } catch (error) {
+                console.error('Error processing file:', error);
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; background: rgba(239, 68, 68, 0.1); border-radius: var(--radius-md); color: #ef4444;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="15" y1="9" x2="9" y2="15"></line>
+                                <line x1="9" y1="9" x2="15" y2="15"></line>
+                            </svg>
+                            <span>Error al procesar el archivo: ${error.message}</span>
+                        </div>
+                    `;
+                }
+            }
+        };
+
+        reader.readAsArrayBuffer(file);
+
+        // Clear input for future uploads
+        input.value = '';
+    },
+
+    // Process report data and show preview
+    processReportData(jsonData, fileName) {
+        const headers = jsonData[0];
+        const rows = jsonData.slice(1).filter(row => row.length > 0 && row[0]);
+
+        // Map columns - try to identify them automatically
+        const columnMap = this.identifyColumns(headers);
+
+        if (!columnMap.campaignName) {
+            throw new Error('No se encontró la columna de nombre de campaña');
+        }
+
+        // Process each row and extract campaign codes
+        const processedData = rows.map(row => {
+            const campaignName = row[columnMap.campaignName] || '';
+            const code = this.extractCampaignCode(campaignName);
+
+            return {
+                originalName: campaignName,
+                code: code,
+                spent: this.parseNumber(row[columnMap.spent]),
+                purchases: this.parseNumber(row[columnMap.purchases]),
+                cpc: this.parseNumber(row[columnMap.cpc]),
+                cpm: this.parseNumber(row[columnMap.cpm]),
+                costPerPurchase: this.parseNumber(row[columnMap.costPerPurchase]),
+                startDate: row[columnMap.startDate] || '',
+                endDate: row[columnMap.endDate] || '',
+                matched: false
+            };
+        });
+
+        // Check which codes match existing campaigns
+        processedData.forEach(item => {
+            if (item.code) {
+                const matchedCampaign = this.generatedCampaigns.find(c => c.code === item.code);
+                item.matched = !!matchedCampaign;
+                if (matchedCampaign) {
+                    item.campaignId = matchedCampaign.id;
+                }
+            }
+        });
+
+        // Store pending data
+        this.pendingReportData = processedData;
+
+        // Show preview
+        this.showReportPreview(headers, processedData);
+    },
+
+    // Identify columns in the report
+    identifyColumns(headers) {
+        const map = {
+            campaignName: null,
+            spent: null,
+            purchases: null,
+            cpc: null,
+            cpm: null,
+            costPerPurchase: null,
+            startDate: null,
+            endDate: null
+        };
+
+        headers.forEach((header, index) => {
+            const h = (header || '').toString().toLowerCase().trim();
+
+            if (h.includes('nombre') && h.includes('campaña') || h === 'nombre de la campaña' || h.includes('campaign name')) {
+                map.campaignName = index;
+            } else if (h.includes('importe gastado') || h.includes('spent') || h.includes('gastado')) {
+                map.spent = index;
+            } else if (h === 'compras' || h === 'purchases' || h === 'conversiones') {
+                map.purchases = index;
+            } else if (h.includes('cpc') || h.includes('coste por clic') || h.includes('cost per click')) {
+                map.cpc = index;
+            } else if (h.includes('cpm') || h.includes('coste por 1000') || h.includes('cost per')) {
+                map.cpm = index;
+            } else if (h.includes('coste por compra') || h.includes('cost per purchase') || h.includes('costo por compra')) {
+                map.costPerPurchase = index;
+            } else if (h.includes('inicio') || h.includes('start')) {
+                map.startDate = index;
+            } else if (h.includes('fin') || h.includes('end')) {
+                map.endDate = index;
+            }
+        });
+
+        // If campaign name not found, assume first column
+        if (map.campaignName === null && headers.length > 0) {
+            map.campaignName = 0;
+        }
+
+        return map;
+    },
+
+    // Extract campaign code from campaign name (last 4 characters that match pattern)
+    extractCampaignCode(campaignName) {
+        if (!campaignName) return null;
+
+        const name = campaignName.toString().trim();
+
+        // Try to find a code pattern at the end (2 letters + 2 numbers)
+        const codePattern = /([A-Z]{2}\d{2})$/i;
+        const match = name.match(codePattern);
+
+        if (match) {
+            return match[1].toUpperCase();
+        }
+
+        // Try to find anywhere in the name
+        const anywherePattern = /\b([A-Z]{2}\d{2})\b/gi;
+        const matches = [...name.matchAll(anywherePattern)];
+
+        if (matches.length > 0) {
+            // Return the last match
+            return matches[matches.length - 1][1].toUpperCase();
+        }
+
+        // Last resort: get last 4 characters if they look like a code
+        const lastFour = name.slice(-4);
+        if (/^[A-Z]{2}\d{2}$/i.test(lastFour)) {
+            return lastFour.toUpperCase();
+        }
+
+        return null;
+    },
+
+    // Parse number from various formats
+    parseNumber(value) {
+        if (value === null || value === undefined || value === '') return 0;
+
+        // If already a number
+        if (typeof value === 'number') return value;
+
+        // Remove currency symbols, spaces, and handle comma as decimal separator
+        let str = value.toString()
+            .replace(/[^\d.,\-]/g, '')
+            .trim();
+
+        // Handle European format (1.234,56 -> 1234.56)
+        if (str.includes(',') && str.includes('.')) {
+            if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+                // European: 1.234,56
+                str = str.replace(/\./g, '').replace(',', '.');
+            } else {
+                // US: 1,234.56
+                str = str.replace(/,/g, '');
+            }
+        } else if (str.includes(',')) {
+            // Could be European decimal or US thousands
+            const parts = str.split(',');
+            if (parts.length === 2 && parts[1].length <= 2) {
+                // Likely European decimal
+                str = str.replace(',', '.');
+            } else {
+                // Likely US thousands
+                str = str.replace(/,/g, '');
+            }
+        }
+
+        const num = parseFloat(str);
+        return isNaN(num) ? 0 : num;
+    },
+
+    // Show report preview
+    showReportPreview(headers, data) {
+        const statusEl = document.getElementById('reportUploadStatus');
+        const previewEl = document.getElementById('reportPreview');
+        const headEl = document.getElementById('reportPreviewHead');
+        const bodyEl = document.getElementById('reportPreviewBody');
+
+        if (!previewEl || !headEl || !bodyEl) return;
+
+        const matchedCount = data.filter(d => d.matched).length;
+        const totalCount = data.length;
+
+        // Update status
+        if (statusEl) {
+            statusEl.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; background: ${matchedCount > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)'}; border-radius: var(--radius-md); color: ${matchedCount > 0 ? '#10b981' : '#f59e0b'};">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        ${matchedCount > 0 ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' : '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>'}
+                    </svg>
+                    <span><strong>${matchedCount}</strong> de <strong>${totalCount}</strong> campañas coinciden con códigos existentes</span>
+                </div>
+            `;
+            statusEl.style.display = 'block';
+        }
+
+        // Build preview table header
+        headEl.innerHTML = `
+            <tr>
+                <th style="width: 80px;">Estado</th>
+                <th style="width: 80px;">Código</th>
+                <th>Nombre Campaña</th>
+                <th style="text-align: right;">Gastado</th>
+                <th style="text-align: center;">Compras</th>
+                <th style="text-align: right;">CPC</th>
+                <th style="text-align: right;">CPM</th>
+                <th style="text-align: right;">C/Compra</th>
+            </tr>
+        `;
+
+        // Build preview table body
+        bodyEl.innerHTML = data.map(item => `
+            <tr style="${item.matched ? '' : 'opacity: 0.6;'}">
+                <td>
+                    ${item.matched ?
+                `<span style="color: #10b981; font-weight: 600;">✓ Match</span>` :
+                `<span style="color: #f59e0b;">Sin match</span>`}
+                </td>
+                <td>
+                    ${item.code ?
+                `<span style="background: ${item.matched ? 'linear-gradient(135deg, var(--primary), #8b5cf6)' : 'var(--surface-hover)'}; 
+                                color: ${item.matched ? 'white' : 'var(--text-muted)'}; 
+                                padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-weight: 600; font-family: monospace;">
+                            ${item.code}
+                        </span>` :
+                '<span style="color: var(--text-muted);">-</span>'}
+                </td>
+                <td style="font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${item.originalName}">
+                    ${item.originalName}
+                </td>
+                <td style="text-align: right; font-family: monospace;">$${this.formatCurrency(item.spent)}</td>
+                <td style="text-align: center; font-weight: 600;">${item.purchases || '-'}</td>
+                <td style="text-align: right; font-family: monospace;">${item.cpc ? '$' + this.formatCurrency(item.cpc) : '-'}</td>
+                <td style="text-align: right; font-family: monospace;">${item.cpm ? '$' + this.formatCurrency(item.cpm) : '-'}</td>
+                <td style="text-align: right; font-family: monospace;">${item.costPerPurchase ? '$' + this.formatCurrency(item.costPerPurchase) : '-'}</td>
+            </tr>
+        `).join('');
+
+        previewEl.style.display = 'block';
+    },
+
+    // Format currency
+    formatCurrency(value) {
+        if (!value && value !== 0) return '0';
+        return new Intl.NumberFormat('es-CO', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+        }).format(value);
+    },
+
+    // Confirm and save report upload
+    confirmReportUpload() {
+        if (!this.pendingReportData || this.pendingReportData.length === 0) {
+            Utils.showNotification('No hay datos para procesar', 'error');
+            return;
+        }
+
+        // Filter only matched data
+        const matchedData = this.pendingReportData.filter(d => d.matched);
+
+        if (matchedData.length === 0) {
+            Utils.showNotification('No hay campañas que coincidan. Los códigos deben estar al final del nombre de la campaña.', 'warning');
+            return;
+        }
+
+        // Load existing performance data
+        this.loadPerformanceData();
+
+        // Add or update performance data
+        matchedData.forEach(item => {
+            const existingIndex = this.performanceData.findIndex(p => p.code === item.code);
+
+            const performanceEntry = {
+                code: item.code,
+                campaignId: item.campaignId,
+                originalName: item.originalName,
+                spent: item.spent,
+                purchases: item.purchases,
+                cpc: item.cpc,
+                cpm: item.cpm,
+                costPerPurchase: item.costPerPurchase,
+                startDate: item.startDate,
+                endDate: item.endDate,
+                updatedAt: new Date().toISOString()
+            };
+
+            if (existingIndex > -1) {
+                // Update existing
+                this.performanceData[existingIndex] = performanceEntry;
+            } else {
+                // Add new
+                this.performanceData.push(performanceEntry);
+            }
+        });
+
+        // Save performance data
+        this.savePerformanceData();
+
+        // Clear pending data and hide preview
+        this.cancelReportUpload();
+
+        // Render performance table
+        this.renderPerformanceTable();
+
+        Utils.showNotification(`¡${matchedData.length} campaña(s) actualizadas con datos de rendimiento!`, 'success');
+    },
+
+    // Cancel report upload
+    cancelReportUpload() {
+        this.pendingReportData = null;
+
+        const statusEl = document.getElementById('reportUploadStatus');
+        const previewEl = document.getElementById('reportPreview');
+
+        if (statusEl) statusEl.style.display = 'none';
+        if (previewEl) previewEl.style.display = 'none';
+    },
+
+    // Load performance data from localStorage
+    loadPerformanceData() {
+        const saved = localStorage.getItem('campaignPerformanceData');
+        if (saved) {
+            try {
+                this.performanceData = JSON.parse(saved);
+            } catch (e) {
+                this.performanceData = [];
+            }
+        }
+    },
+
+    // Save performance data to localStorage
+    savePerformanceData() {
+        localStorage.setItem('campaignPerformanceData', JSON.stringify(this.performanceData));
+    },
+
+    // Render performance table
+    renderPerformanceTable() {
+        const tbody = document.getElementById('campaignPerformanceTable');
+        if (!tbody) return;
+
+        this.loadPerformanceData();
+
+        if (this.performanceData.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        No hay datos de rendimiento. Sube un reporte para ver el rendimiento.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        // Calculate totals
+        const totals = this.performanceData.reduce((acc, item) => {
+            acc.spent += item.spent || 0;
+            acc.purchases += item.purchases || 0;
+            return acc;
+        }, { spent: 0, purchases: 0 });
+
+        tbody.innerHTML = this.performanceData.map(item => {
+            const campaign = this.generatedCampaigns.find(c => c.code === item.code);
+            const campaignName = campaign?.name || item.originalName;
+
+            return `
+                <tr>
+                    <td>
+                        <span onclick="CampaignsModule.copyCode('${item.code}')" 
+                              style="background: linear-gradient(135deg, var(--primary), #8b5cf6); color: white; 
+                                     padding: 0.35rem 0.75rem; border-radius: var(--radius-sm); font-weight: 700;
+                                     cursor: pointer; font-family: monospace; letter-spacing: 1px;"
+                              title="Clic para copiar">
+                            ${item.code}
+                        </span>
+                    </td>
+                    <td style="font-size: 0.8rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis;" title="${campaignName}">
+                        ${campaignName}
+                    </td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 600;">
+                        $${this.formatCurrency(item.spent)}
+                    </td>
+                    <td style="text-align: center; font-weight: 700; color: ${item.purchases > 0 ? '#10b981' : 'var(--text-muted)'};">
+                        ${item.purchases || '-'}
+                    </td>
+                    <td style="text-align: right; font-family: monospace;">
+                        ${item.cpc ? '$' + this.formatCurrency(item.cpc) : '-'}
+                    </td>
+                    <td style="text-align: right; font-family: monospace;">
+                        ${item.cpm ? '$' + this.formatCurrency(item.cpm) : '-'}
+                    </td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: ${item.costPerPurchase ? '#f59e0b' : 'var(--text-muted)'};">
+                        ${item.costPerPurchase ? '$' + this.formatCurrency(item.costPerPurchase) : '-'}
+                    </td>
+                    <td style="font-size: 0.75rem; color: var(--text-muted);">
+                        ${item.startDate || '-'} - ${item.endDate || '-'}
+                    </td>
+                </tr>
+            `;
+        }).join('') + `
+            <tr style="background: var(--surface-hover); font-weight: 700;">
+                <td colspan="2" style="text-align: right;">TOTALES:</td>
+                <td style="text-align: right; font-family: monospace; color: var(--primary);">$${this.formatCurrency(totals.spent)}</td>
+                <td style="text-align: center; color: #10b981;">${totals.purchases}</td>
+                <td colspan="4"></td>
+            </tr>
+        `;
+    },
+
+    // Clear performance data
+    clearPerformanceData() {
+        if (confirm('¿Está seguro de que desea limpiar todos los datos de rendimiento?')) {
+            this.performanceData = [];
+            this.savePerformanceData();
+            this.renderPerformanceTable();
+            Utils.showNotification('Datos de rendimiento eliminados', 'info');
+        }
     }
 };
 
