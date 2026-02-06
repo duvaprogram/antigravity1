@@ -705,7 +705,7 @@
                             <span class="stat-label">Total USD</span>
                         </div>
                     </div>
-                    <div class="stat-card analytics-stat">
+                    <div class="stat-card analytics-stat" id="analyticsTotalBsCard">
                         <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
@@ -716,6 +716,35 @@
                         <div class="stat-info">
                             <span class="stat-value" id="analyticsTotalBs">0 Bs</span>
                             <span class="stat-label">Total Bs</span>
+                        </div>
+                    </div>
+                    <!-- Valor Total de Guías -->
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsTotalGuideValue">$0.00</span>
+                            <span class="stat-label">💰 Valor Total Guías</span>
+                        </div>
+                    </div>
+                    <!-- Total Fletes -->
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="1" y="3" width="15" height="13"></rect>
+                                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                                <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsTotalShippingValue">$0.00</span>
+                            <span class="stat-label">🚚 Total Fletes</span>
                         </div>
                     </div>
                 </div>
@@ -827,7 +856,7 @@
                         <div class="card-body">
                             <div class="currency-stats"
                                 style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
-                                <div class="currency-card"
+                                <div class="currency-card" id="analyticsUsdCurrencyCard"
                                     style="background: var(--surface-hover); padding: 1.25rem; border-radius: var(--radius-lg); text-align: center;">
                                     <div style="font-size: 2rem; font-weight: 700; color: #10b981;"
                                         id="analyticsUsdCount">0</div>
@@ -835,7 +864,7 @@
                                     <div style="font-size: 1.25rem; font-weight: 600; color: var(--text-primary); margin-top: 0.5rem;"
                                         id="analyticsUsdAmount">$0.00</div>
                                 </div>
-                                <div class="currency-card"
+                                <div class="currency-card" id="analyticsBsCurrencyCard"
                                     style="background: var(--surface-hover); padding: 1.25rem; border-radius: var(--radius-lg); text-align: center;">
                                     <div style="font-size: 2rem; font-weight: 700; color: #3b82f6;"
                                         id="analyticsBsCount">0</div>
@@ -889,6 +918,7 @@
                                         <th>Cliente</th>
                                         <th>Ciudad</th>
                                         <th>Total</th>
+                                        <th>Flete</th>
                                         <th>Estado</th>
                                     </tr>
                                 </thead>

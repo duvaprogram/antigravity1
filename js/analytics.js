@@ -151,6 +151,7 @@ const AnalyticsModule = {
             this.updateCityChart();
             this.updateStatusChart();
             this.updateCurrencyStats();
+            this.updateGuideValueStats();
             await this.updateTopProducts();
             this.updateGuidesTable();
 
@@ -266,6 +267,8 @@ const AnalyticsModule = {
 
     updateCurrencyStats() {
         const guides = this.filteredGuides;
+        const cityFilter = this.currentFilters.city;
+        const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
 
         // Guides with USD payment
         const usdGuides = guides.filter(g => g.amountUsd && parseFloat(g.amountUsd) > 0 && g.status !== 'Cancelado');
@@ -275,6 +278,20 @@ const AnalyticsModule = {
         document.getElementById('analyticsUsdCount').textContent = usdCount;
         document.getElementById('analyticsUsdAmount').textContent = `$${usdAmount.toFixed(2)}`;
 
+        // Show/hide currency sections based on country
+        const bsCurrencyCard = document.getElementById('analyticsBsCurrencyCard');
+        const usdCurrencyCard = document.getElementById('analyticsUsdCurrencyCard');
+
+        if (isEcuador) {
+            // Ecuador only uses USD - hide Bs section
+            if (bsCurrencyCard) bsCurrencyCard.style.display = 'none';
+            if (usdCurrencyCard) usdCurrencyCard.style.display = 'block';
+        } else {
+            // Show both for Venezuela (Caracas) or All
+            if (bsCurrencyCard) bsCurrencyCard.style.display = 'block';
+            if (usdCurrencyCard) usdCurrencyCard.style.display = 'block';
+        }
+
         // Guides with Bs payment
         const bsGuides = guides.filter(g => g.paymentBs && parseFloat(g.paymentBs) > 0 && g.status !== 'Cancelado');
         const bsCount = bsGuides.length;
@@ -282,6 +299,50 @@ const AnalyticsModule = {
 
         document.getElementById('analyticsBsCount').textContent = bsCount;
         document.getElementById('analyticsBsAmount').textContent = `${bsAmount.toFixed(2)} Bs`;
+    },
+
+    updateGuideValueStats() {
+        const guides = this.filteredGuides.filter(g => g.status !== 'Cancelado');
+        const cityFilter = this.currentFilters.city;
+        const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
+
+        // Calculate total value of guides (totalAmount)
+        const totalGuideValue = guides.reduce((sum, g) => sum + (parseFloat(g.totalAmount) || 0), 0);
+
+        // Calculate total shipping costs (shippingCost)
+        const totalShippingValue = guides.reduce((sum, g) => sum + (parseFloat(g.shippingCost) || 0), 0);
+
+        // Update display elements
+        const totalValueElement = document.getElementById('analyticsTotalGuideValue');
+        const shippingValueElement = document.getElementById('analyticsTotalShippingValue');
+
+        if (totalValueElement) {
+            if (isEcuador) {
+                totalValueElement.textContent = `$${totalGuideValue.toFixed(2)}`;
+            } else {
+                totalValueElement.textContent = Utils.formatCurrency(totalGuideValue);
+            }
+        }
+
+        if (shippingValueElement) {
+            if (isEcuador) {
+                shippingValueElement.textContent = `$${totalShippingValue.toFixed(2)}`;
+            } else {
+                shippingValueElement.textContent = Utils.formatCurrency(totalShippingValue);
+            }
+        }
+
+        // Update summary stats currency display
+        const totalUsdElement = document.getElementById('analyticsTotalUsd');
+        const totalBsElement = document.getElementById('analyticsTotalBs');
+        const totalBsCard = document.getElementById('analyticsTotalBsCard');
+
+        if (isEcuador) {
+            // For Ecuador, hide Bs total
+            if (totalBsCard) totalBsCard.style.display = 'none';
+        } else {
+            if (totalBsCard) totalBsCard.style.display = 'flex';
+        }
     },
 
     async updateTopProducts() {
@@ -376,7 +437,7 @@ const AnalyticsModule = {
         if (guides.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         No se encontraron guías con los filtros aplicados
                     </td>
                 </tr>
@@ -387,13 +448,32 @@ const AnalyticsModule = {
         // Sort by date (newest first)
         const sortedGuides = [...guides].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
+        const cityFilter = this.currentFilters.city;
+        const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
+
         tbody.innerHTML = sortedGuides.map(guide => {
             const statusClass = Utils.getStatusClass(guide.status);
             const cityClass = guide.city.toLowerCase();
 
-            let paymentInfo = Utils.formatCurrency(guide.totalAmount);
-            if (guide.amountUsd) {
+            // Determine payment info based on country/city filter
+            let paymentInfo;
+            if (isEcuador || guide.city === 'Quito' || guide.city === 'Guayaquil') {
+                // Ecuador uses dollars
+                paymentInfo = `<span style="color: var(--success);">$${(guide.totalAmount || 0).toFixed(2)}</span>`;
+            } else if (guide.amountUsd) {
                 paymentInfo = `<span style="color: var(--success);">$${guide.amountUsd}</span>`;
+            } else {
+                paymentInfo = Utils.formatCurrency(guide.totalAmount);
+            }
+
+            // Shipping cost in separate column
+            let shippingCost = '-';
+            if (guide.shippingCost && parseFloat(guide.shippingCost) > 0) {
+                if (isEcuador || guide.city === 'Quito' || guide.city === 'Guayaquil') {
+                    shippingCost = `<span style="color: var(--primary);">$${parseFloat(guide.shippingCost).toFixed(2)}</span>`;
+                } else {
+                    shippingCost = `<span style="color: var(--primary);">${Utils.formatCurrency(guide.shippingCost)}</span>`;
+                }
             }
 
             return `
@@ -403,6 +483,7 @@ const AnalyticsModule = {
                     <td>${guide.clientName || 'N/A'}</td>
                     <td><span class="city-badge ${cityClass}">${guide.city}</span></td>
                     <td>${paymentInfo}</td>
+                    <td>${shippingCost}</td>
                     <td><span class="status-badge ${statusClass}">${guide.status}</span></td>
                 </tr>
             `;
