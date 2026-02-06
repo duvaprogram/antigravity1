@@ -1616,6 +1616,25 @@
                                     </select>
                                 </div>
 
+                                <!-- Objective Select -->
+                                <div class="form-group">
+                                    <label for="campaignObjective">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2"
+                                            style="display: inline; vertical-align: middle; margin-right: 4px;">
+                                            <circle cx="12" cy="12" r="10"></circle>
+                                            <circle cx="12" cy="12" r="6"></circle>
+                                            <circle cx="12" cy="12" r="2"></circle>
+                                        </svg>
+                                        Objetivo *
+                                    </label>
+                                    <select id="campaignObjective" class="form-control" required>
+                                        <option value="">Seleccione objetivo...</option>
+                                        <option value="MENSAJES">Mensajes</option>
+                                        <option value="COMPRAS">Compras</option>
+                                    </select>
+                                </div>
+
                                 <!-- Date Picker -->
                                 <div class="form-group">
                                     <label for="campaignDate">
@@ -1634,7 +1653,7 @@
 
                                 <!-- Product Select -->
                                 <div class="form-group">
-                                    <label for="campaignProduct">
+                                    <label for="campaignProductSearch">
                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                                             stroke="currentColor" stroke-width="2"
                                             style="display: inline; vertical-align: middle; margin-right: 4px;">
@@ -1644,10 +1663,12 @@
                                         </svg>
                                         Producto *
                                     </label>
-                                    <select id="campaignProduct" class="form-control" required>
-                                        <option value="">Seleccione un producto...</option>
-                                        <!-- Se llenará dinámicamente -->
-                                    </select>
+                                    <div class="autocomplete-container">
+                                        <input type="text" id="campaignProductSearch" placeholder="Buscar producto..."
+                                            autocomplete="off">
+                                        <input type="hidden" id="campaignProduct">
+                                        <div class="autocomplete-suggestions" id="campaignProductSuggestions"></div>
+                                    </div>
                                 </div>
 
                                 <!-- Ad Sets -->

@@ -121,30 +121,70 @@ const CampaignsModule = {
     async loadProducts() {
         try {
             this.products = await Database.getProducts();
-            this.populateProductSelect();
+            // this.populateProductSelect(); // No longer needed
         } catch (error) {
             console.error('Error loading products:', error);
             this.products = [];
         }
     },
 
-    // Populate the product select dropdown
+    // Populate the product select dropdown - DEPRECATED (Replaced by autocomplete)
     populateProductSelect() {
-        const select = document.getElementById('campaignProduct');
-        if (!select) return;
+        // No-op
+    },
 
-        // Clear existing options except the first one
-        select.innerHTML = '<option value="">Seleccione un producto...</option>';
 
-        // Add active products only
-        const activeProducts = this.products.filter(p => p.active !== false);
 
-        activeProducts.forEach(product => {
-            const option = document.createElement('option');
-            option.value = product.name;
-            option.textContent = `${product.name} (${product.sku || 'Sin SKU'})`;
-            select.appendChild(option);
+    // Generate the campaign name
+    generateCampaignName() {
+        const country = document.getElementById('campaignCountry').value;
+        const type = document.getElementById('campaignType').value;
+        const objective = document.getElementById('campaignObjective').value;
+        const date = document.getElementById('campaignDate').value;
+        const product = document.getElementById('campaignProduct').value.trim();
+        const adSets = parseInt(document.getElementById('campaignAdSets').value) || 0;
+        const ads = parseInt(document.getElementById('campaignAds').value) || 0;
+
+        if (!country || !type || !objective || !date || !product) {
+            Utils.showNotification('Por favor complete todos los campos obligatorios', 'error');
+            return;
+        }
+
+        const formattedDate = this.formatDate(date);
+        const formattedProduct = product.toUpperCase().replace(/\s+/g, '-');
+        const campaignCode = this.generateCampaignCode();
+
+        // Format: PAIS-TIPO-OBJETIVO-FECHA-PRODUCTO-CODIGO
+        const campaignName = `${country}-${type}-${objective}-${formattedDate}-${formattedProduct}-${campaignCode}`;
+
+        // Generate ad and ad set codes (no dashes, unique)
+        const adSetCodes = this.generateAdSetCodes(campaignCode, adSets);
+        const adCodes = this.generateAdCodes(campaignCode, ads);
+
+        // Add to history
+        this.addToHistory(campaignName, {
+            country,
+            type,
+            objective,
+            date: formattedDate,
+            product: formattedProduct,
+            code: campaignCode,
+            adSets,
+            ads,
+            adSetCodes,
+            adCodes,
+            createdAt: new Date().toISOString()
         });
+
+        // Show result
+        this.showResult(campaignName, campaignCode, adSets, ads, adSetCodes, adCodes);
+
+        // Reset form for next entry (keep country, type and date)
+        document.getElementById('campaignProduct').value = '';
+        document.getElementById('campaignProductSearch').value = '';
+        document.getElementById('campaignAdSets').value = '';
+        document.getElementById('campaignAds').value = '';
+        this.updatePreview();
     },
 
     // Bind form events
@@ -160,8 +200,8 @@ const CampaignsModule = {
             form.addEventListener('submit', this.handleFormSubmit);
         }
 
-        // Real-time preview
-        const inputs = ['campaignCountry', 'campaignType', 'campaignDate', 'campaignProduct', 'campaignAdSets', 'campaignAds'];
+        // Real-time preview interactions
+        const inputs = ['campaignCountry', 'campaignType', 'campaignObjective', 'campaignDate', 'campaignProduct', 'campaignAdSets', 'campaignAds'];
         inputs.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
@@ -174,6 +214,127 @@ const CampaignsModule = {
                 el.addEventListener('change', this.updatePreviewHandler);
             }
         });
+
+        // Product Autocomplete
+        const productSearchInput = document.getElementById('campaignProductSearch');
+        if (productSearchInput) {
+            productSearchInput.addEventListener('input', Utils.debounce(() => {
+                this.searchProducts(productSearchInput.value);
+            }, 200));
+
+            productSearchInput.addEventListener('focus', () => {
+                if (productSearchInput.value.length >= 1) {
+                    this.searchProducts(productSearchInput.value);
+                }
+            });
+
+            productSearchInput.addEventListener('keydown', (e) => {
+                this.handleAutocompleteKeyboard(e, 'campaignProductSuggestions');
+            });
+        }
+
+        // Close autocomplete when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.autocomplete-container')) {
+                document.querySelectorAll('.autocomplete-suggestions').forEach(el => {
+                    el.classList.remove('active');
+                });
+            }
+        });
+    },
+
+    // Handle keyboard navigation in autocomplete
+    handleAutocompleteKeyboard(e, suggestionsId) {
+        const suggestions = document.getElementById(suggestionsId);
+        const items = suggestions.querySelectorAll('.autocomplete-item:not(.disabled)');
+        const activeItem = suggestions.querySelector('.autocomplete-item.active');
+        let currentIndex = Array.from(items).indexOf(activeItem);
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                if (currentIndex < items.length - 1) {
+                    items[currentIndex]?.classList.remove('active');
+                    items[currentIndex + 1]?.classList.add('active');
+                    items[currentIndex + 1]?.scrollIntoView({ block: 'nearest' });
+                } else if (currentIndex === -1 && items.length > 0) {
+                    items[0]?.classList.add('active');
+                }
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                if (currentIndex > 0) {
+                    items[currentIndex]?.classList.remove('active');
+                    items[currentIndex - 1]?.classList.add('active');
+                    items[currentIndex - 1]?.scrollIntoView({ block: 'nearest' });
+                }
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (activeItem) {
+                    activeItem.click();
+                }
+                break;
+            case 'Escape':
+                suggestions.classList.remove('active');
+                break;
+        }
+    },
+
+    // Search products for autocomplete
+    searchProducts(query) {
+        const suggestionsEl = document.getElementById('campaignProductSuggestions');
+
+        if (query.length < 1) {
+            suggestionsEl.classList.remove('active');
+            return;
+        }
+
+        const queryLower = query.toLowerCase();
+        // Filter active products
+        const activeProducts = this.products.filter(p => p.active !== false);
+
+        const filtered = activeProducts.filter(product =>
+            product.name.toLowerCase().includes(queryLower) ||
+            (product.sku && product.sku.toLowerCase().includes(queryLower))
+        ).slice(0, 10);
+
+        if (filtered.length === 0) {
+            suggestionsEl.innerHTML = '<div class="autocomplete-no-results">No se encontraron productos</div>';
+        } else {
+            suggestionsEl.innerHTML = filtered.map(product => `
+                <div class="autocomplete-item" data-id="${product.id}" data-name="${product.name}" data-sku="${product.sku || ''}">
+                    <div class="item-main">${this.highlightMatch(product.name, query)}</div>
+                    <div class="item-secondary">
+                        ${product.sku ? `<span style="color: var(--text-muted);">SKU: ${product.sku}</span>` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            // Add click handlers
+            suggestionsEl.querySelectorAll('.autocomplete-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    this.selectProduct(item.dataset.id, item.dataset.name, item.dataset.sku);
+                });
+            });
+        }
+
+        suggestionsEl.classList.add('active');
+    },
+
+    // Select a product from autocomplete
+    selectProduct(productId, productName, productSku) {
+        document.getElementById('campaignProduct').value = productName; // Store name or concatenated text? Storing name for now, will format later
+        document.getElementById('campaignProductSearch').value = productName;
+        document.getElementById('campaignProductSuggestions').classList.remove('active');
+        this.updatePreview();
+    },
+
+    // Highlight matching text
+    highlightMatch(text, query) {
+        if (!query) return text;
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return text.replace(regex, '<span class="autocomplete-highlight">$1</span>');
     },
 
     // Set default date to today
@@ -199,8 +360,9 @@ const CampaignsModule = {
     updatePreview() {
         const country = document.getElementById('campaignCountry')?.value || '';
         const type = document.getElementById('campaignType')?.value || '';
+        const objective = document.getElementById('campaignObjective')?.value || '';
         const date = document.getElementById('campaignDate')?.value || '';
-        const product = document.getElementById('campaignProduct')?.value || '';
+        const product = document.getElementById('campaignProduct')?.value || ''; // Value from hidden input (name)
         const adSets = document.getElementById('campaignAdSets')?.value || '';
         const ads = document.getElementById('campaignAds')?.value || '';
 
@@ -210,14 +372,15 @@ const CampaignsModule = {
 
         if (!previewEl || !previewTextEl) return;
 
-        if (country && type && date && product.trim()) {
+        if (country && type && objective && date && product.trim()) {
             const formattedDate = this.formatDate(date);
             const formattedProduct = product.toUpperCase().trim().replace(/\s+/g, '-');
-            const campaignName = `${country}-${type}-${formattedDate}-${formattedProduct}`;
+            // Format example: ECU-ABO-COMPRAS-06-FEB-2026-PRODUCTO-XY01
+            const campaignName = `${country}-${type}-${objective}-${formattedDate}-${formattedProduct}-XY01`;
 
             previewTextEl.innerHTML = `
                 <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem;">
-                    Al generar se asignará un código único como: <strong style="color: var(--primary);">XY01</strong>
+                    Previsualización (El código <strong>XY01</strong> es generado al final):
                 </div>
                 ${campaignName}
             `;
@@ -234,13 +397,13 @@ const CampaignsModule = {
                     infoText += `<div style="margin-bottom: 0.5rem; font-size: 0.85rem; color: var(--text-secondary);">`;
 
                     if (adSetsNum > 0) {
-                        infoText += `<span>📊 ${adSetsNum} Conjunto(s) → Códigos: XY01S1, XY01S2...</span>`;
+                        infoText += `<span>📊 ${adSetsNum} Conjunto(s) → Códigos: ...XY01S1, ...XY01S2</span>`;
                     }
                     if (adSetsNum > 0 && adsNum > 0) {
                         infoText += ` · `;
                     }
                     if (adsNum > 0) {
-                        infoText += `<span>📢 ${adsNum} Anuncio(s) → Códigos: XY01A1, XY01A2...</span>`;
+                        infoText += `<span>📢 ${adsNum} Anuncio(s) → Códigos: ...XY01A1, ...XY01A2</span>`;
                     }
 
                     infoText += `</div></div>`;
@@ -256,52 +419,6 @@ const CampaignsModule = {
         }
     },
 
-    // Generate the campaign name
-    generateCampaignName() {
-        const country = document.getElementById('campaignCountry').value;
-        const type = document.getElementById('campaignType').value;
-        const date = document.getElementById('campaignDate').value;
-        const product = document.getElementById('campaignProduct').value.trim();
-        const adSets = parseInt(document.getElementById('campaignAdSets').value) || 0;
-        const ads = parseInt(document.getElementById('campaignAds').value) || 0;
-
-        if (!country || !type || !date || !product) {
-            Utils.showNotification('Por favor complete todos los campos obligatorios', 'error');
-            return;
-        }
-
-        const formattedDate = this.formatDate(date);
-        const formattedProduct = product.toUpperCase().replace(/\s+/g, '-');
-        const campaignCode = this.generateCampaignCode();
-        const campaignName = `${country}-${type}-${formattedDate}-${formattedProduct}`;
-
-        // Generate ad and ad set codes (no dashes, unique)
-        const adSetCodes = this.generateAdSetCodes(campaignCode, adSets);
-        const adCodes = this.generateAdCodes(campaignCode, ads);
-
-        // Add to history
-        this.addToHistory(campaignName, {
-            country,
-            type,
-            date: formattedDate,
-            product: formattedProduct,
-            code: campaignCode,
-            adSets,
-            ads,
-            adSetCodes,
-            adCodes,
-            createdAt: new Date().toISOString()
-        });
-
-        // Show result
-        this.showResult(campaignName, campaignCode, adSets, ads, adSetCodes, adCodes);
-
-        // Reset form for next entry (keep country, type and date)
-        document.getElementById('campaignProduct').value = '';
-        document.getElementById('campaignAdSets').value = '';
-        document.getElementById('campaignAds').value = '';
-        this.updatePreview();
-    },
 
     // Show the generated result
     showResult(campaignName, campaignCode, adSets, ads, adSetCodes, adCodes) {
