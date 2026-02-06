@@ -223,6 +223,12 @@ const App = {
             document.getElementById('statClients').textContent = clients.length;
             document.getElementById('statGuides').textContent = todayGuides.length;
 
+            // Calculate total inventory cost (price * available quantity)
+            const totalInventoryCost = inventory.reduce((sum, item) => {
+                return sum + ((item.price || 0) * (item.available || 0));
+            }, 0);
+            document.getElementById('statTotalProductCost').textContent = `$${totalInventoryCost.toFixed(2)}`;
+
             // Recent guides
             const recentGuides = guides.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
             const recentGuidesTable = document.getElementById('recentGuidesTable');

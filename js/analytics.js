@@ -42,11 +42,84 @@ const AnalyticsModule = {
             this.refreshData();
         });
 
-        // Product filter
-        document.getElementById('analyticsProduct').addEventListener('change', () => {
-            this.currentFilters.productId = document.getElementById('analyticsProduct').value;
-            this.refreshData();
-        });
+        // Product predictive search
+        const productSearch = document.getElementById('analyticsProductSearch');
+        const productHidden = document.getElementById('analyticsProduct');
+        const suggestions = document.getElementById('analyticsProductSuggestions');
+
+        if (productSearch) {
+            productSearch.addEventListener('input', () => {
+                const query = productSearch.value.toLowerCase().trim();
+
+                if (query.length === 0) {
+                    // Clear filter if empty
+                    productHidden.value = '';
+                    this.currentFilters.productId = '';
+                    suggestions.style.display = 'none';
+                    this.refreshData();
+                    return;
+                }
+
+                // Filter products
+                const matches = this.allProducts
+                    .filter(p => p.active && p.name.toLowerCase().includes(query))
+                    .slice(0, 10);
+
+                if (matches.length > 0) {
+                    suggestions.innerHTML = matches.map(p => `
+                        <div class="suggestion-item" data-id="${p.id}" data-name="${Utils.escapeHtml(p.name)}"
+                            style="padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid var(--border);
+                            transition: background 0.2s;">
+                            <div style="font-weight: 500;">${Utils.escapeHtml(p.name)}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">SKU: ${p.sku || 'N/A'}</div>
+                        </div>
+                    `).join('');
+                    suggestions.style.display = 'block';
+
+                    // Bind click events
+                    suggestions.querySelectorAll('.suggestion-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            productSearch.value = item.dataset.name;
+                            productHidden.value = item.dataset.id;
+                            this.currentFilters.productId = item.dataset.id;
+                            suggestions.style.display = 'none';
+                            this.refreshData();
+                        });
+                        item.addEventListener('mouseenter', () => {
+                            item.style.background = 'var(--surface-hover)';
+                        });
+                        item.addEventListener('mouseleave', () => {
+                            item.style.background = 'transparent';
+                        });
+                    });
+                } else {
+                    suggestions.innerHTML = `
+                        <div style="padding: 1rem; text-align: center; color: var(--text-muted);">
+                            No se encontraron productos
+                        </div>
+                    `;
+                    suggestions.style.display = 'block';
+                }
+            });
+
+            // Hide suggestions when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!productSearch.contains(e.target) && !suggestions.contains(e.target)) {
+                    suggestions.style.display = 'none';
+                }
+            });
+
+            // Clear product filter button functionality
+            productSearch.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    productSearch.value = '';
+                    productHidden.value = '';
+                    this.currentFilters.productId = '';
+                    suggestions.style.display = 'none';
+                    this.refreshData();
+                }
+            });
+        }
     },
 
     setDefaultFilters() {
@@ -77,6 +150,12 @@ const AnalyticsModule = {
         document.getElementById('analyticsCity').value = '';
         document.getElementById('analyticsStatus').value = '';
         document.getElementById('analyticsProduct').value = '';
+
+        // Reset predictive search field
+        const productSearch = document.getElementById('analyticsProductSearch');
+        if (productSearch) {
+            productSearch.value = '';
+        }
 
         this.refreshData();
     },
@@ -118,22 +197,8 @@ const AnalyticsModule = {
 
     async loadProducts() {
         try {
+            // Load products for predictive search
             this.allProducts = await Database.getProducts();
-            const select = document.getElementById('analyticsProduct');
-
-            // Keep the first option (Todos los productos)
-            select.innerHTML = '<option value="">Todos los productos</option>';
-
-            // Add all active products
-            this.allProducts
-                .filter(p => p.active)
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .forEach(product => {
-                    const option = document.createElement('option');
-                    option.value = product.id;
-                    option.textContent = product.name;
-                    select.appendChild(option);
-                });
         } catch (error) {
             console.error('Error loading products for filter:', error);
         }
@@ -151,9 +216,9 @@ const AnalyticsModule = {
             this.updateCityChart();
             this.updateStatusChart();
             this.updateCurrencyStats();
-            this.updateGuideValueStats();
+            await this.updateGuideValueStats();
             await this.updateTopProducts();
-            this.updateGuidesTable();
+            await this.updateGuidesTable();
 
         } catch (error) {
             console.error('Error refreshing analytics:', error);
@@ -301,10 +366,24 @@ const AnalyticsModule = {
         document.getElementById('analyticsBsAmount').textContent = `${bsAmount.toFixed(2)} Bs`;
     },
 
-    updateGuideValueStats() {
-        const guides = this.filteredGuides.filter(g => g.status !== 'Cancelado');
+    async updateGuideValueStats() {
+        let guides = this.filteredGuides.filter(g => g.status !== 'Cancelado');
         const cityFilter = this.currentFilters.city;
         const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
+        const productFilter = this.currentFilters.productId;
+
+        // If product filter is active, filter guides that contain that product
+        if (productFilter) {
+            const guidesWithProduct = [];
+            for (const guide of guides) {
+                const items = await Database.getGuideItems(guide.id);
+                const hasProduct = items.some(item => item.productId === productFilter);
+                if (hasProduct) {
+                    guidesWithProduct.push(guide);
+                }
+            }
+            guides = guidesWithProduct;
+        }
 
         // Calculate total value of guides (totalAmount)
         const totalGuideValue = guides.reduce((sum, g) => sum + (parseFloat(g.totalAmount) || 0), 0);
