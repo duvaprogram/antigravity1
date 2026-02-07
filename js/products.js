@@ -90,7 +90,7 @@ const ProductsModule = {
         if (products.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         No se encontraron productos
                     </td>
                 </tr>
@@ -114,7 +114,8 @@ const ProductsModule = {
                     <br><small style="color: var(--text-muted);">${Utils.escapeHtml(product.description || '')}</small>
                 </td>
                 <td>${product.import_number || '-'}</td>
-                <td>${Utils.formatCurrency(product.price)}</td>
+                <td><span style="color: var(--warning);">${Utils.formatCurrency(product.cost || 0)}</span></td>
+                <td><span style="color: var(--success);">${Utils.formatCurrency(product.price)}</span></td>
                 <td>
                     <span style="font-size: 0.8rem; color: var(--text-muted);">${createdDate}</span>
                 </td>
@@ -160,6 +161,7 @@ const ProductsModule = {
                 document.getElementById('productSku').value = product.sku;
                 document.getElementById('productDescription').value = product.description || '';
                 document.getElementById('productCategory').value = product.category || '';
+                document.getElementById('productCost').value = product.cost || '';
                 document.getElementById('productPrice').value = product.price;
                 document.getElementById('productActive').checked = product.active;
             }
@@ -197,6 +199,7 @@ const ProductsModule = {
             description: document.getElementById('productDescription').value.trim(),
             category: document.getElementById('productCategory').value,
             import_number: parseInt(importNumber),
+            cost: parseFloat(document.getElementById('productCost').value) || 0,
             price: parseFloat(document.getElementById('productPrice').value),
             active: document.getElementById('productActive').checked
         };
