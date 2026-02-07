@@ -223,9 +223,9 @@ const App = {
             document.getElementById('statClients').textContent = clients.length;
             document.getElementById('statGuides').textContent = todayGuides.length;
 
-            // Calculate total inventory cost (price * available quantity)
+            // Calculate total inventory cost (cost * available quantity)
             const totalInventoryCost = inventory.reduce((sum, item) => {
-                return sum + ((item.price || 0) * (item.available || 0));
+                return sum + ((item.cost || 0) * (item.available || 0));
             }, 0);
             document.getElementById('statTotalProductCost').textContent = `$${totalInventoryCost.toFixed(2)}`;
 
