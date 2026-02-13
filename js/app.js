@@ -313,6 +313,21 @@ const App = {
                 });
             }
         });
+
+        // Global handler for close buttons (data-close attribute)
+        document.addEventListener('click', (e) => {
+            const closeBtn = e.target.closest('[data-close]');
+            if (closeBtn) {
+                const modalId = closeBtn.getAttribute('data-close');
+                if (modalId) {
+                    const modal = document.getElementById(modalId);
+                    if (modal) {
+                        modal.classList.remove('active');
+                        document.body.style.overflow = '';
+                    }
+                }
+            }
+        });
     },
 
     bindMobileMenu() {

@@ -95,6 +95,14 @@ const GuidesModule = {
             btn.addEventListener('click', () => Utils.closeModal('modalGuideDetails'));
         });
 
+        document.querySelectorAll('[data-close="modalAdjustShipping"]').forEach(btn => {
+            btn.addEventListener('click', () => Utils.closeModal('modalAdjustShipping'));
+        });
+
+        document.querySelectorAll('[data-close="modalNovedadGestion"]').forEach(btn => {
+            btn.addEventListener('click', () => Utils.closeModal('modalNovedadGestion'));
+        });
+
         // Print guide
         document.getElementById('btnPrintGuide').addEventListener('click', () => {
             this.printGuide();
