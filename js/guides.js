@@ -431,54 +431,196 @@ const GuidesModule = {
                         <span class="status-badge ${statusClass}">${guide.status}</span>
                     </td>
                     <td>
-                        <div style="display: flex; gap: 4px;">
-                            <button class="btn btn-icon btn-secondary" onclick="GuidesModule.viewGuide('${guide.id}')" title="Ver detalles">
+                    <div style="display: flex; gap: 4px; align-items: center;">
+                        <button class="btn btn-icon btn-secondary" onclick="GuidesModule.viewGuide('${guide.id}')" title="Ver detalles">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </button>
+                        <div class="guide-actions-dropdown" style="position: relative;">
+                            <button class="btn btn-icon btn-secondary" onclick="GuidesModule.toggleActionsMenu(event, '${guide.id}')" title="Más acciones">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                    <circle cx="12" cy="12" r="3"></circle>
+                                    <circle cx="12" cy="5" r="1"></circle>
+                                    <circle cx="12" cy="12" r="1"></circle>
+                                    <circle cx="12" cy="19" r="1"></circle>
                                 </svg>
                             </button>
-                            ${guide.status === 'Pendiente' ? `
-                                <button class="btn btn-icon btn-secondary" onclick="GuidesModule.changeStatus('${guide.id}', 'En ruta')" title="Marcar en ruta">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <polyline points="12 6 12 12 16 14"></polyline>
+                            <div class="actions-menu" id="actionsMenu-${guide.id}" style="display: none; position: absolute; right: 0; top: 100%; z-index: 100; min-width: 200px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 0.5rem 0; margin-top: 4px;">
+                                <div style="padding: 0.25rem 1rem; font-size: 0.7rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.5px;">Cambiar Estado</div>
+                                ${['Pendiente', 'En ruta', 'Entregado', 'Pagado', 'Novedad', 'Cancelado', 'Devolución'].map(status => {
+                const isActive = guide.status === status;
+                const statusColors = {
+                    'Pendiente': '#f59e0b',
+                    'En ruta': '#3b82f6',
+                    'Entregado': '#22c55e',
+                    'Pagado': '#8b5cf6',
+                    'Novedad': '#ea580c',
+                    'Cancelado': '#ef4444',
+                    'Devolución': '#f97316'
+                };
+                return `<button onclick="event.stopPropagation(); GuidesModule.changeStatus('${guide.id}', '${status}'); GuidesModule.closeAllMenus();" 
+                                        style="display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 1rem; border: none; background: ${isActive ? 'var(--primary-light)' : 'none'}; color: ${isActive ? 'var(--primary)' : 'var(--text-secondary)'}; cursor: pointer; font-size: 0.85rem; text-align: left; transition: background 0.15s;"
+                                        onmouseover="this.style.background='${isActive ? 'var(--primary-light)' : 'var(--surface-hover)'}'" 
+                                        onmouseout="this.style.background='${isActive ? 'var(--primary-light)' : 'none'}'">
+                                        <span style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColors[status]}; flex-shrink: 0;"></span>
+                                        ${status}
+                                        ${isActive ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: auto;"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}
+                                    </button>`;
+            }).join('')}
+                                <div style="border-top: 1px solid var(--border); margin: 0.5rem 0;"></div>
+                                <button onclick="event.stopPropagation(); GuidesModule.duplicateGuide('${guide.id}'); GuidesModule.closeAllMenus();"
+                                    style="display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 1rem; border: none; background: none; color: var(--text-secondary); cursor: pointer; font-size: 0.85rem; text-align: left; transition: background 0.15s;"
+                                    onmouseover="this.style.background='var(--surface-hover)'" 
+                                    onmouseout="this.style.background='none'">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                                     </svg>
+                                    Duplicar Guía
                                 </button>
-                                <button class="btn btn-icon btn-secondary" onclick="GuidesModule.changeStatus('${guide.id}', 'Cancelado')" title="Anular Guía" style="color: var(--danger);">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <circle cx="12" cy="12" r="10"></circle>
-                                        <line x1="15" y1="9" x2="9" y2="15"></line>
-                                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                                <div style="border-top: 1px solid var(--border); margin: 0.5rem 0;"></div>
+                                <button onclick="event.stopPropagation(); GuidesModule.deleteGuide('${guide.id}'); GuidesModule.closeAllMenus();"
+                                    style="display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 1rem; border: none; background: none; color: var(--danger); cursor: pointer; font-size: 0.85rem; text-align: left; transition: background 0.15s;"
+                                    onmouseover="this.style.background='rgba(239, 68, 68, 0.05)'" 
+                                    onmouseout="this.style.background='none'">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                     </svg>
+                                    Eliminar
                                 </button>
-                            ` : ''}
-                            ${guide.status === 'En ruta' ? `
-                                <button class="btn btn-icon btn-secondary" onclick="GuidesModule.changeStatus('${guide.id}', 'Entregado')" title="Marcar entregado" style="color: var(--success);">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="20 6 9 17 4 12"></polyline>
-                                    </svg>
-                                </button>
-                            ` : ''}
-                            ${guide.status === 'Entregado' ? `
-                                <button class="btn btn-icon btn-secondary" onclick="GuidesModule.changeStatus('${guide.id}', 'Pagado')" title="Marcar como pagado" style="color: #8b5cf6;">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-                                        <line x1="1" y1="10" x2="23" y2="10"></line>
-                                    </svg>
-                                </button>
-                            ` : ''}
-                            <button class="btn btn-icon btn-secondary" onclick="GuidesModule.deleteGuide('${guide.id}')" title="Eliminar Permanentemente">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="3 6 5 6 21 6"></polyline>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        `;
+        }).join('');
+    },
+
+    // ========================================
+    // ACTIONS MENU & DUPLICATE
+    // ========================================
+    toggleActionsMenu(event, guideId) {
+        event.stopPropagation();
+        const menu = document.getElementById(`actionsMenu-${guideId}`);
+        const isOpen = menu.style.display === 'block';
+
+        // Close all menus first
+        this.closeAllMenus();
+
+        if (!isOpen) {
+            menu.style.display = 'block';
+            // Close on outside click
+            setTimeout(() => {
+                document.addEventListener('click', this._closeMenuHandler = () => {
+                    this.closeAllMenus();
+                    document.removeEventListener('click', this._closeMenuHandler);
+                }, { once: true });
+            }, 10);
+        }
+    },
+
+    closeAllMenus() {
+        document.querySelectorAll('.actions-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+    },
+
+    async duplicateGuide(guideId) {
+        try {
+            const guide = await Database.getGuide(guideId);
+            if (!guide) {
+                Utils.showToast('No se pudo cargar la guía', 'error');
+                return;
+            }
+
+            // Open the guide form
+            await this.openGuideModal();
+
+            // Pre-fill form fields
+            if (guide.clientId) {
+                document.getElementById('guideClient').value = guide.clientId;
+                // Find the client to show their info
+                const client = this.allClients.find(c => c.id === guide.clientId);
+                if (client) {
+                    document.getElementById('guideClientSearch').parentElement.style.display = 'none';
+                    const infoDiv = document.getElementById('selectedClientInfo');
+                    infoDiv.style.display = 'block';
+                    infoDiv.innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>${Utils.escapeHtml(client.fullName)}</strong>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">${client.phone} — ${client.address}</div>
+                            </div>
+                            <button type="button" class="btn btn-icon btn-secondary" onclick="GuidesModule.clearClientSelection()" title="Cambiar cliente">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
                                 </svg>
                             </button>
                         </div>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+                    `;
+                }
+            }
+
+            // Set city
+            if (guide.city) {
+                const citySelect = document.getElementById('guideCity');
+                if (citySelect) {
+                    for (let option of citySelect.options) {
+                        if (option.text === guide.city) {
+                            citySelect.value = option.value;
+                            this.selectedCity = guide.city;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Set observations
+            if (guide.observations) {
+                document.getElementById('guideObservations').value = guide.observations;
+            }
+
+            // Set payment info for Caracas
+            if (guide.amountUsd) {
+                const usdEl = document.getElementById('guideAmountUsd');
+                if (usdEl) usdEl.value = guide.amountUsd;
+            }
+            if (guide.paymentBs) {
+                const bsEl = document.getElementById('guidePaymentBs');
+                if (bsEl) bsEl.value = guide.paymentBs;
+            }
+            if (guide.deliveryTime) {
+                const dtEl = document.getElementById('guideDeliveryTime');
+                if (dtEl) dtEl.value = guide.deliveryTime;
+            }
+
+            // Set shipping cost
+            if (guide.shippingCost) {
+                const scEl = document.getElementById('guideShippingCost');
+                if (scEl) scEl.value = guide.shippingCost;
+            }
+
+            // Copy guide items
+            if (guide.items && guide.items.length > 0) {
+                this.currentGuideItems = guide.items.map(item => ({
+                    productId: item.productId,
+                    productName: item.productName,
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice,
+                    subtotal: item.subtotal
+                }));
+                this.renderGuideItems();
+            }
+
+            Utils.showToast('Guía duplicada — Revise los datos y guarde', 'success');
+        } catch (error) {
+            console.error('Error duplicating guide:', error);
+            Utils.showToast('Error al duplicar la guía', 'error');
+        }
     },
 
     async openGuideModal(clientId = null) {
