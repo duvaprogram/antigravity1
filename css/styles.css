@@ -1034,6 +1034,235 @@ table {
     color: var(--danger);
 }
 
+.status-badge.novedad {
+    background: rgba(234, 88, 12, 0.1);
+    color: #ea580c;
+    animation: novedadPulse 2s ease-in-out infinite;
+}
+
+.status-badge.novedad::before {
+    background: #ea580c;
+}
+
+@keyframes novedadPulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* Novedades Panel */
+.guides-layout {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: var(--space-lg);
+    transition: grid-template-columns var(--transition-normal);
+}
+
+.guides-layout.with-novedades {
+    grid-template-columns: 1fr 380px;
+}
+
+.novedades-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 80vh;
+    animation: slideInRight var(--transition-normal);
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.novedades-panel-header {
+    padding: var(--space-md) var(--space-lg);
+    background: linear-gradient(135deg, #ea580c, #f97316);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+}
+
+.novedades-panel-header h3 {
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.novedades-panel-header .novedades-count {
+    background: rgba(255, 255, 255, 0.25);
+    padding: 2px 10px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+}
+
+.novedades-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--space-md);
+}
+
+.novedad-card {
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    margin-bottom: var(--space-sm);
+    transition: all var(--transition-fast);
+    cursor: pointer;
+}
+
+.novedad-card:hover {
+    border-color: #ea580c;
+    transform: translateX(-2px);
+    box-shadow: 3px 0 12px rgba(234, 88, 12, 0.15);
+}
+
+.novedad-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: var(--space-sm);
+}
+
+.novedad-card-guide {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: var(--primary);
+}
+
+.novedad-card-date {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+.novedad-card-client {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    margin-bottom: var(--space-xs);
+}
+
+.novedad-card-gestiones {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    margin-top: var(--space-sm);
+    padding-top: var(--space-sm);
+    border-top: 1px solid var(--border);
+}
+
+.novedad-card-gestiones .gestion-count {
+    background: rgba(234, 88, 12, 0.1);
+    color: #ea580c;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+}
+
+/* Incident Timeline in Modal */
+.incident-timeline {
+    position: relative;
+    padding-left: 24px;
+}
+
+.incident-timeline::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #ea580c, var(--border));
+}
+
+.incident-item {
+    position: relative;
+    margin-bottom: var(--space-md);
+    padding: var(--space-md);
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+}
+
+.incident-item::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 18px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ea580c;
+    border: 2px solid var(--surface);
+}
+
+.incident-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-xs);
+}
+
+.incident-item-type {
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    color: #ea580c;
+}
+
+.incident-item-date {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+.incident-item-description {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.novedades-empty {
+    text-align: center;
+    padding: var(--space-xl);
+    color: var(--text-muted);
+}
+
+.novedades-empty svg {
+    margin-bottom: var(--space-md);
+    opacity: 0.3;
+}
+
+@media (max-width: 1024px) {
+    .guides-layout.with-novedades {
+        grid-template-columns: 1fr;
+    }
+
+    .novedades-panel {
+        max-height: 400px;
+    }
+}
+
 /* ========================================
    Badges
    ======================================== */

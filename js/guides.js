@@ -4,6 +4,7 @@ const GuidesModule = {
     allProducts: [],
     selectedCity: null,
     adjustingGuideId: null,
+    currentNovedadGuideId: null,
 
     init() {
         this.bindEvents();
@@ -330,6 +331,7 @@ const GuidesModule = {
 
     async render() {
         await this.filterGuides();
+        await this.loadNovedadesPanel();
     },
 
     async filterGuides() {
@@ -891,7 +893,24 @@ const GuidesModule = {
                             onclick="GuidesModule.changeStatus('${guide.id}', 'Devolución')">
                         Devolución
                     </button>
+                    <button class="status-btn ${guide.status === 'Novedad' ? 'active' : ''}" 
+                            onclick="GuidesModule.changeStatus('${guide.id}', 'Novedad')"
+                            style="${guide.status === 'Novedad' ? 'border-color: #ea580c; background: rgba(234, 88, 12, 0.1); color: #ea580c;' : ''}">
+                        ⚠️ Novedad
+                    </button>
                 </div>
+                ${guide.status === 'Novedad' ? `
+                <div style="margin-top: 1rem;">
+                    <button class="btn btn-primary" onclick="GuidesModule.openNovedadGestion('${guide.id}')" style="background: linear-gradient(135deg, #ea580c, #f97316); width: 100%;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        Gestionar Novedad
+                    </button>
+                </div>
+                ` : ''}
             </div>
         `;
 
@@ -1018,6 +1037,182 @@ const GuidesModule = {
         document.getElementById('adjustShippingDaysInfo').textContent = `Guía creada hace ${daysSinceCreation} día(s) — ${Utils.formatDate(guide.createdAt)}`;
 
         Utils.openModal('modalAdjustShipping');
+    },
+
+    // ========================================
+    // NOVEDADES MANAGEMENT
+    // ========================================
+    async openNovedadGestion(guideId) {
+        const guide = await Database.getGuide(guideId);
+        if (!guide) return;
+
+        this.currentNovedadGuideId = guideId;
+
+        // Set guide number
+        document.getElementById('novedadGuideNumber').textContent = guide.guideNumber;
+
+        // Set guide info summary
+        document.getElementById('novedadGuideInfo').innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem;">
+                <div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Cliente</div>
+                    <div style="font-weight: 600;">${guide.clientName}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Ciudad</div>
+                    <div style="font-weight: 600;">${guide.city}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total</div>
+                    <div style="font-weight: 600;">${Utils.formatCurrency(guide.totalAmount)}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Fecha</div>
+                    <div style="font-weight: 600;">${Utils.formatDate(guide.createdAt)}</div>
+                </div>
+            </div>
+        `;
+
+        // Load incidents timeline
+        await this.loadNovedadTimeline(guideId);
+
+        // Reset form
+        document.getElementById('novedadActionType').value = '';
+        document.getElementById('novedadActionDescription').value = '';
+
+        Utils.openModal('modalNovedadGestion');
+    },
+
+    async loadNovedadTimeline(guideId) {
+        const incidents = await Database.getGuideIncidents(guideId);
+        const container = document.getElementById('novedadTimeline');
+
+        if (incidents.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 1.5rem; color: var(--text-muted); background: var(--surface-hover); border-radius: var(--radius-md);">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom: 0.5rem; opacity: 0.4;">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    <p style="font-size: 0.85rem;">No hay gestiones registradas aún</p>
+                    <p style="font-size: 0.75rem;">Agregue la primera gestión abajo</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="incident-timeline">
+                ${incidents.map(incident => `
+                    <div class="incident-item">
+                        <div class="incident-item-header">
+                            <span class="incident-item-type">#${incident.actionNumber} — ${incident.actionType}</span>
+                            <span class="incident-item-date">${Utils.formatDate(incident.createdAt, true)}</span>
+                        </div>
+                        ${incident.description ? `<div class="incident-item-description">${Utils.escapeHtml(incident.description)}</div>` : ''}
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    },
+
+    async saveNovedadAction() {
+        const actionType = document.getElementById('novedadActionType').value;
+        const description = document.getElementById('novedadActionDescription').value.trim();
+
+        if (!actionType) {
+            Utils.showToast('Seleccione un tipo de gestión', 'warning');
+            return;
+        }
+
+        if (!this.currentNovedadGuideId) return;
+
+        try {
+            await Database.addGuideIncident(this.currentNovedadGuideId, actionType, description);
+
+            Utils.showToast(`Gestión "${actionType}" registrada`, 'success');
+
+            // Reload timeline
+            await this.loadNovedadTimeline(this.currentNovedadGuideId);
+
+            // Reset form
+            document.getElementById('novedadActionType').value = '';
+            document.getElementById('novedadActionDescription').value = '';
+
+            // Refresh novedades panel
+            await this.loadNovedadesPanel();
+        } catch (error) {
+            console.error('Error saving novedad action:', error);
+            Utils.showToast('Error al registrar la gestión', 'error');
+        }
+    },
+
+    async resolveNovedad() {
+        if (!this.currentNovedadGuideId) return;
+
+        if (!confirm('¿Marcar esta novedad como resuelta? La guía volverá al estado "En ruta".')) return;
+
+        try {
+            // Add a resolution action
+            await Database.addGuideIncident(this.currentNovedadGuideId, 'Novedad Resuelta', 'La novedad ha sido resuelta satisfactoriamente.');
+
+            // Change status back to "En ruta"
+            await Database.updateGuideStatus(this.currentNovedadGuideId, 'En ruta');
+
+            Utils.closeModal('modalNovedadGestion');
+            Utils.showToast('Novedad resuelta — Guía regresó a "En ruta"', 'success');
+
+            // Refresh views
+            if (document.getElementById('modalGuideDetails').classList.contains('active')) {
+                await this.viewGuide(this.currentNovedadGuideId);
+            }
+
+            await this.render();
+            await this.loadNovedadesPanel();
+            this.currentNovedadGuideId = null;
+        } catch (error) {
+            console.error('Error resolving novedad:', error);
+            Utils.showToast('Error al resolver la novedad', 'error');
+        }
+    },
+
+    async loadNovedadesPanel() {
+        const novedades = await Database.getGuidesWithIncidentCounts();
+        const panel = document.getElementById('novedadesPanel');
+        const layout = document.getElementById('guidesLayout');
+        const countEl = document.getElementById('novedadesCount');
+        const listEl = document.getElementById('novedadesList');
+
+        countEl.textContent = novedades.length;
+
+        if (novedades.length === 0) {
+            panel.style.display = 'none';
+            layout.classList.remove('with-novedades');
+            listEl.innerHTML = '';
+            return;
+        }
+
+        panel.style.display = 'flex';
+        layout.classList.add('with-novedades');
+
+        listEl.innerHTML = novedades.map(n => `
+            <div class="novedad-card" onclick="GuidesModule.openNovedadGestion('${n.id}')">
+                <div class="novedad-card-header">
+                    <span class="novedad-card-guide">📦 ${n.guideNumber}</span>
+                    <span class="novedad-card-date">${Utils.formatDate(n.createdAt)}</span>
+                </div>
+                <div class="novedad-card-client">
+                    👤 ${n.clientName} — ${n.city}
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">
+                    ${Utils.formatCurrency(n.totalAmount)}
+                </div>
+                <div class="novedad-card-gestiones">
+                    <span class="gestion-count">${n.incidentCount} gestión(es)</span>
+                    ${n.lastIncident ? `<span>Última: ${n.lastIncident.type}</span>` : '<span>Sin gestiones</span>'}
+                </div>
+            </div>
+        `).join('');
     },
 
     async saveShippingAdjustment() {

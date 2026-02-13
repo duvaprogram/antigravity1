@@ -875,6 +875,108 @@ const Database = {
         }
     },
 
+    // ========================================
+    // GUIDE INCIDENTS (NOVEDADES)
+    // ========================================
+    async getGuideIncidents(guideId) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('guide_incidents')
+                .select('*')
+                .eq('guide_id', guideId)
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+            return (data || []).map(i => ({
+                id: i.id,
+                guideId: i.guide_id,
+                actionType: i.action_type,
+                description: i.description,
+                actionNumber: i.action_number,
+                createdAt: i.created_at,
+                createdBy: i.created_by
+            }));
+        } catch (error) {
+            console.error('Error fetching guide incidents:', error);
+            return [];
+        }
+    },
+
+    async addGuideIncident(guideId, actionType, description) {
+        try {
+            // Get current count of incidents for this guide to set action number
+            const { data: existing } = await supabaseClient
+                .from('guide_incidents')
+                .select('id')
+                .eq('guide_id', guideId);
+
+            const actionNumber = (existing ? existing.length : 0) + 1;
+
+            const { data, error } = await supabaseClient
+                .from('guide_incidents')
+                .insert({
+                    guide_id: guideId,
+                    action_type: actionType,
+                    description: description || null,
+                    action_number: actionNumber
+                })
+                .select()
+                .single();
+
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error adding guide incident:', error);
+            throw error;
+        }
+    },
+
+    async getGuidesWithIncidentCounts() {
+        try {
+            // Get all guides with status "Novedad"
+            const novedadStatusId = this.getStatusId('Novedad');
+            if (!novedadStatusId) return [];
+
+            const { data: guides, error } = await supabaseClient
+                .from('v_guides_complete')
+                .select('*')
+                .eq('status_name', 'Novedad')
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            // Get incident counts for each guide
+            const result = [];
+            for (const g of (guides || [])) {
+                const { data: incidents } = await supabaseClient
+                    .from('guide_incidents')
+                    .select('id, action_type, created_at')
+                    .eq('guide_id', g.id)
+                    .order('created_at', { ascending: false });
+
+                result.push({
+                    id: g.id,
+                    guideNumber: g.guide_number,
+                    clientName: g.client_name,
+                    clientPhone: g.client_phone,
+                    city: g.city_name,
+                    totalAmount: parseFloat(g.total_amount),
+                    createdAt: g.created_at,
+                    incidentCount: incidents ? incidents.length : 0,
+                    lastIncident: incidents && incidents.length > 0 ? {
+                        type: incidents[0].action_type,
+                        date: incidents[0].created_at
+                    } : null
+                });
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error fetching novedades:', error);
+            return [];
+        }
+    },
+
     async deleteGuide(id) {
         try {
             // Delete guide items first (if cascade is not enabled)

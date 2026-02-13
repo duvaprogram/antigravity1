@@ -508,6 +508,7 @@
                         <option value="En ruta">En ruta</option>
                         <option value="Entregado">Entregado</option>
                         <option value="Pagado">Pagado</option>
+                        <option value="Novedad">Novedad</option>
                         <option value="Cancelado">Cancelado</option>
                         <option value="Devolución">Devolución</option>
                     </select>
@@ -528,24 +529,49 @@
                     </button>
                 </div>
 
-                <div class="table-container">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Nº Guía</th>
-                                <th>Fecha</th>
-                                <th>Cliente</th>
-                                <th>Ciudad</th>
-                                <th>Productos</th>
-                                <th>Total</th>
-                                <th>Estado</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody id="guidesTable">
+                <div class="guides-layout" id="guidesLayout">
+                    <div class="guides-table-wrapper">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Nº Guía</th>
+                                        <th>Fecha</th>
+                                        <th>Cliente</th>
+                                        <th>Ciudad</th>
+                                        <th>Productos</th>
+                                        <th>Total</th>
+                                        <th>Estado</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="guidesTable">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Novedades Panel -->
+                    <div class="novedades-panel" id="novedadesPanel" style="display: none;">
+                        <div class="novedades-panel-header">
+                            <h3>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path
+                                        d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                                    </path>
+                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                                Novedades
+                                <span class="novedades-count" id="novedadesCount">0</span>
+                            </h3>
+                        </div>
+                        <div class="novedades-panel-body" id="novedadesList">
                             <!-- Dynamic content -->
-                        </tbody>
-                    </table>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -2380,6 +2406,112 @@
                             <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
                         Guardar Ajuste de Flete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Incident Management (Gestión de Novedad) -->
+    <div class="modal modal-large" id="modalNovedadGestion">
+        <div class="modal-content">
+            <div class="modal-header"
+                style="background: linear-gradient(135deg, rgba(234, 88, 12, 0.1), rgba(249, 115, 22, 0.1));">
+                <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="2">
+                        <path
+                            d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                        </path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                    </svg>
+                    Gestión de Novedad — <span id="novedadGuideNumber" style="color: #ea580c;"></span>
+                </h2>
+                <button class="modal-close" data-close="modalNovedadGestion">&times;</button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <!-- Guide info summary -->
+                <div id="novedadGuideInfo"
+                    style="background: var(--surface-hover); border-radius: var(--radius-md); padding: 1rem; margin-bottom: 1.5rem;">
+                    <!-- Dynamic content -->
+                </div>
+
+                <!-- Existing gestiones timeline -->
+                <div style="margin-bottom: 1.5rem;">
+                    <h3
+                        style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        Historial de Gestiones
+                    </h3>
+                    <div id="novedadTimeline">
+                        <!-- Dynamic timeline -->
+                    </div>
+                </div>
+
+                <!-- Add new gestion form -->
+                <div
+                    style="background: linear-gradient(135deg, rgba(234, 88, 12, 0.05), rgba(249, 115, 22, 0.08)); border: 1px solid rgba(234, 88, 12, 0.2); border-radius: var(--radius-md); padding: 1.25rem;">
+                    <h3
+                        style="font-size: 0.95rem; font-weight: 600; margin-bottom: 1rem; color: #ea580c; display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Agregar Nueva Gestión
+                    </h3>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="novedadActionType" style="font-weight: 600;">
+                                📋 Tipo de Gestión *
+                            </label>
+                            <select id="novedadActionType">
+                                <option value="">Seleccionar tipo...</option>
+                                <option value="Reprogramación">📅 Reprogramación</option>
+                                <option value="Gestión N°1">📞 Gestión N°1</option>
+                                <option value="Gestión N°2">📞 Gestión N°2</option>
+                                <option value="Gestión N°3">📞 Gestión N°3</option>
+                                <option value="Contacto cliente">👤 Contacto cliente</option>
+                                <option value="Cambio dirección">📍 Cambio dirección</option>
+                                <option value="Intento entrega">🚚 Intento entrega</option>
+                                <option value="Otro">📝 Otro</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="novedadActionDescription">
+                                💬 Descripción / Observación
+                            </label>
+                            <textarea id="novedadActionDescription" rows="2"
+                                placeholder="Detalle de la gestión realizada..."></textarea>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1rem;">
+                        <button type="button" class="btn btn-primary" onclick="GuidesModule.saveNovedadAction()"
+                            style="background: linear-gradient(135deg, #ea580c, #f97316);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Registrar Gestión
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" data-close="modalNovedadGestion">Cerrar</button>
+                    <button type="button" class="btn btn-success" onclick="GuidesModule.resolveNovedad()"
+                        title="Marcar como resuelta y cambiar estado">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Novedad Resuelta
                     </button>
                 </div>
             </div>

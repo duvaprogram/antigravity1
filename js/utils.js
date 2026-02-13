@@ -120,7 +120,8 @@ const Utils = {
             'Entregado': 'entregado',
             'Pagado': 'pagado',
             'Cancelado': 'cancelado',
-            'Devolución': 'devolucion'
+            'Devolución': 'devolucion',
+            'Novedad': 'novedad'
         };
         return classes[status] || 'pendiente';
     },
