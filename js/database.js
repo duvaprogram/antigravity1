@@ -691,6 +691,9 @@ const Database = {
                 statusColor: g.status_color,
                 totalAmount: parseFloat(g.total_amount),
                 shippingCost: parseFloat(g.shipping_cost || 0),
+                shippingCostOriginal: g.shipping_cost_original ? parseFloat(g.shipping_cost_original) : null,
+                shippingAdjustedAt: g.shipping_adjusted_at,
+                shippingAdjustmentNote: g.shipping_adjustment_note,
                 observations: g.observations,
                 itemsCount: g.items_count,
                 createdAt: g.created_at,
@@ -728,6 +731,9 @@ const Database = {
                 statusColor: data.status_color,
                 totalAmount: parseFloat(data.total_amount),
                 shippingCost: data.shipping_cost ? parseFloat(data.shipping_cost) : null,
+                shippingCostOriginal: data.shipping_cost_original ? parseFloat(data.shipping_cost_original) : null,
+                shippingAdjustedAt: data.shipping_adjusted_at,
+                shippingAdjustmentNote: data.shipping_adjustment_note,
                 observations: data.observations,
                 createdAt: data.created_at,
                 amountUsd: data.amount_usd ? parseFloat(data.amount_usd) : null,
@@ -831,6 +837,40 @@ const Database = {
             if (error) throw error;
         } catch (error) {
             console.error('Error updating guide status:', error);
+            throw error;
+        }
+    },
+
+    async updateGuideShippingCost(guideId, newShippingCost, adjustmentNote) {
+        try {
+            // First get the current guide to save original cost if not already saved
+            const { data: currentGuide, error: fetchError } = await supabaseClient
+                .from('guides')
+                .select('shipping_cost, shipping_cost_original')
+                .eq('id', guideId)
+                .single();
+
+            if (fetchError) throw fetchError;
+
+            const updateData = {
+                shipping_cost: newShippingCost,
+                shipping_adjusted_at: new Date().toISOString(),
+                shipping_adjustment_note: adjustmentNote || null
+            };
+
+            // Only save original cost the first time we adjust
+            if (!currentGuide.shipping_cost_original && currentGuide.shipping_cost) {
+                updateData.shipping_cost_original = currentGuide.shipping_cost;
+            }
+
+            const { error } = await supabaseClient
+                .from('guides')
+                .update(updateData)
+                .eq('id', guideId);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating guide shipping cost:', error);
             throw error;
         }
     },

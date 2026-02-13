@@ -3,6 +3,7 @@ const GuidesModule = {
     allClients: [],
     allProducts: [],
     selectedCity: null,
+    adjustingGuideId: null,
 
     init() {
         this.bindEvents();
@@ -794,19 +795,56 @@ const GuidesModule = {
                 </table>
             </div>
 
-            ${guide.shippingCost ? `
+            ${guide.shippingCost || guide.shippingCostOriginal ? `
                 <div class="guide-details-section" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(59, 130, 246, 0.1)); padding: 1rem; border-radius: var(--radius-md);">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
-                            <rect x="1" y="3" width="15" height="13"></rect>
-                            <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                            <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                            <circle cx="18.5" cy="18.5" r="2.5"></circle>
-                        </svg>
-                        <span style="font-weight: 600; color: var(--text-primary);">Flete: ${Utils.formatCurrency(guide.shippingCost)}</span>
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                                <rect x="1" y="3" width="15" height="13"></rect>
+                                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                                <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                            </svg>
+                            <span style="font-weight: 600; color: var(--text-primary);">Flete: ${Utils.formatCurrency(guide.shippingCost)}</span>
+                            ${guide.shippingAdjustedAt ? `<span style="font-size: 0.8rem; color: var(--success); font-weight: 500;">✅ Ajustado</span>` : ''}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="GuidesModule.openAdjustShippingModal('${guide.id}')" style="white-space: nowrap;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                            Ajustar Flete
+                        </button>
+                    </div>
+                    ${guide.shippingCostOriginal && guide.shippingAdjustedAt ? `
+                        <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(99, 102, 241, 0.2); font-size: 0.85rem;">
+                            <div style="display: flex; flex-wrap: wrap; gap: 1rem; color: var(--text-muted);">
+                                <span>📋 Flete Original: <strong style="color: var(--text-secondary);">${Utils.formatCurrency(guide.shippingCostOriginal)}</strong></span>
+                                <span>📅 Ajustado: <strong style="color: var(--text-secondary);">${Utils.formatDate(guide.shippingAdjustedAt, true)}</strong></span>
+                            </div>
+                            ${guide.shippingAdjustmentNote ? `<div style="margin-top: 0.5rem; color: var(--text-muted);">💬 ${Utils.escapeHtml(guide.shippingAdjustmentNote)}</div>` : ''}
+                        </div>
+                    ` : ''}
+                    ${!guide.shippingAdjustedAt && guide.shippingCost ? `
+                        <div style="margin-top: 0.5rem; font-size: 0.8rem; color: var(--warning);">
+                            ⚠️ Flete pendiente de ajuste
+                        </div>
+                    ` : ''}
+                </div>
+            ` : `
+                <div class="guide-details-section" style="background: rgba(99, 102, 241, 0.05); padding: 1rem; border-radius: var(--radius-md); border: 1px dashed var(--border);">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="color: var(--text-muted);">🚚 Sin flete asignado</span>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="GuidesModule.openAdjustShippingModal('${guide.id}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Agregar Flete
+                        </button>
                     </div>
                 </div>
-            ` : ''}
+            `}
 
             ${guide.observations ? `
                 <div class="guide-details-section">
@@ -951,6 +989,67 @@ const GuidesModule = {
         }
     },
 
+    async openAdjustShippingModal(guideId) {
+        const guide = await Database.getGuide(guideId);
+        if (!guide) return;
+
+        // Store guide ID for the adjustment
+        this.adjustingGuideId = guideId;
+
+        // Set current values in the modal
+        document.getElementById('adjustShippingGuideNumber').textContent = guide.guideNumber;
+        document.getElementById('adjustShippingCurrentCost').textContent = guide.shippingCost ? Utils.formatCurrency(guide.shippingCost) : 'No asignado';
+        document.getElementById('adjustShippingNewCost').value = guide.shippingCost || '';
+        document.getElementById('adjustShippingNote').value = '';
+
+        // Show original cost info if available
+        const originalInfo = document.getElementById('adjustShippingOriginalInfo');
+        if (guide.shippingCostOriginal) {
+            originalInfo.style.display = 'block';
+            document.getElementById('adjustShippingOriginalCost').textContent = Utils.formatCurrency(guide.shippingCostOriginal);
+        } else {
+            originalInfo.style.display = 'none';
+        }
+
+        // Calculate days since creation
+        const createdDate = new Date(guide.createdAt);
+        const now = new Date();
+        const daysSinceCreation = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+        document.getElementById('adjustShippingDaysInfo').textContent = `Guía creada hace ${daysSinceCreation} día(s) — ${Utils.formatDate(guide.createdAt)}`;
+
+        Utils.openModal('modalAdjustShipping');
+    },
+
+    async saveShippingAdjustment() {
+        const newCost = parseFloat(document.getElementById('adjustShippingNewCost').value);
+        const note = document.getElementById('adjustShippingNote').value.trim();
+
+        if (isNaN(newCost) || newCost < 0) {
+            Utils.showToast('Ingrese un valor de flete válido', 'warning');
+            return;
+        }
+
+        if (!this.adjustingGuideId) return;
+
+        try {
+            await Database.updateGuideShippingCost(this.adjustingGuideId, newCost, note);
+
+            Utils.closeModal('modalAdjustShipping');
+            Utils.showToast('Flete ajustado correctamente', 'success');
+
+            // Refresh the guide details view if open
+            if (document.getElementById('modalGuideDetails').classList.contains('active')) {
+                await this.viewGuide(this.adjustingGuideId);
+            }
+
+            await this.render();
+            this.adjustingGuideId = null;
+        } catch (error) {
+            console.error('Error adjusting shipping cost:', error);
+            Utils.showToast('Error al ajustar el flete', 'error');
+        }
+    },
+
     async printGuide() {
         if (!this.currentViewingGuideId) return;
 
@@ -1017,8 +1116,30 @@ const GuidesModule = {
         // Total
         yPos += 5;
         doc.setFont('helvetica', 'bold');
-        doc.text('TOTAL:', 140, yPos);
+        doc.text('TOTAL PRODUCTOS:', 120, yPos);
         doc.text(`$${total.toFixed(2)}`, 165, yPos);
+
+        // Shipping cost in PDF
+        if (guide.shippingCost) {
+            yPos += 10;
+            doc.text('FLETE:', 120, yPos);
+            doc.text(`$${guide.shippingCost.toFixed(2)}`, 165, yPos);
+
+            if (guide.shippingCostOriginal && guide.shippingAdjustedAt) {
+                yPos += 7;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.text(`(Original: $${guide.shippingCostOriginal.toFixed(2)} - Ajustado)`, 120, yPos);
+                doc.setFontSize(10);
+            }
+
+            yPos += 8;
+            doc.setFont('helvetica', 'bold');
+            doc.setFillColor(230, 240, 255);
+            doc.rect(118, yPos - 5, 72, 8, 'F');
+            doc.text('TOTAL GENERAL:', 120, yPos);
+            doc.text(`$${(total + guide.shippingCost).toFixed(2)}`, 165, yPos);
+        }
 
         // Observations
         if (guide.observations) {
