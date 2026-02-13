@@ -530,90 +530,80 @@ const GuidesModule = {
 
     async duplicateGuide(guideId) {
         try {
-            const guide = await Database.getGuide(guideId);
+            // Load guide data AND items in parallel
+            const [guide, items] = await Promise.all([
+                Database.getGuide(guideId),
+                Database.getGuideItems(guideId)
+            ]);
+
             if (!guide) {
                 Utils.showToast('No se pudo cargar la guía', 'error');
                 return;
             }
 
-            // Open the guide form
+            // Open the guide form first (this resets everything)
             await this.openGuideModal();
 
-            // Pre-fill form fields
+            // Now pre-fill AFTER the modal is open and reset
+
+            // 1. Select client using the proper method (it fetches from DB if needed)
             if (guide.clientId) {
-                document.getElementById('guideClient').value = guide.clientId;
-                // Find the client to show their info
-                const client = this.allClients.find(c => c.id === guide.clientId);
-                if (client) {
-                    document.getElementById('guideClientSearch').parentElement.style.display = 'none';
-                    const infoDiv = document.getElementById('selectedClientInfo');
-                    infoDiv.style.display = 'block';
-                    infoDiv.innerHTML = `
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <strong>${Utils.escapeHtml(client.fullName)}</strong>
-                                <div style="font-size: 0.85rem; color: var(--text-muted);">${client.phone} — ${client.address}</div>
-                            </div>
-                            <button type="button" class="btn btn-icon btn-secondary" onclick="GuidesModule.clearClientSelection()" title="Cambiar cliente">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                                </svg>
-                            </button>
-                        </div>
-                    `;
-                }
+                await this.selectClient(guide.clientId);
             }
 
-            // Set city
+            // 2. Set city (use the city from the guide, match by option text)
             if (guide.city) {
                 const citySelect = document.getElementById('guideCity');
                 if (citySelect) {
-                    for (let option of citySelect.options) {
-                        if (option.text === guide.city) {
-                            citySelect.value = option.value;
+                    for (let i = 0; i < citySelect.options.length; i++) {
+                        if (citySelect.options[i].text === guide.city) {
+                            citySelect.value = citySelect.options[i].value;
                             this.selectedCity = guide.city;
+                            // Trigger change event to show/hide Caracas fields
+                            citySelect.dispatchEvent(new Event('change'));
                             break;
                         }
                     }
                 }
             }
 
-            // Set observations
+            // 3. Set observations
             if (guide.observations) {
                 document.getElementById('guideObservations').value = guide.observations;
             }
 
-            // Set payment info for Caracas
-            if (guide.amountUsd) {
-                const usdEl = document.getElementById('guideAmountUsd');
-                if (usdEl) usdEl.value = guide.amountUsd;
-            }
-            if (guide.paymentBs) {
-                const bsEl = document.getElementById('guidePaymentBs');
-                if (bsEl) bsEl.value = guide.paymentBs;
-            }
-            if (guide.deliveryTime) {
-                const dtEl = document.getElementById('guideDeliveryTime');
-                if (dtEl) dtEl.value = guide.deliveryTime;
-            }
-
-            // Set shipping cost
+            // 4. Set shipping cost
             if (guide.shippingCost) {
                 const scEl = document.getElementById('guideShippingCost');
                 if (scEl) scEl.value = guide.shippingCost;
             }
 
-            // Copy guide items
-            if (guide.items && guide.items.length > 0) {
-                this.currentGuideItems = guide.items.map(item => ({
+            // 5. Set Caracas-specific payment info (wait a tick for fields to be visible)
+            setTimeout(() => {
+                if (guide.amountUsd) {
+                    const usdEl = document.getElementById('guideAmountUsd');
+                    if (usdEl) usdEl.value = guide.amountUsd;
+                }
+                if (guide.paymentBs) {
+                    const bsEl = document.getElementById('guidePaymentBs');
+                    if (bsEl) bsEl.value = guide.paymentBs;
+                }
+                if (guide.deliveryTime) {
+                    const dtEl = document.getElementById('guideDeliveryTime');
+                    if (dtEl) dtEl.value = guide.deliveryTime;
+                }
+            }, 100);
+
+            // 6. Copy guide items from the loaded items
+            if (items && items.length > 0) {
+                this.currentGuideItems = items.map(item => ({
                     productId: item.productId,
                     productName: item.productName,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
                     subtotal: item.subtotal
                 }));
-                this.renderGuideItems();
+                this.updateGuideProductsTable();
             }
 
             Utils.showToast('Guía duplicada — Revise los datos y guarde', 'success');
