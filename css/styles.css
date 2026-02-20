@@ -2295,3 +2295,235 @@ form {
     background: rgba(99, 102, 241, 0.3);
     border-radius: 2px;
 }
+
+/* ========================================
+   Inventory Filters Bar
+   ======================================== */
+.inventory-filters-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+}
+
+.inv-search-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.4rem 0.75rem;
+    flex: 1;
+    min-width: 200px;
+}
+
+.inv-search-bar svg {
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.inv-search-bar input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.inv-search-bar input::placeholder {
+    color: var(--text-muted);
+}
+
+.inventory-filters-bar select {
+    padding: 0.4rem 0.75rem;
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    min-width: 160px;
+    transition: border-color var(--transition-fast);
+}
+
+.inventory-filters-bar select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Results counter */
+.inventory-count {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    padding: 0 0.25rem;
+}
+
+/* ========================================
+   Inventory Cards - Improved
+   ======================================== */
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.inventory-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.inventory-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gradient-primary);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.inventory-card:hover {
+    border-color: var(--border-light);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.inventory-card:hover::before {
+    opacity: 1;
+}
+
+.inventory-card.low-stock {
+    border-color: rgba(239, 68, 68, 0.4);
+}
+
+.inventory-card.low-stock::before {
+    background: var(--gradient-danger);
+    opacity: 1;
+}
+
+.inventory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.inventory-product {
+    font-weight: 600;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 0.2rem;
+}
+
+.inventory-sku {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-family: monospace;
+    margin-bottom: 0.35rem;
+}
+
+/* Category badge on inventory card */
+.inv-category-badge {
+    display: inline-block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-full);
+    background: var(--primary-light);
+    color: var(--primary);
+    margin-top: 0.1rem;
+}
+
+.inventory-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.inventory-stat {
+    text-align: center;
+    background: var(--surface-hover);
+    border-radius: var(--radius-md);
+    padding: 0.5rem 0.25rem;
+}
+
+.inventory-stat-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.inventory-stat-value.warning {
+    color: var(--danger);
+}
+
+.inventory-stat-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-top: 0.1rem;
+}
+
+/* Stock Progress Bar */
+.stock-progress-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.25rem;
+}
+
+.stock-progress-bar {
+    flex: 1;
+    height: 8px;
+    background: var(--surface-hover);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+}
+
+.stock-progress-fill {
+    height: 100%;
+    border-radius: var(--radius-full);
+    transition: width 0.5s ease;
+}
+
+.stock-progress-fill.stock-high {
+    background: linear-gradient(90deg, #10b981, #22c55e);
+}
+
+.stock-progress-fill.stock-mid {
+    background: linear-gradient(90deg, #f59e0b, #fbbf24);
+}
+
+.stock-progress-fill.stock-low {
+    background: linear-gradient(90deg, #ef4444, #f97316);
+}
+
+.stock-progress-pct {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    min-width: 2.5rem;
+    text-align: right;
+}

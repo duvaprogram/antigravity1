@@ -440,6 +440,37 @@
                     </div>
                 </div>
 
+                <!-- Inventory Filters Bar -->
+                <div class="inventory-filters-bar">
+                    <div class="inv-search-bar">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="invSearchInput" placeholder="Buscar por nombre o SKU...">
+                    </div>
+                    <select id="invSortSelect">
+                        <option value="default">Orden original</option>
+                        <option value="stock-desc">Mayor a menor stock</option>
+                        <option value="stock-asc">Menor a mayor stock</option>
+                        <option value="name-asc">Nombre A → Z</option>
+                        <option value="name-desc">Nombre Z → A</option>
+                    </select>
+                    <select id="invCategorySelect">
+                        <option value="">Todas las categorías</option>
+                    </select>
+                    <button class="btn btn-secondary btn-sm" id="btnClearInvFilters" title="Limpiar filtros">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                        Limpiar
+                    </button>
+                </div>
+
+                <!-- Results counter -->
+                <div class="inventory-count" id="inventoryCount"></div>
+
                 <div class="inventory-grid" id="inventoryGrid">
                     <!-- Dynamic content -->
                 </div>
