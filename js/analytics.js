@@ -12,6 +12,7 @@ const AnalyticsModule = {
     },
     filteredGuides: [],
     allProducts: [],
+    COST_FACTOR: 40000,
 
     init() {
         this.bindEvents();
@@ -434,7 +435,7 @@ const AnalyticsModule = {
         // Build a product cost lookup map
         const productCostMap = {};
         for (const p of this.allProducts) {
-            productCostMap[p.id] = parseFloat(p.cost) || 0;
+            productCostMap[p.id] = (parseFloat(p.cost) || 0) * this.COST_FACTOR;
         }
 
         // If product filter is active, filter guides that contain that product
@@ -476,10 +477,22 @@ const AnalyticsModule = {
         // Margin %
         const marginPct = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100) : 0;
 
-        // Update display elements
+        // Update display elements (admin only)
+        const isAdminUser = AuthModule.currentUser?.role === 'admin';
+
         const costEl = document.getElementById('analyticsTotalProductCost');
         const profitEl = document.getElementById('analyticsNetProfit');
         const marginEl = document.getElementById('analyticsMarginPct');
+
+        // Hide cost cards for non-admin
+        const costCard = costEl?.closest('.stat-card');
+        const profitCard = profitEl?.closest('.stat-card');
+        const marginCard = marginEl?.closest('.stat-card');
+        if (costCard) costCard.style.display = isAdminUser ? '' : 'none';
+        if (profitCard) profitCard.style.display = isAdminUser ? '' : 'none';
+        if (marginCard) marginCard.style.display = isAdminUser ? '' : 'none';
+
+        if (!isAdminUser) return;
 
         if (costEl) {
             costEl.textContent = isEcuador ? `$${totalProductCost.toFixed(2)}` : Utils.formatCurrency(totalProductCost);
@@ -504,7 +517,17 @@ const AnalyticsModule = {
         // Build a product cost lookup map
         const productCostMap = {};
         for (const p of this.allProducts) {
-            productCostMap[p.id] = parseFloat(p.cost) || 0;
+            productCostMap[p.id] = (parseFloat(p.cost) || 0) * this.COST_FACTOR;
+        }
+
+        const isAdminUser = AuthModule.currentUser?.role === 'admin';
+
+        // Show/hide cost columns in top products table header
+        const topProductsTable = document.getElementById('analyticsTopProducts')?.closest('table');
+        if (topProductsTable) {
+            const headerCells = topProductsTable.querySelectorAll('thead th');
+            if (headerCells[4]) headerCells[4].style.display = isAdminUser ? '' : 'none';
+            if (headerCells[5]) headerCells[5].style.display = isAdminUser ? '' : 'none';
         }
 
         // Collect all items from filtered guides
@@ -544,9 +567,10 @@ const AnalyticsModule = {
         const tbody = document.getElementById('analyticsTopProducts');
 
         if (sortedProducts.length === 0) {
+            const colSpan = isAdminUser ? 6 : 4;
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="${colSpan}" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         No hay datos de productos
                     </td>
                 </tr>
@@ -559,6 +583,12 @@ const AnalyticsModule = {
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
             const profit = data.revenue - data.cost;
             const profitColor = profit >= 0 ? '#10b981' : '#ef4444';
+
+            const costCols = isAdminUser ? `
+                    <td style="color: var(--warning); font-weight: 500;">${Utils.formatCurrency(data.cost)}</td>
+                    <td style="color: ${profitColor}; font-weight: 600;">${Utils.formatCurrency(profit)}</td>
+            ` : '';
+
             return `
                 <tr>
                     <td style="text-align: center; font-weight: 600;">${medal}</td>
@@ -568,8 +598,7 @@ const AnalyticsModule = {
                     </td>
                     <td style="text-align: center; font-weight: 600;">${data.quantity}</td>
                     <td style="color: var(--success); font-weight: 500;">${Utils.formatCurrency(data.revenue)}</td>
-                    <td style="color: var(--warning); font-weight: 500;">${Utils.formatCurrency(data.cost)}</td>
-                    <td style="color: ${profitColor}; font-weight: 600;">${Utils.formatCurrency(profit)}</td>
+                    ${costCols}
                 </tr>
             `;
         }).join('');

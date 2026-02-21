@@ -7,6 +7,19 @@ const ProductsModule = {
     // Current sort state
     currentSort: { field: 'default', direction: 'asc' },
 
+    // Cost encryption factor
+    COST_FACTOR: 40000,
+
+    isAdmin() {
+        return AuthModule.currentUser?.role === 'admin';
+    },
+
+    // Decode the stored cost to get real cost
+    getRealCost(product) {
+        const storedCost = parseFloat(product.cost) || 0;
+        return storedCost * this.COST_FACTOR;
+    },
+
     init() {
         this.bindEvents();
     },
@@ -244,8 +257,8 @@ const ProductsModule = {
                     valB = parseFloat(b.price) || 0;
                     break;
                 case 'cost':
-                    valA = parseFloat(a.cost) || 0;
-                    valB = parseFloat(b.cost) || 0;
+                    valA = this.getRealCost(a);
+                    valB = this.getRealCost(b);
                     break;
                 case 'name':
                     valA = (a.name || '').toLowerCase();
@@ -278,13 +291,14 @@ const ProductsModule = {
 
     calcMarginPct(product) {
         const price = parseFloat(product.price) || 0;
-        const cost = parseFloat(product.cost) || 0;
+        const cost = this.getRealCost(product);
         if (price === 0) return 0;
         return ((price - cost) / price) * 100;
     },
 
     renderSummary(products, totalProducts) {
         const container = document.getElementById('productsSummary');
+        const admin = this.isAdmin();
 
         if (products.length === 0) {
             container.innerHTML = '';
@@ -293,12 +307,33 @@ const ProductsModule = {
 
         const activeCount = products.filter(p => p.active).length;
         const totalPrice = products.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
-        const totalCost = products.reduce((sum, p) => sum + (parseFloat(p.cost) || 0), 0);
         const avgPrice = products.length > 0 ? totalPrice / products.length : 0;
-        const avgCost = products.length > 0 ? totalCost / products.length : 0;
-        const avgMargin = products.length > 0
-            ? products.reduce((sum, p) => sum + this.calcMarginPct(p), 0) / products.length
-            : 0;
+
+        let costCards = '';
+        if (admin) {
+            const totalCost = products.reduce((sum, p) => sum + this.getRealCost(p), 0);
+            const avgCost = products.length > 0 ? totalCost / products.length : 0;
+            const avgMargin = products.length > 0
+                ? products.reduce((sum, p) => sum + this.calcMarginPct(p), 0) / products.length
+                : 0;
+
+            costCards = `
+            <div class="product-summary-card">
+                <div class="product-summary-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">💰</div>
+                <div class="product-summary-info">
+                    <span class="product-summary-value">${Utils.formatCurrency(avgCost)}</span>
+                    <span class="product-summary-label">Costo promedio</span>
+                </div>
+            </div>
+            <div class="product-summary-card">
+                <div class="product-summary-icon" style="background: ${avgMargin >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${avgMargin >= 0 ? '#10b981' : '#ef4444'};">📊</div>
+                <div class="product-summary-info">
+                    <span class="product-summary-value">${avgMargin.toFixed(1)}%</span>
+                    <span class="product-summary-label">Margen promedio</span>
+                </div>
+            </div>
+            `;
+        }
 
         container.innerHTML = `
             <div class="product-summary-card">
@@ -322,20 +357,7 @@ const ProductsModule = {
                     <span class="product-summary-label">Precio promedio</span>
                 </div>
             </div>
-            <div class="product-summary-card">
-                <div class="product-summary-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">💰</div>
-                <div class="product-summary-info">
-                    <span class="product-summary-value">${Utils.formatCurrency(avgCost)}</span>
-                    <span class="product-summary-label">Costo promedio</span>
-                </div>
-            </div>
-            <div class="product-summary-card">
-                <div class="product-summary-icon" style="background: ${avgMargin >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${avgMargin >= 0 ? '#10b981' : '#ef4444'};">📊</div>
-                <div class="product-summary-info">
-                    <span class="product-summary-value">${avgMargin.toFixed(1)}%</span>
-                    <span class="product-summary-label">Margen promedio</span>
-                </div>
-            </div>
+            ${costCards}
         `;
     },
 
@@ -350,11 +372,29 @@ const ProductsModule = {
 
     renderTable(products) {
         const tbody = document.getElementById('productsTable');
+        const admin = this.isAdmin();
+
+        // Show/hide cost and margin columns based on role
+        const costHeader = document.querySelector('#productsTableEl .sortable-th[data-sort="cost"]');
+        const marginHeader = document.querySelector('#productsTableEl th:nth-child(6)');
+        if (costHeader) costHeader.style.display = admin ? '' : 'none';
+        if (marginHeader) marginHeader.style.display = admin ? '' : 'none';
+
+        // Hide cost sort options for non-admin
+        const sortSelect = document.getElementById('productSortSelect');
+        if (sortSelect) {
+            sortSelect.querySelectorAll('option').forEach(opt => {
+                if (opt.value.startsWith('cost-') || opt.value.startsWith('margin-')) {
+                    opt.style.display = admin ? '' : 'none';
+                }
+            });
+        }
 
         if (products.length === 0) {
+            const colSpan = admin ? 9 : 7;
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="${colSpan}" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         No se encontraron productos
                     </td>
                 </tr>
@@ -370,12 +410,25 @@ const ProductsModule = {
                 day: 'numeric'
             }) : '-';
 
-            // Calculate margin
             const price = parseFloat(product.price) || 0;
-            const cost = parseFloat(product.cost) || 0;
-            const marginAmount = price - cost;
-            const marginPct = price > 0 ? ((marginAmount / price) * 100) : 0;
-            const marginClass = marginPct > 0 ? 'positive' : (marginPct < 0 ? 'negative' : 'neutral');
+
+            // Cost and margin only for admin
+            let costCell = '';
+            let marginCell = '';
+            if (admin) {
+                const cost = this.getRealCost(product);
+                const marginAmount = price - cost;
+                const marginPct = price > 0 ? ((marginAmount / price) * 100) : 0;
+                const marginClass = marginPct > 0 ? 'positive' : (marginPct < 0 ? 'negative' : 'neutral');
+
+                costCell = `<td><span style="color: var(--warning);">${Utils.formatCurrency(cost)}</span></td>`;
+                marginCell = `<td>
+                    <span class="margin-badge ${marginClass}">
+                        ${marginPct >= 0 ? '+' : ''}${marginPct.toFixed(1)}%
+                    </span>
+                    <br><small style="color: var(--text-muted);">${Utils.formatCurrency(marginAmount)}</small>
+                </td>`;
+            }
 
             return `
             <tr>
@@ -386,14 +439,9 @@ const ProductsModule = {
                     ${product.category ? `<br><small style="color: var(--primary); opacity: 0.7;">${Utils.escapeHtml(product.category)}</small>` : ''}
                 </td>
                 <td>${product.import_number || '-'}</td>
-                <td><span style="color: var(--warning);">${Utils.formatCurrency(cost)}</span></td>
+                ${costCell}
                 <td><span style="color: var(--success);">${Utils.formatCurrency(price)}</span></td>
-                <td>
-                    <span class="margin-badge ${marginClass}">
-                        ${marginPct >= 0 ? '+' : ''}${marginPct.toFixed(1)}%
-                    </span>
-                    <br><small style="color: var(--text-muted);">${Utils.formatCurrency(marginAmount)}</small>
-                </td>
+                ${marginCell}
                 <td>
                     <span style="font-size: 0.8rem; color: var(--text-muted);">${createdDate}</span>
                 </td>
@@ -424,6 +472,13 @@ const ProductsModule = {
         const modal = document.getElementById('modalProduct');
         const form = document.getElementById('formProduct');
         const title = document.getElementById('modalProductTitle');
+        const admin = this.isAdmin();
+
+        // Show/hide cost field based on role
+        const costGroup = document.getElementById('productCost')?.closest('.form-group');
+        if (costGroup) {
+            costGroup.style.display = admin ? '' : 'none';
+        }
 
         form.reset();
         document.getElementById('productId').value = '';
@@ -439,7 +494,10 @@ const ProductsModule = {
                 document.getElementById('productSku').value = product.sku;
                 document.getElementById('productDescription').value = product.description || '';
                 document.getElementById('productCategory').value = product.category || '';
-                document.getElementById('productCost').value = product.cost || '';
+                // Show real cost for admin (decoded)
+                if (admin) {
+                    document.getElementById('productCost').value = this.getRealCost(product) || '';
+                }
                 document.getElementById('productPrice').value = product.price;
                 document.getElementById('productActive').checked = product.active;
             }
@@ -477,7 +535,7 @@ const ProductsModule = {
             description: document.getElementById('productDescription').value.trim(),
             category: document.getElementById('productCategory').value,
             import_number: parseInt(importNumber),
-            cost: parseFloat(document.getElementById('productCost').value) || 0,
+            cost: this.isAdmin() ? (parseFloat(document.getElementById('productCost').value) || 0) / this.COST_FACTOR : undefined,
             price: parseFloat(document.getElementById('productPrice').value),
             active: document.getElementById('productActive').checked
         };

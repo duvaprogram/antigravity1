@@ -152,10 +152,14 @@ const Database = {
                 description: product.description || null,
                 category: product.category,
                 import_number: product.import_number || null,
-                cost: product.cost || 0,
                 price: product.price,
                 active: product.active !== false
             };
+
+            // Only include cost if it was provided (admin only)
+            if (product.cost !== undefined) {
+                productData.cost = product.cost;
+            }
 
             let result;
             if (product.id) {
