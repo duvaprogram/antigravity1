@@ -874,6 +874,51 @@
                             <span class="stat-label">🚚 Total Fletes</span>
                         </div>
                     </div>
+                    <!-- Costo Total Productos Vendidos -->
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z">
+                                </path>
+                                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsTotalProductCost">$0.00</span>
+                            <span class="stat-label">🏷️ Costo Productos</span>
+                        </div>
+                    </div>
+                    <!-- Ganancia Neta -->
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsNetProfit">$0.00</span>
+                            <span class="stat-label">📈 Ganancia Neta</span>
+                        </div>
+                    </div>
+                    <!-- Margen % -->
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="19" y1="5" x2="5" y2="19"></line>
+                                <circle cx="6.5" cy="6.5" r="2.5"></circle>
+                                <circle cx="17.5" cy="17.5" r="2.5"></circle>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsMarginPct">0%</span>
+                            <span class="stat-label">📊 Margen %</span>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Dashboard Grid -->
@@ -1017,6 +1062,8 @@
                                             <th>Producto</th>
                                             <th>Cantidad</th>
                                             <th>Ingresos</th>
+                                            <th>Costo</th>
+                                            <th>Ganancia</th>
                                         </tr>
                                     </thead>
                                     <tbody id="analyticsTopProducts">

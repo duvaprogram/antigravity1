@@ -217,6 +217,7 @@ const AnalyticsModule = {
             this.updateStatusChart();
             this.updateCurrencyStats();
             await this.updateGuideValueStats();
+            await this.updateCostStats();
             await this.updateTopProducts();
             await this.updateGuidesTable();
 
@@ -424,11 +425,87 @@ const AnalyticsModule = {
         }
     },
 
+    async updateCostStats() {
+        let guides = this.filteredGuides.filter(g => g.status !== 'Cancelado');
+        const cityFilter = this.currentFilters.city;
+        const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
+        const productFilter = this.currentFilters.productId;
+
+        // Build a product cost lookup map
+        const productCostMap = {};
+        for (const p of this.allProducts) {
+            productCostMap[p.id] = parseFloat(p.cost) || 0;
+        }
+
+        // If product filter is active, filter guides that contain that product
+        if (productFilter) {
+            const guidesWithProduct = [];
+            for (const guide of guides) {
+                const items = await Database.getGuideItems(guide.id);
+                const hasProduct = items.some(item => item.productId === productFilter);
+                if (hasProduct) {
+                    guidesWithProduct.push(guide);
+                }
+            }
+            guides = guidesWithProduct;
+        }
+
+        // Calculate total product cost from guide items
+        let totalProductCost = 0;
+        let totalRevenue = 0;
+
+        for (const guide of guides) {
+            const items = await Database.getGuideItems(guide.id);
+            for (const item of items) {
+                // If product filter is active, only count that product
+                if (productFilter && item.productId !== productFilter) {
+                    continue;
+                }
+                const unitCost = productCostMap[item.productId] || 0;
+                totalProductCost += unitCost * item.quantity;
+                totalRevenue += item.subtotal || (item.quantity * item.unitPrice);
+            }
+        }
+
+        // Total shipping
+        const totalShipping = guides.reduce((sum, g) => sum + (parseFloat(g.shippingCost) || 0), 0);
+
+        // Net profit = Revenue - Product Cost - Shipping
+        const netProfit = totalRevenue - totalProductCost - totalShipping;
+
+        // Margin %
+        const marginPct = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100) : 0;
+
+        // Update display elements
+        const costEl = document.getElementById('analyticsTotalProductCost');
+        const profitEl = document.getElementById('analyticsNetProfit');
+        const marginEl = document.getElementById('analyticsMarginPct');
+
+        if (costEl) {
+            costEl.textContent = isEcuador ? `$${totalProductCost.toFixed(2)}` : Utils.formatCurrency(totalProductCost);
+        }
+        if (profitEl) {
+            profitEl.textContent = isEcuador ? `$${netProfit.toFixed(2)}` : Utils.formatCurrency(netProfit);
+            // Color based on positive/negative
+            profitEl.style.color = netProfit >= 0 ? '#10b981' : '#ef4444';
+        }
+        if (marginEl) {
+            marginEl.textContent = `${marginPct.toFixed(1)}%`;
+            marginEl.style.color = marginPct >= 0 ? '#6366f1' : '#ef4444';
+        }
+    },
+
     async updateTopProducts() {
         // Filter out cancelled guides for product stats
         const guides = this.filteredGuides.filter(g => g.status !== 'Cancelado');
         const productSales = {};
         const productFilter = this.currentFilters.productId;
+
+        // Build a product cost lookup map
+        const productCostMap = {};
+        for (const p of this.allProducts) {
+            productCostMap[p.id] = parseFloat(p.cost) || 0;
+        }
 
         // Collect all items from filtered guides
         for (const guide of guides) {
@@ -441,17 +518,20 @@ const AnalyticsModule = {
 
                 const productName = item.productName || 'Producto';
                 const productId = item.productId;
+                const unitCost = productCostMap[productId] || 0;
 
                 if (!productSales[productId]) {
                     productSales[productId] = {
                         name: productName,
                         quantity: 0,
                         revenue: 0,
+                        cost: 0,
                         guideCount: 0
                     };
                 }
                 productSales[productId].quantity += item.quantity;
                 productSales[productId].revenue += item.subtotal || (item.quantity * item.unitPrice);
+                productSales[productId].cost += unitCost * item.quantity;
                 productSales[productId].guideCount++;
             }
         }
@@ -466,7 +546,7 @@ const AnalyticsModule = {
         if (sortedProducts.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         No hay datos de productos
                     </td>
                 </tr>
@@ -477,6 +557,8 @@ const AnalyticsModule = {
         tbody.innerHTML = sortedProducts.map((item, index) => {
             const [id, data] = item;
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}`;
+            const profit = data.revenue - data.cost;
+            const profitColor = profit >= 0 ? '#10b981' : '#ef4444';
             return `
                 <tr>
                     <td style="text-align: center; font-weight: 600;">${medal}</td>
@@ -486,6 +568,8 @@ const AnalyticsModule = {
                     </td>
                     <td style="text-align: center; font-weight: 600;">${data.quantity}</td>
                     <td style="color: var(--success); font-weight: 500;">${Utils.formatCurrency(data.revenue)}</td>
+                    <td style="color: var(--warning); font-weight: 500;">${Utils.formatCurrency(data.cost)}</td>
+                    <td style="color: ${profitColor}; font-weight: 600;">${Utils.formatCurrency(profit)}</td>
                 </tr>
             `;
         }).join('');
