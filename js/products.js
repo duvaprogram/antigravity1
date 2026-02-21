@@ -1,8 +1,12 @@
 // ========================================
 // Products Module (Async - Supabase)
+// Enhanced with sorting, filtering & stats
 // ========================================
 
 const ProductsModule = {
+    // Current sort state
+    currentSort: { field: 'default', direction: 'asc' },
+
     init() {
         this.bindEvents();
     },
@@ -19,14 +23,45 @@ const ProductsModule = {
             this.saveProduct();
         });
 
-        // Search products
+        // Search products (debounced)
         document.getElementById('searchProducts').addEventListener('input',
-            Utils.debounce((e) => this.filterProducts(), 300)
+            Utils.debounce(() => this.filterProducts(), 300)
         );
 
         // Filter by status
         document.getElementById('filterStatus').addEventListener('change', () => {
             this.filterProducts();
+        });
+
+        // Sort select
+        document.getElementById('productSortSelect').addEventListener('change', (e) => {
+            const val = e.target.value;
+            if (val === 'default') {
+                this.currentSort = { field: 'default', direction: 'asc' };
+            } else {
+                const [field, dir] = val.split('-');
+                this.currentSort = { field, direction: dir };
+            }
+            this.updateSortableHeaders();
+            this.filterProducts();
+        });
+
+        // Filter by category
+        document.getElementById('filterProductCategory').addEventListener('change', () => {
+            this.filterProducts();
+        });
+
+        // Clear filters button
+        document.getElementById('btnClearProductFilters').addEventListener('click', () => {
+            this.clearFilters();
+        });
+
+        // Sortable table headers
+        document.querySelectorAll('#productsTableEl .sortable-th').forEach(th => {
+            th.addEventListener('click', () => {
+                const sortField = th.dataset.sort;
+                this.handleHeaderSort(sortField);
+            });
         });
 
         // Auto-generate SKU when import number changes
@@ -38,6 +73,77 @@ const ProductsModule = {
         document.querySelectorAll('[data-close="modalProduct"]').forEach(btn => {
             btn.addEventListener('click', () => Utils.closeModal('modalProduct'));
         });
+    },
+
+    handleHeaderSort(sortField) {
+        // Map header sort fields to our sort fields
+        const fieldMap = {
+            'sku': 'name', // sort by name when clicking SKU (more useful)
+            'name': 'name',
+            'import': 'import',
+            'cost': 'cost',
+            'price': 'price',
+            'date': 'date'
+        };
+
+        const mapped = fieldMap[sortField] || sortField;
+
+        if (this.currentSort.field === mapped) {
+            // Toggle direction
+            this.currentSort.direction = this.currentSort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            this.currentSort.field = mapped;
+            this.currentSort.direction = 'desc'; // Default to desc for most useful view
+        }
+
+        // Sync the dropdown
+        const selectVal = `${mapped}-${this.currentSort.direction}`;
+        const select = document.getElementById('productSortSelect');
+        const option = select.querySelector(`option[value="${selectVal}"]`);
+        if (option) {
+            select.value = selectVal;
+        } else {
+            select.value = 'default';
+        }
+
+        this.updateSortableHeaders();
+        this.filterProducts();
+    },
+
+    updateSortableHeaders() {
+        // Clear all header states
+        document.querySelectorAll('#productsTableEl .sortable-th').forEach(th => {
+            th.classList.remove('sort-asc', 'sort-desc');
+        });
+
+        if (this.currentSort.field === 'default') return;
+
+        // Map back to header data-sort
+        const reverseMap = {
+            'name': 'name',
+            'import': 'import',
+            'cost': 'cost',
+            'price': 'price',
+            'date': 'date'
+        };
+
+        const headerField = reverseMap[this.currentSort.field];
+        if (headerField) {
+            const th = document.querySelector(`#productsTableEl .sortable-th[data-sort="${headerField}"]`);
+            if (th) {
+                th.classList.add(this.currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+            }
+        }
+    },
+
+    clearFilters() {
+        document.getElementById('searchProducts').value = '';
+        document.getElementById('productSortSelect').value = 'default';
+        document.getElementById('filterProductCategory').value = '';
+        document.getElementById('filterStatus').value = '';
+        this.currentSort = { field: 'default', direction: 'asc' };
+        this.updateSortableHeaders();
+        this.filterProducts();
     },
 
     generateSku(importNumber) {
@@ -58,16 +164,44 @@ const ProductsModule = {
     },
 
     async render() {
+        await this.populateCategories();
         await this.filterProducts();
+    },
+
+    async populateCategories() {
+        try {
+            const products = await Database.getProducts();
+            const categories = [...new Set(products.map(p => p.category).filter(Boolean))].sort();
+            const select = document.getElementById('filterProductCategory');
+            const currentVal = select.value;
+
+            // Keep the first "all" option, replace the rest
+            select.innerHTML = '<option value="">Todas las categorías</option>';
+            categories.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                select.appendChild(opt);
+            });
+
+            // Restore selection if it still exists
+            if (currentVal && categories.includes(currentVal)) {
+                select.value = currentVal;
+            }
+        } catch (e) {
+            console.error('Error populating categories:', e);
+        }
     },
 
     async filterProducts() {
         const searchQuery = document.getElementById('searchProducts').value.toLowerCase();
         const statusFilter = document.getElementById('filterStatus').value;
+        const categoryFilter = document.getElementById('filterProductCategory').value;
 
         let products = await Database.getProducts();
+        const totalProducts = products.length;
 
-        // Apply filters
+        // Apply search filter
         if (searchQuery) {
             products = products.filter(p =>
                 p.name.toLowerCase().includes(searchQuery) ||
@@ -76,12 +210,142 @@ const ProductsModule = {
             );
         }
 
+        // Apply status filter
         if (statusFilter !== '') {
             const isActive = statusFilter === 'true';
             products = products.filter(p => p.active === isActive);
         }
 
+        // Apply category filter
+        if (categoryFilter) {
+            products = products.filter(p => p.category === categoryFilter);
+        }
+
+        // Apply sorting
+        products = this.sortProducts(products);
+
+        // Render summary, count, table
+        this.renderSummary(products, totalProducts);
+        this.renderCount(products.length, totalProducts);
         this.renderTable(products);
+    },
+
+    sortProducts(products) {
+        const { field, direction } = this.currentSort;
+
+        if (field === 'default') return products;
+
+        const sorted = [...products].sort((a, b) => {
+            let valA, valB;
+
+            switch (field) {
+                case 'price':
+                    valA = parseFloat(a.price) || 0;
+                    valB = parseFloat(b.price) || 0;
+                    break;
+                case 'cost':
+                    valA = parseFloat(a.cost) || 0;
+                    valB = parseFloat(b.cost) || 0;
+                    break;
+                case 'name':
+                    valA = (a.name || '').toLowerCase();
+                    valB = (b.name || '').toLowerCase();
+                    return direction === 'asc'
+                        ? valA.localeCompare(valB, 'es')
+                        : valB.localeCompare(valA, 'es');
+                case 'margin':
+                    valA = this.calcMarginPct(a);
+                    valB = this.calcMarginPct(b);
+                    break;
+                case 'date':
+                    valA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                    valB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                    break;
+                case 'import':
+                    valA = parseInt(a.import_number) || 0;
+                    valB = parseInt(b.import_number) || 0;
+                    break;
+                default:
+                    return 0;
+            }
+
+            if (direction === 'asc') return valA - valB;
+            return valB - valA;
+        });
+
+        return sorted;
+    },
+
+    calcMarginPct(product) {
+        const price = parseFloat(product.price) || 0;
+        const cost = parseFloat(product.cost) || 0;
+        if (price === 0) return 0;
+        return ((price - cost) / price) * 100;
+    },
+
+    renderSummary(products, totalProducts) {
+        const container = document.getElementById('productsSummary');
+
+        if (products.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const activeCount = products.filter(p => p.active).length;
+        const totalPrice = products.reduce((sum, p) => sum + (parseFloat(p.price) || 0), 0);
+        const totalCost = products.reduce((sum, p) => sum + (parseFloat(p.cost) || 0), 0);
+        const avgPrice = products.length > 0 ? totalPrice / products.length : 0;
+        const avgCost = products.length > 0 ? totalCost / products.length : 0;
+        const avgMargin = products.length > 0
+            ? products.reduce((sum, p) => sum + this.calcMarginPct(p), 0) / products.length
+            : 0;
+
+        container.innerHTML = `
+            <div class="product-summary-card">
+                <div class="product-summary-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">📦</div>
+                <div class="product-summary-info">
+                    <span class="product-summary-value">${products.length}</span>
+                    <span class="product-summary-label">Productos${products.length !== totalProducts ? ' (filtrados)' : ''}</span>
+                </div>
+            </div>
+            <div class="product-summary-card">
+                <div class="product-summary-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">✓</div>
+                <div class="product-summary-info">
+                    <span class="product-summary-value">${activeCount}</span>
+                    <span class="product-summary-label">Activos</span>
+                </div>
+            </div>
+            <div class="product-summary-card">
+                <div class="product-summary-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">💲</div>
+                <div class="product-summary-info">
+                    <span class="product-summary-value">${Utils.formatCurrency(avgPrice)}</span>
+                    <span class="product-summary-label">Precio promedio</span>
+                </div>
+            </div>
+            <div class="product-summary-card">
+                <div class="product-summary-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">💰</div>
+                <div class="product-summary-info">
+                    <span class="product-summary-value">${Utils.formatCurrency(avgCost)}</span>
+                    <span class="product-summary-label">Costo promedio</span>
+                </div>
+            </div>
+            <div class="product-summary-card">
+                <div class="product-summary-icon" style="background: ${avgMargin >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'}; color: ${avgMargin >= 0 ? '#10b981' : '#ef4444'};">📊</div>
+                <div class="product-summary-info">
+                    <span class="product-summary-value">${avgMargin.toFixed(1)}%</span>
+                    <span class="product-summary-label">Margen promedio</span>
+                </div>
+            </div>
+        `;
+    },
+
+    renderCount(filteredCount, totalCount) {
+        const container = document.getElementById('productsCount');
+        if (filteredCount === totalCount) {
+            container.textContent = `Mostrando ${totalCount} producto${totalCount !== 1 ? 's' : ''}`;
+        } else {
+            container.textContent = `Mostrando ${filteredCount} de ${totalCount} producto${totalCount !== 1 ? 's' : ''}`;
+        }
     },
 
     renderTable(products) {
@@ -90,7 +354,7 @@ const ProductsModule = {
         if (products.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         No se encontraron productos
                     </td>
                 </tr>
@@ -106,16 +370,30 @@ const ProductsModule = {
                 day: 'numeric'
             }) : '-';
 
+            // Calculate margin
+            const price = parseFloat(product.price) || 0;
+            const cost = parseFloat(product.cost) || 0;
+            const marginAmount = price - cost;
+            const marginPct = price > 0 ? ((marginAmount / price) * 100) : 0;
+            const marginClass = marginPct > 0 ? 'positive' : (marginPct < 0 ? 'negative' : 'neutral');
+
             return `
             <tr>
                 <td><code style="color: var(--primary);">${Utils.escapeHtml(product.sku)}</code></td>
                 <td>
                     <strong>${Utils.escapeHtml(product.name)}</strong>
                     <br><small style="color: var(--text-muted);">${Utils.escapeHtml(product.description || '')}</small>
+                    ${product.category ? `<br><small style="color: var(--primary); opacity: 0.7;">${Utils.escapeHtml(product.category)}</small>` : ''}
                 </td>
                 <td>${product.import_number || '-'}</td>
-                <td><span style="color: var(--warning);">${Utils.formatCurrency(product.cost || 0)}</span></td>
-                <td><span style="color: var(--success);">${Utils.formatCurrency(product.price)}</span></td>
+                <td><span style="color: var(--warning);">${Utils.formatCurrency(cost)}</span></td>
+                <td><span style="color: var(--success);">${Utils.formatCurrency(price)}</span></td>
+                <td>
+                    <span class="margin-badge ${marginClass}">
+                        ${marginPct >= 0 ? '+' : ''}${marginPct.toFixed(1)}%
+                    </span>
+                    <br><small style="color: var(--text-muted);">${Utils.formatCurrency(marginAmount)}</small>
+                </td>
                 <td>
                     <span style="font-size: 0.8rem; color: var(--text-muted);">${createdDate}</span>
                 </td>

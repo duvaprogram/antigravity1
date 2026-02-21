@@ -370,7 +370,7 @@
                             <circle cx="11" cy="11" r="8"></circle>
                             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                         </svg>
-                        <input type="text" id="searchProducts" placeholder="Buscar productos...">
+                        <input type="text" id="searchProducts" placeholder="Buscar por nombre, SKU o Nº importación...">
                     </div>
                     <button class="btn btn-primary" id="btnNewProduct">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -382,24 +382,74 @@
                     </button>
                 </div>
 
-                <div class="filters-bar">
+                <!-- Enhanced Filters Bar -->
+                <div class="products-filters-bar">
+                    <select id="productSortSelect">
+                        <option value="default">Ordenar por...</option>
+                        <option value="price-desc">Precio: Mayor → Menor</option>
+                        <option value="price-asc">Precio: Menor → Mayor</option>
+                        <option value="cost-desc">Costo: Mayor → Menor</option>
+                        <option value="cost-asc">Costo: Menor → Mayor</option>
+                        <option value="name-asc">Nombre: A → Z</option>
+                        <option value="name-desc">Nombre: Z → A</option>
+                        <option value="margin-desc">Margen: Mayor → Menor</option>
+                        <option value="margin-asc">Margen: Menor → Mayor</option>
+                        <option value="date-desc">Más recientes primero</option>
+                        <option value="date-asc">Más antiguos primero</option>
+                    </select>
+                    <select id="filterProductCategory">
+                        <option value="">Todas las categorías</option>
+                    </select>
                     <select id="filterStatus">
                         <option value="">Todos los estados</option>
                         <option value="true">Activos</option>
                         <option value="false">Inactivos</option>
                     </select>
+                    <button class="btn btn-secondary btn-sm" id="btnClearProductFilters" title="Limpiar filtros">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                        Limpiar
+                    </button>
                 </div>
 
+                <!-- Products summary stats -->
+                <div class="products-summary" id="productsSummary"></div>
+
+                <!-- Results counter -->
+                <div class="products-count" id="productsCount"></div>
+
                 <div class="table-container">
-                    <table class="table">
+                    <table class="table" id="productsTableEl">
                         <thead>
                             <tr>
-                                <th>SKU</th>
-                                <th>Nombre</th>
-                                <th>Nº Import.</th>
-                                <th>Costo</th>
-                                <th>Precio</th>
-                                <th>Fecha Creación</th>
+                                <th class="sortable-th" data-sort="sku">
+                                    SKU
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th class="sortable-th" data-sort="name">
+                                    Nombre
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th class="sortable-th" data-sort="import">
+                                    Nº Import.
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th class="sortable-th" data-sort="cost">
+                                    Costo
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th class="sortable-th" data-sort="price">
+                                    Precio
+                                    <span class="sort-icon"></span>
+                                </th>
+                                <th>Margen</th>
+                                <th class="sortable-th" data-sort="date">
+                                    Fecha
+                                    <span class="sort-icon"></span>
+                                </th>
                                 <th>Estado</th>
                                 <th>Acciones</th>
                             </tr>
@@ -443,7 +493,8 @@
                 <!-- Inventory Filters Bar -->
                 <div class="inventory-filters-bar">
                     <div class="inv-search-bar">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <circle cx="11" cy="11" r="8"></circle>
                             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                         </svg>
@@ -460,7 +511,8 @@
                         <option value="">Todas las categorías</option>
                     </select>
                     <button class="btn btn-secondary btn-sm" id="btnClearInvFilters" title="Limpiar filtros">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
