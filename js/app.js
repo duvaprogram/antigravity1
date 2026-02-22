@@ -31,6 +31,7 @@ const App = {
             AccountsModule.init();
             UsersModule.init();
             CampaignsModule.init();
+            IncomeStatementModule.init();
 
             // Bind navigation events
             this.bindNavigation();
@@ -141,7 +142,8 @@ const App = {
             'purchases': 'Compras a Proveedores',
             'accounts': 'Cuentas y Flujo de Efectivo',
             'users': 'Administración de Usuarios',
-            'campaigns': 'Creación de Campañas'
+            'campaigns': 'Creación de Campañas',
+            'income-statement': 'Estado de Resultados'
         };
         document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
 
@@ -203,6 +205,9 @@ const App = {
                 break;
             case 'campaigns':
                 CampaignsModule.init();
+                break;
+            case 'income-statement':
+                await IncomeStatementModule.render();
                 break;
         }
     },

@@ -2701,3 +2701,242 @@ form {
     background: rgba(107, 114, 128, 0.1);
     color: #6b7280;
 }
+
+/* ========================================
+   Income Statement Module
+   ======================================== */
+
+/* KPI stat cards */
+.is-stat-card {
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.is-stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--gradient-primary);
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.is-stat-card:hover::before {
+    opacity: 1;
+}
+
+.is-stat-card .stat-sub {
+    margin-top: 2px;
+}
+
+/* Country flag */
+.country-flag {
+    font-size: 1.1rem;
+    line-height: 1;
+}
+
+/* Margin badges */
+.is-margin-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.is-margin-badge.good {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.is-margin-badge.warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+}
+
+.is-margin-badge.bad {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+/* Category badge */
+.is-category-badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: var(--primary-light);
+    color: var(--primary);
+}
+
+/* Sales total row */
+.is-total-row {
+    background: var(--surface-hover) !important;
+    border-top: 2px solid var(--border-light) !important;
+}
+
+.is-total-row td {
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+}
+
+/* P&L Statement */
+.is-pl-card .card-body {
+    padding: 0;
+}
+
+.is-pl-section {
+    border-bottom: 1px solid var(--border);
+}
+
+.is-pl-section:last-of-type {
+    border-bottom: none;
+}
+
+.is-pl-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9rem;
+    transition: background var(--transition-fast);
+}
+
+.is-pl-row:hover {
+    background: var(--surface-hover);
+}
+
+.is-pl-header-row {
+    background: var(--surface-hover);
+    font-weight: 700;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    padding: 0.5rem 1.5rem;
+}
+
+.is-pl-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.is-pl-subtotal {
+    font-weight: 600;
+    border-top: 1px solid var(--border);
+    background: rgba(99, 102, 241, 0.03);
+}
+
+.is-pl-subtotal.highlight-green {
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.is-pl-total {
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 1rem 1.5rem;
+    border-top: 3px double var(--border-light);
+}
+
+.is-pl-total.profit {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(16, 185, 129, 0.02));
+    color: var(--success);
+}
+
+.is-pl-total.loss {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(239, 68, 68, 0.02));
+    color: var(--danger);
+}
+
+/* KPI mini cards */
+.is-pl-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid var(--border);
+    background: var(--surface-hover);
+}
+
+.is-kpi-card {
+    text-align: center;
+    padding: 0.75rem;
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    border: 1px solid var(--border);
+}
+
+.is-kpi-value {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.is-kpi-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-top: 0.25rem;
+}
+
+/* Loading spinner */
+.spinner-sm {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top: 2px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* Import area hover effect */
+.is-import-area {
+    transition: all var(--transition-normal);
+}
+
+.is-import-area:hover {
+    border-color: var(--primary);
+    background: rgba(99, 102, 241, 0.03);
+}
+
+/* Responsive adjustments for Income Statement */
+@media (max-width: 768px) {
+    .is-pl-row {
+        padding: 0.5rem 1rem;
+        font-size: 0.85rem;
+    }
+
+    .is-pl-total {
+        font-size: 1rem;
+        padding: 0.75rem 1rem;
+    }
+
+    .is-pl-kpis {
+        grid-template-columns: repeat(2, 1fr);
+        padding: 1rem;
+    }
+
+    .is-kpi-value {
+        font-size: 1rem;
+    }
+}

@@ -133,6 +133,14 @@
                     </svg>
                     <span>Compras</span>
                 </a>
+                <a href="#income-statement" class="nav-item nav-admin-only" data-section="income-statement"
+                    style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="1" x2="12" y2="23"></line>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                    <span>Estado de Resultados</span>
+                </a>
                 <a href="#accounts" class="nav-item nav-admin-only" data-section="accounts" style="display: none;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
@@ -2142,6 +2150,386 @@
                 </div>
             </section>
 
+            <!-- Income Statement Section -->
+            <section class="content-section" id="section-income-statement">
+                <!-- Header -->
+                <div class="section-header">
+                    <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                        </svg>
+                        Estado de Resultados
+                    </h2>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-secondary" onclick="IncomeStatementModule.exportToCSV()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Exportar
+                        </button>
+                        <button class="btn btn-primary" onclick="IncomeStatementModule.render()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                            Actualizar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="card is-filters-card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header"
+                        style="background: linear-gradient(135deg, #059669, #10b981); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                            </svg>
+                            Filtros del Período
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted);">País</label>
+                                <select id="isCountryFilter" class="form-control">
+                                    <option value="">Todos los países</option>
+                                    <option value="Ecuador">🇪🇨 Ecuador</option>
+                                    <option value="Venezuela">🇻🇪 Venezuela</option>
+                                    <option value="Colombia">🇨🇴 Colombia</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted);">Desde</label>
+                                <input type="date" id="isDateFrom" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted);">Hasta</label>
+                                <input type="date" id="isDateTo" class="form-control">
+                            </div>
+                        </div>
+                        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <button class="btn btn-secondary btn-sm"
+                                onclick="IncomeStatementModule.setQuickFilter('today')">Hoy</button>
+                            <button class="btn btn-secondary btn-sm"
+                                onclick="IncomeStatementModule.setQuickFilter('week')">Semana</button>
+                            <button class="btn btn-secondary btn-sm"
+                                onclick="IncomeStatementModule.setQuickFilter('month')">Mes</button>
+                            <button class="btn btn-secondary btn-sm"
+                                onclick="IncomeStatementModule.setQuickFilter('quarter')">Trimestre</button>
+                            <button class="btn btn-secondary btn-sm"
+                                onclick="IncomeStatementModule.setQuickFilter('year')">Año</button>
+                            <button class="btn btn-secondary btn-sm"
+                                onclick="IncomeStatementModule.setQuickFilter('all')">Todo</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary KPI Cards -->
+                <div
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="stat-card is-stat-card">
+                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="isRevenue">$0.00</span>
+                            <span class="stat-label">Ventas</span>
+                        </div>
+                    </div>
+                    <div class="stat-card is-stat-card">
+                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: #ef4444;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path
+                                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
+                                </path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="isCOGS">$0.00</span>
+                            <span class="stat-label">Costo Mercancía</span>
+                        </div>
+                    </div>
+                    <div class="stat-card is-stat-card">
+                        <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="isGrossProfit">$0.00</span>
+                            <span class="stat-label">Utilidad Bruta</span>
+                            <span class="stat-sub" id="isGrossMarginPct"
+                                style="font-size: 0.7rem; color: var(--text-muted);">0.0% margen</span>
+                        </div>
+                    </div>
+                    <div class="stat-card is-stat-card">
+                        <div class="stat-icon" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <path d="M8 12h8"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="isAdSpend">$0.00</span>
+                            <span class="stat-label">Gasto Publicitario</span>
+                            <span class="stat-sub" id="isROAS"
+                                style="font-size: 0.7rem; color: var(--text-muted);">ROAS: N/A</span>
+                        </div>
+                    </div>
+                    <div class="stat-card is-stat-card">
+                        <div class="stat-icon" style="background: rgba(249, 115, 22, 0.1); color: #f97316;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="isOpExpenses">$0.00</span>
+                            <span class="stat-label">Gastos Operativos</span>
+                        </div>
+                    </div>
+                    <div class="stat-card is-stat-card">
+                        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="isNetProfit">$0.00</span>
+                            <span class="stat-label">Utilidad Neta</span>
+                            <span class="stat-sub" id="isNetMarginPct"
+                                style="font-size: 0.7rem; color: var(--text-muted);">0.0% margen</span>
+                        </div>
+                    </div>
+                    <div class="stat-card is-stat-card">
+                        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="1" y="3" width="15" height="13"></rect>
+                                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                                <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                                <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="isOrders">0</span>
+                            <span class="stat-label">Pedidos Entregados</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sales by Country -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header"
+                        style="background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
+                            Ventas por País
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>País</th>
+                                        <th style="text-align: right;">Pedidos</th>
+                                        <th style="text-align: right;">Unidades</th>
+                                        <th style="text-align: right;">Ventas</th>
+                                        <th style="text-align: right;">Costo</th>
+                                        <th style="text-align: right;">Util. Bruta</th>
+                                        <th style="text-align: center;">Margen</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="isSalesTable">
+                                    <tr>
+                                        <td colspan="7"
+                                            style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                            Cargando datos...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Facebook Ads Import -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header"
+                        style="background: linear-gradient(135deg, #1877f2, #42b72a); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
+                            </svg>
+                            Gastos Publicitarios (Facebook/Meta)
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <!-- Import Area -->
+                        <div class="is-import-area"
+                            style="margin-bottom: 1.5rem; padding: 1.25rem; background: var(--surface-hover); border-radius: var(--radius-md); border: 2px dashed var(--border);">
+                            <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                                <div style="flex: 1; min-width: 200px;">
+                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">📤 Importar Reporte de
+                                        Facebook</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-muted);">
+                                        Sube el archivo CSV o XLSX exportado desde el Administrador de Anuncios de
+                                        Facebook/Meta.
+                                        Se identificarán automáticamente las columnas de gasto, impresiones, clics y
+                                        compras.
+                                    </div>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <select id="fbImportCountry" class="form-control" style="min-width: 130px;">
+                                        <option value="Ecuador">🇪🇨 Ecuador</option>
+                                        <option value="Venezuela">🇻🇪 Venezuela</option>
+                                        <option value="Colombia">🇨🇴 Colombia</option>
+                                    </select>
+                                    <input type="file" id="fbReportFile" accept=".csv,.xlsx,.xls"
+                                        style="display: none;">
+                                    <button class="btn btn-primary"
+                                        onclick="document.getElementById('fbReportFile').click()">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="17 8 12 3 7 8"></polyline>
+                                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                                        </svg>
+                                        Subir Archivo
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="fbImportStatus" style="display: none; margin-top: 1rem;"></div>
+                            <div id="fbImportPreview" style="display: none; margin-top: 1rem;"></div>
+                        </div>
+
+                        <!-- Ad Expenses Table -->
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>País</th>
+                                        <th>Campaña</th>
+                                        <th style="text-align: right;">Gastado</th>
+                                        <th style="text-align: right;">Impresiones</th>
+                                        <th style="text-align: right;">Clicks</th>
+                                        <th style="text-align: center;">CTR</th>
+                                        <th style="text-align: center;">Compras</th>
+                                        <th style="text-align: right;">Costo/Compra</th>
+                                        <th>Fecha</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="isAdExpensesTable">
+                                    <tr>
+                                        <td colspan="10"
+                                            style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                            Cargando gastos publicitarios...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Operational Expenses -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header"
+                        style="background: linear-gradient(135deg, #f97316, #ea580c); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                            </svg>
+                            Gastos Operativos
+                        </h3>
+                        <button class="btn btn-sm"
+                            style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);"
+                            onclick="IncomeStatementModule.showAddExpenseModal()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Nuevo Gasto
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>País</th>
+                                        <th>Categoría</th>
+                                        <th>Descripción</th>
+                                        <th style="text-align: right;">Monto</th>
+                                        <th>Fecha</th>
+                                        <th>Método</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="isOpExpensesTable">
+                                    <tr>
+                                        <td colspan="7"
+                                            style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                            Cargando gastos operativos...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- P&L Statement -->
+                <div class="card is-pl-card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header"
+                        style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                            Estado de Pérdidas y Ganancias (P&L)
+                        </h3>
+                    </div>
+                    <div class="card-body" id="isPLStatement">
+                        <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                            Cargando estado de resultados...
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div><!-- End app-container -->
 
@@ -2870,11 +3258,81 @@
         </div>
     </div>
 
+    <!-- Modal: Operational Expense -->
+    <div class="modal" id="modalOperationalExpense">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Nuevo Gasto Operativo</h2>
+                <button class="modal-close" data-close="modalOperationalExpense">&times;</button>
+            </div>
+            <form id="formOperationalExpense">
+                <input type="hidden" id="opExpenseId">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="opExpenseCountry">País *</label>
+                        <select id="opExpenseCountry" required>
+                            <option value="Ecuador">🇪🇨 Ecuador</option>
+                            <option value="Venezuela">🇻🇪 Venezuela</option>
+                            <option value="Colombia">🇨🇴 Colombia</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="opExpenseCategory">Categoría *</label>
+                        <select id="opExpenseCategory" required>
+                            <option value="Envío">📦 Envío</option>
+                            <option value="Empaques">🎁 Empaques</option>
+                            <option value="Almacenamiento">🏠 Almacenamiento</option>
+                            <option value="Personal">👤 Personal</option>
+                            <option value="Servicios">⚙️ Servicios</option>
+                            <option value="Impuestos">🏛️ Impuestos</option>
+                            <option value="Devoluciones">↩️ Devoluciones</option>
+                            <option value="Comisiones">💳 Comisiones</option>
+                            <option value="Otro">📝 Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="opExpenseDescription">Descripción *</label>
+                        <input type="text" id="opExpenseDescription" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="opExpenseAmount">Monto (USD) *</label>
+                        <input type="number" id="opExpenseAmount" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="opExpenseDate">Fecha *</label>
+                        <input type="date" id="opExpenseDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="opExpensePayMethod">Método de Pago</label>
+                        <select id="opExpensePayMethod">
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="Nequi">Nequi</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="opExpenseNotes">Notas</label>
+                        <textarea id="opExpenseNotes" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary"
+                        data-close="modalOperationalExpense">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Gasto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- SheetJS for Excel/CSV parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabase-config.js"></script>
@@ -2890,6 +3348,7 @@
     <script src="js/accounts.js"></script>
     <script src="js/users.js"></script>
     <script src="js/campaigns.js"></script>
+    <script src="js/income-statement.js"></script>
     <script src="js/app.js"></script>
     <script src="js/auth.js"></script>
 </body>
