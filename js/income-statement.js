@@ -1467,58 +1467,131 @@ const IncomeStatementModule = {
     async confirmFBImport() {
         if (!this.fbImportData || this.fbImportData.length === 0) return;
 
+        const statusEl = document.getElementById('fbImportStatus');
+
+        // Show loading state
+        if (statusEl) {
+            statusEl.style.display = 'block';
+            statusEl.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--primary);">
+                    <div class="spinner-sm"></div>
+                    Importando ${this.fbImportData.length} registros a la base de datos...
+                </div>`;
+        }
+
         try {
-            // Sanitize data - only send columns that exist in the ad_expenses table
-            const sanitizedData = this.fbImportData.map(row => {
-                const clean = {
-                    country: row.country,
-                    campaign_name: row.campaign_name,
-                    ad_set_name: row.ad_set_name,
-                    ad_name: row.ad_name,
-                    amount_spent: row.amount_spent,
-                    impressions: row.impressions || 0,
-                    clicks: row.clicks || 0,
-                    reach: row.reach || 0,
-                    purchases: row.purchases || 0,
-                    cpc: row.cpc || 0,
-                    cpm: row.cpm || 0,
-                    ctr: row.ctr || 0,
-                    cost_per_purchase: row.cost_per_purchase || 0,
-                    date_start: row.date_start,
-                    date_end: row.date_end,
-                    source: row.source || 'Facebook',
-                };
-                // Only add optional fields if they have values
-                if (row.currency) clean.currency = row.currency;
+            // Build the data with only the essential columns first
+            const essentialData = this.fbImportData.map(row => ({
+                country: row.country || 'Ecuador',
+                campaign_name: row.campaign_name || null,
+                amount_spent: row.amount_spent || 0,
+                impressions: row.impressions || 0,
+                clicks: row.clicks || 0,
+                purchases: row.purchases || 0,
+                date_start: row.date_start,
+            }));
+
+            // Extra columns we'll try to add
+            const extraColumns = ['ad_set_name', 'ad_name', 'reach', 'cpc', 'cpm', 'ctr',
+                'cost_per_purchase', 'date_end', 'source', 'currency'];
+
+            // Test with one row first to find which columns are accepted
+            let testRow = { ...essentialData[0] };
+
+            // Add extra columns from the first row
+            for (const col of extraColumns) {
+                if (this.fbImportData[0][col] !== undefined && this.fbImportData[0][col] !== null) {
+                    testRow[col] = this.fbImportData[0][col];
+                }
+            }
+
+            // Try inserting one test row to validate schema
+            let { error: testError } = await supabaseClient
+                .from('ad_expenses')
+                .insert([testRow]);
+
+            let acceptedColumns;
+
+            if (testError) {
+                console.warn('Full insert failed, trying essential columns only:', testError.message);
+
+                // Delete test row if it was partially inserted
+                // Try essential-only insert
+                let { error: essentialError } = await supabaseClient
+                    .from('ad_expenses')
+                    .insert([essentialData[0]]);
+
+                if (essentialError) {
+                    // Even essential columns fail - show detailed error
+                    console.error('Essential insert also failed:', essentialError);
+                    throw new Error(`La tabla ad_expenses no acepta los datos. Error: ${essentialError.message}`);
+                }
+
+                // Essential only works - delete the test row and use essential columns
+                acceptedColumns = Object.keys(essentialData[0]);
+                // Delete the test row we just inserted
+                const { data: lastInserted } = await supabaseClient
+                    .from('ad_expenses')
+                    .select('id')
+                    .eq('campaign_name', essentialData[0].campaign_name)
+                    .eq('date_start', essentialData[0].date_start)
+                    .eq('amount_spent', essentialData[0].amount_spent)
+                    .order('id', { ascending: false })
+                    .limit(1);
+                if (lastInserted && lastInserted[0]) {
+                    await supabaseClient.from('ad_expenses').delete().eq('id', lastInserted[0].id);
+                }
+            } else {
+                // Full insert worked - delete the test row and use all columns
+                acceptedColumns = Object.keys(testRow);
+                const { data: lastInserted } = await supabaseClient
+                    .from('ad_expenses')
+                    .select('id')
+                    .eq('campaign_name', testRow.campaign_name)
+                    .eq('date_start', testRow.date_start)
+                    .eq('amount_spent', testRow.amount_spent)
+                    .order('id', { ascending: false })
+                    .limit(1);
+                if (lastInserted && lastInserted[0]) {
+                    await supabaseClient.from('ad_expenses').delete().eq('id', lastInserted[0].id);
+                }
+            }
+
+            console.log('✅ Accepted columns:', acceptedColumns);
+
+            // Build final data with only accepted columns
+            const finalData = this.fbImportData.map(row => {
+                const clean = {};
+                for (const col of acceptedColumns) {
+                    if (col === 'country') clean.country = row.country || 'Ecuador';
+                    else if (col === 'campaign_name') clean.campaign_name = row.campaign_name || null;
+                    else if (col === 'amount_spent') clean.amount_spent = row.amount_spent || 0;
+                    else if (col === 'date_start') clean.date_start = row.date_start;
+                    else if (row[col] !== undefined) clean[col] = row[col];
+                    else clean[col] = 0;
+                }
                 return clean;
             });
 
             // Insert in batches of 50
             const batchSize = 50;
             let insertedCount = 0;
-            for (let i = 0; i < sanitizedData.length; i += batchSize) {
-                const batch = sanitizedData.slice(i, i + batchSize);
+            for (let i = 0; i < finalData.length; i += batchSize) {
+                const batch = finalData.slice(i, i + batchSize);
                 const { error } = await supabaseClient
                     .from('ad_expenses')
                     .insert(batch);
-                if (error) {
-                    console.error('Supabase insert error:', error);
-                    // If it's a column error, try without optional columns
-                    if (error.message && error.message.includes('column')) {
-                        // Strip potentially missing columns and retry
-                        const safeBatch = batch.map(r => {
-                            const { currency, ...rest } = r;
-                            return rest;
-                        });
-                        const { error: retryError } = await supabaseClient
-                            .from('ad_expenses')
-                            .insert(safeBatch);
-                        if (retryError) throw retryError;
-                    } else {
-                        throw error;
-                    }
-                }
+                if (error) throw error;
                 insertedCount += batch.length;
+
+                // Update progress
+                if (statusEl && finalData.length > batchSize) {
+                    statusEl.innerHTML = `
+                        <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--primary);">
+                            <div class="spinner-sm"></div>
+                            Importando... ${insertedCount}/${finalData.length} registros
+                        </div>`;
+                }
             }
 
             Utils.showNotification(`✅ ${insertedCount} registros de Facebook importados correctamente`, 'success');
@@ -1526,7 +1599,14 @@ const IncomeStatementModule = {
             this.render();
         } catch (error) {
             console.error('Error importing FB data:', error);
-            Utils.showNotification('Error al importar datos de Facebook: ' + error.message, 'error');
+            if (statusEl) {
+                statusEl.innerHTML = `
+                    <div style="padding: 1rem; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: var(--radius-md);">
+                        <div style="font-weight: 600; color: var(--danger);">❌ Error al importar</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">${error.message}</div>
+                    </div>`;
+            }
+            Utils.showNotification('Error al importar datos: ' + error.message, 'error');
         }
     },
 
