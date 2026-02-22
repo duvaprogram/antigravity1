@@ -1480,104 +1480,33 @@ const IncomeStatementModule = {
         }
 
         try {
-            // Build the data with only the essential columns first
-            const essentialData = this.fbImportData.map(row => ({
+            // Map data to exact table columns: ad_expenses
+            const insertData = this.fbImportData.map(row => ({
                 country: row.country || 'Ecuador',
                 campaign_name: row.campaign_name || null,
+                ad_set_name: row.ad_set_name || null,
+                ad_name: row.ad_name || null,
                 amount_spent: row.amount_spent || 0,
+                currency: row.currency || 'USD',
                 impressions: row.impressions || 0,
                 clicks: row.clicks || 0,
+                reach: row.reach || 0,
                 purchases: row.purchases || 0,
+                cpc: row.cpc || 0,
+                cpm: row.cpm || 0,
+                ctr: row.ctr || 0,
+                cost_per_purchase: row.cost_per_purchase || 0,
                 date_start: row.date_start,
+                date_end: row.date_end || row.date_start,
+                source: row.source || 'Facebook',
+                import_batch_id: this.fbImportBatchId || null,
             }));
-
-            // Extra columns we'll try to add
-            const extraColumns = ['ad_set_name', 'ad_name', 'reach', 'cpc', 'cpm', 'ctr',
-                'cost_per_purchase', 'date_end', 'source', 'currency'];
-
-            // Test with one row first to find which columns are accepted
-            let testRow = { ...essentialData[0] };
-
-            // Add extra columns from the first row
-            for (const col of extraColumns) {
-                if (this.fbImportData[0][col] !== undefined && this.fbImportData[0][col] !== null) {
-                    testRow[col] = this.fbImportData[0][col];
-                }
-            }
-
-            // Try inserting one test row to validate schema
-            let { error: testError } = await supabaseClient
-                .from('ad_expenses')
-                .insert([testRow]);
-
-            let acceptedColumns;
-
-            if (testError) {
-                console.warn('Full insert failed, trying essential columns only:', testError.message);
-
-                // Delete test row if it was partially inserted
-                // Try essential-only insert
-                let { error: essentialError } = await supabaseClient
-                    .from('ad_expenses')
-                    .insert([essentialData[0]]);
-
-                if (essentialError) {
-                    // Even essential columns fail - show detailed error
-                    console.error('Essential insert also failed:', essentialError);
-                    throw new Error(`La tabla ad_expenses no acepta los datos. Error: ${essentialError.message}`);
-                }
-
-                // Essential only works - delete the test row and use essential columns
-                acceptedColumns = Object.keys(essentialData[0]);
-                // Delete the test row we just inserted
-                const { data: lastInserted } = await supabaseClient
-                    .from('ad_expenses')
-                    .select('id')
-                    .eq('campaign_name', essentialData[0].campaign_name)
-                    .eq('date_start', essentialData[0].date_start)
-                    .eq('amount_spent', essentialData[0].amount_spent)
-                    .order('id', { ascending: false })
-                    .limit(1);
-                if (lastInserted && lastInserted[0]) {
-                    await supabaseClient.from('ad_expenses').delete().eq('id', lastInserted[0].id);
-                }
-            } else {
-                // Full insert worked - delete the test row and use all columns
-                acceptedColumns = Object.keys(testRow);
-                const { data: lastInserted } = await supabaseClient
-                    .from('ad_expenses')
-                    .select('id')
-                    .eq('campaign_name', testRow.campaign_name)
-                    .eq('date_start', testRow.date_start)
-                    .eq('amount_spent', testRow.amount_spent)
-                    .order('id', { ascending: false })
-                    .limit(1);
-                if (lastInserted && lastInserted[0]) {
-                    await supabaseClient.from('ad_expenses').delete().eq('id', lastInserted[0].id);
-                }
-            }
-
-            console.log('✅ Accepted columns:', acceptedColumns);
-
-            // Build final data with only accepted columns
-            const finalData = this.fbImportData.map(row => {
-                const clean = {};
-                for (const col of acceptedColumns) {
-                    if (col === 'country') clean.country = row.country || 'Ecuador';
-                    else if (col === 'campaign_name') clean.campaign_name = row.campaign_name || null;
-                    else if (col === 'amount_spent') clean.amount_spent = row.amount_spent || 0;
-                    else if (col === 'date_start') clean.date_start = row.date_start;
-                    else if (row[col] !== undefined) clean[col] = row[col];
-                    else clean[col] = 0;
-                }
-                return clean;
-            });
 
             // Insert in batches of 50
             const batchSize = 50;
             let insertedCount = 0;
-            for (let i = 0; i < finalData.length; i += batchSize) {
-                const batch = finalData.slice(i, i + batchSize);
+            for (let i = 0; i < insertData.length; i += batchSize) {
+                const batch = insertData.slice(i, i + batchSize);
                 const { error } = await supabaseClient
                     .from('ad_expenses')
                     .insert(batch);
@@ -1585,16 +1514,16 @@ const IncomeStatementModule = {
                 insertedCount += batch.length;
 
                 // Update progress
-                if (statusEl && finalData.length > batchSize) {
+                if (statusEl && insertData.length > batchSize) {
                     statusEl.innerHTML = `
                         <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--primary);">
                             <div class="spinner-sm"></div>
-                            Importando... ${insertedCount}/${finalData.length} registros
+                            Importando... ${insertedCount}/${insertData.length} registros
                         </div>`;
                 }
             }
 
-            Utils.showToast(`✅ ${insertedCount} registros de Facebook importados correctamente`, 'success');
+            Utils.showToast(`✅ ${insertedCount} registros importados correctamente`, 'success');
             this.cancelFBImport();
             this.render();
         } catch (error) {
@@ -1606,7 +1535,7 @@ const IncomeStatementModule = {
                         <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">${error.message}</div>
                     </div>`;
             }
-            Utils.showToast('Error al importar datos: ' + error.message, 'error');
+            Utils.showToast('Error al importar: ' + error.message, 'error');
         }
     },
 
