@@ -1468,17 +1468,60 @@ const IncomeStatementModule = {
         if (!this.fbImportData || this.fbImportData.length === 0) return;
 
         try {
+            // Sanitize data - only send columns that exist in the ad_expenses table
+            const sanitizedData = this.fbImportData.map(row => {
+                const clean = {
+                    country: row.country,
+                    campaign_name: row.campaign_name,
+                    ad_set_name: row.ad_set_name,
+                    ad_name: row.ad_name,
+                    amount_spent: row.amount_spent,
+                    impressions: row.impressions || 0,
+                    clicks: row.clicks || 0,
+                    reach: row.reach || 0,
+                    purchases: row.purchases || 0,
+                    cpc: row.cpc || 0,
+                    cpm: row.cpm || 0,
+                    ctr: row.ctr || 0,
+                    cost_per_purchase: row.cost_per_purchase || 0,
+                    date_start: row.date_start,
+                    date_end: row.date_end,
+                    source: row.source || 'Facebook',
+                };
+                // Only add optional fields if they have values
+                if (row.currency) clean.currency = row.currency;
+                return clean;
+            });
+
             // Insert in batches of 50
             const batchSize = 50;
-            for (let i = 0; i < this.fbImportData.length; i += batchSize) {
-                const batch = this.fbImportData.slice(i, i + batchSize);
+            let insertedCount = 0;
+            for (let i = 0; i < sanitizedData.length; i += batchSize) {
+                const batch = sanitizedData.slice(i, i + batchSize);
                 const { error } = await supabaseClient
                     .from('ad_expenses')
                     .insert(batch);
-                if (error) throw error;
+                if (error) {
+                    console.error('Supabase insert error:', error);
+                    // If it's a column error, try without optional columns
+                    if (error.message && error.message.includes('column')) {
+                        // Strip potentially missing columns and retry
+                        const safeBatch = batch.map(r => {
+                            const { currency, ...rest } = r;
+                            return rest;
+                        });
+                        const { error: retryError } = await supabaseClient
+                            .from('ad_expenses')
+                            .insert(safeBatch);
+                        if (retryError) throw retryError;
+                    } else {
+                        throw error;
+                    }
+                }
+                insertedCount += batch.length;
             }
 
-            Utils.showNotification(`✅ ${this.fbImportData.length} registros de Facebook importados correctamente`, 'success');
+            Utils.showNotification(`✅ ${insertedCount} registros de Facebook importados correctamente`, 'success');
             this.cancelFBImport();
             this.render();
         } catch (error) {
