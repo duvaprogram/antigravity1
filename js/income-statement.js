@@ -403,24 +403,41 @@ const IncomeStatementModule = {
         const tbody = document.getElementById('isAdExpensesTable');
         if (!tbody) return;
 
-        // Get base filtered expenses (by main income statement filters)
-        let expenses = this.getFilteredAdExpenses();
+        // Comenzar con TODOS los gastos para que los filtros locales puedan sobrescribir los globales
+        let expenses = this.adExpenses;
 
-        // Apply ad-specific filters
+        // Obtain specific filters for ads and global filters as fallbacks
         const adCountry = document.getElementById('adFilterCountry')?.value || '';
         const adDateFrom = document.getElementById('adFilterDateFrom')?.value || '';
         const adDateTo = document.getElementById('adFilterDateTo')?.value || '';
         const adSearch = (document.getElementById('adFilterSearch')?.value || '').toLowerCase().trim();
 
-        if (adCountry) {
-            expenses = expenses.filter(e => e.country === adCountry);
+        // 1. Filtrar por Pais (Local override de Global)
+        const filterCountry = adCountry || this.filters.country;
+        if (filterCountry) {
+            expenses = expenses.filter(e => e.country === filterCountry);
         }
-        if (adDateFrom) {
-            expenses = expenses.filter(e => e.date_start >= adDateFrom);
+
+        // 2. Filtrar por Fecha (Local override de Global)
+        const filterDateFrom = adDateFrom || this.filters.dateFrom;
+        const filterDateTo = adDateTo || this.filters.dateTo;
+
+        if (filterDateFrom) {
+            expenses = expenses.filter(e => {
+                if (!e.date_start) return false;
+                const itemDate = new Date(e.date_start).toISOString().split('T')[0];
+                return itemDate >= filterDateFrom;
+            });
         }
-        if (adDateTo) {
-            expenses = expenses.filter(e => e.date_start <= adDateTo);
+        if (filterDateTo) {
+            expenses = expenses.filter(e => {
+                if (!e.date_start) return false;
+                const itemDate = new Date(e.date_start).toISOString().split('T')[0];
+                return itemDate <= filterDateTo;
+            });
         }
+
+        // 3. Search
         if (adSearch) {
             expenses = expenses.filter(e =>
                 (e.campaign_name || '').toLowerCase().includes(adSearch) ||
@@ -1524,6 +1541,22 @@ const IncomeStatementModule = {
             }
 
             Utils.showToast(`✅ ${insertedCount} registros importados correctamente`, 'success');
+
+            // Check if any inserted record is within the current global date filter
+            const insertedInFilter = insertData.some(row => {
+                const itemDate = new Date(row.date_start).toISOString().split('T')[0];
+                if (this.filters.dateFrom && itemDate < this.filters.dateFrom) return false;
+                if (this.filters.dateTo && itemDate > this.filters.dateTo) return false;
+                if (this.filters.country && row.country !== this.filters.country) return false;
+                return true;
+            });
+
+            if (!insertedInFilter) {
+                setTimeout(() => {
+                    Utils.showToast('Nota: Los registros importados están fuera del rango o país actual del filtro general.', 'info');
+                }, 1500);
+            }
+
             this.cancelFBImport();
             this.render();
         } catch (error) {
@@ -1620,6 +1653,35 @@ const IncomeStatementModule = {
         } catch (error) {
             Utils.showToast('Error al eliminar: ' + error.message, 'error');
         }
+    },
+
+    onCurrencyChange() {
+        const currency = document.getElementById('fbImportCurrency')?.value;
+        const trmContainer = document.getElementById('trmInputContainer');
+        const conversionInfo = document.getElementById('conversionInfo');
+        if (currency === 'COP') {
+            if (trmContainer) trmContainer.style.display = 'flex';
+            if (conversionInfo) conversionInfo.style.display = 'block';
+        } else {
+            if (trmContainer) trmContainer.style.display = 'none';
+            if (conversionInfo) conversionInfo.style.display = 'none';
+        }
+    },
+
+    filterAdExpenses() {
+        this.renderAdExpensesTable();
+    },
+
+    clearAdFilters() {
+        const resetInput = (id) => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        };
+        resetInput('adFilterCountry');
+        resetInput('adFilterDateFrom');
+        resetInput('adFilterDateTo');
+        resetInput('adFilterSearch');
+        this.renderAdExpensesTable();
     },
 
     // ========================================
