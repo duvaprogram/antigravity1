@@ -202,7 +202,7 @@ const IncomeStatementModule = {
             if (guide.guide_items) {
                 guide.guide_items.forEach(item => {
                     const qty = parseInt(item.quantity || 0);
-                    const cost = parseFloat(item.products?.cost || 0);
+                    const cost = parseFloat(item.products?.cost || 0) * 40000;
                     byCountry[country].totalCost += qty * cost;
                     byCountry[country].unitsSold += qty;
                 });
