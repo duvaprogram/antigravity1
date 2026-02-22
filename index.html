@@ -2590,6 +2590,57 @@
                     </div>
                 </div>
 
+                <!-- External Sales -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header"
+                        style="background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="16"></line>
+                                <line x1="8" y1="12" x2="16" y2="12"></line>
+                            </svg>
+                            Otras Plataformas (Ajustes Manuales)
+                        </h3>
+                        <button class="btn btn-sm"
+                            style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);"
+                            onclick="IncomeStatementModule.openExternalSalesModal()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Registrar Venta Extra
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>País</th>
+                                        <th>Descripción</th>
+                                        <th style="text-align: right; color: var(--success);">Ingresos (USD)</th>
+                                        <th style="text-align: right; color: var(--danger);">Costo Mercancía (USD)</th>
+                                        <th style="text-align: right; color: var(--primary);">Costo Fletes (USD)</th>
+                                        <th>Fecha</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="isExternalSalesTable">
+                                    <tr>
+                                        <td colspan="7"
+                                            style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                            Cargando ventas externas...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- P&L Statement -->
                 <div class="card is-pl-card" style="margin-bottom: 1.5rem;">
                     <div class="card-header"
@@ -3402,6 +3453,55 @@
                     <button type="button" class="btn btn-secondary"
                         data-close="modalOperationalExpense">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar Gasto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: External Sale -->
+    <div class="modal" id="modalExternalSale">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Registrar Venta Manual (Otras Plataformas)</h2>
+                <button class="modal-close" data-close="modalExternalSale">&times;</button>
+            </div>
+            <form id="formExternalSale">
+                <input type="hidden" id="extSaleId">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="extSaleCountry">País *</label>
+                        <select id="extSaleCountry" required>
+                            <option value="Todos">Global / Todos</option>
+                            <option value="Ecuador">🇪🇨 Ecuador</option>
+                            <option value="Venezuela">🇻🇪 Venezuela</option>
+                            <option value="Colombia">🇨🇴 Colombia</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="extSaleDate">Fecha *</label>
+                        <input type="date" id="extSaleDate" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="extSaleDescription">Descripción</label>
+                        <input type="text" id="extSaleDescription"
+                            placeholder="Ej: Ventas por Mercadolibre, Ajuste mensual...">
+                    </div>
+                    <div class="form-group">
+                        <label for="extSaleRevenue">Ingresos Netos (USD) *</label>
+                        <input type="number" id="extSaleRevenue" step="0.01" min="0" required value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="extSaleProductCost">Costo de Mercancía (USD) *</label>
+                        <input type="number" id="extSaleProductCost" step="0.01" min="0" required value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="extSaleShippingCost">Costo de Fletes (USD) *</label>
+                        <input type="number" id="extSaleShippingCost" step="0.01" min="0" required value="0">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalExternalSale">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
                 </div>
             </form>
         </div>

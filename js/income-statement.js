@@ -8,6 +8,8 @@ const IncomeStatementModule = {
     guideItems: [],
     adExpenses: [],
     operationalExpenses: [],
+    operationalExpenses: [],
+    externalSales: [],
     products: [],
 
     // Current filters
@@ -54,6 +56,15 @@ const IncomeStatementModule = {
                 this.saveOperationalExpense();
             });
         }
+
+        // External Sale form
+        const extSaleForm = document.getElementById('formExternalSale');
+        if (extSaleForm) {
+            extSaleForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.saveExternalSale();
+            });
+        }
     },
 
     setDefaultFilters() {
@@ -85,6 +96,7 @@ const IncomeStatementModule = {
             this.renderSalesTable();
             this.renderAdExpensesTable();
             this.renderOperationalExpensesTable();
+            this.renderExternalSalesTable();
             this.renderPLStatement();
         } catch (error) {
             console.error('Error rendering income statement:', error);
@@ -123,7 +135,17 @@ const IncomeStatementModule = {
                 .order('expense_date', { ascending: false });
 
             if (opError) throw opError;
+            if (opError) throw opError;
             this.operationalExpenses = opExpenses || [];
+
+            // Load external sales
+            const { data: extSales, error: extError } = await supabaseClient
+                .from('external_sales')
+                .select('*')
+                .order('sale_date', { ascending: false });
+
+            if (extError) throw extError;
+            this.externalSales = extSales || [];
 
         } catch (error) {
             console.error('Error loading data:', error);
@@ -541,6 +563,116 @@ const IncomeStatementModule = {
                     </td>
                 </tr>`;
         }).join('');
+    },
+
+    // ========================================
+    // EXTERNAL SALES
+    // ========================================
+    getFilteredExternalSales() {
+        return this.filterByDateAndCountry(
+            this.externalSales,
+            'sale_date',
+            (sale) => sale.country === 'Todos' ? null : sale.country
+        );
+    },
+
+    getExternalSalesSummary() {
+        const sales = this.getFilteredExternalSales();
+        let totalRevenue = 0, totalCost = 0, totalShipping = 0;
+        sales.forEach(s => {
+            totalRevenue += parseFloat(s.revenue || 0);
+            totalCost += parseFloat(s.product_cost || 0);
+            totalShipping += parseFloat(s.shipping_cost || 0);
+        });
+        return { totalRevenue, totalCost, totalShipping };
+    },
+
+    renderExternalSalesTable() {
+        const tbody = document.getElementById('isExternalSalesTable');
+        if (!tbody) return;
+
+        const sales = this.getFilteredExternalSales();
+
+        if (sales.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        No hay ventas manuales registradas en este período.
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        tbody.innerHTML = sales.map(sale => {
+            return `
+                <tr>
+                    <td>
+                        <span class="country-flag">${this.getCountryFlag(sale.country === 'Todos' ? sale.country : sale.country)}</span>
+                        ${sale.country}
+                    </td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${sale.description || '-'}</td>
+                    <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(sale.revenue)}</td>
+                    <td style="text-align: right; color: var(--danger);">${this.formatCurrency(sale.product_cost)}</td>
+                    <td style="text-align: right; color: var(--primary);">${this.formatCurrency(sale.shipping_cost)}</td>
+                    <td style="font-size: 0.85rem;">${this.formatDate(sale.sale_date)}</td>
+                    <td>
+                        <button class="btn btn-icon btn-sm btn-danger-light" onclick="IncomeStatementModule.deleteExternalSale('${sale.id}')" title="Eliminar">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </td>
+                </tr>`;
+        }).join('');
+    },
+
+    openExternalSalesModal() {
+        const form = document.getElementById('formExternalSale');
+        if (form) form.reset();
+        document.getElementById('extSaleId').value = '';
+        document.getElementById('extSaleDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('modalExternalSale').classList.add('active');
+    },
+
+    async saveExternalSale() {
+        const id = document.getElementById('extSaleId')?.value;
+        const data = {
+            country: document.getElementById('extSaleCountry').value,
+            sale_date: document.getElementById('extSaleDate').value,
+            description: document.getElementById('extSaleDescription').value,
+            revenue: parseFloat(document.getElementById('extSaleRevenue').value) || 0,
+            product_cost: parseFloat(document.getElementById('extSaleProductCost').value) || 0,
+            shipping_cost: parseFloat(document.getElementById('extSaleShippingCost').value) || 0
+        };
+
+        try {
+            if (id) {
+                const { error } = await supabaseClient.from('external_sales').update(data).eq('id', id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabaseClient.from('external_sales').insert(data);
+                if (error) throw error;
+            }
+            Utils.showToast('Venta externa guardada', 'success');
+            document.getElementById('modalExternalSale').classList.remove('active');
+            this.render();
+        } catch (error) {
+            console.error('Error saving external sale:', error);
+            Utils.showToast('Error al guardar: ' + error.message, 'error');
+        }
+    },
+
+    async deleteExternalSale(id) {
+        if (!confirm('¿Eliminar esta venta manual?')) return;
+        try {
+            const { error } = await supabaseClient.from('external_sales').delete().eq('id', id);
+            if (error) throw error;
+            Utils.showToast('Venta eliminada', 'success');
+            this.render();
+        } catch (error) {
+            Utils.showToast('Error al eliminar: ' + error.message, 'error');
+        }
     },
 
     renderPLStatement() {
