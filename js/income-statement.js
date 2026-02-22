@@ -1594,7 +1594,7 @@ const IncomeStatementModule = {
                 }
             }
 
-            Utils.showNotification(`✅ ${insertedCount} registros de Facebook importados correctamente`, 'success');
+            Utils.showToast(`✅ ${insertedCount} registros de Facebook importados correctamente`, 'success');
             this.cancelFBImport();
             this.render();
         } catch (error) {
@@ -1606,7 +1606,7 @@ const IncomeStatementModule = {
                         <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">${error.message}</div>
                     </div>`;
             }
-            Utils.showNotification('Error al importar datos: ' + error.message, 'error');
+            Utils.showToast('Error al importar datos: ' + error.message, 'error');
         }
     },
 
@@ -1660,12 +1660,12 @@ const IncomeStatementModule = {
                 if (error) throw error;
             }
 
-            Utils.showNotification('Gasto operativo guardado', 'success');
+            Utils.showToast('Gasto operativo guardado', 'success');
             document.getElementById('modalOperationalExpense').classList.remove('active');
             this.render();
         } catch (error) {
             console.error('Error saving operational expense:', error);
-            Utils.showNotification('Error al guardar: ' + error.message, 'error');
+            Utils.showToast('Error al guardar: ' + error.message, 'error');
         }
     },
 
@@ -1674,10 +1674,10 @@ const IncomeStatementModule = {
         try {
             const { error } = await supabaseClient.from('ad_expenses').delete().eq('id', id);
             if (error) throw error;
-            Utils.showNotification('Gasto publicitario eliminado', 'success');
+            Utils.showToast('Gasto publicitario eliminado', 'success');
             this.render();
         } catch (error) {
-            Utils.showNotification('Error al eliminar: ' + error.message, 'error');
+            Utils.showToast('Error al eliminar: ' + error.message, 'error');
         }
     },
 
@@ -1686,10 +1686,10 @@ const IncomeStatementModule = {
         try {
             const { error } = await supabaseClient.from('operational_expenses').delete().eq('id', id);
             if (error) throw error;
-            Utils.showNotification('Gasto operativo eliminado', 'success');
+            Utils.showToast('Gasto operativo eliminado', 'success');
             this.render();
         } catch (error) {
-            Utils.showNotification('Error al eliminar: ' + error.message, 'error');
+            Utils.showToast('Error al eliminar: ' + error.message, 'error');
         }
     },
 
@@ -1769,7 +1769,7 @@ const IncomeStatementModule = {
         link.download = `estado_resultados_${this.filters.dateFrom || 'all'}.csv`;
         link.click();
 
-        Utils.showNotification('Estado de resultados exportado', 'success');
+        Utils.showToast('Estado de resultados exportado', 'success');
     },
 
     // ========================================
