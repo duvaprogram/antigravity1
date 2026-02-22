@@ -296,7 +296,7 @@ const IncomeStatementModule = {
         const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0);
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
-        const grossProfit = totalRevenue - totalCOGS;
+        const grossProfit = totalRevenue - totalCOGS - totalShipping;
         const netProfit = grossProfit - totalAdSpend - totalOpExp;
         const totalOrders = salesData.reduce((s, c) => s + c.orderCount, 0);
 
@@ -360,7 +360,7 @@ const IncomeStatementModule = {
             totalRow.totalShipping += row.totalShipping;
             totalRow.orderCount += row.orderCount;
             totalRow.unitsSold += row.unitsSold;
-            const grossProfit = row.totalRevenue - row.totalCost;
+            const grossProfit = row.totalRevenue - row.totalCost - row.totalShipping;
             const margin = row.totalRevenue > 0 ? ((grossProfit / row.totalRevenue) * 100).toFixed(1) : '0.0';
 
             return `
@@ -554,7 +554,7 @@ const IncomeStatementModule = {
         const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
         const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0);
         const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0);
-        const grossProfit = totalRevenue - totalCOGS;
+        const grossProfit = totalRevenue - totalCOGS - totalShipping;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
         const totalExpenses = totalAdSpend + totalOpExp;
@@ -602,6 +602,10 @@ const IncomeStatementModule = {
                 <div class="is-pl-row">
                     <span style="padding-left: 1rem;">Costo de Mercancía Vendida</span>
                     <span style="color: var(--danger);">${this.formatCurrency(totalCOGS)}</span>
+                </div>
+                <div class="is-pl-row">
+                    <span style="padding-left: 1rem;">Costo de Fletes (Envíos)</span>
+                    <span style="color: var(--danger);">${this.formatCurrency(totalShipping)}</span>
                 </div>
                 <div class="is-pl-row is-pl-subtotal highlight-green">
                     <span>UTILIDAD BRUTA</span>
@@ -1737,7 +1741,8 @@ const IncomeStatementModule = {
 
         const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
         const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0);
-        const grossProfit = totalRevenue - totalCOGS;
+        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0);
+        const grossProfit = totalRevenue - totalCOGS - totalShipping;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
         const netProfit = grossProfit - totalAdSpend - totalOpExp;
@@ -1748,6 +1753,7 @@ const IncomeStatementModule = {
         csv += 'Concepto,Monto\n';
         csv += `Ventas Netas,${totalRevenue.toFixed(2)}\n`;
         csv += `Costo de Mercancía,${totalCOGS.toFixed(2)}\n`;
+        csv += `Costo de Fletes,${totalShipping.toFixed(2)}\n`;
         csv += `Utilidad Bruta,${grossProfit.toFixed(2)}\n`;
         csv += `Gastos Publicitarios,${totalAdSpend.toFixed(2)}\n`;
         csv += `Gastos Operativos,${totalOpExp.toFixed(2)}\n`;
