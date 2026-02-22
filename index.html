@@ -2400,10 +2400,10 @@
                                         Sube el archivo CSV o XLSX exportado desde el Administrador de Anuncios de
                                         Facebook/Meta.
                                         Se identificarán automáticamente las columnas de gasto, impresiones, clics y
-                                        compras.
+                                        compras. Si tu archivo tiene una columna "Mes", se usará como fecha.
                                     </div>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
                                     <select id="fbImportCountry" class="form-control" style="min-width: 130px;">
                                         <option value="Ecuador">🇪🇨 Ecuador</option>
                                         <option value="Venezuela">🇻🇪 Venezuela</option>
@@ -2423,8 +2423,89 @@
                                     </button>
                                 </div>
                             </div>
+                            <!-- Currency Conversion -->
+                            <div
+                                style="margin-top: 1rem; padding: 0.75rem; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                                <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                                            stroke="var(--primary)" stroke-width="2">
+                                            <line x1="12" y1="1" x2="12" y2="23"></line>
+                                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                        </svg>
+                                        <span style="font-weight: 600; font-size: 0.85rem;">Moneda del reporte:</span>
+                                    </div>
+                                    <select id="fbImportCurrency" class="form-control" style="min-width: 110px;"
+                                        onchange="IncomeStatementModule.onCurrencyChange()">
+                                        <option value="USD">🇺🇸 USD (Dólar)</option>
+                                        <option value="COP">🇨🇴 COP (Peso Colombiano)</option>
+                                    </select>
+                                    <div id="trmInputContainer"
+                                        style="display: none; align-items: center; gap: 0.5rem;">
+                                        <label
+                                            style="font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">TRM
+                                            (1 USD =):</label>
+                                        <div style="display: flex; align-items: center; gap: 0.25rem;">
+                                            <span
+                                                style="font-weight: 600; color: var(--text-muted); font-size: 0.85rem;">$</span>
+                                            <input type="number" id="fbTrmRate" class="form-control" value="4200"
+                                                min="1" step="0.01" style="width: 100px; font-weight: 600;"
+                                                placeholder="4200">
+                                            <span style="font-size: 0.8rem; color: var(--text-muted);">COP</span>
+                                        </div>
+                                    </div>
+                                    <div id="conversionInfo"
+                                        style="display: none; font-size: 0.75rem; color: var(--primary); padding: 0.25rem 0.5rem; background: rgba(99, 102, 241, 0.1); border-radius: var(--radius-sm);">
+                                        💱 Los montos se convertirán automáticamente a USD
+                                    </div>
+                                </div>
+                            </div>
                             <div id="fbImportStatus" style="display: none; margin-top: 1rem;"></div>
                             <div id="fbImportPreview" style="display: none; margin-top: 1rem;"></div>
+                        </div>
+
+                        <!-- Ad Expenses Filters -->
+                        <div
+                            style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; margin-bottom: 1rem; padding: 0.75rem; background: var(--surface-hover); border-radius: var(--radius-md);">
+                            <div class="form-group" style="flex: 1; min-width: 120px; margin: 0;">
+                                <label
+                                    style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.25rem;">País</label>
+                                <select id="adFilterCountry" class="form-control"
+                                    style="padding: 0.4rem 0.6rem; font-size: 0.85rem;"
+                                    onchange="IncomeStatementModule.filterAdExpenses()">
+                                    <option value="">Todos</option>
+                                    <option value="Ecuador">🇪🇨 Ecuador</option>
+                                    <option value="Venezuela">🇻🇪 Venezuela</option>
+                                    <option value="Colombia">🇨🇴 Colombia</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 120px; margin: 0;">
+                                <label
+                                    style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.25rem;">Desde</label>
+                                <input type="date" id="adFilterDateFrom" class="form-control"
+                                    style="padding: 0.4rem 0.6rem; font-size: 0.85rem;"
+                                    onchange="IncomeStatementModule.filterAdExpenses()">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 120px; margin: 0;">
+                                <label
+                                    style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.25rem;">Hasta</label>
+                                <input type="date" id="adFilterDateTo" class="form-control"
+                                    style="padding: 0.4rem 0.6rem; font-size: 0.85rem;"
+                                    onchange="IncomeStatementModule.filterAdExpenses()">
+                            </div>
+                            <div class="form-group" style="flex: 2; min-width: 150px; margin: 0;">
+                                <label
+                                    style="font-size: 0.7rem; color: var(--text-muted); margin-bottom: 0.25rem;">Buscar
+                                    campaña</label>
+                                <input type="text" id="adFilterSearch" class="form-control"
+                                    placeholder="🔍 Buscar por nombre..."
+                                    style="padding: 0.4rem 0.6rem; font-size: 0.85rem;"
+                                    oninput="IncomeStatementModule.filterAdExpenses()">
+                            </div>
+                            <button class="btn btn-secondary btn-sm" style="padding: 0.4rem 0.75rem;"
+                                onclick="IncomeStatementModule.clearAdFilters()">Limpiar</button>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); width: 100%;"
+                                id="adFilterSummary"></div>
                         </div>
 
                         <!-- Ad Expenses Table -->
@@ -2434,7 +2515,7 @@
                                     <tr>
                                         <th>País</th>
                                         <th>Campaña</th>
-                                        <th style="text-align: right;">Gastado</th>
+                                        <th style="text-align: right;">Gastado (USD)</th>
                                         <th style="text-align: right;">Impresiones</th>
                                         <th style="text-align: right;">Clicks</th>
                                         <th style="text-align: center;">CTR</th>

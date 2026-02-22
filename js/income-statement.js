@@ -403,12 +403,48 @@ const IncomeStatementModule = {
         const tbody = document.getElementById('isAdExpensesTable');
         if (!tbody) return;
 
-        const expenses = this.getFilteredAdExpenses();
+        // Get base filtered expenses (by main income statement filters)
+        let expenses = this.getFilteredAdExpenses();
+
+        // Apply ad-specific filters
+        const adCountry = document.getElementById('adFilterCountry')?.value || '';
+        const adDateFrom = document.getElementById('adFilterDateFrom')?.value || '';
+        const adDateTo = document.getElementById('adFilterDateTo')?.value || '';
+        const adSearch = (document.getElementById('adFilterSearch')?.value || '').toLowerCase().trim();
+
+        if (adCountry) {
+            expenses = expenses.filter(e => e.country === adCountry);
+        }
+        if (adDateFrom) {
+            expenses = expenses.filter(e => e.date_start >= adDateFrom);
+        }
+        if (adDateTo) {
+            expenses = expenses.filter(e => e.date_start <= adDateTo);
+        }
+        if (adSearch) {
+            expenses = expenses.filter(e =>
+                (e.campaign_name || '').toLowerCase().includes(adSearch) ||
+                (e.ad_set_name || '').toLowerCase().includes(adSearch) ||
+                (e.ad_name || '').toLowerCase().includes(adSearch)
+            );
+        }
+
+        // Update filter summary
+        const summaryEl = document.getElementById('adFilterSummary');
+        if (summaryEl) {
+            const totalSpent = expenses.reduce((s, e) => s + parseFloat(e.amount_spent || 0), 0);
+            const totalAll = this.getFilteredAdExpenses().length;
+            if (expenses.length !== totalAll) {
+                summaryEl.innerHTML = `Mostrando <strong>${expenses.length}</strong> de ${totalAll} registros · Gasto filtrado: <strong style="color:var(--danger)">$${totalSpent.toFixed(2)}</strong>`;
+            } else {
+                summaryEl.innerHTML = `${expenses.length} registros · Gasto total: <strong style="color:var(--danger)">$${totalSpent.toFixed(2)}</strong>`;
+            }
+        }
 
         if (expenses.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 0.5rem; opacity: 0.3;">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M8 12h8"></path>
@@ -686,6 +722,12 @@ const IncomeStatementModule = {
             ['costo', 'compra'],
             ['cost', 'result'],
         ],
+        month: [
+            ['mes'],
+            ['month'],
+            ['periodo'],
+            ['period'],
+        ],
         date_start: [
             ['reporting', 'start'],
             ['inicio', 'informe'],
@@ -707,6 +749,101 @@ const IncomeStatementModule = {
             ['frequency'],
             ['frecuencia'],
         ],
+    },
+
+    /**
+     * Show/hide TRM input based on currency selection
+     */
+    onCurrencyChange() {
+        const currency = document.getElementById('fbImportCurrency')?.value || 'USD';
+        const trmContainer = document.getElementById('trmInputContainer');
+        const conversionInfo = document.getElementById('conversionInfo');
+        if (currency === 'COP') {
+            if (trmContainer) trmContainer.style.display = 'flex';
+            if (conversionInfo) conversionInfo.style.display = 'block';
+        } else {
+            if (trmContainer) trmContainer.style.display = 'none';
+            if (conversionInfo) conversionInfo.style.display = 'none';
+        }
+    },
+
+    /**
+     * Parse a month name/number into a date (first day of that month)
+     * Supports: "Enero", "Febrero", "Jan", "January", "01", "1", "2024-01", "Enero 2024", etc.
+     */
+    parseMonthToDate(val, year) {
+        if (!val) return null;
+        const str = String(val).trim().toLowerCase();
+
+        // Map of month names to numbers
+        const monthMap = {
+            'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+            'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12,
+            'ene': 1, 'feb': 2, 'mar': 3, 'abr': 4, 'may': 5, 'jun': 6,
+            'jul': 7, 'ago': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dic': 12,
+            'january': 1, 'february': 2, 'march': 3, 'april': 4, 'june': 6,
+            'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
+            'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+            'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+        };
+
+        // Try "Enero 2024" or "January 2024" format
+        const monthYearMatch = str.match(/^(\w+)\s+(\d{4})$/);
+        if (monthYearMatch) {
+            const monthNum = monthMap[monthYearMatch[1]];
+            if (monthNum) {
+                return `${monthYearMatch[2]}-${String(monthNum).padStart(2, '0')}-01`;
+            }
+        }
+
+        // Try "2024-01" format
+        const isoMonthMatch = str.match(/^(\d{4})-(\d{1,2})$/);
+        if (isoMonthMatch) {
+            return `${isoMonthMatch[1]}-${isoMonthMatch[2].padStart(2, '0')}-01`;
+        }
+
+        // Try "01/2024" or "1/2024" format  
+        const slashMatch = str.match(/^(\d{1,2})[\/\-](\d{4})$/);
+        if (slashMatch) {
+            return `${slashMatch[2]}-${slashMatch[1].padStart(2, '0')}-01`;
+        }
+
+        // Try month name only (use provided year or current year)
+        const useYear = year || new Date().getFullYear();
+        const monthNum = monthMap[str];
+        if (monthNum) {
+            return `${useYear}-${String(monthNum).padStart(2, '0')}-01`;
+        }
+
+        // Try pure number (1-12)
+        const num = parseInt(str);
+        if (num >= 1 && num <= 12) {
+            return `${useYear}-${String(num).padStart(2, '0')}-01`;
+        }
+
+        return null;
+    },
+
+    /**
+     * Filter ad expenses table with dedicated ad filters
+     */
+    filterAdExpenses() {
+        this.renderAdExpensesTable();
+    },
+
+    /**
+     * Clear ad expense filters
+     */
+    clearAdFilters() {
+        const country = document.getElementById('adFilterCountry');
+        const dateFrom = document.getElementById('adFilterDateFrom');
+        const dateTo = document.getElementById('adFilterDateTo');
+        const search = document.getElementById('adFilterSearch');
+        if (country) country.value = '';
+        if (dateFrom) dateFrom.value = '';
+        if (dateTo) dateTo.value = '';
+        if (search) search.value = '';
+        this.renderAdExpensesTable();
     },
 
     handleFBFileUpload(event) {
@@ -868,6 +1005,7 @@ const IncomeStatementModule = {
             'amount_spent',                              // spending
             'campaign_name', 'ad_set_name', 'ad_name',  // names
             'impressions', 'clicks', 'reach', 'purchases', // performance
+            'month',                                     // month (fallback for dates)
             'date_start', 'date_end',                    // dates
             'frequency',                                 // other
         ];
@@ -996,6 +1134,11 @@ const IncomeStatementModule = {
         const results = [];
         const country = document.getElementById('fbImportCountry')?.value || 'Ecuador';
 
+        // Get currency settings
+        const importCurrency = document.getElementById('fbImportCurrency')?.value || 'USD';
+        const trmRate = parseFloat(document.getElementById('fbTrmRate')?.value) || 4200;
+        const needsConversion = importCurrency === 'COP' && trmRate > 0;
+
         if (jsonData.length === 0) return { data: results, diagnostics: 'Sin datos' };
 
         const columns = Object.keys(jsonData[0]);
@@ -1014,7 +1157,28 @@ const IncomeStatementModule = {
             }
         }
 
+        // Check if we have a month column but no date column
+        const hasMonthCol = Object.values(finalMapping).includes('month');
+        const hasDateCol = Object.values(finalMapping).includes('date_start');
+
+        if (hasMonthCol && !hasDateCol) {
+            diagnostics += `<br>📅 Usando columna "Mes" como fecha de referencia`;
+        }
+
+        // Currency diagnostics
+        if (needsConversion) {
+            diagnostics += `<br>💱 Conversión: COP → USD (TRM: $${trmRate.toLocaleString()} COP = 1 USD)`;
+        }
+
         console.log('📊 FB Import - Final mapping:', finalMapping);
+
+        // Try to detect a year column or infer year
+        let inferredYear = new Date().getFullYear();
+        // Check if any row has a year-like value we can use
+        const yearCol = columns.find(c => {
+            const normalized = c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+            return normalized === 'ano' || normalized === 'year' || normalized === 'año';
+        });
 
         // Process rows
         let skippedNoAmount = 0;
@@ -1031,10 +1195,30 @@ const IncomeStatementModule = {
                 return;
             }
 
-            // Parse date
+            // Apply currency conversion COP → USD
+            if (needsConversion) {
+                amountSpent = amountSpent / trmRate;
+            }
+
+            // Parse date - try date_start first, then month column
             let dateStart = this.parseDate(mapped.date_start);
+            if (!dateStart && mapped.month) {
+                // Use month column as date
+                const rowYear = yearCol ? (parseInt(row[yearCol]) || inferredYear) : inferredYear;
+                dateStart = this.parseMonthToDate(mapped.month, rowYear);
+            }
             if (!dateStart) {
                 dateStart = new Date().toISOString().split('T')[0];
+            }
+
+            // Convert monetary metrics if needed
+            let cpc = this.parseNumeric(mapped.cpc);
+            let cpm = this.parseNumeric(mapped.cpm);
+            let costPerPurchase = this.parseNumeric(mapped.cost_per_purchase);
+            if (needsConversion) {
+                cpc = cpc / trmRate;
+                cpm = cpm / trmRate;
+                costPerPurchase = costPerPurchase / trmRate;
             }
 
             results.push({
@@ -1048,10 +1232,10 @@ const IncomeStatementModule = {
                 clicks: this.parseInteger(mapped.clicks),
                 reach: this.parseInteger(mapped.reach),
                 purchases: this.parseInteger(mapped.purchases),
-                cpc: this.parseNumeric(mapped.cpc),
-                cpm: this.parseNumeric(mapped.cpm),
+                cpc: cpc,
+                cpm: cpm,
                 ctr: this.parseNumeric(mapped.ctr),
-                cost_per_purchase: this.parseNumeric(mapped.cost_per_purchase),
+                cost_per_purchase: costPerPurchase,
                 date_start: dateStart,
                 date_end: this.parseDate(mapped.date_end) || dateStart,
                 source: 'Facebook',
