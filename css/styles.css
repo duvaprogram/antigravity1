@@ -587,6 +587,19 @@ table {
     overflow: hidden;
 }
 
+/* Allow overflow visible in guides table so action menus are not clipped */
+.guides-table-wrapper .table-container {
+    overflow: visible;
+}
+
+/* When the menu flips upward */
+.actions-menu.flip-up {
+    top: auto !important;
+    bottom: 100% !important;
+    margin-top: 0 !important;
+    margin-bottom: 4px !important;
+}
+
 .table {
     width: 100%;
 }

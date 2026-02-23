@@ -520,6 +520,17 @@ const GuidesModule = {
 
         if (!isOpen) {
             menu.style.display = 'block';
+            menu.classList.remove('flip-up');
+
+            // Check if menu overflows the viewport and flip upward if needed
+            requestAnimationFrame(() => {
+                const menuRect = menu.getBoundingClientRect();
+                const viewportHeight = window.innerHeight;
+                if (menuRect.bottom > viewportHeight - 10) {
+                    menu.classList.add('flip-up');
+                }
+            });
+
             // Close on outside click
             setTimeout(() => {
                 document.addEventListener('click', this._closeMenuHandler = () => {
