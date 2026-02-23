@@ -682,10 +682,11 @@ const IncomeStatementModule = {
         const salesData = this.getSalesByCountry();
         const adExpData = this.getAdExpensesByCountry();
         const opExpData = this.getOpExpensesByCountry();
+        const extSalesSummary = this.getExternalSalesSummary();
 
-        const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
-        const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0);
-        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0);
+        const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0) + extSalesSummary.totalRevenue;
+        const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0) + extSalesSummary.totalCost;
+        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping;
         const grossProfit = totalRevenue - totalCOGS - totalShipping;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
@@ -1870,10 +1871,11 @@ const IncomeStatementModule = {
         const salesData = this.getSalesByCountry();
         const adExpData = this.getAdExpensesByCountry();
         const opExpData = this.getOpExpensesByCountry();
+        const extSalesSummary = this.getExternalSalesSummary();
 
-        const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
-        const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0);
-        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0);
+        const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0) + extSalesSummary.totalRevenue;
+        const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0) + extSalesSummary.totalCost;
+        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping;
         const grossProfit = totalRevenue - totalCOGS - totalShipping;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
