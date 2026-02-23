@@ -639,6 +639,13 @@ const GuidesModule = {
         this.currentGuideItems = [];
         this.selectedCity = null;
 
+        // Default local date (YYYY-MM-DD)
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        document.getElementById('guideDate').value = `${year}-${month}-${day}`;
+
         // Reset client search and info display
         document.getElementById('guideClientSearch').value = '';
         document.getElementById('guideClient').value = '';
@@ -805,6 +812,7 @@ const GuidesModule = {
         const clientId = document.getElementById('guideClient').value;
         const observations = document.getElementById('guideObservations').value.trim();
         const shippingCost = document.getElementById('guideShippingCost').value;
+        const guideDate = document.getElementById('guideDate').value;
 
         // Caracas specific fields
         const amountUsd = document.getElementById('guideAmountUsd').value;
@@ -832,6 +840,13 @@ const GuidesModule = {
                 totalAmount,
                 observations
             };
+
+            // If a custom date is provided, use it (append current time to keep it valid for timestamp fields if needed)
+            if (guideDate) {
+                const now = new Date();
+                const timeString = now.toISOString().split('T')[1]; // keep current UTC time part
+                guideData.createdAt = `${guideDate}T${timeString}`;
+            }
 
             // Add shipping cost if provided
             if (shippingCost) {

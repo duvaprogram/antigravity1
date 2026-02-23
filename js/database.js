@@ -766,19 +766,24 @@ const Database = {
             let result;
             if (guide.id) {
                 // Update existing guide
+                const updateData = {
+                    client_id: guide.clientId,
+                    city_id: cityId,
+                    status_id: statusId,
+                    total_amount: guide.totalAmount || 0,
+                    shipping_cost: guide.shippingCost || null,
+                    observations: guide.observations || null,
+                    amount_usd: guide.amountUsd || null,
+                    payment_bs: guide.paymentBs || null,
+                    delivery_time: guide.deliveryTime || null
+                };
+                if (guide.createdAt) {
+                    updateData.created_at = guide.createdAt;
+                }
+
                 const { data, error } = await supabaseClient
                     .from('guides')
-                    .update({
-                        client_id: guide.clientId,
-                        city_id: cityId,
-                        status_id: statusId,
-                        total_amount: guide.totalAmount || 0,
-                        shipping_cost: guide.shippingCost || null,
-                        observations: guide.observations || null,
-                        amount_usd: guide.amountUsd || null,
-                        payment_bs: guide.paymentBs || null,
-                        delivery_time: guide.deliveryTime || null
-                    })
+                    .update(updateData)
                     .eq('id', guide.id)
                     .select()
                     .single();
@@ -789,20 +794,25 @@ const Database = {
                 const { data: guideNum } = await supabaseClient
                     .rpc('generate_guide_number');
 
+                const insertData = {
+                    guide_number: guideNum,
+                    client_id: guide.clientId,
+                    city_id: cityId,
+                    status_id: statusId,
+                    total_amount: guide.totalAmount || 0,
+                    shipping_cost: guide.shippingCost || null,
+                    observations: guide.observations || null,
+                    amount_usd: guide.amountUsd || null,
+                    payment_bs: guide.paymentBs || null,
+                    delivery_time: guide.deliveryTime || null
+                };
+                if (guide.createdAt) {
+                    insertData.created_at = guide.createdAt;
+                }
+
                 const { data, error } = await supabaseClient
                     .from('guides')
-                    .insert({
-                        guide_number: guideNum,
-                        client_id: guide.clientId,
-                        city_id: cityId,
-                        status_id: statusId,
-                        total_amount: guide.totalAmount || 0,
-                        shipping_cost: guide.shippingCost || null,
-                        observations: guide.observations || null,
-                        amount_usd: guide.amountUsd || null,
-                        payment_bs: guide.paymentBs || null,
-                        delivery_time: guide.deliveryTime || null
-                    })
+                    .insert(insertData)
                     .select()
                     .single();
                 if (error) throw error;
