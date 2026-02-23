@@ -2379,13 +2379,13 @@
                 <!-- Facebook Ads Import -->
                 <div class="card" style="margin-bottom: 1.5rem;">
                     <div class="card-header"
-                        style="background: linear-gradient(135deg, #1877f2, #42b72a); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                        style="background: linear-gradient(135deg, #1877f2, #ff0050); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
                         <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
                                 <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
                             </svg>
-                            Gastos Publicitarios (Facebook/Meta)
+                            Gastos Publicitarios (Importar)
                         </h3>
                     </div>
                     <div class="card-body">
@@ -2395,15 +2395,18 @@
                             <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                                 <div style="flex: 1; min-width: 200px;">
                                     <div style="font-weight: 600; margin-bottom: 0.25rem;">📤 Importar Reporte de
-                                        Facebook</div>
+                                        Gastos</div>
                                     <div style="font-size: 0.8rem; color: var(--text-muted);">
-                                        Sube el archivo CSV o XLSX exportado desde el Administrador de Anuncios de
-                                        Facebook/Meta.
+                                        Sube el archivo CSV o XLSX exportado desde tu Administrador de Anuncios.
                                         Se identificarán automáticamente las columnas de gasto, impresiones, clics y
                                         compras. Si tu archivo tiene una columna "Mes", se usará como fecha.
                                     </div>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                    <select id="fbImportPlatform" class="form-control" style="min-width: 140px;">
+                                        <option value="Facebook">🔵 Facebook</option>
+                                        <option value="TikTok">🎵 TikTok</option>
+                                    </select>
                                     <select id="fbImportCountry" class="form-control" style="min-width: 130px;">
                                         <option value="Ecuador">🇪🇨 Ecuador</option>
                                         <option value="Venezuela">🇻🇪 Venezuela</option>
@@ -2514,6 +2517,7 @@
                                 <thead>
                                     <tr>
                                         <th>País</th>
+                                        <th>Plataforma</th>
                                         <th>Campaña</th>
                                         <th style="text-align: right;">Gastado (USD)</th>
                                         <th style="text-align: right;">Impresiones</th>
@@ -2527,7 +2531,7 @@
                                 </thead>
                                 <tbody id="isAdExpensesTable">
                                     <tr>
-                                        <td colspan="10"
+                                        <td colspan="11"
                                             style="text-align: center; color: var(--text-muted); padding: 2rem;">
                                             Cargando gastos publicitarios...
                                         </td>

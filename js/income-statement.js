@@ -483,12 +483,12 @@ const IncomeStatementModule = {
         if (expenses.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 0.5rem; opacity: 0.3;">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M8 12h8"></path>
                         </svg>
-                        <br>No hay gastos publicitarios. Importa un reporte de Facebook para comenzar.
+                        <br>No hay gastos publicitarios. Importa un reporte para comenzar.
                     </td>
                 </tr>`;
             return;
@@ -497,11 +497,19 @@ const IncomeStatementModule = {
         tbody.innerHTML = expenses.map(exp => {
             const costPerPurchase = exp.purchases > 0 ? (exp.amount_spent / exp.purchases) : 0;
             const ctr = exp.impressions > 0 ? ((exp.clicks / exp.impressions) * 100) : 0;
+            const sourceIcon = exp.source === 'TikTok' ? '🎵' : '🔵';
+            const sourceName = exp.source || 'Facebook';
             return `
                 <tr>
                     <td>
                         <span class="country-flag">${this.getCountryFlag(exp.country)}</span>
                         ${exp.country}
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.25rem;">
+                            <span title="${sourceName}">${sourceIcon}</span>
+                            <span style="font-size: 0.8rem; color: var(--text-muted);">${sourceName}</span>
+                        </div>
                     </td>
                     <td style="font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${exp.campaign_name || ''}">${exp.campaign_name || '-'}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--danger);">$${parseFloat(exp.amount_spent).toFixed(2)}</td>
@@ -755,7 +763,7 @@ const IncomeStatementModule = {
                     <span></span>
                 </div>
                 <div class="is-pl-row">
-                    <span style="padding-left: 1rem;">📢 Publicidad (Facebook/Meta)</span>
+                    <span style="padding-left: 1rem;">📢 Inversión Publicitaria (Ads)</span>
                     <span style="color: var(--danger); font-weight: 500;">${this.formatCurrency(totalAdSpend)}</span>
                 </div>
                 ${opCategoriesHTML}
@@ -1045,7 +1053,7 @@ const IncomeStatementModule = {
                 }
 
                 if (jsonData.length === 0) {
-                    statusEl.innerHTML = `<div style="color: var(--danger);">❌ El archivo no contiene datos. Asegúrate de exportar la tabla desde el Administrador de Anuncios de Facebook.</div>`;
+                    statusEl.innerHTML = `<div style="color: var(--danger);">❌ El archivo no contiene datos. Asegúrate de exportar la tabla desde tu Administrador de Anuncios.</div>`;
                     return;
                 }
 
@@ -1113,7 +1121,7 @@ const IncomeStatementModule = {
                         <div style="font-weight: 600; color: var(--danger);">❌ Error al leer el archivo</div>
                         <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.25rem;">${err.message}</div>
                         <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
-                            💡 <strong>Sugerencia:</strong> Exporta el archivo directamente desde el Administrador de Anuncios de Facebook 
+                            💡 <strong>Sugerencia:</strong> Exporta el archivo directamente desde tu Administrador de Anuncios 
                             usando la opción "Exportar datos de tabla" en formato CSV o XLSX.
                         </div>
                     </div>`;
@@ -1287,6 +1295,7 @@ const IncomeStatementModule = {
     parseFBReport(jsonData) {
         const results = [];
         const country = document.getElementById('fbImportCountry')?.value || 'Ecuador';
+        const importPlatform = document.getElementById('fbImportPlatform')?.value || 'Facebook';
 
         // Get currency settings
         const importCurrency = document.getElementById('fbImportCurrency')?.value || 'USD';
@@ -1392,7 +1401,7 @@ const IncomeStatementModule = {
                 cost_per_purchase: costPerPurchase,
                 date_start: dateStart,
                 date_end: this.parseDate(mapped.date_end) || dateStart,
-                source: 'Facebook',
+                source: importPlatform,
                 import_batch_id: this.fbImportBatchId
             });
         });
