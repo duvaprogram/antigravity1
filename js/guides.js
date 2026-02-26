@@ -396,6 +396,9 @@ const GuidesModule = {
     },
 
     renderTable(guides) {
+        // Clean up detached action menus from the body before re-rendering
+        document.querySelectorAll('body > .actions-menu').forEach(menu => menu.remove());
+
         const tbody = document.getElementById('guidesTable');
 
         if (guides.length === 0) {
@@ -514,20 +517,39 @@ const GuidesModule = {
         event.stopPropagation();
         const menu = document.getElementById(`actionsMenu-${guideId}`);
         const isOpen = menu.style.display === 'block';
+        const positionBtn = event.currentTarget;
 
         // Close all menus first
         this.closeAllMenus();
 
         if (!isOpen) {
+            // Append to body to avoid overflow clipping from table wrappers
+            if (menu.parentElement !== document.body) {
+                document.body.appendChild(menu);
+            }
+
             menu.style.display = 'block';
             menu.classList.remove('flip-up');
+
+            // Setup fixed positioning relative to viewport
+            const btnRect = positionBtn.getBoundingClientRect();
+            menu.style.position = 'fixed';
+            menu.style.margin = '0';
+            menu.style.right = 'auto';
+            menu.style.top = (btnRect.bottom + 4) + 'px';
+            menu.style.left = (btnRect.right - 200) + 'px'; // Base width estimate
 
             // Check if menu overflows the viewport and flip upward if needed
             requestAnimationFrame(() => {
                 const menuRect = menu.getBoundingClientRect();
                 const viewportHeight = window.innerHeight;
+
+                // Fine-tune horizontal position once rendered
+                menu.style.left = (btnRect.right - menuRect.width) + 'px';
+
                 if (menuRect.bottom > viewportHeight - 10) {
                     menu.classList.add('flip-up');
+                    menu.style.top = (btnRect.top - menuRect.height - 4) + 'px';
                 }
             });
 
