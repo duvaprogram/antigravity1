@@ -21,10 +21,10 @@ const FreightsModule = {
     bindEvents() {
         const form = document.getElementById('formFreight');
         if (form) {
-            form.addEventListener('submit', (e) => {
+            form.onsubmit = (e) => {
                 e.preventDefault();
                 this.saveFreight();
-            });
+            };
         }
 
         // Filter events
@@ -106,6 +106,9 @@ const FreightsModule = {
             notes
         };
 
+        const submitBtn = document.querySelector('#formFreight button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+
         try {
             if (id) {
                 // Update existing
@@ -136,6 +139,8 @@ const FreightsModule = {
             } else {
                 Utils.showToast('Error al guardar el flete', 'error');
             }
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
         }
     },
 
