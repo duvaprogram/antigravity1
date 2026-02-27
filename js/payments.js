@@ -66,7 +66,7 @@ const PaymentsModule = {
             .select(`
                 *,
                 payment_guides (
-                    guides ( id, guide_number, client_name, total_amount, city_id, created_at )
+                    guides ( id, guide_number, total_amount, city_id, created_at, clients ( full_name ), cities ( name ) )
                 )
             `)
             .order('created_at', { ascending: false });
@@ -343,7 +343,7 @@ const PaymentsModule = {
                     ${guides.map(g => `
                         <tr>
                             <td><strong>${g.guide_number}</strong></td>
-                            <td>${Utils.escapeHtml(g.client_name || '')}</td>
+                            <td>${Utils.escapeHtml(g.clients?.full_name || '')}</td>
                             <td>$${parseFloat(g.total_amount || 0).toFixed(2)}</td>
                         </tr>
                     `).join('')}
