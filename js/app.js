@@ -29,6 +29,7 @@ const App = {
             ConfirmationModule.init();
             PurchasesModule.init();
             FreightsModule.init();
+            PaymentsModule.init();
             AccountsModule.init();
             UsersModule.init();
             CampaignsModule.init();
@@ -142,6 +143,7 @@ const App = {
             'confirmation': 'Confirmación de Pedidos',
             'purchases': 'Compras a Proveedores',
             'freights': 'Fletes - Pagos de Movilización',
+            'payments': 'Gestión de Pagos',
             'accounts': 'Cuentas y Flujo de Efectivo',
             'users': 'Administración de Usuarios',
             'campaigns': 'Creación de Campañas',
@@ -201,6 +203,9 @@ const App = {
                 break;
             case 'freights':
                 await FreightsModule.render();
+                break;
+            case 'payments':
+                await PaymentsModule.render();
                 break;
             case 'accounts':
                 await AccountsModule.render();
