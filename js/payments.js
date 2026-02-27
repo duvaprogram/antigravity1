@@ -121,6 +121,12 @@ const PaymentsModule = {
                                 <circle cx="12" cy="12" r="3"></circle>
                             </svg>
                         </button>
+                        <button class="btn btn-icon btn-sm" onclick="PaymentsModule.editPayment('${payment.id}')" title="Editar pago">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
                         <button class="btn btn-icon btn-sm text-danger" onclick="PaymentsModule.deletePayment('${payment.id}')" title="Eliminar pago">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -134,6 +140,7 @@ const PaymentsModule = {
     },
 
     async showPaymentModal() {
+        document.getElementById('modalPaymentTitle').textContent = 'Registrar Nuevo Pago';
         document.getElementById('formPayment').reset();
         document.getElementById('paymentId').value = '';
         document.getElementById('paymentOriginCustomGroup').style.display = 'none';
@@ -141,6 +148,57 @@ const PaymentsModule = {
 
         this.selectedGuideIds.clear();
         document.getElementById('selectAllPaymentGuides').checked = false;
+
+        App.showLoading(true);
+        try {
+            await this.loadAvailableGuides();
+            this.renderModalGuides();
+        } catch (e) {
+            console.error(e);
+            Utils.showToast("Error al cargar guías", "error");
+        } finally {
+            App.showLoading(false);
+            document.getElementById('modalPayment').classList.add('active');
+            document.body.style.overflow = 'hidden';
+            this.updateSelectedCount();
+        }
+    },
+
+    async editPayment(paymentId) {
+        const payment = this.payments.find(p => p.id === paymentId);
+        if (!payment) return;
+
+        document.getElementById('modalPaymentTitle').textContent = 'Editar Pago ' + payment.code;
+        document.getElementById('paymentId').value = payment.id;
+
+        let originSelect = document.getElementById('paymentOrigin');
+        // Check if origin is one of the predefined options
+        let isPredefined = Array.from(originSelect.options).some(opt => opt.value === payment.origin);
+
+        if (isPredefined && payment.origin) {
+            originSelect.value = payment.origin;
+            document.getElementById('paymentOriginCustomGroup').style.display = 'none';
+        } else {
+            originSelect.value = 'Otro';
+            document.getElementById('paymentOriginCustomGroup').style.display = 'block';
+            document.getElementById('paymentOriginCustom').value = payment.origin || '';
+        }
+
+        document.getElementById('paymentAmount').value = payment.amount;
+        document.getElementById('paymentCurrency').value = payment.currency || 'USD';
+        document.getElementById('paymentDate').value = payment.created_at ? new Date(payment.created_at).toISOString().split('T')[0] : '';
+        document.getElementById('paymentNotes').value = payment.notes || '';
+
+        this.selectedGuideIds.clear();
+        document.getElementById('selectAllPaymentGuides').checked = false;
+
+        if (payment.payment_guides) {
+            payment.payment_guides.forEach(pg => {
+                if (pg.guides && pg.guides.id) {
+                    this.selectedGuideIds.add(pg.guides.id);
+                }
+            });
+        }
 
         App.showLoading(true);
         try {
@@ -264,6 +322,7 @@ const PaymentsModule = {
     async handlePaymentSubmit(e) {
         e.preventDefault();
 
+        const paymentId = document.getElementById('paymentId').value;
         const originSelect = document.getElementById('paymentOrigin').value;
         const originCustom = document.getElementById('paymentOriginCustom').value;
         const origin = originSelect === 'Otro' ? originCustom : originSelect;
@@ -273,8 +332,6 @@ const PaymentsModule = {
         const date = document.getElementById('paymentDate').value;
         const notes = document.getElementById('paymentNotes').value;
 
-        const paymentCode = this.generatePaymentCode(origin);
-
         App.showLoading(true);
         try {
             // Include created_at if possible
@@ -283,26 +340,50 @@ const PaymentsModule = {
             const now = new Date();
             createdAtTarget.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
 
-            // 1. Insert payment
-            const { data: newPayment, error: payErr } = await window.supabaseClient
-                .from('payments')
-                .insert({
-                    code: paymentCode,
-                    amount: parseFloat(amount),
-                    currency: currency,
-                    origin: origin,
-                    notes: notes,
-                    created_at: createdAtTarget.toISOString()
-                })
-                .select()
-                .single();
+            let currentPaymentId = paymentId;
 
-            if (payErr) throw payErr;
+            if (currentPaymentId) {
+                // UPDATE EXISTING
+                const { error: payErr } = await window.supabaseClient
+                    .from('payments')
+                    .update({
+                        amount: parseFloat(amount),
+                        currency: currency,
+                        origin: origin,
+                        notes: notes,
+                        created_at: createdAtTarget.toISOString()
+                    })
+                    .eq('id', currentPaymentId);
 
-            // 2. Insert payment_guides associations
+                if (payErr) throw payErr;
+
+                // Remove all existing associations
+                await window.supabaseClient.from('payment_guides').delete().eq('payment_id', currentPaymentId);
+
+            } else {
+                // INSERT NEW
+                const paymentCode = this.generatePaymentCode(origin);
+                const { data: newPayment, error: payErr } = await window.supabaseClient
+                    .from('payments')
+                    .insert({
+                        code: paymentCode,
+                        amount: parseFloat(amount),
+                        currency: currency,
+                        origin: origin,
+                        notes: notes,
+                        created_at: createdAtTarget.toISOString()
+                    })
+                    .select()
+                    .single();
+
+                if (payErr) throw payErr;
+                currentPaymentId = newPayment.id;
+            }
+
+            // Insert new payment_guides associations (whether new or update)
             if (this.selectedGuideIds.size > 0) {
                 const associations = Array.from(this.selectedGuideIds).map(guideId => ({
-                    payment_id: newPayment.id,
+                    payment_id: currentPaymentId,
                     guide_id: guideId
                 }));
 
@@ -313,7 +394,7 @@ const PaymentsModule = {
                 if (assocErr) throw assocErr;
             }
 
-            Utils.showToast(`Pago registrado con código ${paymentCode}`, 'success');
+            Utils.showToast(paymentId ? 'Pago actualizado correctamente' : 'Pago registrado correctamente', 'success');
             document.getElementById('modalPayment').classList.remove('active');
             document.body.style.overflow = '';
 
