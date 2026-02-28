@@ -30,7 +30,8 @@ const PaymentsModule = {
         // Search inputs for guides in the modal
         document.getElementById('searchPaymentGuides')?.addEventListener('input', () => this.filterModalGuides());
         document.getElementById('filterPaymentGuideCity')?.addEventListener('change', () => this.filterModalGuides());
-        document.getElementById('filterPaymentGuideDate')?.addEventListener('change', () => this.filterModalGuides());
+        document.getElementById('filterPaymentGuideDateStart')?.addEventListener('change', () => this.filterModalGuides());
+        document.getElementById('filterPaymentGuideDateEnd')?.addEventListener('change', () => this.filterModalGuides());
 
         // Select all checkbox
         document.getElementById('selectAllPaymentGuides')?.addEventListener('change', (e) => {
@@ -145,6 +146,9 @@ const PaymentsModule = {
         document.getElementById('paymentId').value = '';
         document.getElementById('paymentOriginCustomGroup').style.display = 'none';
         document.getElementById('paymentDate').valueAsDate = new Date();
+
+        document.getElementById('filterPaymentGuideDateStart').value = '';
+        document.getElementById('filterPaymentGuideDateEnd').value = '';
 
         this.selectedGuideIds.clear();
         document.getElementById('selectAllPaymentGuides').checked = false;
@@ -280,7 +284,8 @@ const PaymentsModule = {
     filterModalGuides() {
         const searchVal = document.getElementById('searchPaymentGuides').value.toLowerCase();
         const cityVal = document.getElementById('filterPaymentGuideCity').value;
-        const dateVal = document.getElementById('filterPaymentGuideDate').value;
+        const dateStartVal = document.getElementById('filterPaymentGuideDateStart').value;
+        const dateEndVal = document.getElementById('filterPaymentGuideDateEnd').value;
 
         const filtered = this.availableGuides.filter(g => {
             let matches = true;
@@ -295,9 +300,10 @@ const PaymentsModule = {
             }
             if (cityVal && g.city_name !== cityVal) matches = false;
 
-            if (dateVal) {
+            if (dateStartVal || dateEndVal) {
                 const guideDate = new Date(g.created_at).toISOString().split('T')[0];
-                if (guideDate !== dateVal) matches = false;
+                if (dateStartVal && guideDate < dateStartVal) matches = false;
+                if (dateEndVal && guideDate > dateEndVal) matches = false;
             }
             return matches;
         });

@@ -3804,7 +3804,11 @@
                         <option value="Guayaquil">Ecuador - Guayaquil</option>
                         <option value="Caracas">Venezuela - Caracas</option>
                     </select>
-                    <input type="date" id="filterPaymentGuideDate">
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="date" id="filterPaymentGuideDateStart" title="Fecha inicio">
+                        <span style="color: var(--text-muted);">-</span>
+                        <input type="date" id="filterPaymentGuideDateEnd" title="Fecha fin">
+                    </div>
                 </div>
 
                 <div class="table-container"
