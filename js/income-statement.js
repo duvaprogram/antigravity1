@@ -57,6 +57,15 @@ const IncomeStatementModule = {
             });
         }
 
+        // Ad expense form (Manual)
+        const adExpForm = document.getElementById('formAdExpense');
+        if (adExpForm) {
+            adExpForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.saveAdExpense();
+            });
+        }
+
         // External Sale form
         const extSaleForm = document.getElementById('formExternalSale');
         if (extSaleForm) {
@@ -521,7 +530,13 @@ const IncomeStatementModule = {
                         ${exp.purchases > 0 ? `$${costPerPurchase.toFixed(2)}` : '-'}
                     </td>
                     <td style="font-size: 0.8rem; color: var(--text-muted);">${this.formatDate(exp.date_start)}</td>
-                    <td>
+                    <td style="white-space: nowrap;">
+                        <button class="btn btn-icon btn-sm" style="color: var(--primary); background: rgba(59, 130, 246, 0.1); border: none; margin-right: 4px;" onclick="IncomeStatementModule.editAdExpense('${exp.id}')" title="Editar">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                        </button>
                         <button class="btn btn-icon btn-sm btn-danger-light" onclick="IncomeStatementModule.deleteAdExpense('${exp.id}')" title="Eliminar">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -1390,8 +1405,15 @@ const IncomeStatementModule = {
                 costPerPurchase = costPerPurchase / trmRate;
             }
 
+            // Auto-detect country based on campaign name
+            let rowCountry = country;
+            const campNameUpper = (this.cleanText(mapped.campaign_name) || '').toUpperCase();
+            if (campNameUpper.includes('ECU')) rowCountry = 'Ecuador';
+            else if (campNameUpper.includes('COL')) rowCountry = 'Colombia';
+            else if (campNameUpper.includes('VEN')) rowCountry = 'Venezuela';
+
             results.push({
-                country: country,
+                country: rowCountry,
                 campaign_name: this.cleanText(mapped.campaign_name) || null,
                 ad_set_name: this.cleanText(mapped.ad_set_name) || null,
                 ad_name: this.cleanText(mapped.ad_name) || null,
@@ -1792,6 +1814,99 @@ const IncomeStatementModule = {
             this.render();
         } catch (error) {
             Utils.showToast('Error al eliminar: ' + error.message, 'error');
+        }
+    },
+
+    // ========================================
+    // Ad Expense Form functions
+    // ========================================
+
+    showAddAdExpenseModal() {
+        document.getElementById('formAdExpense').reset();
+        document.getElementById('adExpenseId').value = '';
+        
+        // Defaults
+        const now = new Date();
+        document.getElementById('adExpenseDate').value = now.toISOString().split('T')[0];
+        document.getElementById('adExpensePlatform').value = 'Facebook';
+        
+        const modal = document.getElementById('modalAdExpense');
+        if (modal) modal.classList.add('active');
+    },
+
+    editAdExpense(id) {
+        const exp = this.adExpenses.find(e => e.id === id);
+        if (!exp) return;
+
+        document.getElementById('adExpenseId').value = exp.id;
+        document.getElementById('adExpenseCountry').value = exp.country || 'Ecuador';
+        document.getElementById('adExpensePlatform').value = exp.source || 'Facebook';
+        document.getElementById('adExpenseCampaign').value = exp.campaign_name || '';
+        document.getElementById('adExpenseAmount').value = exp.amount_spent || 0;
+        document.getElementById('adExpenseDate').value = exp.date_start ? exp.date_start.split('T')[0] : '';
+        document.getElementById('adExpenseImpressions').value = exp.impressions || 0;
+        document.getElementById('adExpenseClicks').value = exp.clicks || 0;
+        document.getElementById('adExpensePurchases').value = exp.purchases || 0;
+
+        const modal = document.getElementById('modalAdExpense');
+        if (modal) modal.classList.add('active');
+    },
+
+    async saveAdExpense() {
+        const id = document.getElementById('adExpenseId').value;
+        const country = document.getElementById('adExpenseCountry').value;
+        const source = document.getElementById('adExpensePlatform').value;
+        const campaign_name = document.getElementById('adExpenseCampaign').value;
+        const amount_spent = parseFloat(document.getElementById('adExpenseAmount').value) || 0;
+        const date_start = document.getElementById('adExpenseDate').value;
+        const impressions = parseInt(document.getElementById('adExpenseImpressions').value) || 0;
+        const clicks = parseInt(document.getElementById('adExpenseClicks').value) || 0;
+        const purchases = parseInt(document.getElementById('adExpensePurchases').value) || 0;
+
+        let ctr = 0;
+        if (impressions > 0) {
+            ctr = (clicks / impressions) * 100;
+        }
+
+        let cpp = 0;
+        if (purchases > 0) {
+            cpp = amount_spent / purchases;
+        }
+
+        const data = {
+            country,
+            source,
+            campaign_name,
+            amount_spent,
+            currency: 'USD',
+            date_start,
+            impressions,
+            clicks,
+            purchases,
+            ctr,
+            cost_per_purchase: cpp
+        };
+
+        try {
+            if (id) {
+                const { error } = await supabaseClient
+                    .from('ad_expenses')
+                    .update(data)
+                    .eq('id', id);
+                if (error) throw error;
+                Utils.showToast('Gasto actualizado', 'success');
+            } else {
+                const { error } = await supabaseClient
+                    .from('ad_expenses')
+                    .insert(data);
+                if (error) throw error;
+                Utils.showToast('Gasto registrado', 'success');
+            }
+            
+            document.getElementById('modalAdExpense').classList.remove('active');
+            this.render();
+        } catch (error) {
+            Utils.showToast('Error al guardar: ' + error.message, 'error');
         }
     },
 

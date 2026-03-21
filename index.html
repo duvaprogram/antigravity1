@@ -2561,8 +2561,17 @@
                                 stroke-width="2">
                                 <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path>
                             </svg>
-                            Gastos Publicitarios (Importar)
+                            Gastos Publicitarios
                         </h3>
+                        <button class="btn btn-sm"
+                            style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);"
+                            onclick="IncomeStatementModule.showAddAdExpenseModal()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Gasto Manual
+                        </button>
                     </div>
                     <div class="card-body">
                         <!-- Import Area -->
@@ -3638,6 +3647,65 @@
                     <button type="button" class="btn btn-secondary"
                         data-close="modalOperationalExpense">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar Gasto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Ad Expense (Manual) -->
+    <div class="modal" id="modalAdExpense">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Gasto Publicitario Manual</h2>
+                <button class="modal-close" data-close="modalAdExpense">&times;</button>
+            </div>
+            <form id="formAdExpense">
+                <input type="hidden" id="adExpenseId">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="adExpenseCountry">País *</label>
+                        <select id="adExpenseCountry" required>
+                            <option value="Ecuador">🇪🇨 Ecuador</option>
+                            <option value="Venezuela">🇻🇪 Venezuela</option>
+                            <option value="Colombia">🇨🇴 Colombia</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="adExpensePlatform">Plataforma *</label>
+                        <select id="adExpensePlatform" required>
+                            <option value="Facebook">🔵 Facebook</option>
+                            <option value="TikTok">🎵 TikTok</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="adExpenseCampaign">Nombre de la Campaña *</label>
+                        <input type="text" id="adExpenseCampaign" required placeholder="Ej: ECU - Conversiones Año Nuevo">
+                    </div>
+                    <div class="form-group">
+                        <label for="adExpenseAmount">Gastado (USD) *</label>
+                        <input type="number" id="adExpenseAmount" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="adExpenseDate">Fecha *</label>
+                        <input type="date" id="adExpenseDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="adExpenseImpressions">Impresiones</label>
+                        <input type="number" id="adExpenseImpressions" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="adExpenseClicks">Clicks</label>
+                        <input type="number" id="adExpenseClicks" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="adExpensePurchases">Compras</label>
+                        <input type="number" id="adExpensePurchases" min="0" value="0">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary"
+                        data-close="modalAdExpense">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Campaña</button>
                 </div>
             </form>
         </div>
