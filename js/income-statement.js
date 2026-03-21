@@ -562,6 +562,12 @@ const IncomeStatementModule = {
                     <td style="font-size: 0.85rem;">${this.formatDate(exp.expense_date)}</td>
                     <td style="font-size: 0.8rem; color: var(--text-muted);">${exp.payment_method || '-'}</td>
                     <td>
+                        <button class="btn btn-icon btn-sm" style="color: var(--primary); background: rgba(59, 130, 246, 0.1); border: none; margin-right: 4px;" onclick="IncomeStatementModule.duplicateOperationalExpense('${exp.id}')" title="Duplicar gasto">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
                         <button class="btn btn-icon btn-sm btn-danger-light" onclick="IncomeStatementModule.deleteOperationalExpense('${exp.id}')" title="Eliminar">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -1798,6 +1804,37 @@ const IncomeStatementModule = {
             this.render();
         } catch (error) {
             Utils.showToast('Error al eliminar: ' + error.message, 'error');
+        }
+    },
+
+    duplicateOperationalExpense(id) {
+        const exp = this.operationalExpenses.find(e => e.id === id);
+        if (!exp) {
+            Utils.showToast("Gasto no encontrado", 'error');
+            return;
+        }
+
+        const date = new Date(exp.expense_date + 'T12:00:00');
+        date.setMonth(date.getMonth() + 1);
+        const nextMonthDate = date.toISOString().split('T')[0];
+
+        // Fill form with duplicated data but empty ID so it creates a new record
+        document.getElementById('opExpenseId').value = '';
+        document.getElementById('opExpenseCountry').value = exp.country;
+        document.getElementById('opExpenseCategory').value = exp.category || 'Envío';
+        document.getElementById('opExpenseDescription').value = exp.description;
+        document.getElementById('opExpenseAmount').value = exp.amount;
+        document.getElementById('opExpenseDate').value = nextMonthDate;
+        document.getElementById('opExpensePayMethod').value = exp.payment_method || 'Efectivo';
+        
+        const notesObj = document.getElementById('opExpenseNotes');
+        if (notesObj) notesObj.value = exp.notes || '';
+
+        // Open modal
+        const modal = document.getElementById('modalOperationalExpense');
+        if (modal) {
+            modal.classList.add('active');
+            Utils.showToast('Revisa los datos y confirma el gasto', 'info');
         }
     },
 
