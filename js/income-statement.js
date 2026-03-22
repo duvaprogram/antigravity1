@@ -576,6 +576,7 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 600; color: var(--danger);">${this.formatCurrency(exp.amount)}</td>
                     <td style="font-size: 0.85rem;">${this.formatDate(exp.expense_date)}</td>
                     <td style="font-size: 0.8rem; color: var(--text-muted);">${exp.payment_method || '-'}</td>
+                    <td style="white-space: nowrap; text-align: right;">
                         <button class="btn btn-icon btn-sm" style="color: var(--primary); background: rgba(59, 130, 246, 0.1); border: none; margin-right: 4px;" onclick="IncomeStatementModule.editOperationalExpense('${exp.id}')" title="Editar gasto">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 20h9"></path>
