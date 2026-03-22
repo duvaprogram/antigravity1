@@ -576,7 +576,12 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 600; color: var(--danger);">${this.formatCurrency(exp.amount)}</td>
                     <td style="font-size: 0.85rem;">${this.formatDate(exp.expense_date)}</td>
                     <td style="font-size: 0.8rem; color: var(--text-muted);">${exp.payment_method || '-'}</td>
-                    <td>
+                        <button class="btn btn-icon btn-sm" style="color: var(--primary); background: rgba(59, 130, 246, 0.1); border: none; margin-right: 4px;" onclick="IncomeStatementModule.editOperationalExpense('${exp.id}')" title="Editar gasto">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                        </button>
                         <button class="btn btn-icon btn-sm" style="color: var(--primary); background: rgba(59, 130, 246, 0.1); border: none; margin-right: 4px;" onclick="IncomeStatementModule.duplicateOperationalExpense('${exp.id}')" title="Duplicar gasto">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -633,6 +638,11 @@ const IncomeStatementModule = {
         }
 
         tbody.innerHTML = sales.map(sale => {
+            const delivered = sale.delivered || 0;
+            const returned = sale.returned || 0;
+            const totalOrders = delivered + returned;
+            const returnRate = totalOrders > 0 ? ((returned / totalOrders) * 100).toFixed(1) : '0.0';
+
             return `
                 <tr>
                     <td>
@@ -643,8 +653,17 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(sale.revenue)}</td>
                     <td style="text-align: right; color: var(--danger);">${this.formatCurrency(sale.product_cost)}</td>
                     <td style="text-align: right; color: var(--primary);">${this.formatCurrency(sale.shipping_cost)}</td>
+                    <td style="text-align: right;">${delivered}</td>
+                    <td style="text-align: right;">${returned}</td>
+                    <td style="text-align: center;">${returnRate}%</td>
                     <td style="font-size: 0.85rem;">${this.formatDate(sale.sale_date)}</td>
-                    <td>
+                    <td style="white-space: nowrap;">
+                        <button class="btn btn-icon btn-sm" style="color: var(--primary); background: rgba(59, 130, 246, 0.1); border: none; margin-right: 4px;" onclick="IncomeStatementModule.editExternalSale('${sale.id}')" title="Editar">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 20h9"></path>
+                                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                            </svg>
+                        </button>
                         <button class="btn btn-icon btn-sm btn-danger-light" onclick="IncomeStatementModule.deleteExternalSale('${sale.id}')" title="Eliminar">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -661,7 +680,27 @@ const IncomeStatementModule = {
         if (form) form.reset();
         document.getElementById('extSaleId').value = '';
         document.getElementById('extSaleDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('extSaleDelivered').value = '0';
+        document.getElementById('extSaleReturned').value = '0';
         document.getElementById('modalExternalSale').classList.add('active');
+    },
+
+    editExternalSale(id) {
+        const sale = this.externalSales.find(s => s.id === id);
+        if (!sale) return;
+
+        document.getElementById('extSaleId').value = sale.id;
+        document.getElementById('extSaleCountry').value = sale.country || 'Todos';
+        document.getElementById('extSaleDate').value = sale.sale_date ? sale.sale_date.split('T')[0] : '';
+        document.getElementById('extSaleDescription').value = sale.description || '';
+        document.getElementById('extSaleRevenue').value = sale.revenue || 0;
+        document.getElementById('extSaleProductCost').value = sale.product_cost || 0;
+        document.getElementById('extSaleShippingCost').value = sale.shipping_cost || 0;
+        document.getElementById('extSaleDelivered').value = sale.delivered || 0;
+        document.getElementById('extSaleReturned').value = sale.returned || 0;
+
+        const modal = document.getElementById('modalExternalSale');
+        if (modal) modal.classList.add('active');
     },
 
     async saveExternalSale() {
@@ -672,7 +711,9 @@ const IncomeStatementModule = {
             description: document.getElementById('extSaleDescription').value,
             revenue: parseFloat(document.getElementById('extSaleRevenue').value) || 0,
             product_cost: parseFloat(document.getElementById('extSaleProductCost').value) || 0,
-            shipping_cost: parseFloat(document.getElementById('extSaleShippingCost').value) || 0
+            shipping_cost: parseFloat(document.getElementById('extSaleShippingCost').value) || 0,
+            delivered: parseInt(document.getElementById('extSaleDelivered').value) || 0,
+            returned: parseInt(document.getElementById('extSaleReturned').value) || 0
         };
 
         try {
@@ -1768,6 +1809,25 @@ const IncomeStatementModule = {
             document.getElementById('opExpenseDate').value = new Date().toISOString().split('T')[0];
             modal.classList.add('active');
         }
+    },
+
+    editOperationalExpense(id) {
+        const exp = this.operationalExpenses.find(e => e.id === id);
+        if (!exp) return;
+
+        document.getElementById('opExpenseId').value = exp.id;
+        document.getElementById('opExpenseCountry').value = exp.country || 'Ecuador';
+        document.getElementById('opExpenseCategory').value = exp.category || 'Envío';
+        document.getElementById('opExpenseDescription').value = exp.description || '';
+        document.getElementById('opExpenseAmount').value = exp.amount || 0;
+        document.getElementById('opExpenseDate').value = exp.expense_date ? exp.expense_date.split('T')[0] : '';
+        document.getElementById('opExpensePayMethod').value = exp.payment_method || 'Efectivo';
+        
+        const notesObj = document.getElementById('opExpenseNotes');
+        if (notesObj) notesObj.value = exp.notes || '';
+
+        const modal = document.getElementById('modalOperationalExpense');
+        if (modal) modal.classList.add('active');
     },
 
     async saveOperationalExpense() {

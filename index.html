@@ -2813,6 +2813,9 @@
                                         <th style="text-align: right; color: var(--success);">Ingresos (USD)</th>
                                         <th style="text-align: right; color: var(--danger);">Costo Mercancía (USD)</th>
                                         <th style="text-align: right; color: var(--primary);">Costo Fletes (USD)</th>
+                                        <th style="text-align: right;">Entregados</th>
+                                        <th style="text-align: right;">Devueltos</th>
+                                        <th style="text-align: center;">% Devolución</th>
                                         <th>Fecha</th>
                                         <th></th>
                                     </tr>
@@ -3750,6 +3753,14 @@
                     <div class="form-group">
                         <label for="extSaleShippingCost">Costo de Fletes (USD) *</label>
                         <input type="number" id="extSaleShippingCost" step="0.01" min="0" required value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="extSaleDelivered">Pedidos Entregados</label>
+                        <input type="number" id="extSaleDelivered" min="0" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="extSaleReturned">Pedidos Devueltos</label>
+                        <input type="number" id="extSaleReturned" min="0" value="0">
                     </div>
                 </div>
                 <div class="form-actions">
