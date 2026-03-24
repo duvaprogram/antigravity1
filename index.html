@@ -118,6 +118,22 @@
                     </svg>
                     <span>Análisis de Datos</span>
                 </a>
+                <a href="#calculator" class="nav-item" data-section="calculator">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                        <line x1="8" y1="6" x2="16" y2="6"></line>
+                        <line x1="16" y1="14" x2="16" y2="18"></line>
+                        <path d="M16 10h.01"></path>
+                        <path d="M12 10h.01"></path>
+                        <path d="M8 10h.01"></path>
+                        <path d="M12 14h.01"></path>
+                        <path d="M8 14h.01"></path>
+                        <path d="M12 18h.01"></path>
+                        <path d="M8 18h.01"></path>
+                    </svg>
+                    <span>Calculadora</span>
+                </a>
+
                 <a href="#confirmation" class="nav-item" data-section="confirmation">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 11l3 3L22 4"></path>
@@ -1162,6 +1178,107 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Calculator Section -->
+            <section class="content-section" id="section-calculator">
+                <div class="section-header">
+                    <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                            <line x1="8" y1="6" x2="16" y2="6"></line>
+                        </svg>
+                        Calculadora de Precios y Utilidad
+                    </h2>
+                </div>
+
+                <div class="calculator-grid">
+                    <!-- Inputs Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Variables de Entrada</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="calculatorForm" class="calculator-form">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="calcCompra">Costo de Compra ($)</label>
+                                        <input type="number" id="calcCompra" value="16761" step="0.01">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="calcVenta">Precio de Venta ($)</label>
+                                        <input type="number" id="calcVenta" value="77297" step="0.01">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="calcCpa">CPA Inicial ($)</label>
+                                        <input type="number" id="calcCpa" value="15000" step="0.01">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="calcCancelacion">% De Cancelación</label>
+                                        <input type="number" id="calcCancelacion" value="10" step="0.1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="calcDevolucion">% De Devolución</label>
+                                        <input type="number" id="calcDevolucion" value="25" step="0.1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="calcFullfilment">Fullfilment ($)</label>
+                                        <input type="number" id="calcFullfilment" value="2000" step="0.01">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="calcFlete">Flete ($)</label>
+                                        <input type="number" id="calcFlete" value="16500" step="0.01">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="calcAdmin">Costo Administrativo ($)</label>
+                                        <input type="number" id="calcAdmin" value="2000" step="0.01">
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Results Card -->
+                    <div class="results-container">
+                        <div class="card result-card main-result">
+                            <div class="card-body">
+                                <span class="result-label">Utilidad Neta Estimada</span>
+                                <span class="result-value" id="resUtilidadNeta">$0.00</span>
+                                <div class="result-badge" id="resUtilidadNetaPercent">0%</div>
+                            </div>
+                        </div>
+
+                        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 1rem;">
+                            <div class="stat-card">
+                                <div class="stat-info">
+                                    <span class="stat-label">Costo Real Flete</span>
+                                    <span class="stat-value" id="resRealFlete">$0.00</span>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-info">
+                                    <span class="stat-label">Costo Real Publicidad</span>
+                                    <span class="stat-value" id="resRealPublicidad">$0.00</span>
+                                </div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-info">
+                                    <span class="stat-label">Inefectividad Total</span>
+                                    <span class="stat-value" id="resInefectividad">0%</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card" style="margin-top: 1rem; border-style: dashed; background: var(--surface-hover);">
+                            <div class="card-body" style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
+                                <strong>Nota sobre las fórmulas:</strong><br>
+                                • Inefectividad = % Cancelación + % Devolución<br>
+                                • Costo Real Flete = Flete / (1 - % Devolución)<br>
+                                • Costo Real Publicidad = CPA / (1 - Inefectividad)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
 
             <!-- Confirmation Section -->
             <section class="content-section" id="section-confirmation">
@@ -3944,6 +4061,8 @@
     <script src="js/accounts.js?v=20260222"></script>
     <script src="js/users.js?v=20260222"></script>
     <script src="js/campaigns.js?v=20260222"></script>
+    <script src="js/calculator.js?v=20260222"></script>
+
     <script src="js/income-statement.js?v=20260222"></script>
     <script src="js/app.js?v=20260222"></script>
     <script src="js/auth.js?v=20260222"></script>

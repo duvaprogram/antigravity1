@@ -26,3 +26,4 @@ test-supabase.html
 # Build output
 dist/
 build/
+.vercel

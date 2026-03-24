@@ -34,6 +34,8 @@ const App = {
             UsersModule.init();
             CampaignsModule.init();
             IncomeStatementModule.init();
+            CalculatorModule.init();
+
 
             // Bind navigation events
             this.bindNavigation();
@@ -147,8 +149,10 @@ const App = {
             'accounts': 'Cuentas y Flujo de Efectivo',
             'users': 'Administración de Usuarios',
             'campaigns': 'Creación de Campañas',
-            'income-statement': 'Estado de Resultados'
+            'income-statement': 'Estado de Resultados',
+            'calculator': 'Calculadora de Utilidad'
         };
+
         document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
 
         // Show/hide sections
@@ -219,6 +223,10 @@ const App = {
             case 'income-statement':
                 await IncomeStatementModule.render();
                 break;
+            case 'calculator':
+                CalculatorModule.init();
+                break;
+
         }
     },
 

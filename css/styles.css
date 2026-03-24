@@ -2953,3 +2953,95 @@ form {
         font-size: 1rem;
     }
 }
+
+/* ========================================
+   Calculator Module Styles
+   ======================================== */
+.calculator-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: var(--space-xl);
+    align-items: start;
+}
+
+.calculator-form .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-md);
+}
+
+.calculator-form .form-group label {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+    margin-bottom: var(--space-xs);
+    text-transform: uppercase;
+}
+
+.calculator-form input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+}
+
+.calculator-form input:focus {
+    outline: none;
+    border-color: var(--primary);
+    background: var(--surface-elevated);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.results-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-lg);
+}
+
+.result-card.main-result {
+    background: var(--gradient-primary);
+    color: white;
+    padding: var(--space-xl);
+    text-align: center;
+    position: relative;
+    overflow: visible;
+}
+
+.result-card.main-result .result-label {
+    display: block;
+    font-size: var(--font-size-sm);
+    text-transform: uppercase;
+    opacity: 0.8;
+    margin-bottom: var(--space-sm);
+}
+
+.result-card.main-result .result-value {
+    font-size: 3.5rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.result-badge {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-full);
+    font-weight: 700;
+    box-shadow: var(--shadow-lg);
+    font-size: 1.25rem;
+    z-index: 10;
+}
+
+.badge-success { background: var(--success); color: white; }
+.badge-warning { background: var(--warning); color: white; }
+.badge-danger { background: var(--danger); color: white; }
+
+@media (max-width: 1024px) {
+    .calculator-grid {
+        grid-template-columns: 1fr;
+    }
+}
