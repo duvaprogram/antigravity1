@@ -134,6 +134,9 @@ const InventoryModule = {
             filtered = filtered.filter(item => item.category === categoryVal);
         }
 
+        // Render stats before sorting
+        this.renderStats(filtered);
+
         // Sort
         switch (sortVal) {
             case 'stock-desc':
@@ -153,6 +156,25 @@ const InventoryModule = {
         }
 
         this.renderItems(filtered);
+    },
+
+    renderStats(inventory) {
+        if (!document.getElementById('inventoryStatsGrid')) return;
+
+        const totalItems = inventory.length;
+        const totalUnits = inventory.reduce((sum, i) => sum + (i.available || 0), 0);
+        const lowStockItems = inventory.filter(i => i.isLowStock || (i.available <= (i.minStock || 0))).length;
+        const totalCost = inventory.reduce((sum, i) => sum + ((i.cost || 0) * (i.available || 0)), 0);
+
+        const elTotalItems = document.getElementById('invStatTotalItems');
+        const elTotalUnits = document.getElementById('invStatTotalUnits');
+        const elLowStock = document.getElementById('invStatLowStock');
+        const elTotalCost = document.getElementById('invStatTotalCost');
+
+        if (elTotalItems) elTotalItems.textContent = totalItems;
+        if (elTotalUnits) elTotalUnits.textContent = totalUnits;
+        if (elLowStock) elLowStock.textContent = lowStockItems;
+        if (elTotalCost) elTotalCost.textContent = `$${totalCost.toFixed(2)}`;
     },
 
     renderItems(inventory) {
