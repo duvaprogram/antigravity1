@@ -79,8 +79,13 @@ const InventoryModule = {
     },
 
     async render() {
-        const inventory = await Database.getInventoryByCity(this.currentCity);
+        const [inventory, products] = await Promise.all([
+            Database.getInventoryByCity(this.currentCity),
+            Database.getProducts()
+        ]);
+        
         this._cachedInventory = inventory;
+        this._cachedProducts = products;
 
         // Populate category filter
         this.populateCategories(inventory);
@@ -164,7 +169,12 @@ const InventoryModule = {
         const totalItems = inventory.length;
         const totalUnits = inventory.reduce((sum, i) => sum + (i.available || 0), 0);
         const lowStockItems = inventory.filter(i => i.isLowStock || (i.available <= (i.minStock || 0))).length;
-        const totalCost = inventory.reduce((sum, i) => sum + ((i.cost || 0) * (i.available || 0)), 0);
+        
+        const totalCost = inventory.reduce((sum, item) => {
+            const product = (this._cachedProducts || []).find(p => p.id === item.productId);
+            const itemCost = item.cost || (product ? product.cost : 0) || 0;
+            return sum + (itemCost * (item.available || 0));
+        }, 0);
 
         const elTotalItems = document.getElementById('invStatTotalItems');
         const elTotalUnits = document.getElementById('invStatTotalUnits');

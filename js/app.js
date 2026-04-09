@@ -248,7 +248,10 @@ const App = {
 
             // Calculate total inventory cost (cost * available quantity)
             const totalInventoryCost = inventory.reduce((sum, item) => {
-                return sum + ((item.cost || 0) * (item.available || 0));
+                // Fallback to product cost if view doesn't return it directly
+                const product = products.find(p => p.id === item.productId);
+                const itemCost = item.cost || (product ? product.cost : 0) || 0;
+                return sum + (itemCost * (item.available || 0));
             }, 0);
             document.getElementById('statTotalProductCost').textContent = `$${totalInventoryCost.toFixed(2)}`;
 
