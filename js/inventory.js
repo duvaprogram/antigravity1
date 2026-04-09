@@ -172,7 +172,15 @@ const InventoryModule = {
         
         const totalCost = inventory.reduce((sum, item) => {
             const product = (this._cachedProducts || []).find(p => p.id === item.productId);
-            const itemCost = item.cost || (product ? product.cost : 0) || 0;
+            let itemCost;
+            
+            if (product && typeof window.ProductsModule !== 'undefined' && typeof window.ProductsModule.getRealCost === 'function') {
+                itemCost = window.ProductsModule.getRealCost(product);
+            } else {
+                // Fallback to 40000 factor if module is missing or using raw cost
+                const rawCost = item.cost || (product ? product.cost : 0) || 0;
+                itemCost = rawCost * 40000;
+            }
             return sum + (itemCost * (item.available || 0));
         }, 0);
 

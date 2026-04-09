@@ -250,7 +250,13 @@ const App = {
             const totalInventoryCost = inventory.reduce((sum, item) => {
                 // Fallback to product cost if view doesn't return it directly
                 const product = products.find(p => p.id === item.productId);
-                const itemCost = item.cost || (product ? product.cost : 0) || 0;
+                let itemCost;
+                if (product && typeof window.ProductsModule !== 'undefined' && typeof window.ProductsModule.getRealCost === 'function') {
+                    itemCost = window.ProductsModule.getRealCost(product);
+                } else {
+                    const rawCost = item.cost || (product ? product.cost : 0) || 0;
+                    itemCost = rawCost * 40000;
+                }
                 return sum + (itemCost * (item.available || 0));
             }, 0);
             document.getElementById('statTotalProductCost').textContent = `$${totalInventoryCost.toFixed(2)}`;
