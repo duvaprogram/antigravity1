@@ -8,7 +8,8 @@ const PurchasesModule = {
     filters: {
         dateFrom: null,
         dateTo: null,
-        provider: ''
+        provider: '',
+        status: ''
     },
 
     // All records cache
@@ -44,6 +45,11 @@ const PurchasesModule = {
         }
         if (filterProvider) {
             filterProvider.addEventListener('change', () => this.applyFilters());
+        }
+
+        const filterStatus = document.getElementById('purchaseFilterStatus');
+        if (filterStatus) {
+            filterStatus.addEventListener('change', () => this.applyFilters());
         }
     },
 
@@ -86,6 +92,7 @@ const PurchasesModule = {
         document.getElementById('purchaseQuantity').value = purchase.quantity || 1;
         document.getElementById('purchaseAmount').value = purchase.amount;
         document.getElementById('purchasePaymentMethod').value = purchase.payment_method || 'Efectivo';
+        document.getElementById('purchaseStatus').value = purchase.status || 'Enviado';
         document.getElementById('purchaseCategory').value = purchase.category || 'Mercancía';
         document.getElementById('purchaseNotes').value = purchase.notes || '';
     },
@@ -98,6 +105,7 @@ const PurchasesModule = {
         const quantity = parseInt(document.getElementById('purchaseQuantity').value) || 1;
         const amount = parseFloat(document.getElementById('purchaseAmount').value);
         const paymentMethod = document.getElementById('purchasePaymentMethod').value;
+        const status = document.getElementById('purchaseStatus').value;
         const category = document.getElementById('purchaseCategory').value;
         const notes = document.getElementById('purchaseNotes').value.trim();
 
@@ -113,6 +121,7 @@ const PurchasesModule = {
             quantity,
             amount,
             payment_method: paymentMethod,
+            status,
             category,
             notes
         };
@@ -191,6 +200,11 @@ const PurchasesModule = {
                     </span>
                 </td>
                 <td>
+                    <span class="status-badge ${this.getStatusClass(p.status)}">
+                        ${p.status || 'Enviado'}
+                    </span>
+                </td>
+                <td>
                     <div style="display: flex; gap: 0.5rem;">
                         <button class="btn btn-icon btn-secondary btn-sm" onclick="PurchasesModule.openPurchaseModal('${p.id}')" title="Editar">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -207,7 +221,7 @@ const PurchasesModule = {
                     </div>
                 </td>
             </tr>
-        `).join('') : '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">No hay compras registradas</td></tr>';
+        `).join('') : '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No hay compras registradas</td></tr>';
     },
 
     async updateStats() {
@@ -272,6 +286,9 @@ const PurchasesModule = {
         if (this.filters.provider) {
             filtered = filtered.filter(r => r.provider === this.filters.provider);
         }
+        if (this.filters.status) {
+            filtered = filtered.filter(r => (r.status || 'Enviado') === this.filters.status);
+        }
 
         return filtered;
     },
@@ -280,10 +297,12 @@ const PurchasesModule = {
         const dateFrom = document.getElementById('purchaseFilterDateFrom');
         const dateTo = document.getElementById('purchaseFilterDateTo');
         const provider = document.getElementById('purchaseFilterProvider');
+        const status = document.getElementById('purchaseFilterStatus');
 
         this.filters.dateFrom = dateFrom ? dateFrom.value : null;
         this.filters.dateTo = dateTo ? dateTo.value : null;
         this.filters.provider = provider ? provider.value : '';
+        this.filters.status = status ? status.value : '';
 
         this.updateTable();
     },
@@ -292,15 +311,18 @@ const PurchasesModule = {
         const dateFrom = document.getElementById('purchaseFilterDateFrom');
         const dateTo = document.getElementById('purchaseFilterDateTo');
         const provider = document.getElementById('purchaseFilterProvider');
+        const status = document.getElementById('purchaseFilterStatus');
 
         if (dateFrom) dateFrom.value = '';
         if (dateTo) dateTo.value = '';
         if (provider) provider.value = '';
+        if (status) status.value = '';
 
         this.filters = {
             dateFrom: null,
             dateTo: null,
-            provider: ''
+            provider: '',
+            status: ''
         };
 
         this.updateTable();
@@ -330,6 +352,15 @@ const PurchasesModule = {
             minimumFractionDigits: 0,
             maximumFractionDigits: 0
         }).format(amount);
+    },
+
+    getStatusClass(status) {
+        switch (status) {
+            case 'Enviado': return 'status-processing';
+            case 'En tránsito': return 'status-transit';
+            case 'En bodega': return 'status-delivered';
+            default: return '';
+        }
     },
 
     getPaymentMethodClass(method) {
