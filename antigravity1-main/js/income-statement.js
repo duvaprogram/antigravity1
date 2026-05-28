@@ -2071,6 +2071,11 @@ const IncomeStatementModule = {
                 from = new Date(now.getFullYear(), quarter * 3, 1).toISOString().split('T')[0];
                 to = new Date(now.getFullYear(), quarter * 3 + 3, 0).toISOString().split('T')[0];
                 break;
+            case 'semester':
+                const semester = Math.floor(now.getMonth() / 6);
+                from = new Date(now.getFullYear(), semester * 6, 1).toISOString().split('T')[0];
+                to = new Date(now.getFullYear(), semester * 6 + 6, 0).toISOString().split('T')[0];
+                break;
             case 'year':
                 from = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
                 to = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
@@ -2080,6 +2085,17 @@ const IncomeStatementModule = {
                 to = now.toISOString().split('T')[0];
                 break;
         }
+
+        document.getElementById('isDateFrom').value = from;
+        document.getElementById('isDateTo').value = to;
+        this.applyFilters();
+    },
+
+    setMonthFilter(monthIndex) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const from = new Date(year, monthIndex, 1).toISOString().split('T')[0];
+        const to = new Date(year, monthIndex + 1, 0).toISOString().split('T')[0];
 
         document.getElementById('isDateFrom').value = from;
         document.getElementById('isDateTo').value = to;
