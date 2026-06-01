@@ -83,9 +83,17 @@ const GuidesModule = {
         });
         
         // Filter by product
-        document.getElementById('filterGuideProduct').addEventListener('input', Utils.debounce(() => {
+        const filterProductInput = document.getElementById('filterGuideProduct');
+        filterProductInput.addEventListener('input', Utils.debounce(() => {
             this.filterGuides();
+            this.searchFilterProducts(filterProductInput.value);
         }, 300));
+        
+        filterProductInput.addEventListener('focus', () => {
+            if (filterProductInput.value.length >= 1) {
+                this.searchFilterProducts(filterProductInput.value);
+            }
+        });
 
         // Clear all filters
         document.getElementById('btnClearFilters').addEventListener('click', () => {
@@ -123,10 +131,12 @@ const GuidesModule = {
 
         // Close autocomplete when clicking outside
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.autocomplete-container')) {
+            if (!e.target.closest('.autocomplete-container') && !e.target.closest('#filterGuideProduct') && !e.target.closest('#filterProductSuggestions')) {
                 document.querySelectorAll('.autocomplete-suggestions').forEach(el => {
                     el.classList.remove('active');
                 });
+                const filterSugg = document.getElementById('filterProductSuggestions');
+                if (filterSugg) filterSugg.style.display = 'none';
             }
         });
 
@@ -343,6 +353,39 @@ const GuidesModule = {
         document.getElementById('selectedProductStock').style.display = 'none';
     },
 
+    // Predictive search for product filter
+    async searchFilterProducts(query) {
+        const suggestionsEl = document.getElementById('filterProductSuggestions');
+        
+        if (query.length < 1) {
+            suggestionsEl.style.display = 'none';
+            return;
+        }
+
+        if (this.allProducts.length === 0) {
+            const products = await Database.getProducts();
+            this.allProducts = products.filter(p => p.active);
+        }
+
+        const queryLower = query.toLowerCase();
+        let filtered = this.allProducts.filter(product =>
+            product.name.toLowerCase().includes(queryLower) ||
+            (product.sku && product.sku.toLowerCase().includes(queryLower))
+        ).slice(0, 15);
+
+        if (filtered.length === 0) {
+            suggestionsEl.innerHTML = '<div style="padding: 0.5rem; color: var(--text-muted); font-size: 0.85rem;">No se encontraron productos</div>';
+        } else {
+            suggestionsEl.innerHTML = filtered.map(product => `
+                <div class="autocomplete-item" style="padding: 0.5rem; cursor: pointer; border-bottom: 1px solid var(--border); font-size: 0.85rem;" 
+                    onclick="document.getElementById('filterGuideProduct').value = '${product.name}'; document.getElementById('filterProductSuggestions').style.display = 'none'; GuidesModule.filterGuides();">
+                    ${this.highlightMatch(product.name, query)}
+                </div>
+            `).join('');
+        }
+        suggestionsEl.style.display = 'block';
+    },
+
     // Highlight matching text
     highlightMatch(text, query) {
         if (!query) return text;
@@ -463,7 +506,14 @@ const GuidesModule = {
                     <td>${Utils.formatDate(guide.createdAt)}</td>
                     <td>${guide.clientName ? Utils.escapeHtml(guide.clientName) : 'Cliente eliminado'}</td>
                     <td><span class="city-badge ${cityClass}">${guide.city}</span></td>
-                    <td>${guide.itemsCount || 0} items</td>
+                    <td>
+                        ${guide.items && guide.items.length > 0 ? 
+                            `<div style="display: flex; flex-direction: column; gap: 2px;">
+                                ${guide.items.map(i => `<span style="font-size: 0.85em; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;" title="${i.products?.name}">${i.quantity ? i.quantity + 'x ' : ''}${i.products?.name}</span>`).join('')}
+                            </div>`
+                            : `<span style="color: var(--text-muted);">${guide.itemsCount || 0} items</span>`
+                        }
+                    </td>
                     <td>${paymentInfo}</td>
                     <td>
                         <span class="status-badge ${statusClass}">${guide.status}</span>

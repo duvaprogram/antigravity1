@@ -696,8 +696,11 @@
                         style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
                     <input type="date" id="filterGuideDateTo" title="Fecha Hasta"
                         style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
-                    <input type="text" id="filterGuideProduct" placeholder="Buscar producto..."
-                        style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); max-width: 150px;">
+                    <div style="position: relative; display: inline-block;">
+                        <input type="text" id="filterGuideProduct" placeholder="Buscar producto..." autocomplete="off"
+                            style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); max-width: 180px;">
+                        <div id="filterProductSuggestions" class="autocomplete-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); max-height: 200px; overflow-y: auto; z-index: 1000; box-shadow: var(--shadow-lg);"></div>
+                    </div>
                     <button class="btn btn-secondary" id="btnClearFilters" title="Limpiar filtros">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
