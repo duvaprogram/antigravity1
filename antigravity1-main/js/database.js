@@ -678,7 +678,10 @@ const Database = {
         try {
             const { data, error } = await supabaseClient
                 .from('v_guides_complete')
-                .select('*')
+                .select(`
+                    *,
+                    guide_items ( products ( name ) )
+                `)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -700,6 +703,7 @@ const Database = {
                 shippingAdjustmentNote: g.shipping_adjustment_note,
                 observations: g.observations,
                 itemsCount: g.items_count,
+                items: g.guide_items || [],
                 createdAt: g.created_at,
                 deliveryDate: g.delivery_date,
                 deliveredAt: g.delivered_at,

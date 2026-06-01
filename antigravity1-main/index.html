@@ -692,8 +692,12 @@
                         <option value="USD">Divisa (USD)</option>
                         <option value="BS">Pago Móvil (Bs)</option>
                     </select>
-                    <input type="date" id="filterGuideDate"
+                    <input type="date" id="filterGuideDateFrom" title="Fecha Desde"
                         style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                    <input type="date" id="filterGuideDateTo" title="Fecha Hasta"
+                        style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                    <input type="text" id="filterGuideProduct" placeholder="Buscar producto..."
+                        style="padding: 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary); max-width: 150px;">
                     <button class="btn btn-secondary" id="btnClearFilters" title="Limpiar filtros">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2">
@@ -2586,30 +2590,18 @@
                                 onclick="IncomeStatementModule.setQuickFilter('all')">Todo</button>
                         </div>
                         <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(0)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Ene</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(1)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Feb</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(2)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Mar</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(3)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Abr</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(4)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">May</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(5)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Jun</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(6)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Jul</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(7)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Ago</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(8)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Sep</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(9)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Oct</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(10)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Nov</button>
-                            <button class="btn btn-sm" style="background: var(--surface); color: var(--text-secondary); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.6rem; font-size: 0.75rem; cursor: pointer; transition: all 0.15s;"
-                                onclick="IncomeStatementModule.setMonthFilter(11)" onmouseover="this.style.background='var(--primary-light)';this.style.borderColor='var(--primary)';this.style.color='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)';this.style.color='var(--text-secondary)'">Dic</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(0, this)">Ene</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(1, this)">Feb</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(2, this)">Mar</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(3, this)">Abr</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(4, this)">May</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(5, this)">Jun</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(6, this)">Jul</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(7, this)">Ago</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(8, this)">Sep</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(9, this)">Oct</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(10, this)">Nov</button>
+                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(11, this)">Dic</button>
                         </div>
                     </div>
                 </div>

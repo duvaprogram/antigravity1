@@ -74,10 +74,18 @@ const GuidesModule = {
             this.filterGuides();
         });
 
-        // Filter by date
-        document.getElementById('filterGuideDate').addEventListener('change', () => {
+        // Filter by date range
+        document.getElementById('filterGuideDateFrom').addEventListener('change', () => {
             this.filterGuides();
         });
+        document.getElementById('filterGuideDateTo').addEventListener('change', () => {
+            this.filterGuides();
+        });
+        
+        // Filter by product
+        document.getElementById('filterGuideProduct').addEventListener('input', Utils.debounce(() => {
+            this.filterGuides();
+        }, 300));
 
         // Clear all filters
         document.getElementById('btnClearFilters').addEventListener('click', () => {
@@ -85,7 +93,9 @@ const GuidesModule = {
             document.getElementById('filterGuideStatus').value = '';
             document.getElementById('filterGuideCity').value = '';
             document.getElementById('filterGuidePayment').value = '';
-            document.getElementById('filterGuideDate').value = '';
+            document.getElementById('filterGuideDateFrom').value = '';
+            document.getElementById('filterGuideDateTo').value = '';
+            document.getElementById('filterGuideProduct').value = '';
             this.filterGuides();
         });
 
@@ -350,7 +360,9 @@ const GuidesModule = {
         const statusFilter = document.getElementById('filterGuideStatus').value;
         const cityFilter = document.getElementById('filterGuideCity').value;
         const paymentFilter = document.getElementById('filterGuidePayment').value;
-        const dateFilter = document.getElementById('filterGuideDate').value;
+        const dateFromFilter = document.getElementById('filterGuideDateFrom').value;
+        const dateToFilter = document.getElementById('filterGuideDateTo').value;
+        const productFilter = document.getElementById('filterGuideProduct').value.toLowerCase();
 
         let guides = await Database.getGuides();
 
@@ -388,10 +400,22 @@ const GuidesModule = {
         }
 
         // Apply date filter
-        if (dateFilter) {
+        if (dateFromFilter || dateToFilter) {
             guides = guides.filter(g => {
                 const guideDate = new Date(g.createdAt).toISOString().split('T')[0];
-                return guideDate === dateFilter;
+                let isValid = true;
+                if (dateFromFilter && guideDate < dateFromFilter) isValid = false;
+                if (dateToFilter && guideDate > dateToFilter) isValid = false;
+                return isValid;
+            });
+        }
+
+        // Apply product filter
+        if (productFilter) {
+            guides = guides.filter(g => {
+                if (!g.items || g.items.length === 0) return false;
+                const productsStr = g.items.map(i => i.products?.name || '').join(' ').toLowerCase();
+                return productsStr.includes(productFilter);
             });
         }
 

@@ -2088,10 +2088,11 @@ const IncomeStatementModule = {
 
         document.getElementById('isDateFrom').value = from;
         document.getElementById('isDateTo').value = to;
+        document.querySelectorAll('.month-tag').forEach(el => el.classList.remove('active'));
         this.applyFilters();
     },
 
-    setMonthFilter(monthIndex) {
+    setMonthFilter(monthIndex, btn) {
         const now = new Date();
         const year = now.getFullYear();
         const from = new Date(year, monthIndex, 1).toISOString().split('T')[0];
@@ -2099,6 +2100,10 @@ const IncomeStatementModule = {
 
         document.getElementById('isDateFrom').value = from;
         document.getElementById('isDateTo').value = to;
+
+        document.querySelectorAll('.month-tag').forEach(el => el.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+
         this.applyFilters();
     },
 
