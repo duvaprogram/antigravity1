@@ -147,6 +147,15 @@ const InventoryModule = {
         this.renderStats(filtered);
 
         // Sort
+        const getCostVal = (item) => {
+            const product = (this._cachedProducts || []).find(p => p.id === item.productId);
+            if (product && typeof window.ProductsModule !== 'undefined' && typeof window.ProductsModule.getRealCost === 'function') {
+                return window.ProductsModule.getRealCost(product);
+            }
+            const rawCost = item.cost || (product ? product.cost : 0) || 0;
+            return rawCost * 40000;
+        };
+
         switch (sortVal) {
             case 'stock-desc':
                 filtered.sort((a, b) => b.available - a.available);
@@ -159,6 +168,15 @@ const InventoryModule = {
                 break;
             case 'name-desc':
                 filtered.sort((a, b) => (b.productName || '').localeCompare(a.productName || ''));
+                break;
+            case 'cost-desc':
+                filtered.sort((a, b) => getCostVal(b) - getCostVal(a));
+                break;
+            case 'cost-asc':
+                filtered.sort((a, b) => getCostVal(a) - getCostVal(b));
+                break;
+            case 'val-desc':
+                filtered.sort((a, b) => (getCostVal(b) * b.available) - (getCostVal(a) * a.available));
                 break;
             default:
                 break;
