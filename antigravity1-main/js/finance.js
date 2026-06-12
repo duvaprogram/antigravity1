@@ -642,27 +642,57 @@ const FinanceModule = {
             return;
         }
 
-        // Calculate distribution totals
-        let cashTotal = 0;
-        let bankTotal = 0;
-        let propertiesTotal = 0;
-        let otherAssetsTotal = 0;
-        let debtsTotal = 0;
+        // Calculate distribution totals dynamically by category display name
+        const categoryBalances = {};
+        let totalAssets = 0;
+        let totalLiabilities = 0;
 
         this.accounts.forEach(acc => {
             const balance = parseFloat(acc.balance || 0);
             if (acc.type === 'asset') {
-                const name = this.getCategoryDisplayName(acc.category);
-                if (name.includes('Efectivo')) cashTotal += balance;
-                else if (name.includes('Bancaria')) bankTotal += balance;
-                else if (name.includes('Bienes') || name.includes('Propiedades')) propertiesTotal += balance;
-                else otherAssetsTotal += balance;
+                totalAssets += balance;
             } else {
-                debtsTotal += balance;
+                totalLiabilities += balance;
             }
+
+            if (balance === 0) return; // skip empty accounts in chart
+            
+            const categoryName = this.getCategoryDisplayName(acc.category);
+            categoryBalances[categoryName] = (categoryBalances[categoryName] || 0) + balance;
         });
 
+        // Add inventory if it has value
         const inventoryVal = await this.calculateInventoryValue();
+        if (inventoryVal > 0) {
+            categoryBalances['📦 Inventario'] = inventoryVal;
+        }
+
+        const labels = Object.keys(categoryBalances);
+        const dataValues = Object.values(categoryBalances);
+
+        // Predefined colors for standard categories, and dynamic palette for custom ones
+        const colorPalette = [
+            '#3b82f6', // Banco
+            '#10b981', // Efectivo
+            '#f59e0b', // Inventario
+            '#a855f7', // Bienes
+            '#ef4444', // Deudas / Tarjetas
+            '#64748b', // Gris (Otros)
+            '#ec4899', // Rosado
+            '#06b6d4', // Celeste
+            '#14b8a6', // Turquesa
+            '#f43f5e'  // Rosa fuerte
+        ];
+
+        const bgColors = labels.map((label, idx) => {
+            const lowerLabel = label.toLowerCase();
+            if (lowerLabel.includes('bancaria') || lowerLabel.includes('bank')) return '#3b82f6';
+            if (lowerLabel.includes('efectivo') || lowerLabel.includes('cash')) return '#10b981';
+            if (lowerLabel.includes('inventario')) return '#f59e0b';
+            if (lowerLabel.includes('bienes') || lowerLabel.includes('propiedades') || lowerLabel.includes('property')) return '#a855f7';
+            if (lowerLabel.includes('tarjeta') || lowerLabel.includes('credit_card') || lowerLabel.includes('préstamo') || lowerLabel.includes('loan')) return '#ef4444';
+            return colorPalette[idx % colorPalette.length];
+        });
 
         // 1. Doughnut chart
         const distCanvas = document.getElementById('pfDistributionChart');
@@ -675,17 +705,10 @@ const FinanceModule = {
             this.distributionChart = new Chart(distCtx, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Banco', 'Efectivo', 'Bienes/Propiedades', 'Inventario', 'Otros Activos', 'Deudas'],
+                    labels: labels,
                     datasets: [{
-                        data: [bankTotal, cashTotal, propertiesTotal, inventoryVal, otherAssetsTotal, debtsTotal],
-                        backgroundColor: [
-                            '#3b82f6', // Banco
-                            '#10b981', // Efectivo
-                            '#a855f7', // Bienes
-                            '#f59e0b', // Inventario
-                            '#64748b', // Otros Activos
-                            '#ef4444'  // Deudas
-                        ],
+                        data: dataValues,
+                        backgroundColor: bgColors,
                         borderWidth: 1,
                         borderColor: '#2d2d44'
                     }]
@@ -717,10 +740,10 @@ const FinanceModule = {
             const history = [...this.snapshots].reverse();
             
             const labels = history.length > 0 ? history.map(h => Utils.formatDate(h.date)) : ['Hoy'];
-            const netWorthData = history.length > 0 ? history.map(h => parseFloat(h.net_worth)) : [bankTotal + cashTotal + propertiesTotal + inventoryVal + otherAssetsTotal - debtsTotal];
+            const netWorthData = history.length > 0 ? history.map(h => parseFloat(h.net_worth)) : [totalAssets + inventoryVal - totalLiabilities];
             const inventoryData = history.length > 0 ? history.map(h => parseFloat(h.inventory_value)) : [inventoryVal];
-            const assetsData = history.length > 0 ? history.map(h => parseFloat(h.total_assets)) : [bankTotal + cashTotal + propertiesTotal + otherAssetsTotal];
-            const liabilitiesData = history.length > 0 ? history.map(h => parseFloat(h.total_liabilities)) : [debtsTotal];
+            const assetsData = history.length > 0 ? history.map(h => parseFloat(h.total_assets)) : [totalAssets];
+            const liabilitiesData = history.length > 0 ? history.map(h => parseFloat(h.total_liabilities)) : [totalLiabilities];
 
             this.evolutionChart = new Chart(evoCtx, {
                 type: 'bar',
