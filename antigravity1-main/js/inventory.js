@@ -60,6 +60,7 @@ const InventoryModule = {
     bindInventoryFilters() {
         const searchInput = document.getElementById('invSearchInput');
         const sortSelect = document.getElementById('invSortSelect');
+        const sortCostSelect = document.getElementById('invSortCostSelect');
         const categorySelect = document.getElementById('invCategorySelect');
         const clearBtn = document.getElementById('btnClearInvFilters');
 
@@ -67,7 +68,20 @@ const InventoryModule = {
             searchInput.addEventListener('input', () => this.applyFilters());
         }
         if (sortSelect) {
-            sortSelect.addEventListener('change', () => this.applyFilters());
+            sortSelect.addEventListener('change', (e) => {
+                if (sortCostSelect && e.target.value !== 'default') {
+                    sortCostSelect.value = 'default';
+                }
+                this.applyFilters();
+            });
+        }
+        if (sortCostSelect) {
+            sortCostSelect.addEventListener('change', (e) => {
+                if (sortSelect && e.target.value !== 'default') {
+                    sortSelect.value = 'default';
+                }
+                this.applyFilters();
+            });
         }
         if (categorySelect) {
             categorySelect.addEventListener('change', () => this.applyFilters());
@@ -76,6 +90,7 @@ const InventoryModule = {
             clearBtn.addEventListener('click', () => {
                 if (searchInput) searchInput.value = '';
                 if (sortSelect) sortSelect.value = 'default';
+                if (sortCostSelect) sortCostSelect.value = 'default';
                 if (categorySelect) categorySelect.value = '';
                 this.applyFilters();
             });
@@ -126,6 +141,7 @@ const InventoryModule = {
     applyFilters() {
         const searchVal = (document.getElementById('invSearchInput')?.value || '').toLowerCase().trim();
         const sortVal = document.getElementById('invSortSelect')?.value || 'default';
+        const sortCostVal = document.getElementById('invSortCostSelect')?.value || 'default';
         const categoryVal = document.getElementById('invCategorySelect')?.value || '';
 
         let filtered = [...this._cachedInventory];
@@ -156,7 +172,9 @@ const InventoryModule = {
             return rawCost * 40000;
         };
 
-        switch (sortVal) {
+        const activeSort = sortCostVal !== 'default' ? sortCostVal : sortVal;
+
+        switch (activeSort) {
             case 'stock-desc':
                 filtered.sort((a, b) => b.available - a.available);
                 break;
