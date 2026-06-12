@@ -102,7 +102,12 @@ const UsersModule = {
 
             // Convert to object
             this.pendingPermissions = {};
-            const modules = ['dashboard', 'products', 'inventory', 'clients', 'guides', 'confirmation', 'purchases'];
+            const modules = [
+                'dashboard', 'products', 'inventory', 'clients', 'guides', 
+                'confirmation', 'purchases', 'analytics', 'freights', 
+                'payments', 'accounts', 'campaigns', 'income-statement', 
+                'calculator', 'finance'
+            ];
 
             modules.forEach(module => {
                 const perm = data.find(p => p.module === module);
@@ -128,7 +133,15 @@ const UsersModule = {
             clients: { name: 'Clientes', icon: '👥' },
             guides: { name: 'Guías de Despacho', icon: '📄' },
             confirmation: { name: 'Confirmación', icon: '✅' },
-            purchases: { name: 'Compras', icon: '🛒' }
+            purchases: { name: 'Compras', icon: '🛒' },
+            analytics: { name: 'Análisis de Datos', icon: '📉' },
+            freights: { name: 'Fletes / Movilización', icon: '🚚' },
+            payments: { name: 'Gestión de Pagos', icon: '💳' },
+            accounts: { name: 'Cuentas / Flujo Caja', icon: '🏦' },
+            campaigns: { name: 'Creación de Campañas', icon: '📣' },
+            'income-statement': { name: 'Estado de Resultados', icon: '📊' },
+            calculator: { name: 'Calculadora de Utilidad', icon: '🧮' },
+            finance: { name: 'Finanzas Personales', icon: '💵' }
         };
 
         grid.innerHTML = Object.entries(moduleNames).map(([key, info]) => {
