@@ -258,6 +258,32 @@ const InventoryModule = {
                 ? `<span class="inv-category-badge">${Utils.escapeHtml(item.category)}</span>`
                 : '';
 
+            // Calculate cost details
+            const product = (this._cachedProducts || []).find(p => p.id === item.productId);
+            let itemCost = 0;
+            if (product && typeof window.ProductsModule !== 'undefined' && typeof window.ProductsModule.getRealCost === 'function') {
+                itemCost = window.ProductsModule.getRealCost(product);
+            } else {
+                const rawCost = item.cost || (product ? product.cost : 0) || 0;
+                itemCost = rawCost * 40000;
+            }
+            const totalItemCost = itemCost * (item.available || 0);
+
+            const isAdmin = typeof window.AuthModule !== 'undefined' && window.AuthModule.currentUser?.role === 'admin';
+
+            const costHtml = isAdmin ? `
+                <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.8rem;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-secondary);">Costo Unitario:</span>
+                        <span style="color: var(--warning); font-weight: 600;">$${itemCost.toFixed(2)}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-secondary);">Costo Total Stock:</span>
+                        <span style="color: var(--success); font-weight: 700;">$${totalItemCost.toFixed(2)}</span>
+                    </div>
+                </div>
+            ` : '';
+
             return `
                 <div class="inventory-card ${isLowStock ? 'low-stock' : ''}">
                     <div class="inventory-header">
@@ -299,6 +325,8 @@ const InventoryModule = {
                             </span>
                         </div>
                     ` : ''}
+
+                    ${costHtml}
 
                     <div style="margin-top: 0.75rem; text-align: right;">
                         <button class="btn btn-icon btn-secondary" onclick="InventoryModule.deleteInventoryItem('${item.productId}', '${item.city}')" title="Eliminar del inventario" style="color: var(--danger);">
