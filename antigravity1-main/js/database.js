@@ -1396,6 +1396,102 @@ const Database = {
             console.error('Error saving PF transaction:', error);
             throw error;
         }
+    },
+
+    async getPFCategories() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('pf_categories')
+                .select('*')
+                .order('name');
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Error fetching PF categories:', error);
+            if (error && error.code === '42P01') return [];
+            throw error;
+        }
+    },
+
+    async savePFCategory(category) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('pf_categories')
+                .insert({
+                    name: category.name,
+                    type: category.type
+                })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error saving PF category:', error);
+            throw error;
+        }
+    },
+
+    async deletePFCategory(id) {
+        try {
+            const { error } = await supabaseClient
+                .from('pf_categories')
+                .delete()
+                .eq('id', id);
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting PF category:', error);
+            throw error;
+        }
+    },
+
+    async getPFSnapshots() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('pf_snapshots')
+                .select('*')
+                .order('date', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Error fetching PF snapshots:', error);
+            if (error && error.code === '42P01') return [];
+            throw error;
+        }
+    },
+
+    async savePFSnapshot(snapshot) {
+        try {
+            const { data, error } = await supabaseClient
+                .from('pf_snapshots')
+                .insert({
+                    date: snapshot.date,
+                    total_assets: snapshot.total_assets,
+                    total_liabilities: snapshot.total_liabilities,
+                    net_worth: snapshot.net_worth,
+                    inventory_value: snapshot.inventory_value,
+                    details: snapshot.details
+                })
+                .select()
+                .single();
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error saving PF snapshot:', error);
+            throw error;
+        }
+    },
+
+    async deletePFSnapshot(id) {
+        try {
+            const { error } = await supabaseClient
+                .from('pf_snapshots')
+                .delete()
+                .eq('id', id);
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting PF snapshot:', error);
+            throw error;
+        }
     }
 };
 

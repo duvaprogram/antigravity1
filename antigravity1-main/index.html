@@ -3066,6 +3066,12 @@
                 <div class="section-header">
                     <h2>Finanzas Personales</h2>
                     <div class="header-buttons">
+                        <button class="btn btn-secondary" id="btnManagePFCategories">
+                            ⚙️ Categorías
+                        </button>
+                        <button class="btn btn-secondary" id="btnSavePFSnapshot">
+                            💾 Guardar Reporte Hoy
+                        </button>
                         <button class="btn btn-primary" id="btnNewPFAccount">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -3086,7 +3092,18 @@
                         </div>
                         <div class="stat-info">
                             <span class="stat-value" id="statTotalAssets">$0.00</span>
-                            <span class="stat-label">Total Activos</span>
+                            <span class="stat-label">Cuentas y Efectivo</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statPFInventory">$0.00</span>
+                            <span class="stat-label">Valor del Inventario</span>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -3098,7 +3115,7 @@
                         </div>
                         <div class="stat-info">
                             <span class="stat-value" id="statTotalLiabilities">$0.00</span>
-                            <span class="stat-label">Total Pasivos</span>
+                            <span class="stat-label">Total Deudas (Pasivos)</span>
                         </div>
                     </div>
                     <div class="stat-card">
@@ -3110,12 +3127,32 @@
                         </div>
                         <div class="stat-info">
                             <span class="stat-value" id="statNetWorth">$0.00</span>
-                            <span class="stat-label">Patrimonio Neto</span>
+                            <span class="stat-label">Patrimonio Neto Total</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="dashboard-grid">
+                <!-- Charts Row -->
+                <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); margin-bottom: 2rem;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Distribución Patrimonial</h3>
+                        </div>
+                        <div class="card-body" style="position: relative; height: 260px; display: flex; justify-content: center; align-items: center;">
+                            <canvas id="pfDistributionChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Evolución de Patrimonio</h3>
+                        </div>
+                        <div class="card-body" style="position: relative; height: 260px; display: flex; justify-content: center; align-items: center;">
+                            <canvas id="pfEvolutionChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid" style="margin-bottom: 2rem;">
                     <div class="card">
                         <div class="card-header">
                             <h3>Activos y Cuentas</h3>
@@ -3153,6 +3190,33 @@
                                 </thead>
                                 <tbody id="pfLiabilitiesTable">
                                     <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Snapshots History -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Historial de Reportes Guardados (Cortes de Caja)</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha del Reporte</th>
+                                        <th>Cuentas / Efectivo</th>
+                                        <th>Valor Inventario</th>
+                                        <th>Total Deudas</th>
+                                        <th>Patrimonio Neto</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pfSnapshotsTable">
+                                    <!-- Dynamic -->
+                                    <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay reportes históricos guardados</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -4319,10 +4383,126 @@
         </div>
     </div>
 
+    <!-- Modal: Personal Finance Categories Manager -->
+    <div class="modal" id="modalPFCategories">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Gestionar Categorías Financieras</h2>
+                <button class="modal-close" data-close="modalPFCategories">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem 0 0 0;">
+                <!-- Add Category Form -->
+                <form id="formPFCategory" style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border);">
+                    <div class="form-grid" style="grid-template-columns: 2fr 1fr auto; align-items: end; gap: 1rem;">
+                        <div class="form-group">
+                            <label for="pfCatName">Nombre de la Categoría *</label>
+                            <input type="text" id="pfCatName" required placeholder="Ej: Cooperativa, Préstamo Familiar...">
+                        </div>
+                        <div class="form-group">
+                            <label for="pfCatType">Tipo *</label>
+                            <select id="pfCatType" required>
+                                <option value="asset">Activo (Dinero)</option>
+                                <option value="liability">Pasivo (Deuda)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <button type="submit" class="btn btn-primary" style="height: 42px;">Agregar</button>
+                        </div>
+                    </div>
+                </form>
+                
+                <!-- Categories List Table -->
+                <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem;">Categorías Registradas</h3>
+                <div class="table-container" style="max-height: 250px; overflow-y: auto;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Tipo</th>
+                                <th>Acciones</th>
+                           </tr>
+                       </thead>
+                       <tbody id="pfCategoriesListTable">
+                           <!-- Dynamic -->
+                       </tbody>
+                   </table>
+               </div>
+           </div>
+       </div>
+   </div>
+
+    <!-- Modal: Personal Finance Snapshot Detail -->
+    <div class="modal" id="modalPFSnapshotDetail">
+        <div class="modal-content" style="max-width: 700px;">
+            <div class="modal-header">
+                <h2 id="pfSnapshotDetailTitle">Detalle de Reporte Financiero</h2>
+                <button class="modal-close" data-close="modalPFSnapshotDetail">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem 0 0 0;">
+                <!-- Summary Cards inside modal -->
+                <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="stat-card" style="padding: 1rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                        <span class="stat-label" style="font-size: 0.75rem;">Cuentas / Efectivo</span>
+                        <span class="stat-value" id="pfSnapshotValAssets" style="font-size: 1.25rem; color: var(--success);">$0.00</span>
+                    </div>
+                    <div class="stat-card" style="padding: 1rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                        <span class="stat-label" style="font-size: 0.75rem;">Valor Inventario</span>
+                        <span class="stat-value" id="pfSnapshotValInventory" style="font-size: 1.25rem; color: var(--warning);">$0.00</span>
+                    </div>
+                    <div class="stat-card" style="padding: 1rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                        <span class="stat-label" style="font-size: 0.75rem;">Total Deudas</span>
+                        <span class="stat-value" id="pfSnapshotValLiabilities" style="font-size: 1.25rem; color: var(--danger);">$0.00</span>
+                    </div>
+                    <div class="stat-card" style="padding: 1rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem;">
+                        <span class="stat-label" style="font-size: 0.75rem;">Patrimonio Neto</span>
+                        <span class="stat-value" id="pfSnapshotValNetWorth" style="font-size: 1.25rem; color: var(--primary); font-weight: 700;">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Details Grid -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1rem;">
+                    <div>
+                        <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem;">Activos y Cuentas</h3>
+                        <div class="table-container" style="max-height: 200px; overflow-y: auto;">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Cuenta</th>
+                                        <th>Saldo</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pfSnapshotDetailAssetsTable">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 style="margin-bottom: 0.5rem; font-size: 1.1rem;">Pasivos (Deudas)</h3>
+                        <div class="table-container" style="max-height: 200px; overflow-y: auto;">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Deuda</th>
+                                        <th>Saldo</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pfSnapshotDetailLiabilitiesTable">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- SheetJS for Excel/CSV parsing -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
