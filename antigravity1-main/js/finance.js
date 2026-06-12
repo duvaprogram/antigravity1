@@ -111,18 +111,11 @@ const FinanceModule = {
 
     async calculateInventoryValue() {
         try {
-            const inventory = await Database.getInventory();
-            const products = await Database.getProducts();
-            
-            return inventory.reduce((sum, item) => {
-                const product = products.find(p => p.id === item.productId);
-                let itemCost = 0;
-                if (product) {
-                    const storedCost = parseFloat(product.cost) || 0;
-                    // Decode cost
-                    itemCost = storedCost * 40000;
+            return this.accounts.reduce((sum, acc) => {
+                if (acc.type === 'asset' && acc.category && acc.category.toLowerCase().includes('inventario')) {
+                    return sum + (parseFloat(acc.balance) || 0);
                 }
-                return sum + (itemCost * (item.available || 0));
+                return sum;
             }, 0);
         } catch (error) {
             console.error('Error calculating inventory value:', error);
@@ -135,8 +128,11 @@ const FinanceModule = {
         let totalLiabilities = 0;
 
         this.accounts.forEach(acc => {
+            const isInv = acc.type === 'asset' && acc.category && acc.category.toLowerCase().includes('inventario');
             if (acc.type === 'asset') {
-                totalAssets += parseFloat(acc.balance || 0);
+                if (!isInv) {
+                    totalAssets += parseFloat(acc.balance || 0);
+                }
             } else if (acc.type === 'liability') {
                 totalLiabilities += parseFloat(acc.balance || 0);
             }
@@ -514,8 +510,11 @@ const FinanceModule = {
 
         this.accounts.forEach(acc => {
             const balance = parseFloat(acc.balance || 0);
+            const isInv = acc.type === 'asset' && acc.category && acc.category.toLowerCase().includes('inventario');
             if (acc.type === 'asset') {
-                totalAssets += balance;
+                if (!isInv) {
+                    totalAssets += balance;
+                }
             } else if (acc.type === 'liability') {
                 totalLiabilities += balance;
             }
@@ -674,13 +673,16 @@ const FinanceModule = {
 
         this.accounts.forEach(acc => {
             const balance = parseFloat(acc.balance || 0);
+            const isInv = acc.type === 'asset' && acc.category && acc.category.toLowerCase().includes('inventario');
             if (acc.type === 'asset') {
-                totalAssets += balance;
+                if (!isInv) {
+                    totalAssets += balance;
+                }
             } else {
                 totalLiabilities += balance;
             }
 
-            if (balance === 0) return; // skip empty accounts in chart
+            if (balance === 0 || isInv) return; // skip empty and inventory accounts in chart
             
             const categoryName = this.getCategoryDisplayName(acc.category);
             categoryBalances[categoryName] = (categoryBalances[categoryName] || 0) + balance;
