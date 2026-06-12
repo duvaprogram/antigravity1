@@ -109,6 +109,12 @@ const FinanceModule = {
                     <td><span class="badge" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border);">${categoryNames[acc.category] || acc.category}</span></td>
                     <td style="color: var(--success); font-weight: 600;">${Utils.formatCurrency(acc.balance)} ${acc.currency}</td>
                     <td>
+                        <button class="btn btn-sm btn-icon" style="color: var(--primary);" title="Editar Cuenta" onclick="FinanceModule.editAccount('${acc.id}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
                         <button class="btn btn-sm btn-icon" style="color: var(--success);" title="Ingresar Dinero" onclick="FinanceModule.openTransactionModal('${acc.id}', 'income')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -141,6 +147,12 @@ const FinanceModule = {
                     <td><span class="badge" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border);">${categoryNames[acc.category] || acc.category}</span></td>
                     <td style="color: var(--danger); font-weight: 600;">${Utils.formatCurrency(acc.balance)} ${acc.currency}</td>
                     <td>
+                        <button class="btn btn-sm btn-icon" style="color: var(--primary);" title="Editar Cuenta" onclick="FinanceModule.editAccount('${acc.id}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
                         <button class="btn btn-sm btn-icon" style="color: var(--success);" title="Registrar Préstamo / Aumento deuda" onclick="FinanceModule.openTransactionModal('${acc.id}', 'income')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -164,11 +176,25 @@ const FinanceModule = {
         }
     },
 
-    openAccountModal(accountId = null) {
+    openAccountModal() {
         document.getElementById('formPFAccount').reset();
         document.getElementById('pfAccountId').value = '';
         document.getElementById('modalPFAccount').classList.add('active');
         document.getElementById('pfAccountName').focus();
+    },
+
+    editAccount(id) {
+        const account = this.accounts.find(a => a.id === id);
+        if (!account) return;
+
+        document.getElementById('pfAccountId').value = account.id;
+        document.getElementById('pfAccountName').value = account.name;
+        document.getElementById('pfAccountType').value = account.type;
+        document.getElementById('pfAccountCategory').value = account.category;
+        document.getElementById('pfAccountBalance').value = account.balance;
+        document.getElementById('pfAccountCurrency').value = account.currency;
+
+        document.getElementById('modalPFAccount').classList.add('active');
     },
 
     async handleSaveAccount(e) {
