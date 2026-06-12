@@ -1266,6 +1266,136 @@ const Database = {
             console.error('Error fetching city stats:', error);
             return { quito: 0, guayaquil: 0 };
         }
+    },
+
+    // ========================================
+    // PERSONAL FINANCE
+    // ========================================
+    async getPFAccounts() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('pf_accounts')
+                .select('*')
+                .order('name');
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Error fetching PF accounts:', error);
+            // Si la tabla no existe aún (error 42P01 en PostgreSQL), podemos retornar vacío
+            if (error && error.code === '42P01') {
+                console.warn('pf_accounts table does not exist yet. Please run the SQL schema.');
+                return [];
+            }
+            throw error;
+        }
+    },
+
+    async savePFAccount(account) {
+        try {
+            let result;
+            if (account.id) {
+                const { data, error } = await supabaseClient
+                    .from('pf_accounts')
+                    .update({
+                        name: account.name,
+                        type: account.type,
+                        category: account.category,
+                        balance: account.balance,
+                        currency: account.currency
+                    })
+                    .eq('id', account.id)
+                    .select()
+                    .single();
+                if (error) throw error;
+                result = data;
+            } else {
+                const { data, error } = await supabaseClient
+                    .from('pf_accounts')
+                    .insert({
+                        name: account.name,
+                        type: account.type,
+                        category: account.category,
+                        balance: account.balance,
+                        currency: account.currency
+                    })
+                    .select()
+                    .single();
+                if (error) throw error;
+                result = data;
+            }
+            return result;
+        } catch (error) {
+            console.error('Error saving PF account:', error);
+            throw error;
+        }
+    },
+
+    async deletePFAccount(id) {
+        try {
+            const { error } = await supabaseClient.from('pf_accounts').delete().eq('id', id);
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting PF account:', error);
+            throw error;
+        }
+    },
+
+    async getPFTransactions() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('pf_transactions')
+                .select('*, pf_accounts(name)')
+                .order('date', { ascending: false });
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Error fetching PF transactions:', error);
+            if (error && error.code === '42P01') return [];
+            throw error;
+        }
+    },
+
+    async savePFTransaction(tx) {
+        try {
+            // Guardar transacción
+            const { data, error } = await supabaseClient
+                .from('pf_transactions')
+                .insert({
+                    account_id: tx.accountId,
+                    type: tx.type,
+                    amount: tx.amount,
+                    description: tx.description,
+                    date: tx.date
+                })
+                .select()
+                .single();
+            if (error) throw error;
+
+            // Actualizar balance de cuenta
+            const accountData = await supabaseClient.from('pf_accounts').select('balance, type').eq('id', tx.accountId).single();
+            if (accountData.data) {
+                let currentBalance = parseFloat(accountData.data.balance || 0);
+                
+                // Si la cuenta es un Activo: income suma, expense resta.
+                // Si la cuenta es un Pasivo (deuda): un pago (expense de deuda) reduce el saldo, un préstamo (income de deuda) lo aumenta.
+                // Asumimos lógica simple: para cuentas normales (asset), ingresar dinero aumenta balance.
+                let modifier = 1;
+                if (accountData.data.type === 'asset') {
+                    modifier = (tx.type === 'income') ? 1 : -1;
+                } else if (accountData.data.type === 'liability') {
+                    // Si tienes una deuda, y recibes dinero prestado (income), la deuda crece.
+                    // Si pagas (expense), la deuda se reduce.
+                    modifier = (tx.type === 'income') ? 1 : -1;
+                }
+
+                let newBalance = currentBalance + (tx.amount * modifier);
+                await supabaseClient.from('pf_accounts').update({ balance: newBalance }).eq('id', tx.accountId);
+            }
+            return data;
+        } catch (error) {
+            console.error('Error saving PF transaction:', error);
+            throw error;
+        }
     }
 };
 

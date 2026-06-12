@@ -27,3 +27,5 @@ test-supabase.html
 dist/
 build/
 .vercel
+
+.vercel

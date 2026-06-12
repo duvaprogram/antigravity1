@@ -181,6 +181,12 @@
                     </svg>
                     <span>Cuentas</span>
                 </a>
+                <a href="#finance" class="nav-item nav-admin-only" data-section="finance" style="display: none;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                    </svg>
+                    <span>Finanzas Personales</span>
+                </a>
                 <!-- Admin only: Users management -->
                 <a href="#users" class="nav-item nav-admin-only" data-section="users" style="display: none;">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3055,6 +3061,105 @@
                 </div>
             </section>
 
+            <!-- Finance Section -->
+            <section class="content-section" id="section-finance">
+                <div class="section-header">
+                    <h2>Finanzas Personales</h2>
+                    <div class="header-buttons">
+                        <button class="btn btn-primary" id="btnNewPFAccount">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Nueva Cuenta / Activo
+                        </button>
+                    </div>
+                </div>
+
+                <div class="stats-grid" style="margin-bottom: 2rem;">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statTotalAssets">$0.00</span>
+                            <span class="stat-label">Total Activos</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                                <polyline points="17 18 23 18 23 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statTotalLiabilities">$0.00</span>
+                            <span class="stat-label">Total Pasivos</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: var(--primary);">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="statNetWorth">$0.00</span>
+                            <span class="stat-label">Patrimonio Neto</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Activos y Cuentas</h3>
+                        </div>
+                        <div class="card-body">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Categoría</th>
+                                        <th>Saldo</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pfAssetsTable">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Pasivos (Deudas)</h3>
+                        </div>
+                        <div class="card-body">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Nombre</th>
+                                        <th>Categoría</th>
+                                        <th>Saldo Deudor</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pfLiabilitiesTable">
+                                    <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div><!-- End app-container -->
 
@@ -4129,6 +4234,91 @@
         </div>
     </div>
 
+    <!-- Modal: Personal Finance Account -->
+    <div class="modal" id="modalPFAccount">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Registrar Cuenta / Activo / Pasivo</h2>
+                <button class="modal-close" data-close="modalPFAccount">&times;</button>
+            </div>
+            <form id="formPFAccount">
+                <input type="hidden" id="pfAccountId">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="pfAccountName">Nombre de la Cuenta *</label>
+                        <input type="text" id="pfAccountName" required placeholder="Ej: Cuenta Ahorros Pichincha, Tarjeta Visa...">
+                    </div>
+                    <div class="form-group">
+                        <label for="pfAccountType">Tipo *</label>
+                        <select id="pfAccountType" required>
+                            <option value="asset">Activo (Dinero a favor)</option>
+                            <option value="liability">Pasivo (Deuda)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="pfAccountCategory">Categoría *</label>
+                        <select id="pfAccountCategory" required>
+                            <option value="bank">Cuenta Bancaria</option>
+                            <option value="cash">Efectivo</option>
+                            <option value="property">Bienes/Propiedades</option>
+                            <option value="credit_card">Tarjeta de Crédito</option>
+                            <option value="loan">Préstamo</option>
+                            <option value="other">Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="pfAccountBalance">Saldo Inicial *</label>
+                        <input type="number" id="pfAccountBalance" step="0.01" value="0.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="pfAccountCurrency">Moneda *</label>
+                        <select id="pfAccountCurrency" required>
+                            <option value="USD">USD</option>
+                            <option value="COP">COP</option>
+                            <option value="BS">BS</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalPFAccount">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Personal Finance Transaction -->
+    <div class="modal" id="modalPFTransaction">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalPFTransactionTitle">Registrar Transacción</h2>
+                <button class="modal-close" data-close="modalPFTransaction">&times;</button>
+            </div>
+            <form id="formPFTransaction">
+                <input type="hidden" id="pfTxAccountId">
+                <input type="hidden" id="pfTxType">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="pfTxAmount">Monto *</label>
+                        <input type="number" id="pfTxAmount" step="0.01" min="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="pfTxDate">Fecha *</label>
+                        <input type="date" id="pfTxDate" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="pfTxDescription">Descripción *</label>
+                        <input type="text" id="pfTxDescription" required placeholder="Ej: Ingreso por ventas, Pago de luz...">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalPFTransaction">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Transacción</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
@@ -4155,6 +4345,7 @@
     <script src="js/campaigns.js?v=20260222"></script>
     <script src="js/calculator.js?v=20260222"></script>
 
+    <script src="js/finance.js?v=20260222"></script>
     <script src="js/income-statement.js?v=20260222"></script>
     <script src="js/app.js?v=20260222"></script>
     <script src="js/auth.js?v=20260222"></script>

@@ -38,6 +38,7 @@ const App = {
             CampaignsModule.init();
             IncomeStatementModule.init();
             CalculatorModule.init();
+            FinanceModule.init();
 
 
             // Bind navigation events
@@ -153,7 +154,8 @@ const App = {
             'users': 'Administración de Usuarios',
             'campaigns': 'Creación de Campañas',
             'income-statement': 'Estado de Resultados',
-            'calculator': 'Calculadora de Utilidad'
+            'calculator': 'Calculadora de Utilidad',
+            'finance': 'Finanzas Personales'
         };
 
         document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
@@ -228,6 +230,13 @@ const App = {
                 break;
             case 'calculator':
                 CalculatorModule.init();
+                break;
+            case 'finance':
+                if (typeof FinanceModule.render === 'function') {
+                    await FinanceModule.render();
+                } else {
+                    FinanceModule.init();
+                }
                 break;
 
         }
