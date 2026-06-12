@@ -254,7 +254,20 @@ const FinanceModule = {
         const categorySelect = document.getElementById('pfAccountCategory');
         if (!categorySelect) return;
 
-        const availableCats = this.categories.length > 0 ? this.categories : this.defaultCategories;
+        // Combine default categories and loaded custom categories, de-duplicating by name
+        const availableCats = [];
+        const seenNames = new Set();
+        this.defaultCategories.forEach(c => {
+            availableCats.push(c);
+            seenNames.add(c.name);
+        });
+        this.categories.forEach(c => {
+            if (!seenNames.has(c.name)) {
+                availableCats.push(c);
+                seenNames.add(c.name);
+            }
+        });
+
         const filtered = availableCats.filter(c => c.type === type);
 
         categorySelect.innerHTML = filtered.map(c => `
@@ -396,7 +409,19 @@ const FinanceModule = {
         const tbody = document.getElementById('pfCategoriesListTable');
         if (!tbody) return;
 
-        const cats = this.categories.length > 0 ? this.categories : this.defaultCategories;
+        // Combine default and custom categories, de-duplicating by name
+        const cats = [];
+        const seenNames = new Set();
+        this.defaultCategories.forEach(c => {
+            cats.push(c);
+            seenNames.add(c.name);
+        });
+        this.categories.forEach(c => {
+            if (!seenNames.has(c.name)) {
+                cats.push(c);
+                seenNames.add(c.name);
+            }
+        });
 
         tbody.innerHTML = cats.map(cat => {
             const typeLabel = cat.type === 'asset' ? '🟢 Activo' : '🔴 Pasivo';
