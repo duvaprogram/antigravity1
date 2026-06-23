@@ -51,6 +51,19 @@ const PurchasesModule = {
         if (filterStatus) {
             filterStatus.addEventListener('change', () => this.applyFilters());
         }
+
+        // Select All checkbox event listener
+        const selectAllCb = document.getElementById('selectAllPurchases');
+        if (selectAllCb) {
+            selectAllCb.addEventListener('change', (e) => {
+                const checked = e.target.checked;
+                const checkboxes = document.querySelectorAll('.purchase-select-checkbox');
+                checkboxes.forEach(cb => {
+                    cb.checked = checked;
+                });
+                this.updateSelectedSum();
+            });
+        }
     },
 
     async render() {
@@ -174,6 +187,12 @@ const PurchasesModule = {
         const purchases = await this.getPurchases();
         this.allRecords = purchases;
 
+        // Reset select-all state and sum
+        const selectAllCb = document.getElementById('selectAllPurchases');
+        if (selectAllCb) selectAllCb.checked = false;
+        const selectedSumEl = document.getElementById('selectedPurchasesSum');
+        if (selectedSumEl) selectedSumEl.textContent = '$0';
+
         // Apply filters
         const filtered = this.filterRecords(purchases);
 
@@ -189,6 +208,9 @@ const PurchasesModule = {
 
         tableBody.innerHTML = filtered.length ? filtered.map(p => `
             <tr>
+                <td style="text-align: center;">
+                    <input type="checkbox" class="purchase-select-checkbox" data-amount="${p.amount || 0}" data-id="${p.id}" style="cursor: pointer;" onclick="PurchasesModule.updateSelectedSum()">
+                </td>
                 <td>${p.date}</td>
                 <td>${p.provider}</td>
                 <td>${p.description}</td>
@@ -221,7 +243,7 @@ const PurchasesModule = {
                     </div>
                 </td>
             </tr>
-        `).join('') : '<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">No hay compras registradas</td></tr>';
+        `).join('') : '<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">No hay compras registradas</td></tr>';
     },
 
     async updateStats() {
@@ -372,6 +394,28 @@ const PurchasesModule = {
             case 'Tarjeta': return 'status-processing';
             case 'Crédito': return 'status-cancelled';
             default: return '';
+        }
+    },
+
+    updateSelectedSum() {
+        const checkboxes = document.querySelectorAll('.purchase-select-checkbox');
+        let sum = 0;
+        checkboxes.forEach(cb => {
+            if (cb.checked) {
+                sum += parseFloat(cb.dataset.amount) || 0;
+            }
+        });
+
+        const selectedSumEl = document.getElementById('selectedPurchasesSum');
+        if (selectedSumEl) {
+            selectedSumEl.textContent = `$${this.formatCurrency(sum)}`;
+        }
+
+        // Keep Select All checkbox in sync
+        const selectAllCb = document.getElementById('selectAllPurchases');
+        if (selectAllCb) {
+            const allChecked = checkboxes.length > 0 && Array.from(checkboxes).every(cb => cb.checked);
+            selectAllCb.checked = allChecked;
         }
     }
 };
