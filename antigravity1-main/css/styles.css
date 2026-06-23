@@ -3071,6 +3071,34 @@ form {
 /* ========================================
    Materials Calculator Module Styles
    ======================================== */
+.mat-tabs {
+    display: flex;
+    gap: 1rem;
+}
+
+.mat-tab {
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 0.5rem 0.25rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding-bottom: 0.75rem;
+    transition: all var(--transition-fast);
+}
+
+.mat-tab:hover {
+    color: var(--text-primary);
+}
+
+.mat-tab.active {
+    border-bottom-color: var(--primary);
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
 .materials-calc-grid {
     display: grid;
     grid-template-columns: 1.2fr 1fr;

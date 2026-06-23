@@ -37,6 +37,12 @@ const MaterialsCalculatorModule = (() => {
     let threadLengthCm = 35;
     let isRotating = false;
     let initialized = false;
+    
+    // Pestaña activa
+    let activeTab = 'direct'; // 'direct' o 'inverse'
+    
+    // Entradas de stock para la calculadora inversa
+    let stockInputs = {};
 
     // Gradientes SVG para renderizado fotorrealista
     const SVG_DEFS = `
@@ -44,21 +50,21 @@ const MaterialsCalculatorModule = (() => {
             <feDropShadow dx="1" dy="2" stdDeviation="1.5" flood-opacity="0.5" />
         </filter>
 
-        <!-- Neopreno Negro (Mate con sombra interna suave) -->
+        <!-- Neopreno Negro (Mate) -->
         <radialGradient id="grad-neopreno_negro" cx="30%" cy="30%" r="70%">
             <stop offset="0%" stop-color="#4d4d4d" />
             <stop offset="60%" stop-color="#1e1e1e" />
             <stop offset="100%" stop-color="#080808" />
         </radialGradient>
         
-        <!-- Neopreno Rojo (Mate con sombra interna suave) -->
+        <!-- Neopreno Rojo (Mate) -->
         <radialGradient id="grad-neopreno_rojo" cx="30%" cy="30%" r="70%">
             <stop offset="0%" stop-color="#ff4f4f" />
             <stop offset="65%" stop-color="#bb1111" />
             <stop offset="100%" stop-color="#660000" />
         </radialGradient>
 
-        <!-- Dorado No. 6 (Esférico Brillante Metálico) -->
+        <!-- Dorado No. 6 -->
         <radialGradient id="grad-dorado_no6" cx="30%" cy="30%" r="70%">
             <stop offset="0%" stop-color="#fffae6" />
             <stop offset="25%" stop-color="#ffd700" />
@@ -96,10 +102,12 @@ const MaterialsCalculatorModule = (() => {
      */
     function init() {
         if (initialized) {
-            // Si ya se inicializó, solo actualizamos los cálculos y el preview
             updateCalculations();
             renderPreview();
             renderSequenceList();
+            if (activeTab === 'inverse') {
+                renderInverseTable();
+            }
             return;
         }
 
@@ -112,6 +120,9 @@ const MaterialsCalculatorModule = (() => {
             inputBatch.addEventListener('input', (e) => {
                 batchSize = Math.max(1, parseInt(e.target.value) || 1);
                 updateCalculations();
+                if (activeTab === 'inverse') {
+                    updateInverseCapacity();
+                }
             });
         }
 
@@ -121,6 +132,9 @@ const MaterialsCalculatorModule = (() => {
             inputWastage.addEventListener('input', (e) => {
                 wastagePercent = Math.max(0, parseFloat(e.target.value) || 0);
                 updateCalculations();
+                if (activeTab === 'inverse') {
+                    updateInverseCapacity();
+                }
             });
         }
 
@@ -130,6 +144,9 @@ const MaterialsCalculatorModule = (() => {
             inputThread.addEventListener('input', (e) => {
                 threadLengthCm = Math.max(1, parseInt(e.target.value) || 1);
                 updateCalculations();
+                if (activeTab === 'inverse') {
+                    renderInverseTable();
+                }
             });
         }
 
@@ -152,6 +169,9 @@ const MaterialsCalculatorModule = (() => {
                     renderSequenceList();
                     renderPreview();
                     updateCalculations();
+                    if (activeTab === 'inverse') {
+                        renderInverseTable();
+                    }
                 }
             });
         }
@@ -167,6 +187,9 @@ const MaterialsCalculatorModule = (() => {
                     renderSequenceList();
                     renderPreview();
                     updateCalculations();
+                    if (activeTab === 'inverse') {
+                        renderInverseTable();
+                    }
                     Utils.showToast('Secuencia restablecida', 'info');
                 }
             });
@@ -182,12 +205,14 @@ const MaterialsCalculatorModule = (() => {
                     const typeId = typeSelect.value;
                     const qty = Math.max(1, parseInt(qtyInput.value) || 1);
                     
-                    // Añadir nuevo grupo de balines a la secuencia
                     sequence.push({ typeId, qty });
                     
                     renderSequenceList();
                     renderPreview();
                     updateCalculations();
+                    if (activeTab === 'inverse') {
+                        renderInverseTable();
+                    }
                     Utils.showToast('Balines añadidos al diseño', 'success');
                 }
             });
@@ -229,6 +254,45 @@ const MaterialsCalculatorModule = (() => {
             });
         });
 
+        // Bindeo de pestañas
+        const btnTabDirect = document.getElementById('btnTabDirect');
+        const btnTabInverse = document.getElementById('btnTabInverse');
+        const containerDirect = document.getElementById('containerDirectCalc');
+        const containerInverse = document.getElementById('containerInverseCalc');
+
+        if (btnTabDirect && btnTabInverse) {
+            btnTabDirect.addEventListener('click', () => {
+                activeTab = 'direct';
+                btnTabDirect.classList.add('active');
+                btnTabInverse.classList.remove('active');
+                containerDirect.style.display = 'block';
+                containerInverse.style.display = 'none';
+                updateCalculations();
+            });
+
+            btnTabInverse.addEventListener('click', () => {
+                activeTab = 'inverse';
+                btnTabInverse.classList.add('active');
+                btnTabDirect.classList.remove('active');
+                containerDirect.style.display = 'none';
+                containerInverse.style.display = 'block';
+                renderInverseTable();
+            });
+        }
+
+        // Escuchar cambios de inputs de stock en la tabla inversa
+        const inverseTableBody = document.getElementById('matCalcInverseTable');
+        if (inverseTableBody) {
+            inverseTableBody.addEventListener('input', (e) => {
+                if (e.target.classList.contains('mat-stock-input')) {
+                    const typeId = e.target.dataset.typeId;
+                    const val = parseFloat(e.target.value) || 0;
+                    stockInputs[typeId] = val;
+                    updateInverseCapacity();
+                }
+            });
+        }
+
         // Exportar PDF
         const btnPdf = document.getElementById('btnMatCalcExportPdf');
         if (btnPdf) {
@@ -255,7 +319,6 @@ const MaterialsCalculatorModule = (() => {
         let overlay = '';
 
         if (beadType.type === 'metal_diamond') {
-            // Dibujar líneas de facetas (efecto diamantado)
             let lines = '';
             const numFacets = 8;
             for (let i = 0; i < numFacets; i++) {
@@ -273,13 +336,9 @@ const MaterialsCalculatorModule = (() => {
 
         return `
             <g class="bead-group">
-                <!-- Esfera con Degradado e Imputación de Sombra -->
                 <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${gradId})" filter="url(#shadow)" />
-                <!-- Líneas diamantadas en caso de aplicar -->
                 ${overlay}
-                <!-- Contorno suave del balín -->
                 <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(0,0,0,0.18)" stroke-width="0.6" />
-                <!-- Punto de brillo esférico (luz ambiental) -->
                 <circle cx="${cx - r * 0.35}" cy="${cy - r * 0.35}" r="${r * 0.16}" fill="rgba(255,255,255,0.55)" filter="blur(0.5px)" />
             </g>
         `;
@@ -292,10 +351,8 @@ const MaterialsCalculatorModule = (() => {
         const svgEl = document.getElementById('matCalcSvgPreview');
         if (!svgEl) return;
 
-        // Limpiar lienzo dinámico y establecer definiciones de degradados
         svgEl.innerHTML = `<defs>${SVG_DEFS}</defs>`;
 
-        // Si la secuencia está vacía
         if (sequence.length === 0) {
             svgEl.innerHTML += `
                 <text x="150" y="150" text-anchor="middle" dominant-baseline="middle" fill="var(--text-muted)" font-size="13" font-weight="500">
@@ -305,7 +362,6 @@ const MaterialsCalculatorModule = (() => {
             return;
         }
 
-        // Aplanar la lista de balines respetando su cantidad
         const flatBeads = [];
         sequence.forEach(item => {
             const beadType = BEAD_TYPES[item.typeId];
@@ -319,18 +375,13 @@ const MaterialsCalculatorModule = (() => {
         const cx = 150;
         const cy = 150;
 
-        // Calcular la circunferencia base sumando los diámetros en mm
-        // Usamos una escala: 1mm = 3px de radio base (6px de diámetro base)
         let totalBaseDiameter = 0;
         flatBeads.forEach(bead => {
-            totalBaseDiameter += (bead.sizeMm * 1.5) * 2; // pixel scale: radius = sizeMm * 1.5, diameter = sizeMm * 3
+            totalBaseDiameter += (bead.sizeMm * 1.5) * 2;
         });
 
-        // Circunferencia = 2 * PI * R_base => R_base = Circunferencia / 2 * PI
         let R_base = totalBaseDiameter / (2 * Math.PI);
 
-        // Escalamos dinámicamente para que quepa perfecto en la pantalla de 300x300
-        // Queremos que el radio final R esté entre 55 y 105 px
         let R = R_base;
         const maxR = 100;
         const minR = 55;
@@ -342,36 +393,28 @@ const MaterialsCalculatorModule = (() => {
 
         const scale = R / R_base;
 
-        // Dibujar el hilo elástico por debajo de los balines
         const threadCircle = `
             <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#111" stroke-width="2" stroke-dasharray="2 3" opacity="0.6" />
         `;
 
-        // Renderizar balines
         let beadGroupsString = '';
         let currentAngle = 0;
         const rotationClass = isRotating ? 'rotating-bracelet' : '';
 
         flatBeads.forEach((bead, index) => {
             const nextBead = flatBeads[(index + 1) % flatBeads.length];
-            
-            // Radios escalados finales en píxeles
             const r_render = (bead.sizeMm * 1.5) * scale;
             const next_r_render = (nextBead.sizeMm * 1.5) * scale;
 
-            // Calcular posición trigonométrica de la esfera
             const x = cx + R * Math.cos(currentAngle);
             const y = cy + R * Math.sin(currentAngle);
 
             beadGroupsString += getBeadSVGString(bead, x, y, r_render);
 
-            // Determinar el paso angular para la siguiente esfera
-            // Paso angular = (Radio_actual + Radio_siguiente) / R_del_circulo
             const angleStep = (r_render + next_r_render) / R;
             currentAngle += angleStep;
         });
 
-        // Insertar elementos en el SVG
         svgEl.innerHTML += `
             <g class="${rotationClass}" style="transform-origin: 150px 150px;">
                 ${threadCircle}
@@ -409,14 +452,12 @@ const MaterialsCalculatorModule = (() => {
                         </div>
                     </div>
                     <div style="display: flex; align-items: center;">
-                        <!-- Controles de Cantidad -->
                         <div class="bead-qty-controls">
                             <button type="button" class="bead-qty-btn" onclick="MaterialsCalculatorModule.updateBeadQty(${index}, -1)">−</button>
                             <span class="bead-qty-display">${item.qty}</span>
                             <button type="button" class="bead-qty-btn" onclick="MaterialsCalculatorModule.updateBeadQty(${index}, 1)">+</button>
                         </div>
                         
-                        <!-- Controles de Orden y Acción -->
                         <div class="bead-action-controls">
                             <button type="button" class="bead-action-btn" onclick="MaterialsCalculatorModule.moveBead(${index}, -1)" title="Subir orden" ${index === 0 ? 'disabled style="opacity: 0.3;"' : ''}>
                                 ▲
@@ -448,16 +489,18 @@ const MaterialsCalculatorModule = (() => {
         renderSequenceList();
         renderPreview();
         updateCalculations();
+        if (activeTab === 'inverse') {
+            renderInverseTable();
+        }
     }
 
     /**
-     * Mueve un nodo de balines hacia arriba (-1) o abajo (+1) en la secuencia
+     * Mueve un nodo de balines hacia arriba o abajo en la secuencia
      */
     function moveBead(index, direction) {
         const targetIndex = index + direction;
         if (targetIndex < 0 || targetIndex >= sequence.length) return;
 
-        // Intercambiar elementos
         const temp = sequence[index];
         sequence[index] = sequence[targetIndex];
         sequence[targetIndex] = temp;
@@ -465,6 +508,9 @@ const MaterialsCalculatorModule = (() => {
         renderSequenceList();
         renderPreview();
         updateCalculations();
+        if (activeTab === 'inverse') {
+            renderInverseTable();
+        }
     }
 
     /**
@@ -477,11 +523,14 @@ const MaterialsCalculatorModule = (() => {
         renderSequenceList();
         renderPreview();
         updateCalculations();
+        if (activeTab === 'inverse') {
+            renderInverseTable();
+        }
         Utils.showToast('Grupo eliminado', 'info');
     }
 
     /**
-     * Calcula los materiales totales y actualiza la tabla de resultados
+     * Calcula los materiales totales (modo directo)
      */
     function updateCalculations() {
         const tableBody = document.getElementById('matCalcResultsTable');
@@ -490,11 +539,9 @@ const MaterialsCalculatorModule = (() => {
 
         if (!tableBody) return;
 
-        // Actualizar encabezados
         if (batchQtyHeader) batchQtyHeader.textContent = `Total (${batchSize} ud)`;
         if (wastageHeader) wastageHeader.textContent = `Total + Margen (${wastagePercent}%)`;
 
-        // Si no hay balines en la secuencia
         if (sequence.length === 0) {
             tableBody.innerHTML = `
                 <tr>
@@ -506,7 +553,6 @@ const MaterialsCalculatorModule = (() => {
             return;
         }
 
-        // Agrupar y sumar cantidades unitarias por tipo de balín
         const aggregatedBeads = {};
         sequence.forEach(item => {
             if (aggregatedBeads[item.typeId]) {
@@ -518,7 +564,6 @@ const MaterialsCalculatorModule = (() => {
 
         let rowsHtml = '';
 
-        // Renderizar filas de balines
         Object.entries(aggregatedBeads).forEach(([typeId, singleQty]) => {
             const beadType = BEAD_TYPES[typeId];
             if (!beadType) return;
@@ -541,8 +586,6 @@ const MaterialsCalculatorModule = (() => {
             `;
         });
 
-        // Calcular Hilo Elástico
-        // Largo unitario en metros
         const singleThreadM = threadLengthCm / 100;
         const totalThreadM = singleThreadM * batchSize;
         const totalThreadWithWastageM = totalThreadM * (1 + wastagePercent / 100);
@@ -565,6 +608,247 @@ const MaterialsCalculatorModule = (() => {
     }
 
     /**
+     * RENDERIZA la tabla del Calculador Inverso de Capacidad
+     */
+    function renderInverseTable() {
+        const tableBody = document.getElementById('matCalcInverseTable');
+        if (!tableBody) return;
+
+        if (sequence.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+                        Añade balines para habilitar la calculadora inversa.
+                    </td>
+                </tr>
+            `;
+            document.getElementById('inverseResultCard').innerHTML = '';
+            return;
+        }
+
+        const aggregatedBeads = {};
+        sequence.forEach(item => {
+            if (aggregatedBeads[item.typeId]) {
+                aggregatedBeads[item.typeId] += item.qty;
+            } else {
+                aggregatedBeads[item.typeId] = item.qty;
+            }
+        });
+
+        let rowsHtml = '';
+
+        // Filas para balines
+        Object.entries(aggregatedBeads).forEach(([typeId, singleQty]) => {
+            const beadType = BEAD_TYPES[typeId];
+            if (!beadType) return;
+
+            const savedStock = stockInputs[typeId] !== undefined ? stockInputs[typeId] : '';
+
+            rowsHtml += `
+                <tr class="inverse-calc-row" data-type-id="${typeId}" data-single-qty="${singleQty}">
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div class="bead-color-dot" style="width: 12px; height: 12px; background: ${beadType.displayColor}; flex-shrink: 0;"></div>
+                            <strong>${beadType.name}</strong>
+                        </div>
+                    </td>
+                    <td style="text-align: center; font-weight: 500;">${singleQty} ud</td>
+                    <td style="text-align: center;">
+                        <input type="number" 
+                               class="mat-stock-input form-control input-sm" 
+                               data-type-id="${typeId}" 
+                               value="${savedStock}" 
+                               min="0" 
+                               placeholder="Ej. 100" 
+                               style="width: 100%; text-align: center; padding: 0.25rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary);">
+                    </td>
+                    <td style="text-align: center; font-weight: 700; color: var(--primary);" class="row-capacity" id="cap-${typeId}">0 pulseras</td>
+                </tr>
+            `;
+        });
+
+        // Fila para el hilo
+        const savedThreadStock = stockInputs.thread !== undefined ? stockInputs.thread : '';
+        rowsHtml += `
+            <tr class="inverse-calc-row" data-type-id="thread" data-single-qty="${threadLengthCm}">
+                <td>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 1.1rem; flex-shrink: 0;">🧵</span>
+                        <strong>Hilo / Cordón Elástico</strong>
+                    </div>
+                </td>
+                <td style="text-align: center; font-weight: 500;">${threadLengthCm} cm</td>
+                <td style="text-align: center; display: flex; align-items: center; gap: 0.25rem;">
+                    <input type="number" 
+                           class="mat-stock-input form-control input-sm" 
+                           data-type-id="thread" 
+                           value="${savedThreadStock}" 
+                           min="0" 
+                           step="0.1"
+                           placeholder="Ej. 10" 
+                           style="flex: 1; text-align: center; padding: 0.25rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary);">
+                    <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">metros</span>
+                </td>
+                <td style="text-align: center; font-weight: 700; color: var(--primary);" class="row-capacity" id="cap-thread">0 pulseras</td>
+            </tr>
+        `;
+
+        tableBody.innerHTML = rowsHtml;
+        updateInverseCapacity();
+    }
+
+    /**
+     * REALIZA los cálculos de capacidad en base a las entradas de stock provistas
+     */
+    function updateInverseCapacity() {
+        const tableBody = document.getElementById('matCalcInverseTable');
+        if (!tableBody) return;
+
+        const aggregatedBeads = {};
+        sequence.forEach(item => {
+            if (aggregatedBeads[item.typeId]) {
+                aggregatedBeads[item.typeId] += item.qty;
+            } else {
+                aggregatedBeads[item.typeId] = item.qty;
+            }
+        });
+
+        const capacities = [];
+        const materialDetails = [];
+
+        // 1. Calcular para balines
+        Object.entries(aggregatedBeads).forEach(([typeId, singleQty]) => {
+            const stock = parseFloat(stockInputs[typeId]) || 0;
+            const cap = Math.floor(stock / singleQty);
+            
+            const cell = document.getElementById(`cap-${typeId}`);
+            if (cell) cell.textContent = `${cap.toLocaleString()} pulseras`;
+            
+            capacities.push(cap);
+            materialDetails.push({
+                id: typeId,
+                name: BEAD_TYPES[typeId].name,
+                singleQty: singleQty,
+                stock: stock,
+                capacity: cap,
+                unitName: 'balines'
+            });
+        });
+
+        // 2. Calcular para hilo (ingresado en metros)
+        const threadStockM = parseFloat(stockInputs.thread) || 0;
+        const threadStockCm = threadStockM * 100;
+        const threadCap = Math.floor(threadStockCm / threadLengthCm);
+        
+        const cellThread = document.getElementById('cap-thread');
+        if (cellThread) cellThread.textContent = `${threadCap.toLocaleString()} pulseras`;
+
+        capacities.push(threadCap);
+        materialDetails.push({
+            id: 'thread',
+            name: 'Hilo / Cordón Elástico',
+            singleQty: threadLengthCm,
+            stock: threadStockM,
+            capacity: threadCap,
+            unitName: 'metros'
+        });
+
+        // 3. Obtener el límite máximo y el cuello de botella
+        const minCapacity = sequence.length > 0 ? Math.min(...capacities) : 0;
+        
+        // Identificar cuáles son los materiales limitantes
+        const limitingMaterials = materialDetails.filter(m => m.capacity === minCapacity);
+        
+        // Renderizar tarjeta de resumen
+        const resultCard = document.getElementById('inverseResultCard');
+        if (!resultCard) return;
+
+        // Si todos los stocks ingresados son 0
+        const totalStock = Object.values(stockInputs).reduce((sum, val) => sum + (val || 0), 0);
+        if (totalStock === 0) {
+            resultCard.innerHTML = `
+                <div style="font-size: 0.9rem; color: var(--text-muted); font-weight: 500;">
+                    ⚠️ Ingrese las cantidades disponibles en stock arriba para calcular.
+                </div>
+            `;
+            return;
+        }
+
+        let limitingHtml = '';
+        if (minCapacity === 0) {
+            const lackingList = limitingMaterials.map(m => `<strong>${m.name}</strong>`).join(', ');
+            limitingHtml = `
+                <p style="color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; line-height: 1.4;">
+                    No puedes fabricar ninguna pulsera porque tienes stock en 0 de: ${lackingList}.
+                </p>
+            `;
+        } else {
+            const limitingNames = limitingMaterials.map(m => m.name).join(' y ');
+            limitingHtml = `
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; line-height: 1.4;">
+                    El material que limita tu producción es: <strong style="color: var(--text-primary);">${limitingNames}</strong>.
+                </p>
+            `;
+        }
+
+        // Sugerencias inteligentes: ¿Cuánto necesito para completar el lote objetivo (ej. 300)?
+        let suggestionHtml = '';
+        if (minCapacity < batchSize) {
+            const missingInsumos = [];
+            materialDetails.forEach(m => {
+                let requiredTotal = 0;
+                if (m.id === 'thread') {
+                    requiredTotal = (m.singleQty * batchSize) / 100; // en metros
+                } else {
+                    requiredTotal = m.singleQty * batchSize;
+                }
+                
+                // Con desperdicio
+                const requiredWithWastage = m.id === 'thread' 
+                    ? requiredTotal * (1 + wastagePercent / 100)
+                    : Math.ceil(requiredTotal * (1 + wastagePercent / 100));
+
+                if (m.stock < requiredWithWastage) {
+                    const diff = requiredWithWastage - m.stock;
+                    missingInsumos.push(`
+                        <li style="margin-bottom: 0.25rem;">
+                            Faltan <strong>${m.id === 'thread' ? diff.toFixed(2) : Math.ceil(diff).toLocaleString()} ${m.unitName}</strong> de ${m.name} (necesitas ${m.id === 'thread' ? requiredWithWastage.toFixed(2) : requiredWithWastage.toLocaleString()} para el lote de ${batchSize}).
+                        </li>
+                    `);
+                }
+            });
+
+            if (missingInsumos.length > 0) {
+                suggestionHtml = `
+                    <div style="text-align: left; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--border); font-size: 0.8rem;">
+                        <span style="font-weight: 600; color: var(--text-primary); display: block; margin-bottom: 0.4rem;">📝 Para completar el lote objetivo de ${batchSize} unidades:</span>
+                        <ul style="padding-left: 1.2rem; margin: 0; color: var(--text-secondary); line-height: 1.4;">
+                            ${missingInsumos.join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+        } else {
+            suggestionHtml = `
+                <div style="margin-top: 1rem; padding: 0.5rem; background: rgba(16, 185, 129, 0.1); color: var(--success); border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 600;">
+                    🎉 ¡Tienes suficiente material en stock para completar tu lote objetivo de ${batchSize} pulseras!
+                </div>
+            `;
+        }
+
+        resultCard.innerHTML = `
+            <span style="display: block; font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em;">
+                Capacidad de Fabricación Máxima
+            </span>
+            <span style="display: block; font-size: 2.2rem; font-weight: 800; color: var(--primary); margin: 0.25rem 0; line-height: 1.1;">
+                ${minCapacity.toLocaleString()} pulseras
+            </span>
+            ${limitingHtml}
+            ${suggestionHtml}
+        `;
+    }
+
+    /**
      * Genera y exporta los resultados de los cálculos a un libro de Excel
      */
     function exportToXlsx() {
@@ -574,7 +858,6 @@ const MaterialsCalculatorModule = (() => {
         }
 
         try {
-            // Agrupar y sumar
             const aggregatedBeads = {};
             sequence.forEach(item => {
                 if (aggregatedBeads[item.typeId]) {
@@ -584,21 +867,18 @@ const MaterialsCalculatorModule = (() => {
                 }
             });
 
-            // Preparar datos para Excel
             const data = [
                 ['REPORTE DE MATERIALES DE PRODUCCIÓN - PULSERAS'],
                 [],
                 ['1. Configuración del Lote'],
                 ['Cantidad de Pulseras a Fabricar', batchSize, 'unidades'],
-                ['Margen de Desperdicio', wastagePercent / 100, ''], // formatted later
+                ['Margen de Desperdicio', wastagePercent / 100, ''],
                 ['Largo de Hilo por Pulsera', threadLengthCm, 'cm'],
                 [],
                 ['2. Desglose Físico de Materiales'],
                 ['Material', 'Cant. por Pulsera', `Total (${batchSize} ud)`, `Total + Margen (${wastagePercent}%)`, 'Tipo'],
             ];
 
-            // Formatear porcentaje en celda de desperdicio
-            // Agregar balines
             Object.entries(aggregatedBeads).forEach(([typeId, singleQty]) => {
                 const beadType = BEAD_TYPES[typeId];
                 if (!beadType) return;
@@ -615,7 +895,6 @@ const MaterialsCalculatorModule = (() => {
                 ]);
             });
 
-            // Agregar hilo
             const singleThreadM = threadLengthCm / 100;
             const totalThreadM = singleThreadM * batchSize;
             const totalThreadWithWastageM = totalThreadM * (1 + wastagePercent / 100);
@@ -628,22 +907,19 @@ const MaterialsCalculatorModule = (() => {
                 'Hilo'
             ]);
 
-            // Generar libro de trabajo SheetJS
             const ws = XLSX.utils.aoa_to_sheet(data);
             
-            // Ajustar anchos de columnas
             ws['!cols'] = [
-                { wch: 35 }, // Material
-                { wch: 18 }, // Cant. por Pulsera
-                { wch: 18 }, // Total batch
-                { wch: 22 }, // Total + Margen
-                { wch: 12 }  // Tipo
+                { wch: 35 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 22 },
+                { wch: 12 }
             ];
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Materiales');
             
-            // Descargar archivo
             XLSX.writeFile(wb, `calculo_materiales_${batchSize}_pulseras.xlsx`);
             Utils.showToast('Excel generado correctamente', 'success');
         } catch (error) {
@@ -665,10 +941,9 @@ const MaterialsCalculatorModule = (() => {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
 
-            // Configurar fuentes y diseño
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(20);
-            doc.setTextColor(33, 37, 41); // Gris oscuro
+            doc.setTextColor(33, 37, 41);
             doc.text('REPORTE DE MATERIALES DE PRODUCCIÓN', 105, 20, { align: 'center' });
 
             doc.setFontSize(13);
@@ -676,12 +951,10 @@ const MaterialsCalculatorModule = (() => {
             doc.setTextColor(108, 117, 125);
             doc.text('Cotización de insumos físicos para producción por lotes', 105, 28, { align: 'center' });
 
-            // Dibujar línea separadora estética
             doc.setDrawColor(220, 224, 230);
             doc.setLineWidth(0.5);
             doc.line(20, 35, 190, 35);
 
-            // 1. Detalles del lote
             doc.setFontSize(11);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(33, 37, 41);
@@ -693,14 +966,12 @@ const MaterialsCalculatorModule = (() => {
             doc.text(`• Margen de desperdicio estimado: ${wastagePercent}%`, 25, 60);
             doc.text(`• Largo de hilo por pulsera: ${threadLengthCm} cm`, 25, 67);
 
-            // 2. Tabla de desglose de materiales
             let yPos = 82;
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
             doc.text('2. DESGLOSE FÍSICO DE MATERIALES REQUERIDOS', 20, yPos);
             yPos += 8;
 
-            // Cabecera de la tabla
             doc.setFillColor(242, 244, 248);
             doc.rect(20, yPos - 5, 170, 8, 'F');
             doc.setFontSize(9);
@@ -713,7 +984,6 @@ const MaterialsCalculatorModule = (() => {
             yPos += 8;
             doc.setFont('helvetica', 'normal');
 
-            // Agrupar secuenciador
             const aggregatedBeads = {};
             sequence.forEach(item => {
                 if (aggregatedBeads[item.typeId]) {
@@ -723,7 +993,6 @@ const MaterialsCalculatorModule = (() => {
                 }
             });
 
-            // Listar balines en el PDF
             Object.entries(aggregatedBeads).forEach(([typeId, singleQty]) => {
                 const beadType = BEAD_TYPES[typeId];
                 if (!beadType) return;
@@ -739,14 +1008,12 @@ const MaterialsCalculatorModule = (() => {
                 doc.text(`${totalWithWastage.toLocaleString()} ud`, 185, yPos, { align: 'right' });
                 doc.setFont('helvetica', 'normal');
 
-                // Línea inferior
                 doc.setDrawColor(240, 242, 245);
                 doc.line(20, yPos + 3, 190, yPos + 3);
 
                 yPos += 8;
             });
 
-            // Listar hilo en el PDF
             const singleThreadM = threadLengthCm / 100;
             const totalThreadM = singleThreadM * batchSize;
             const totalThreadWithWastageM = totalThreadM * (1 + wastagePercent / 100);
@@ -759,11 +1026,10 @@ const MaterialsCalculatorModule = (() => {
             doc.text(`${threadLengthCm} cm`, 100, yPos, { align: 'right' });
             doc.text(`${totalThreadM.toFixed(2)} m`, 140, yPos, { align: 'right' });
             doc.setFont('helvetica', 'bold');
-            doc.setTextColor(99, 102, 241); // Color primario
+            doc.setTextColor(99, 102, 241);
             doc.text(`${totalThreadWithWastageM.toFixed(2)} m`, 185, yPos, { align: 'right' });
             doc.setTextColor(33, 37, 41);
 
-            // Dibujar recuadro de totales
             yPos += 15;
             doc.setDrawColor(99, 102, 241);
             doc.setFillColor(245, 246, 255);
@@ -776,7 +1042,6 @@ const MaterialsCalculatorModule = (() => {
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(9);
             
-            // Total de balines en la orden
             const totalSingleBeads = Object.values(aggregatedBeads).reduce((a, b) => a + b, 0);
             const totalBatchBeads = totalSingleBeads * batchSize;
             const totalBatchBeadsWithWastage = Object.entries(aggregatedBeads).reduce((acc, [typeId, singleQty]) => {
@@ -786,14 +1051,12 @@ const MaterialsCalculatorModule = (() => {
             doc.text(`- Cantidad de balines totales a ensamblar en lote: ${totalBatchBeads.toLocaleString()} unidades.`, 25, yPos + 14);
             doc.text(`- Total de balines a comprar (incluyendo margen): ${totalBatchBeadsWithWastage.toLocaleString()} unidades.`, 25, yPos + 20);
 
-            // Pie de página
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(128, 128, 128);
             const dateStr = new Date().toLocaleDateString('es-EC', { hour: '2-digit', minute: '2-digit' });
             doc.text(`Generado por Sistema de Domicilios - Calculadora de Materiales · ${dateStr}`, 105, 282, { align: 'center' });
 
-            // Guardar archivo
             doc.save(`reporte_materiales_${batchSize}_pulseras.pdf`);
             Utils.showToast('PDF generado correctamente', 'success');
         } catch (error) {
@@ -810,5 +1073,4 @@ const MaterialsCalculatorModule = (() => {
     };
 })();
 
-// Compartir módulo globalmente
 window.MaterialsCalculatorModule = MaterialsCalculatorModule;
