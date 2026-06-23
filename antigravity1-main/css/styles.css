@@ -3066,4 +3066,217 @@ form {
     .calculator-grid {
         grid-template-columns: 1fr;
     }
-}
+}
+
+/* ========================================
+   Materials Calculator Module Styles
+   ======================================== */
+.materials-calc-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: var(--space-xl);
+    align-items: start;
+}
+
+.bead-sequence-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.50rem;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+    margin-top: 0.5rem;
+}
+
+.bead-sequence-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+}
+
+.bead-sequence-item:hover {
+    border-color: var(--border-light);
+    background: var(--surface-hover);
+    transform: translateX(2px);
+}
+
+.bead-info-col {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+}
+
+.bead-color-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    box-shadow: inset -2px -2px 5px rgba(0,0,0,0.4), 1px 1px 3px rgba(0,0,0,0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+.bead-color-dot::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.bead-name-text {
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.bead-qty-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-right: 1rem;
+}
+
+.bead-qty-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.bead-qty-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.bead-qty-display {
+    width: 28px;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.bead-action-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.bead-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    padding: 0;
+}
+
+.bead-action-btn:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+    border-color: var(--border-light);
+}
+
+.bead-action-btn.delete-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* Preview Styles */
+.preview-wrapper {
+    width: 100%;
+    height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    transition: all 0.3s ease;
+    overflow: hidden;
+    position: relative;
+}
+
+.velvet-dark {
+    background: radial-gradient(circle, #2e2f34 0%, #17181c 100%);
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+}
+
+.silk-white {
+    background: radial-gradient(circle, #ffffff 0%, #e2e8f0 100%);
+    box-shadow: inset 0 0 30px rgba(0,0,0,0.05);
+}
+
+.skin-tone {
+    background: radial-gradient(circle, #fce3d7 0%, #e2b49a 100%);
+    box-shadow: inset 0 0 35px rgba(0,0,0,0.15);
+}
+
+.grid-trans {
+    background-color: #0f172a;
+    background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 0);
+    background-size: 16px 16px;
+}
+
+.bg-select-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 0;
+}
+
+.bg-select-btn.active {
+    border-color: var(--primary);
+    transform: scale(1.2);
+}
+
+.bg-select-btn[data-bg="velvet-dark"] { background: #17181c; }
+.bg-select-btn[data-bg="silk-white"] { background: #e2e8f0; }
+.bg-select-btn[data-bg="skin-tone"] { background: #e2b49a; }
+.bg-select-btn[data-bg="grid-trans"] { background: #0f172a; }
+
+/* SVG Animation for Rotation */
+@keyframes rotate-brac {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.rotating-bracelet {
+    animation: rotate-brac 25s linear infinite;
+    transform-origin: 150px 150px;
+}
+
+.rotating-bracelet-paused {
+    animation-play-state: paused;
+}
+
+@media (max-width: 1024px) {
+    .materials-calc-grid {
+        grid-template-columns: 1fr;
+    }
+}
+

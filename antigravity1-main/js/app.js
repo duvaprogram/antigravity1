@@ -38,6 +38,7 @@ const App = {
             CampaignsModule.init();
             IncomeStatementModule.init();
             CalculatorModule.init();
+            MaterialsCalculatorModule.init();
             FinanceModule.init();
 
 
@@ -155,7 +156,9 @@ const App = {
             'campaigns': 'Creación de Campañas',
             'income-statement': 'Estado de Resultados',
             'calculator': 'Calculadora de Utilidad',
-            'finance': 'Finanzas Personales'
+            'materials-calculator': 'Calculadora de Materiales',
+            'finance': 'Finanzas Personales',
+            'images': 'Galería de Imágenes'
         };
 
         document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
@@ -231,12 +234,17 @@ const App = {
             case 'calculator':
                 CalculatorModule.init();
                 break;
+            case 'materials-calculator':
+                MaterialsCalculatorModule.init();
+                break;
             case 'finance':
                 if (typeof FinanceModule.render === 'function') {
                     await FinanceModule.render();
                 } else {
                     FinanceModule.init();
                 }
+                break;
+            case 'images':
                 break;
 
         }

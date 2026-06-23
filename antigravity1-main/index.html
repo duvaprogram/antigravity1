@@ -133,6 +133,12 @@
                     </svg>
                     <span>Calculadora</span>
                 </a>
+                <a href="#materials-calculator" class="nav-item" data-section="materials-calculator">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                    </svg>
+                    <span>Calculadora Materiales</span>
+                </a>
 
                 <a href="#confirmation" class="nav-item" data-section="confirmation">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -203,6 +209,14 @@
                         <polyline points="22 4 12 14.01 9 11.01"></polyline>
                     </svg>
                     <span>Campañas</span>
+                </a>
+                <a href="#images" class="nav-item" data-section="images">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    <span>Imágenes</span>
                 </a>
             </nav>
 
@@ -1344,6 +1358,166 @@
                                 • Inefectividad = % Cancelación + % Devolución<br>
                                 • Costo Real Flete = Flete / (1 - % Devolución)<br>
                                 • Costo Real Publicidad = CPA / (1 - Inefectividad)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Materials Calculator Section -->
+            <section class="content-section" id="section-materials-calculator">
+                <div class="section-header">
+                    <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                        </svg>
+                        Calculadora de Materiales para Pulseras
+                    </h2>
+                </div>
+
+                <div class="materials-calc-grid">
+                    <!-- Configuración y Editor -->
+                    <div class="materials-left-column">
+                        <!-- Card 1: Configuración del Lote -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>1. Configuración del Lote</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+                                    <div class="form-group">
+                                        <label for="matCalcBatchSize">Cantidad de Pulseras</label>
+                                        <input type="number" id="matCalcBatchSize" value="300" min="1" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="matCalcWastage">Margen de Desperdicio (%)</label>
+                                        <input type="number" id="matCalcWastage" value="5" min="0" max="100" step="0.5">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="matCalcThreadPerBrac">Largo de Hilo / Pulsera (cm)</label>
+                                        <input type="number" id="matCalcThreadPerBrac" value="35" min="5" max="200" step="1">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 2: Secuencia de Balines -->
+                        <div class="card" style="margin-top: 1.5rem;">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                                <h3>2. Diseño y Secuencia de Balines</h3>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <select id="matCalcPresetSelect" class="form-control btn-sm" style="max-width: 180px; padding: 0.25rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                        <option value="san_benito">Preset: San Benito</option>
+                                        <option value="empty">Preset: Vacío</option>
+                                    </select>
+                                    <button class="btn btn-secondary btn-sm" id="btnMatCalcResetPreset" title="Restablecer diseño">
+                                        Reajustar
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="add-bead-panel" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; background: var(--surface-hover); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                                    <div style="flex: 1; min-width: 180px;">
+                                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Tipo de Balín a Añadir</label>
+                                        <select id="matCalcBeadTypeSelect" class="form-control" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                            <!-- Dynamic preset options will be populated by JS -->
+                                        </select>
+                                    </div>
+                                    <div style="width: 80px;">
+                                        <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Cantidad</label>
+                                        <input type="number" id="matCalcBeadQtyInput" value="2" min="1" max="100" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                    </div>
+                                    <div style="display: flex; align-items: flex-end;">
+                                        <button class="btn btn-primary" id="btnMatCalcAddBead" style="padding: 0.4rem 1rem;">
+                                            + Añadir
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="sequence-list-container">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">
+                                        <span>Orden y Tipo de Balín</span>
+                                        <span>Cantidad por Pulsera</span>
+                                    </div>
+                                    <div id="matCalcBeadSequenceList" class="bead-sequence-list">
+                                        <!-- Dynamic items -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Visualización y Resultados -->
+                    <div class="materials-right-column">
+                        <!-- Card 3: Previsualización -->
+                        <div class="card">
+                            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                                <h3>3. Vista Previa de la Pulsera</h3>
+                                <button class="btn btn-sm btn-secondary" id="btnMatCalcToggleRotation" style="display: flex; align-items: center; gap: 0.25rem;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path>
+                                    </svg>
+                                    <span>Girar</span>
+                                </button>
+                            </div>
+                            <div class="card-body" style="padding: 0; display: flex; flex-direction: column; align-items: center;">
+                                <div id="matCalcPreviewWrapper" class="preview-wrapper velvet-dark">
+                                    <svg id="matCalcSvgPreview" viewBox="0 0 300 300" width="100%" height="100%">
+                                        <!-- Dynamic SVGs -->
+                                    </svg>
+                                </div>
+                                <div class="preview-controls" style="display: flex; justify-content: center; gap: 0.5rem; padding: 0.75rem; width: 100%; border-top: 1px solid var(--border); background: var(--surface-hover);">
+                                    <span style="font-size: 0.75rem; color: var(--text-muted); align-self: center;">Fondo:</span>
+                                    <button class="bg-select-btn active" data-bg="velvet-dark" title="Terciopelo Oscuro"></button>
+                                    <button class="bg-select-btn" data-bg="silk-white" title="Seda Clara"></button>
+                                    <button class="bg-select-btn" data-bg="skin-tone" title="Contraste Piel"></button>
+                                    <button class="bg-select-btn" data-bg="grid-trans" title="Transparente"></button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Card 4: Resultados de Materiales -->
+                        <div class="card" style="margin-top: 1.5rem;">
+                            <div class="card-header">
+                                <h3>4. Materiales Totales Requeridos</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-container" style="margin-bottom: 1rem;">
+                                    <table class="table" style="font-size: 0.875rem;">
+                                        <thead>
+                                            <tr>
+                                                <th>Material</th>
+                                                <th style="text-align: center;">Por Pulsera</th>
+                                                <th style="text-align: center;" id="matCalcBatchQtyHeader">Total (300 ud)</th>
+                                                <th style="text-align: center; color: var(--primary);" id="matCalcWastageHeader">Total + Margen (5%)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="matCalcResultsTable">
+                                            <!-- Dynamic calculations -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div style="display: flex; gap: 0.5rem;">
+                                    <button class="btn btn-primary" id="btnMatCalcExportPdf" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                            <polyline points="14 2 14 8 20 8"></polyline>
+                                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                                        </svg>
+                                        Exportar PDF
+                                    </button>
+                                    <button class="btn btn-secondary" id="btnMatCalcExportXlsx" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                            <line x1="9" y1="3" x2="9" y2="21"></line>
+                                            <line x1="15" y1="3" x2="15" y2="21"></line>
+                                            <line x1="3" y1="9" x2="21" y2="9"></line>
+                                            <line x1="3" y1="15" x2="21" y2="15"></line>
+                                        </svg>
+                                        Exportar Excel
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -3230,6 +3404,11 @@
                 </div>
             </section>
 
+            <!-- Images Section -->
+            <section class="content-section" id="section-images">
+                <iframe src="https://cloudflare-image-manager.vercel.app?v=3" style="width: 100%; height: calc(100vh - 80px); border: none; border-radius: 8px;" allow="clipboard-write"></iframe>
+            </section>
+
         </main>
     </div><!-- End app-container -->
 
@@ -4533,6 +4712,7 @@
 
     <script src="js/finance.js?v=20260222"></script>
     <script src="js/income-statement.js?v=20260222"></script>
+    <script src="js/materials-calculator.js?v=20260623"></script>
     <script src="js/app.js?v=20260222"></script>
     <script src="js/auth.js?v=20260222"></script>
 </body>
