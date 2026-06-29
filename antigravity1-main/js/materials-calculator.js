@@ -32,7 +32,8 @@ const MaterialsCalculatorModule = (() => {
 
     // Estado inicial
     let sequence = JSON.parse(JSON.stringify(PRESETS.san_benito));
-    let batchSize = 300;
+    let batchNegro = 150;
+    let batchRojo = 150;
     let wastagePercent = 5;
     let threadLengthCm = 35;
     let isRotating = false;
@@ -114,11 +115,23 @@ const MaterialsCalculatorModule = (() => {
         console.log('Iniciando MaterialsCalculatorModule...');
 
         // Bindear controles del lote
-        const inputBatch = document.getElementById('matCalcBatchSize');
-        if (inputBatch) {
-            inputBatch.value = batchSize;
-            inputBatch.addEventListener('input', (e) => {
-                batchSize = Math.max(1, parseInt(e.target.value) || 1);
+        const inputBatchNegro = document.getElementById('matCalcBatchNegro');
+        if (inputBatchNegro) {
+            inputBatchNegro.value = batchNegro;
+            inputBatchNegro.addEventListener('input', (e) => {
+                batchNegro = Math.max(0, parseInt(e.target.value) || 0);
+                updateCalculations();
+                if (activeTab === 'inverse') {
+                    updateInverseCapacity();
+                }
+            });
+        }
+
+        const inputBatchRojo = document.getElementById('matCalcBatchRojo');
+        if (inputBatchRojo) {
+            inputBatchRojo.value = batchRojo;
+            inputBatchRojo.addEventListener('input', (e) => {
+                batchRojo = Math.max(0, parseInt(e.target.value) || 0);
                 updateCalculations();
                 if (activeTab === 'inverse') {
                     updateInverseCapacity();
@@ -539,6 +552,8 @@ const MaterialsCalculatorModule = (() => {
 
         if (!tableBody) return;
 
+        const batchSize = batchNegro + batchRojo;
+
         if (batchQtyHeader) batchQtyHeader.textContent = `Total (${batchSize} ud)`;
         if (wastageHeader) wastageHeader.textContent = `Total + Margen (${wastagePercent}%)`;
 
@@ -554,15 +569,60 @@ const MaterialsCalculatorModule = (() => {
         }
 
         const aggregatedBeads = {};
+        let neoprenosPerBracelet = 0;
+
         sequence.forEach(item => {
-            if (aggregatedBeads[item.typeId]) {
-                aggregatedBeads[item.typeId] += item.qty;
+            if (item.typeId.includes('neopreno')) {
+                neoprenosPerBracelet += item.qty;
             } else {
-                aggregatedBeads[item.typeId] = item.qty;
+                if (aggregatedBeads[item.typeId]) {
+                    aggregatedBeads[item.typeId] += item.qty;
+                } else {
+                    aggregatedBeads[item.typeId] = item.qty;
+                }
             }
         });
 
         let rowsHtml = '';
+
+        if (neoprenosPerBracelet > 0) {
+            if (batchNegro > 0) {
+                const totalQty = neoprenosPerBracelet * batchNegro;
+                const totalWithWastage = Math.ceil(totalQty * (1 + wastagePercent / 100));
+                const beadType = BEAD_TYPES['neopreno_negro'];
+                rowsHtml += `
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div class="bead-color-dot" style="width: 12px; height: 12px; background: ${beadType.displayColor}; flex-shrink: 0;"></div>
+                                <strong>${beadType.name}</strong>
+                            </div>
+                        </td>
+                        <td style="text-align: center; font-weight: 500;">${neoprenosPerBracelet} (en negras)</td>
+                        <td style="text-align: center; font-weight: 500;">${totalQty.toLocaleString()} ud</td>
+                        <td style="text-align: center; font-weight: 700; color: var(--primary);">${totalWithWastage.toLocaleString()} ud</td>
+                    </tr>
+                `;
+            }
+            if (batchRojo > 0) {
+                const totalQty = neoprenosPerBracelet * batchRojo;
+                const totalWithWastage = Math.ceil(totalQty * (1 + wastagePercent / 100));
+                const beadType = BEAD_TYPES['neopreno_rojo'];
+                rowsHtml += `
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div class="bead-color-dot" style="width: 12px; height: 12px; background: ${beadType.displayColor}; flex-shrink: 0;"></div>
+                                <strong>${beadType.name}</strong>
+                            </div>
+                        </td>
+                        <td style="text-align: center; font-weight: 500;">${neoprenosPerBracelet} (en rojas)</td>
+                        <td style="text-align: center; font-weight: 500;">${totalQty.toLocaleString()} ud</td>
+                        <td style="text-align: center; font-weight: 700; color: var(--primary);">${totalWithWastage.toLocaleString()} ud</td>
+                    </tr>
+                `;
+            }
+        }
 
         Object.entries(aggregatedBeads).forEach(([typeId, singleQty]) => {
             const beadType = BEAD_TYPES[typeId];
@@ -627,15 +687,48 @@ const MaterialsCalculatorModule = (() => {
         }
 
         const aggregatedBeads = {};
+        let neoprenosPerBracelet = 0;
         sequence.forEach(item => {
-            if (aggregatedBeads[item.typeId]) {
-                aggregatedBeads[item.typeId] += item.qty;
+            if (item.typeId.includes('neopreno')) {
+                neoprenosPerBracelet += item.qty;
             } else {
-                aggregatedBeads[item.typeId] = item.qty;
+                if (aggregatedBeads[item.typeId]) {
+                    aggregatedBeads[item.typeId] += item.qty;
+                } else {
+                    aggregatedBeads[item.typeId] = item.qty;
+                }
             }
         });
 
         let rowsHtml = '';
+
+        if (neoprenosPerBracelet > 0) {
+            ['neopreno_negro', 'neopreno_rojo'].forEach(typeId => {
+                const beadType = BEAD_TYPES[typeId];
+                const savedStock = stockInputs[typeId] !== undefined ? stockInputs[typeId] : '';
+                rowsHtml += `
+                    <tr class="inverse-calc-row" data-type-id="${typeId}" data-single-qty="${neoprenosPerBracelet}">
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <div class="bead-color-dot" style="width: 12px; height: 12px; background: ${beadType.displayColor}; flex-shrink: 0;"></div>
+                                <strong>${beadType.name}</strong>
+                            </div>
+                        </td>
+                        <td style="text-align: center; font-weight: 500;">${neoprenosPerBracelet} ud</td>
+                        <td style="text-align: center;">
+                            <input type="number" 
+                                   class="mat-stock-input form-control input-sm" 
+                                   data-type-id="${typeId}" 
+                                   value="${savedStock}" 
+                                   min="0" 
+                                   placeholder="Ej. 100" 
+                                   style="width: 100%; text-align: center; padding: 0.25rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary);">
+                        </td>
+                        <td style="text-align: center; font-weight: 700; color: var(--primary);" class="row-capacity" id="cap-${typeId}">0 pulseras</td>
+                    </tr>
+                `;
+            });
+        }
 
         // Filas para balines
         Object.entries(aggregatedBeads).forEach(([typeId, singleQty]) => {
@@ -704,19 +797,48 @@ const MaterialsCalculatorModule = (() => {
         const tableBody = document.getElementById('matCalcInverseTable');
         if (!tableBody) return;
 
+        const batchSize = batchNegro + batchRojo;
+
         const aggregatedBeads = {};
+        let neoprenosPerBracelet = 0;
         sequence.forEach(item => {
-            if (aggregatedBeads[item.typeId]) {
-                aggregatedBeads[item.typeId] += item.qty;
+            if (item.typeId.includes('neopreno')) {
+                neoprenosPerBracelet += item.qty;
             } else {
-                aggregatedBeads[item.typeId] = item.qty;
+                if (aggregatedBeads[item.typeId]) {
+                    aggregatedBeads[item.typeId] += item.qty;
+                } else {
+                    aggregatedBeads[item.typeId] = item.qty;
+                }
             }
         });
 
         const capacities = [];
         const materialDetails = [];
+        let totalNeopreneCap = 0;
 
         // 1. Calcular para balines
+        if (neoprenosPerBracelet > 0) {
+            ['neopreno_negro', 'neopreno_rojo'].forEach(typeId => {
+                const stock = parseFloat(stockInputs[typeId]) || 0;
+                const cap = Math.floor(stock / neoprenosPerBracelet);
+                
+                const cell = document.getElementById(`cap-${typeId}`);
+                if (cell) cell.textContent = `${cap.toLocaleString()} pulseras`;
+                
+                totalNeopreneCap += cap;
+                materialDetails.push({
+                    id: typeId,
+                    name: BEAD_TYPES[typeId].name,
+                    singleQty: neoprenosPerBracelet,
+                    stock: stock,
+                    capacity: cap,
+                    unitName: 'balines'
+                });
+            });
+            capacities.push(totalNeopreneCap);
+        }
+
         Object.entries(aggregatedBeads).forEach(([typeId, singleQty]) => {
             const stock = parseFloat(stockInputs[typeId]) || 0;
             const cap = Math.floor(stock / singleQty);
@@ -858,12 +980,19 @@ const MaterialsCalculatorModule = (() => {
         }
 
         try {
+            const batchSize = batchNegro + batchRojo;
             const aggregatedBeads = {};
+            let neoprenosPerBracelet = 0;
+
             sequence.forEach(item => {
-                if (aggregatedBeads[item.typeId]) {
-                    aggregatedBeads[item.typeId] += item.qty;
+                if (item.typeId.includes('neopreno')) {
+                    neoprenosPerBracelet += item.qty;
                 } else {
-                    aggregatedBeads[item.typeId] = item.qty;
+                    if (aggregatedBeads[item.typeId]) {
+                        aggregatedBeads[item.typeId] += item.qty;
+                    } else {
+                        aggregatedBeads[item.typeId] = item.qty;
+                    }
                 }
             });
 
@@ -871,13 +1000,40 @@ const MaterialsCalculatorModule = (() => {
                 ['REPORTE DE MATERIALES DE PRODUCCIÓN - PULSERAS'],
                 [],
                 ['1. Configuración del Lote'],
-                ['Cantidad de Pulseras a Fabricar', batchSize, 'unidades'],
+                ['Cantidad de Pulseras Negras', batchNegro, 'unidades'],
+                ['Cantidad de Pulseras Rojas', batchRojo, 'unidades'],
+                ['Total Pulseras a Fabricar', batchSize, 'unidades'],
                 ['Margen de Desperdicio', wastagePercent / 100, ''],
                 ['Largo de Hilo por Pulsera', threadLengthCm, 'cm'],
                 [],
                 ['2. Desglose Físico de Materiales'],
                 ['Material', 'Cant. por Pulsera', `Total (${batchSize} ud)`, `Total + Margen (${wastagePercent}%)`, 'Tipo'],
             ];
+
+            if (neoprenosPerBracelet > 0) {
+                if (batchNegro > 0) {
+                    const totalQty = neoprenosPerBracelet * batchNegro;
+                    const totalWithWastage = Math.ceil(totalQty * (1 + wastagePercent / 100));
+                    data.push([
+                        BEAD_TYPES['neopreno_negro'].name,
+                        neoprenosPerBracelet + ' (en negras)',
+                        totalQty,
+                        totalWithWastage,
+                        BEAD_TYPES['neopreno_negro'].sizeName
+                    ]);
+                }
+                if (batchRojo > 0) {
+                    const totalQty = neoprenosPerBracelet * batchRojo;
+                    const totalWithWastage = Math.ceil(totalQty * (1 + wastagePercent / 100));
+                    data.push([
+                        BEAD_TYPES['neopreno_rojo'].name,
+                        neoprenosPerBracelet + ' (en rojas)',
+                        totalQty,
+                        totalWithWastage,
+                        BEAD_TYPES['neopreno_rojo'].sizeName
+                    ]);
+                }
+            }
 
             Object.entries(aggregatedBeads).forEach(([typeId, singleQty]) => {
                 const beadType = BEAD_TYPES[typeId];
@@ -938,6 +1094,7 @@ const MaterialsCalculatorModule = (() => {
         }
 
         try {
+            const batchSize = batchNegro + batchRojo;
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
 
@@ -962,11 +1119,13 @@ const MaterialsCalculatorModule = (() => {
 
             doc.setFont('helvetica', 'normal');
             doc.setFontSize(10);
-            doc.text(`• Cantidad de pulseras a fabricar: ${batchSize} unidades`, 25, 53);
-            doc.text(`• Margen de desperdicio estimado: ${wastagePercent}%`, 25, 60);
-            doc.text(`• Largo de hilo por pulsera: ${threadLengthCm} cm`, 25, 67);
+            doc.text(`• Cantidad de pulseras negras: ${batchNegro} unidades`, 25, 53);
+            doc.text(`• Cantidad de pulseras rojas: ${batchRojo} unidades`, 25, 60);
+            doc.text(`• Total de pulseras: ${batchSize} unidades`, 25, 67);
+            doc.text(`• Margen de desperdicio estimado: ${wastagePercent}%`, 25, 74);
+            doc.text(`• Largo de hilo por pulsera: ${threadLengthCm} cm`, 25, 81);
 
-            let yPos = 82;
+            let yPos = 96;
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(11);
             doc.text('2. DESGLOSE FÍSICO DE MATERIALES REQUERIDOS', 20, yPos);
@@ -985,13 +1144,54 @@ const MaterialsCalculatorModule = (() => {
             doc.setFont('helvetica', 'normal');
 
             const aggregatedBeads = {};
+            let neoprenosPerBracelet = 0;
             sequence.forEach(item => {
-                if (aggregatedBeads[item.typeId]) {
-                    aggregatedBeads[item.typeId] += item.qty;
+                if (item.typeId.includes('neopreno')) {
+                    neoprenosPerBracelet += item.qty;
                 } else {
-                    aggregatedBeads[item.typeId] = item.qty;
+                    if (aggregatedBeads[item.typeId]) {
+                        aggregatedBeads[item.typeId] += item.qty;
+                    } else {
+                        aggregatedBeads[item.typeId] = item.qty;
+                    }
                 }
             });
+
+            let totalNeopreneWastage = 0;
+            if (neoprenosPerBracelet > 0) {
+                if (batchNegro > 0) {
+                    const beadType = BEAD_TYPES['neopreno_negro'];
+                    const totalQty = neoprenosPerBracelet * batchNegro;
+                    const totalWithWastage = Math.ceil(totalQty * (1 + wastagePercent / 100));
+                    totalNeopreneWastage += totalWithWastage;
+
+                    doc.text(beadType.name, 23, yPos);
+                    doc.text(`${neoprenosPerBracelet} (en negras)`, 100, yPos, { align: 'right' });
+                    doc.text(`${totalQty.toLocaleString()} ud`, 140, yPos, { align: 'right' });
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`${totalWithWastage.toLocaleString()} ud`, 185, yPos, { align: 'right' });
+                    doc.setFont('helvetica', 'normal');
+                    doc.setDrawColor(240, 242, 245);
+                    doc.line(20, yPos + 3, 190, yPos + 3);
+                    yPos += 8;
+                }
+                if (batchRojo > 0) {
+                    const beadType = BEAD_TYPES['neopreno_rojo'];
+                    const totalQty = neoprenosPerBracelet * batchRojo;
+                    const totalWithWastage = Math.ceil(totalQty * (1 + wastagePercent / 100));
+                    totalNeopreneWastage += totalWithWastage;
+
+                    doc.text(beadType.name, 23, yPos);
+                    doc.text(`${neoprenosPerBracelet} (en rojas)`, 100, yPos, { align: 'right' });
+                    doc.text(`${totalQty.toLocaleString()} ud`, 140, yPos, { align: 'right' });
+                    doc.setFont('helvetica', 'bold');
+                    doc.text(`${totalWithWastage.toLocaleString()} ud`, 185, yPos, { align: 'right' });
+                    doc.setFont('helvetica', 'normal');
+                    doc.setDrawColor(240, 242, 245);
+                    doc.line(20, yPos + 3, 190, yPos + 3);
+                    yPos += 8;
+                }
+            }
 
             Object.entries(aggregatedBeads).forEach(([typeId, singleQty]) => {
                 const beadType = BEAD_TYPES[typeId];
@@ -1043,10 +1243,10 @@ const MaterialsCalculatorModule = (() => {
             doc.setFontSize(9);
             
             const totalSingleBeads = Object.values(aggregatedBeads).reduce((a, b) => a + b, 0);
-            const totalBatchBeads = totalSingleBeads * batchSize;
+            const totalBatchBeads = (totalSingleBeads * batchSize) + (neoprenosPerBracelet * batchSize);
             const totalBatchBeadsWithWastage = Object.entries(aggregatedBeads).reduce((acc, [typeId, singleQty]) => {
                 return acc + Math.ceil(singleQty * batchSize * (1 + wastagePercent / 100));
-            }, 0);
+            }, totalNeopreneWastage);
 
             doc.text(`- Cantidad de balines totales a ensamblar en lote: ${totalBatchBeads.toLocaleString()} unidades.`, 25, yPos + 14);
             doc.text(`- Total de balines a comprar (incluyendo margen): ${totalBatchBeadsWithWastage.toLocaleString()} unidades.`, 25, yPos + 20);

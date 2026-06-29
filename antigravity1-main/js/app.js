@@ -40,7 +40,7 @@ const App = {
             CalculatorModule.init();
             MaterialsCalculatorModule.init();
             FinanceModule.init();
-
+            JournalModule.init();
 
             // Bind navigation events
             this.bindNavigation();
@@ -158,7 +158,8 @@ const App = {
             'calculator': 'Calculadora de Utilidad',
             'materials-calculator': 'Calculadora de Materiales',
             'finance': 'Finanzas Personales',
-            'images': 'Galería de Imágenes'
+            'images': 'Galería de Imágenes',
+            'journal': 'Diario y Metas'
         };
 
         document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
@@ -245,6 +246,13 @@ const App = {
                 }
                 break;
             case 'images':
+                break;
+            case 'journal':
+                if (typeof JournalModule.render === 'function') {
+                    await JournalModule.render();
+                } else {
+                    JournalModule.init();
+                }
                 break;
 
         }

@@ -218,6 +218,13 @@
                     </svg>
                     <span>Imágenes</span>
                 </a>
+                <a href="#journal" class="nav-item" data-section="journal">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    <span>Diario & Metas</span>
+                </a>
             </nav>
 
             <div class="sidebar-footer">
@@ -1386,8 +1393,12 @@
                             <div class="card-body">
                                 <div class="form-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
                                     <div class="form-group">
-                                        <label for="matCalcBatchSize">Cantidad de Pulseras</label>
-                                        <input type="number" id="matCalcBatchSize" value="300" min="1" step="1">
+                                        <label for="matCalcBatchNegro" style="font-size: 0.85rem;">Pulseras (Neo. Negro)</label>
+                                        <input type="number" id="matCalcBatchNegro" value="150" min="0" step="1">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="matCalcBatchRojo" style="font-size: 0.85rem;">Pulseras (Neo. Rojo)</label>
+                                        <input type="number" id="matCalcBatchRojo" value="150" min="0" step="1">
                                     </div>
                                     <div class="form-group">
                                         <label for="matCalcWastage">Margen de Desperdicio (%)</label>
@@ -3460,6 +3471,97 @@
                 <iframe src="https://cloudflare-image-manager.vercel.app?v=3" style="width: 100%; height: calc(100vh - 80px); border: none; border-radius: 8px;" allow="clipboard-write"></iframe>
             </section>
 
+            <!-- Journal Section -->
+            <section class="content-section" id="section-journal">
+                <div class="journal-header">
+                    <h2>Mi Diario y Metas</h2>
+                    <p class="journal-subtitle">Un espacio para reflexionar, planificar y crecer.</p>
+                </div>
+
+                <div class="journal-grid">
+                    <!-- Left Column: Mood & Daily Entry -->
+                    <div class="journal-col">
+                        <!-- Mood Tracker -->
+                        <div class="journal-card glass-card">
+                            <h3 class="card-title">¿Cómo te sientes hoy?</h3>
+                            <div class="mood-selector" id="moodSelector">
+                                <button class="mood-btn" data-mood="amazing" title="Increíble">🤩</button>
+                                <button class="mood-btn" data-mood="happy" title="Feliz">😊</button>
+                                <button class="mood-btn" data-mood="neutral" title="Normal">😐</button>
+                                <button class="mood-btn" data-mood="sad" title="Triste">😔</button>
+                                <button class="mood-btn" data-mood="stressed" title="Estresado">😫</button>
+                            </div>
+                        </div>
+
+                        <!-- Daily Reflection -->
+                        <div class="journal-card glass-card">
+                            <h3 class="card-title">Reflexión Diaria</h3>
+                            <form id="journalEntryForm">
+                                <div class="form-group">
+                                    <label>¿Qué hice bien hoy? / ¿Qué logré?</label>
+                                    <textarea id="journalDone" rows="3" placeholder="Escribe tus logros y cosas positivas..." required></textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label>¿Qué estoy haciendo mal? / ¿Qué debo mejorar?</label>
+                                    <textarea id="journalWrong" rows="3" placeholder="Escribe tus áreas de mejora y obstáculos..." required></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-primary btn-full journal-submit-btn">Guardar Entrada</button>
+                            </form>
+                        </div>
+
+                        <!-- Recent Entries -->
+                        <div class="journal-card glass-card">
+                            <h3 class="card-title">Entradas Recientes</h3>
+                            <div class="journal-entries-list" id="journalEntriesList">
+                                <!-- Entries loaded via JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Goals Tracker -->
+                    <div class="journal-col">
+                        <div class="journal-card glass-card">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h3 class="card-title" style="margin-bottom: 0;">Mis Metas</h3>
+                                <button class="btn btn-sm btn-primary" id="btnNewGoal">+ Nueva Meta</button>
+                            </div>
+                            
+                            <!-- Add Goal Form (Hidden by default) -->
+                            <div id="newGoalFormContainer" style="display: none; margin-bottom: 1.5rem; padding: 1rem; background: var(--bg-primary); border-radius: 8px;">
+                                <form id="goalForm">
+                                    <div class="form-group">
+                                        <label>Título de la Meta</label>
+                                        <input type="text" id="goalTitle" required placeholder="Ej: Bajar 5kg, Aprender JS...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Fecha Límite</label>
+                                        <input type="date" id="goalDate" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Categoría</label>
+                                        <select id="goalCategory">
+                                            <option value="Personal">Personal</option>
+                                            <option value="Salud">Salud</option>
+                                            <option value="Trabajo">Trabajo / Negocio</option>
+                                            <option value="Finanzas">Finanzas</option>
+                                        </select>
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                        <button type="button" class="btn btn-sm btn-secondary" id="btnCancelGoal">Cancelar</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">Guardar</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Goals List -->
+                            <div class="goals-list" id="goalsList">
+                                <!-- Goals loaded via JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div><!-- End app-container -->
 
@@ -4764,6 +4866,7 @@
     <script src="js/finance.js?v=20260222"></script>
     <script src="js/income-statement.js?v=20260222"></script>
     <script src="js/materials-calculator.js?v=20260623"></script>
+    <script src="js/journal.js?v=1"></script>
     <script src="js/app.js?v=20260222"></script>
     <script src="js/auth.js?v=20260222"></script>
 </body>
