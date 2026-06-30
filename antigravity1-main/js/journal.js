@@ -18,12 +18,18 @@ const JournalModule = {
         
         if (savedEntries) {
             this.entries = JSON.parse(savedEntries);
+        } else if (typeof JournalSeedData !== 'undefined') {
+            this.entries = [...JournalSeedData.entries];
+            localStorage.setItem('journal_entries', JSON.stringify(this.entries));
         } else {
             this.entries = [];
         }
 
         if (savedGoals) {
             this.goals = JSON.parse(savedGoals);
+        } else if (typeof JournalSeedData !== 'undefined') {
+            this.goals = [...JournalSeedData.goals];
+            localStorage.setItem('journal_goals', JSON.stringify(this.goals));
         } else {
             this.goals = [];
         }
