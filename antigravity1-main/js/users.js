@@ -106,7 +106,7 @@ const UsersModule = {
                 'dashboard', 'products', 'inventory', 'clients', 'guides', 
                 'confirmation', 'purchases', 'analytics', 'freights', 
                 'payments', 'accounts', 'campaigns', 'income-statement', 
-                'calculator', 'finance'
+                'calculator', 'materials-calculator', 'finance', 'images', 'journal', 'users'
             ];
 
             modules.forEach(module => {
@@ -141,7 +141,11 @@ const UsersModule = {
             campaigns: { name: 'Creación de Campañas', icon: '📣' },
             'income-statement': { name: 'Estado de Resultados', icon: '📊' },
             calculator: { name: 'Calculadora de Utilidad', icon: '🧮' },
-            finance: { name: 'Finanzas Personales', icon: '💵' }
+            'materials-calculator': { name: 'Calculadora de Materiales', icon: '📐' },
+            finance: { name: 'Finanzas Personales', icon: '💵' },
+            images: { name: 'Galería de Imágenes', icon: '🖼️' },
+            journal: { name: 'Diario y Metas', icon: '📔' },
+            users: { name: 'Usuarios y Permisos', icon: '🛡️' }
         };
 
         grid.innerHTML = Object.entries(moduleNames).map(([key, info]) => {

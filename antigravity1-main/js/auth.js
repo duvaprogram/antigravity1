@@ -93,7 +93,16 @@ const AuthModule = {
                 analytics: { can_access: true, can_edit: true },
                 confirmation: { can_access: true, can_edit: true },
                 purchases: { can_access: true, can_edit: true },
+                freights: { can_access: true, can_edit: true },
+                payments: { can_access: true, can_edit: true },
                 accounts: { can_access: true, can_edit: true },
+                campaigns: { can_access: true, can_edit: true },
+                'income-statement': { can_access: true, can_edit: true },
+                calculator: { can_access: true, can_edit: true },
+                'materials-calculator': { can_access: true, can_edit: true },
+                finance: { can_access: true, can_edit: true },
+                images: { can_access: true, can_edit: true },
+                journal: { can_access: true, can_edit: true },
                 users: { can_access: true, can_edit: true }
             };
             return;
