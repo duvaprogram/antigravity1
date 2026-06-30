@@ -13,6 +13,25 @@ const JournalModule = {
         this.loadData();
         this.bindEvents();
     },
+    
+    restoreSeedData() {
+        if (!confirm('¿Estás seguro de querer restaurar el historial original? Esto sobreescribirá tus datos actuales del diario y metas si tienes alguno.')) return;
+        
+        if (typeof JournalSeedData !== 'undefined') {
+            this.entries = [...JournalSeedData.entries];
+            this.goals = [...JournalSeedData.goals];
+            this.principles = JSON.parse(JSON.stringify(JournalSeedData.principles));
+            this.saveData();
+            
+            this.renderEntries();
+            this.renderGoals();
+            this.renderPrinciples();
+            
+            Utils.showToast('Historial restaurado exitosamente', 'success');
+        } else {
+            Utils.showToast('Error: No se encontró el archivo de historial', 'error');
+        }
+    },
 
     loadData() {
         const savedEntries = localStorage.getItem('journal_entries');
