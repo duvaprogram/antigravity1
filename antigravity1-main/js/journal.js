@@ -39,6 +39,25 @@ const JournalModule = {
 
         if (savedPrinciples) {
             this.principles = JSON.parse(savedPrinciples);
+            
+            // Migration: Add areas to existing items if missing
+            if (typeof JournalSeedData !== 'undefined' && JournalSeedData.principles) {
+                let migrated = false;
+                for (const category in this.principles) {
+                    if (this.principles[category] && Array.isArray(this.principles[category])) {
+                        this.principles[category].forEach(item => {
+                            if (!item.area) {
+                                const seedItem = JournalSeedData.principles[category]?.find(s => s.id === item.id);
+                                item.area = seedItem && seedItem.area ? seedItem.area : 'Personal';
+                                migrated = true;
+                            }
+                        });
+                    }
+                }
+                if (migrated) {
+                    localStorage.setItem('journal_principles', JSON.stringify(this.principles));
+                }
+            }
         } else if (typeof JournalSeedData !== 'undefined' && JournalSeedData.principles) {
             this.principles = JSON.parse(JSON.stringify(JournalSeedData.principles));
             localStorage.setItem('journal_principles', JSON.stringify(this.principles));
