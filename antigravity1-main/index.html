@@ -3484,12 +3484,15 @@
                         <!-- Mood Tracker -->
                         <div class="journal-card glass-card">
                             <h3 class="card-title">¿Cómo te sientes hoy?</h3>
-                            <div class="mood-selector" id="moodSelector">
-                                <button class="mood-btn" data-mood="amazing" title="Increíble">🤩</button>
-                                <button class="mood-btn" data-mood="happy" title="Feliz">😊</button>
-                                <button class="mood-btn" data-mood="neutral" title="Normal">😐</button>
-                                <button class="mood-btn" data-mood="sad" title="Triste">😔</button>
-                                <button class="mood-btn" data-mood="stressed" title="Estresado">😫</button>
+                            <div class="form-group" style="margin-top: 1rem;">
+                                <select id="moodSelect" style="width: 100%; padding: 0.8rem; border-radius: 8px; font-size: 1.1rem; background: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border); outline: none;">
+                                    <option value="" disabled selected>Selecciona tu estado de ánimo...</option>
+                                    <option value="amazing">🤩 Increíble / Súper bien</option>
+                                    <option value="happy">😊 Feliz / Contento</option>
+                                    <option value="neutral">😐 Normal / Neutral</option>
+                                    <option value="sad">😔 Triste / Bajo de nota</option>
+                                    <option value="stressed">😫 Estresado / Confundido</option>
+                                </select>
                             </div>
                         </div>
 
@@ -3545,6 +3548,10 @@
                                             <option value="Trabajo">Trabajo / Negocio</option>
                                             <option value="Finanzas">Finanzas</option>
                                         </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Plan: ¿Cómo voy a cumplir la meta?</label>
+                                        <textarea id="goalPlan" rows="3" placeholder="Ej: Me levantaré a las 5am todos los días, ahorraré 10%..."></textarea>
                                     </div>
                                     <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
                                         <button type="button" class="btn btn-sm btn-secondary" id="btnCancelGoal">Cancelar</button>

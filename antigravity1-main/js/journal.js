@@ -41,15 +41,6 @@ const JournalModule = {
     },
 
     bindEvents() {
-        // Mood Selector
-        document.querySelectorAll('.mood-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
-                e.currentTarget.classList.add('selected');
-                this.currentMood = e.currentTarget.dataset.mood;
-            });
-        });
-
         // Journal Entry Form
         const form = document.getElementById('journalEntryForm');
         if (form) {
@@ -101,7 +92,10 @@ const JournalModule = {
     handleSaveEntry(e) {
         e.preventDefault();
         
-        if (!this.currentMood) {
+        const moodSelect = document.getElementById('moodSelect');
+        const selectedMood = moodSelect ? moodSelect.value : null;
+
+        if (!selectedMood) {
             Utils.showToast('Por favor selecciona cómo te sientes hoy', 'error');
             return;
         }
@@ -112,7 +106,7 @@ const JournalModule = {
         const newEntry = {
             id: Date.now().toString(),
             date: new Date().toISOString(),
-            mood: this.currentMood,
+            mood: selectedMood,
             doneWell: doneWell,
             doneWrong: doneWrong
         };
@@ -124,8 +118,7 @@ const JournalModule = {
         
         // Reset form
         document.getElementById('journalEntryForm').reset();
-        document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
-        this.currentMood = null;
+        if (moodSelect) moodSelect.value = '';
 
         this.renderEntries();
     },
@@ -182,12 +175,14 @@ const JournalModule = {
         const title = document.getElementById('goalTitle').value;
         const date = document.getElementById('goalDate').value;
         const category = document.getElementById('goalCategory').value;
+        const plan = document.getElementById('goalPlan') ? document.getElementById('goalPlan').value : '';
 
         const newGoal = {
             id: Date.now().toString(),
             title: title,
             targetDate: date,
             category: category,
+            plan: plan,
             completed: false,
             createdAt: new Date().toISOString()
         };
@@ -239,6 +234,7 @@ const JournalModule = {
                         </div>
                     </div>
                     <div class="goal-title">${Utils.escapeHtml(goal.title)}</div>
+                    ${goal.plan ? `<div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem; border-left: 2px solid var(--border); padding-left: 8px;">${Utils.escapeHtml(goal.plan).replace(/\n/g, '<br>')}</div>` : ''}
                     <div class="goal-footer">
                         <span style="color: ${isLate ? 'var(--danger)' : 'var(--text-muted)'}; font-size: 0.8rem; display: flex; align-items: center; gap: 4px;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
