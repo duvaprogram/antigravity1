@@ -3565,6 +3565,30 @@
                                 <!-- Goals loaded via JS -->
                             </div>
                         </div>
+                        
+                        <!-- Principles & Rules -->
+                        <div class="journal-card glass-card" style="margin-top: var(--space-xl);">
+                            <h3 class="card-title">Mis Principios y Reglas</h3>
+                            <div class="form-group" style="margin-bottom: 1rem;">
+                                <select id="principlesCategory" style="width: 100%; padding: 0.6rem; border-radius: 8px; background: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border); outline: none;">
+                                    <option value="principles">📜 Principios y Valores</option>
+                                    <option value="rules">🛡️ Reglas de Vida</option>
+                                    <option value="actions">🚀 Cómo actuaré</option>
+                                    <option value="improvements">🔧 Cosas que mejorar</option>
+                                </select>
+                            </div>
+
+                            <!-- List -->
+                            <div id="principlesList" style="margin-bottom: 1rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                                <!-- Loaded via JS -->
+                            </div>
+
+                            <!-- Add New -->
+                            <form id="principleForm" style="display: flex; gap: 0.5rem;">
+                                <input type="text" id="newPrinciple" placeholder="Añadir nuevo..." style="flex: 1; padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-hover); color: var(--text-primary); outline: none;" required>
+                                <button type="submit" class="btn btn-sm btn-primary">Añadir</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </section>

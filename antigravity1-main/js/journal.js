@@ -5,6 +5,7 @@
 const JournalModule = {
     entries: [],
     goals: [],
+    principles: { principles: [], rules: [], actions: [], improvements: [] },
     currentMood: null,
 
     init() {
@@ -15,6 +16,7 @@ const JournalModule = {
     loadData() {
         const savedEntries = localStorage.getItem('journal_entries');
         const savedGoals = localStorage.getItem('journal_goals');
+        const savedPrinciples = localStorage.getItem('journal_principles');
         
         if (savedEntries) {
             this.entries = JSON.parse(savedEntries);
@@ -33,11 +35,21 @@ const JournalModule = {
         } else {
             this.goals = [];
         }
+
+        if (savedPrinciples) {
+            this.principles = JSON.parse(savedPrinciples);
+        } else if (typeof JournalSeedData !== 'undefined' && JournalSeedData.principles) {
+            this.principles = JSON.parse(JSON.stringify(JournalSeedData.principles));
+            localStorage.setItem('journal_principles', JSON.stringify(this.principles));
+        } else {
+            this.principles = { principles: [], rules: [], actions: [], improvements: [] };
+        }
     },
 
     saveData() {
         localStorage.setItem('journal_entries', JSON.stringify(this.entries));
         localStorage.setItem('journal_goals', JSON.stringify(this.goals));
+        localStorage.setItem('journal_principles', JSON.stringify(this.principles));
     },
 
     bindEvents() {
@@ -71,11 +83,23 @@ const JournalModule = {
         if (goalForm) {
             goalForm.addEventListener('submit', (e) => this.handleSaveGoal(e));
         }
+
+        // Principles Events
+        const principlesCategory = document.getElementById('principlesCategory');
+        if (principlesCategory) {
+            principlesCategory.addEventListener('change', () => this.renderPrinciples());
+        }
+
+        const principleForm = document.getElementById('principleForm');
+        if (principleForm) {
+            principleForm.addEventListener('submit', (e) => this.handleAddPrinciple(e));
+        }
     },
 
     async render() {
         this.renderEntries();
         this.renderGoals();
+        this.renderPrinciples();
     },
 
     getMoodEmoji(mood) {
@@ -265,6 +289,58 @@ const JournalModule = {
         this.saveData();
         this.renderGoals();
         Utils.showToast('Meta eliminada', 'success');
+    },
+
+    handleAddPrinciple(e) {
+        e.preventDefault();
+        const input = document.getElementById('newPrinciple');
+        const category = document.getElementById('principlesCategory').value;
+        const text = input.value.trim();
+        
+        if (!text) return;
+
+        const newItem = {
+            id: 'p_' + Date.now().toString(),
+            text: text
+        };
+
+        this.principles[category].push(newItem);
+        this.saveData();
+        this.renderPrinciples();
+        
+        input.value = '';
+        Utils.showToast('Agregado exitosamente', 'success');
+    },
+
+    renderPrinciples() {
+        const list = document.getElementById('principlesList');
+        const category = document.getElementById('principlesCategory');
+        if (!list || !category) return;
+
+        const currentCategory = category.value;
+        const items = this.principles[currentCategory] || [];
+
+        if (items.length === 0) {
+            list.innerHTML = `<p style="text-align:center; color: var(--text-muted); font-size: 0.9rem; padding: 1rem 0;">No hay elementos en esta categoría.</p>`;
+            return;
+        }
+
+        list.innerHTML = items.map(item => `
+            <div style="background: var(--bg-primary); padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+                <span style="font-size: 0.9rem; line-height: 1.4; flex: 1;">${Utils.escapeHtml(item.text)}</span>
+                <button type="button" class="btn btn-icon" style="color: var(--danger); background: none; min-width: 24px; width: 24px; height: 24px; padding: 0;" onclick="JournalModule.deletePrinciple('${currentCategory}', '${item.id}')" title="Eliminar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+            </div>
+        `).join('');
+    },
+
+    deletePrinciple(category, id) {
+        if (!confirm('¿Eliminar este elemento?')) return;
+        this.principles[category] = this.principles[category].filter(p => p.id !== id);
+        this.saveData();
+        this.renderPrinciples();
+        Utils.showToast('Elemento eliminado', 'success');
     }
 };
 
