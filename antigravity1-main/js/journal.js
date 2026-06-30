@@ -397,7 +397,10 @@ const JournalModule = {
             
             html += areaItems.map(item => `
                 <div style="background: var(--bg-primary); padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.25rem;">
-                    <span style="font-size: 0.9rem; line-height: 1.4; flex: 1;">${Utils.escapeHtml(item.text)}</span>
+                    <div style="flex: 1; display: flex; flex-direction: column; gap: 0.25rem;">
+                        <span style="font-size: 0.9rem; line-height: 1.4;">${Utils.escapeHtml(item.text)}</span>
+                        <span style="font-size: 0.7rem; color: var(--primary); font-weight: 500; background: rgba(0, 122, 255, 0.1); padding: 0.1rem 0.4rem; border-radius: 4px; align-self: flex-start; border: 1px solid rgba(0, 122, 255, 0.2);">${area}</span>
+                    </div>
                     <button type="button" class="btn btn-icon" style="color: var(--danger); background: none; min-width: 24px; width: 24px; height: 24px; padding: 0;" onclick="JournalModule.deletePrinciple('${currentCategory}', '${item.id}')" title="Eliminar">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                     </button>
