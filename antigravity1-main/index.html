@@ -3584,7 +3584,14 @@
                             </div>
 
                             <!-- Add New -->
-                            <form id="principleForm" style="display: flex; gap: 0.5rem;">
+                            <form id="principleForm" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <select id="principleArea" style="padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-hover); color: var(--text-primary); outline: none; min-width: 120px;">
+                                    <option value="Personal">👤 Personal</option>
+                                    <option value="Trabajo">💼 Trabajo/Negocio</option>
+                                    <option value="Salud">🏋️ Salud y Fitness</option>
+                                    <option value="Finanzas">💰 Finanzas</option>
+                                    <option value="Relaciones">💖 Relaciones</option>
+                                </select>
                                 <input type="text" id="newPrinciple" placeholder="Añadir nuevo..." style="flex: 1; padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-hover); color: var(--text-primary); outline: none;" required>
                                 <button type="submit" class="btn btn-sm btn-primary">Añadir</button>
                             </form>

@@ -250,26 +250,26 @@ const JournalSeedData = {
     ],
     principles: {
         principles: [
-            { id: "p1", text: "Soy un ser puro con buenos sentimientos sin presumir nada viviendo en la realidad buena." },
-            { id: "p2", text: "Tengo valores sólidos. Tengo un propósito firme." },
-            { id: "p3", text: "Yo soy mejor en todos los aspectos, y no desde el ego, sino desde el trabajo, la disciplina y la convicción." }
+            { id: "p1", text: "Soy un ser puro con buenos sentimientos sin presumir nada viviendo en la realidad buena.", area: "Personal" },
+            { id: "p2", text: "Tengo valores sólidos. Tengo un propósito firme.", area: "Personal" },
+            { id: "p3", text: "Yo soy mejor en todos los aspectos, y no desde el ego, sino desde el trabajo, la disciplina y la convicción.", area: "Trabajo" }
         ],
         rules: [
-            { id: "r1", text: "Me levanto a las 6:00 AM (tres horas antes que los débiles)." },
-            { id: "r2", text: "Voy al gym diario (disciplina física = disciplina mental)." },
-            { id: "r3", text: "No voy a volver a hacer cosas que no estén bien, ni que se salgan de ese camino." },
-            { id: "r4", text: "No compartir con personas que me drenan energía ni me aportan crecimiento." }
+            { id: "r1", text: "Me levanto a las 6:00 AM (tres horas antes que los débiles).", area: "Salud" },
+            { id: "r2", text: "Voy al gym diario (disciplina física = disciplina mental).", area: "Salud" },
+            { id: "r3", text: "No voy a volver a hacer cosas que no estén bien, ni que se salgan de ese camino.", area: "Personal" },
+            { id: "r4", text: "No compartir con personas que me drenan energía ni me aportan crecimiento.", area: "Relaciones" }
         ],
         actions: [
-            { id: "a1", text: "Ejecutar rápido y sin sobrepensar. Sacar mis herramientas con alta calidad." },
-            { id: "a2", text: "Ser más estratégico con mi dinero: invertir mejor, testear más productos." },
-            { id: "a3", text: "Trabajo enfocado sin distracciones." },
-            { id: "a4", text: "Estudio inglés 2 veces por semana (conversaciones reales)." }
+            { id: "a1", text: "Ejecutar rápido y sin sobrepensar. Sacar mis herramientas con alta calidad.", area: "Trabajo" },
+            { id: "a2", text: "Ser más estratégico con mi dinero: invertir mejor, testear más productos.", area: "Finanzas" },
+            { id: "a3", text: "Trabajo enfocado sin distracciones.", area: "Trabajo" },
+            { id: "a4", text: "Estudio inglés 2 veces por semana (conversaciones reales).", area: "Personal" }
         ],
         improvements: [
-            { id: "i1", text: "La ejecución lenta: tengo que actuar más rápido con mis productos ganadores." },
-            { id: "i2", text: "La concentración: me desenfoco con demasiada facilidad. Reducir distracciones." },
-            { id: "i3", text: "La productividad: debo apretar en todos los aspectos y dejar la procrastinación." }
+            { id: "i1", text: "La ejecución lenta: tengo que actuar más rápido con mis productos ganadores.", area: "Trabajo" },
+            { id: "i2", text: "La concentración: me desenfoco con demasiada facilidad. Reducir distracciones.", area: "Trabajo" },
+            { id: "i3", text: "La productividad: debo apretar en todos los aspectos y dejar la procrastinación.", area: "Personal" }
         ]
     }
 };

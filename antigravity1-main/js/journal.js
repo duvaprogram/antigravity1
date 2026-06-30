@@ -330,14 +330,17 @@ const JournalModule = {
     handleAddPrinciple(e) {
         e.preventDefault();
         const input = document.getElementById('newPrinciple');
+        const areaSelect = document.getElementById('principleArea');
         const category = document.getElementById('principlesCategory').value;
         const text = input.value.trim();
+        const area = areaSelect ? areaSelect.value : 'Personal';
         
         if (!text) return;
 
         const newItem = {
             id: 'p_' + Date.now().toString(),
-            text: text
+            text: text,
+            area: area
         };
 
         this.principles[category].push(newItem);
@@ -361,14 +364,29 @@ const JournalModule = {
             return;
         }
 
-        list.innerHTML = items.map(item => `
-            <div style="background: var(--bg-primary); padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
-                <span style="font-size: 0.9rem; line-height: 1.4; flex: 1;">${Utils.escapeHtml(item.text)}</span>
-                <button type="button" class="btn btn-icon" style="color: var(--danger); background: none; min-width: 24px; width: 24px; height: 24px; padding: 0;" onclick="JournalModule.deletePrinciple('${currentCategory}', '${item.id}')" title="Eliminar">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
-            </div>
-        `).join('');
+        // Group by area
+        const grouped = {};
+        items.forEach(item => {
+            const area = item.area || 'Personal';
+            if (!grouped[area]) grouped[area] = [];
+            grouped[area].push(item);
+        });
+
+        let html = '';
+        for (const [area, areaItems] of Object.entries(grouped)) {
+            html += `<div style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-top: 0.75rem; margin-bottom: 0.25rem; text-transform: uppercase;">${area}</div>`;
+            
+            html += areaItems.map(item => `
+                <div style="background: var(--bg-primary); padding: 0.6rem; border-radius: 6px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.25rem;">
+                    <span style="font-size: 0.9rem; line-height: 1.4; flex: 1;">${Utils.escapeHtml(item.text)}</span>
+                    <button type="button" class="btn btn-icon" style="color: var(--danger); background: none; min-width: 24px; width: 24px; height: 24px; padding: 0;" onclick="JournalModule.deletePrinciple('${currentCategory}', '${item.id}')" title="Eliminar">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        list.innerHTML = html;
     },
 
     deletePrinciple(category, id) {
