@@ -7,6 +7,7 @@ const JournalModule = {
     goals: [],
     principles: { principles: [], rules: [], actions: [], improvements: [] },
     currentMood: null,
+    editingGoalId: null,
 
     init() {
         this.loadData();
@@ -77,6 +78,7 @@ const JournalModule = {
                 newGoalFormContainer.style.display = 'none';
                 btnNewGoal.style.display = 'block';
                 goalForm.reset();
+                this.editingGoalId = null;
             });
         }
 
@@ -201,17 +203,28 @@ const JournalModule = {
         const category = document.getElementById('goalCategory').value;
         const plan = document.getElementById('goalPlan') ? document.getElementById('goalPlan').value : '';
 
-        const newGoal = {
-            id: Date.now().toString(),
-            title: title,
-            targetDate: date,
-            category: category,
-            plan: plan,
-            completed: false,
-            createdAt: new Date().toISOString()
-        };
+        if (this.editingGoalId) {
+            const goal = this.goals.find(g => g.id === this.editingGoalId);
+            if (goal) {
+                goal.title = title;
+                goal.targetDate = date;
+                goal.category = category;
+                goal.plan = plan;
+            }
+            this.editingGoalId = null;
+        } else {
+            const newGoal = {
+                id: Date.now().toString(),
+                title: title,
+                targetDate: date,
+                category: category,
+                plan: plan,
+                completed: false,
+                createdAt: new Date().toISOString()
+            };
+            this.goals.push(newGoal);
+        }
 
-        this.goals.push(newGoal);
         this.saveData();
 
         Utils.showToast('Meta guardada', 'success');
@@ -249,10 +262,13 @@ const JournalModule = {
                     <div class="goal-header">
                         <span class="goal-category badge">${Utils.escapeHtml(goal.category)}</span>
                         <div class="goal-actions">
-                            <button class="btn btn-sm btn-icon" style="color: ${goal.completed ? 'var(--text-muted)' : 'var(--success)'}" onclick="JournalModule.toggleGoal('${goal.id}')" title="${goal.completed ? 'Reabrir' : 'Completar'}">
+                            <button type="button" class="btn btn-sm btn-icon" style="color: ${goal.completed ? 'var(--text-muted)' : 'var(--success)'}" onclick="JournalModule.toggleGoal('${goal.id}')" title="${goal.completed ? 'Reabrir' : 'Completar'}">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
                             </button>
-                            <button class="btn btn-sm btn-icon" style="color: var(--danger)" onclick="JournalModule.deleteGoal('${goal.id}')" title="Eliminar">
+                            <button type="button" class="btn btn-sm btn-icon" style="color: var(--primary)" onclick="JournalModule.editGoal('${goal.id}')" title="Editar">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-icon" style="color: var(--danger)" onclick="JournalModule.deleteGoal('${goal.id}')" title="Eliminar">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                             </button>
                         </div>
@@ -281,6 +297,26 @@ const JournalModule = {
                 Utils.showToast('¡Felicidades por completar tu meta! 🎉', 'success');
             }
         }
+    },
+
+    editGoal(id) {
+        const goal = this.goals.find(g => g.id === id);
+        if (!goal) return;
+
+        this.editingGoalId = id;
+
+        document.getElementById('goalTitle').value = goal.title;
+        document.getElementById('goalDate').value = goal.targetDate;
+        document.getElementById('goalCategory').value = goal.category;
+        if (document.getElementById('goalPlan')) {
+            document.getElementById('goalPlan').value = goal.plan || '';
+        }
+
+        document.getElementById('newGoalFormContainer').style.display = 'block';
+        document.getElementById('btnNewGoal').style.display = 'none';
+        
+        // Scroll to form if needed
+        document.getElementById('newGoalFormContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
     },
 
     deleteGoal(id) {
