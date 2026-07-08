@@ -378,21 +378,22 @@ const PurchasesModule = {
 
     getStatusClass(status) {
         switch (status) {
-            case 'Enviado': return 'status-processing';
-            case 'En tránsito': return 'status-transit';
-            case 'En bodega': return 'status-delivered';
+            case 'Enviado': return 'pendiente';
+            case 'En tránsito': return 'en-ruta';
+            case 'En bodega': return 'pagado';
+            case 'Entregado a destino': return 'entregado';
             default: return '';
         }
     },
 
     getPaymentMethodClass(method) {
         switch (method) {
-            case 'Efectivo': return 'status-delivered';
-            case 'Transferencia': return 'status-transit';
-            case 'Nequi': return 'status-transit';
-            case 'Daviplata': return 'status-transit';
-            case 'Tarjeta': return 'status-processing';
-            case 'Crédito': return 'status-cancelled';
+            case 'Efectivo': return 'entregado';
+            case 'Transferencia': return 'en-ruta';
+            case 'Nequi': return 'pagado';
+            case 'Daviplata': return 'pagado';
+            case 'Tarjeta': return 'pendiente';
+            case 'Crédito': return 'cancelado';
             default: return '';
         }
     },
