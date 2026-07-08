@@ -1429,6 +1429,8 @@ form {
 .form-group input,
 .form-group select,
 .form-group textarea {
+    width: 100%;
+    min-width: 0;
     padding: var(--space-sm) var(--space-md);
     background: var(--surface-hover);
     border: 1px solid var(--border);
