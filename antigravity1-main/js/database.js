@@ -680,7 +680,8 @@ const Database = {
                 .from('v_guides_complete')
                 .select(`
                     *,
-                    guide_items ( products ( name ) )
+                    guide_items ( products ( name ) ),
+                    guide_metadata ( source )
                 `)
                 .order('created_at', { ascending: false });
 
@@ -704,6 +705,7 @@ const Database = {
                 observations: g.observations,
                 itemsCount: g.items_count,
                 items: g.guide_items || [],
+                source: (g.guide_metadata && g.guide_metadata.source) ? g.guide_metadata.source : 'Manual',
                 createdAt: g.created_at,
                 deliveryDate: g.delivery_date,
                 deliveredAt: g.delivered_at,
@@ -721,7 +723,10 @@ const Database = {
         try {
             const { data, error } = await supabaseClient
                 .from('v_guides_complete')
-                .select('*')
+                .select(`
+                    *,
+                    guide_metadata ( source )
+                `)
                 .eq('id', id)
                 .single();
 
@@ -743,6 +748,7 @@ const Database = {
                 shippingAdjustedAt: data.shipping_adjusted_at,
                 shippingAdjustmentNote: data.shipping_adjustment_note,
                 observations: data.observations,
+                source: (data.guide_metadata && data.guide_metadata.source) ? data.guide_metadata.source : 'Manual',
                 createdAt: data.created_at,
                 amountUsd: data.amount_usd ? parseFloat(data.amount_usd) : null,
                 paymentBs: data.payment_bs ? parseFloat(data.payment_bs) : null,
@@ -1022,7 +1028,10 @@ const Database = {
         try {
             let query = supabaseClient
                 .from('v_guides_complete')
-                .select('*')
+                .select(`
+                    *,
+                    guide_metadata ( source )
+                `)
                 .order('created_at', { ascending: false });
 
             if (city !== 'all') {
@@ -1039,6 +1048,7 @@ const Database = {
                 clientName: g.client_name,
                 city: g.city_name,
                 status: g.status_name,
+                source: (g.guide_metadata && g.guide_metadata.source) ? g.guide_metadata.source : 'Manual',
                 createdAt: g.created_at
             }));
         } catch (error) {

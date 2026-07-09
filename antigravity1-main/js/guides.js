@@ -498,10 +498,17 @@ const GuidesModule = {
                 }
             }
 
+            const sourceBadge = guide.source === 'Tienda Web' 
+                ? `<span style="font-size: 0.65em; background: #8b5cf6; color: white; padding: 2px 6px; border-radius: 4px; font-weight: 600; letter-spacing: 0.5px;">WEB</span>`
+                : '';
+
             return `
                 <tr>
                     <td>
-                        <strong style="color: var(--primary);">${guide.guideNumber}</strong>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <strong style="color: var(--primary);">${guide.guideNumber}</strong>
+                            ${sourceBadge}
+                        </div>
                     </td>
                     <td>${Utils.formatDate(guide.createdAt)}</td>
                     <td>${guide.clientName ? Utils.escapeHtml(guide.clientName) : 'Cliente eliminado'}</td>
