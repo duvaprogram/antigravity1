@@ -2657,13 +2657,14 @@
                                         <th>Fecha</th>
                                         <th style="text-align: center;">Conjuntos</th>
                                         <th style="text-align: center;">Anuncios</th>
+                                        <th>Estado</th>
                                         <th>Creado</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="campaignsHistoryTable">
                                     <tr>
-                                        <td colspan="9"
+                                        <td colspan="10"
                                             style="text-align: center; color: var(--text-muted); padding: 2rem;">
                                             No hay campañas generadas aún
                                         </td>
@@ -5061,6 +5062,16 @@
                         <div class="form-group">
                             <label for="editCampaignAds">Anuncios</label>
                             <input type="number" id="editCampaignAds" class="form-control" min="0" max="100">
+                        </div>
+                        <div class="form-group">
+                            <label>Estado de Campaña</label>
+                            <div style="padding-top: 0.5rem; display: flex; align-items: center;">
+                                <label class="switch">
+                                    <input type="checkbox" id="editCampaignActive" checked>
+                                    <span class="slider"></span>
+                                    <span class="switch-label" style="margin-left: 6px; font-weight: 600;">Activa</span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                     <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">

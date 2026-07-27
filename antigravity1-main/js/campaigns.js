@@ -664,7 +664,7 @@ const CampaignsModule = {
         if (this.generatedCampaigns.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         No hay campañas generadas aún
                     </td>
                 </tr>`;
@@ -684,9 +684,10 @@ const CampaignsModule = {
             const adSetsDisplay = campaign.adSets > 0 ? campaign.adSets : '-';
             const adsDisplay = campaign.ads > 0 ? campaign.ads : '-';
             const codeDisplay = campaign.code || '-';
+            const isActive = campaign.active !== false;
 
             return `
-                <tr>
+                <tr style="${!isActive ? 'opacity: 0.75; background: rgba(0,0,0,0.02);' : ''}">
                     <td>
                         <span onclick="CampaignsModule.copyCode('${codeDisplay}')" 
                               style="background: linear-gradient(135deg, var(--primary), #8b5cf6); color: white; 
@@ -696,34 +697,45 @@ const CampaignsModule = {
                             ${codeDisplay}
                         </span>
                     </td>
-                    <td style="font-family: monospace; font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${campaign.name}</td>
+                    <td style="font-family: monospace; font-size: 0.8rem; max-width: 190px; overflow: hidden; text-overflow: ellipsis;">${campaign.name}</td>
                     <td>${this.countries[campaign.country] || campaign.country}</td>
                     <td><span class="badge badge-${campaign.type === 'ABO' ? 'primary' : 'secondary'}">${campaign.type}</span></td>
                     <td style="font-size: 0.85rem;">${campaign.date}</td>
                     <td style="text-align: center; font-weight: 600;">${adSetsDisplay}</td>
                     <td style="text-align: center; font-weight: 600;">${adsDisplay}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.35rem;">
+                            <label class="switch" title="Clic para Activar / Desactivar">
+                                <input type="checkbox" ${isActive ? 'checked' : ''} onchange="CampaignsModule.toggleCampaignStatus('${campaign.id}', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                            <span style="font-size: 0.75rem; font-weight: 600; color: ${isActive ? '#10b981' : 'var(--text-muted)'};">
+                                ${isActive ? 'Activa' : 'Inactiva'}
+                            </span>
+                        </div>
+                    </td>
                     <td style="font-size: 0.75rem; color: var(--text-muted);">${formattedDate}</td>
                     <td>
                         <div style="display: flex; gap: 0.25rem;">
-                            <button class="btn btn-icon btn-sm" onclick="CampaignsModule.openAdDetailsModal(${campaign.id})" title="Anuncios, Post IDs y Compras">
+                            <button class="btn btn-icon btn-sm" onclick="CampaignsModule.openAdDetailsModal('${campaign.id}')" title="Anuncios, Post IDs y Compras">
                                 📢
                             </button>
-                            <button class="btn btn-icon btn-sm" onclick="CampaignsModule.openEditCampaignModal(${campaign.id})" title="Editar Campaña">
+                            <button class="btn btn-icon btn-sm" onclick="CampaignsModule.openEditCampaignModal('${campaign.id}')" title="Editar Campaña">
                                 ✏️
                             </button>
-                            <button class="btn btn-icon btn-sm" onclick="CampaignsModule.copyAllCodes(${campaign.id})" title="Copiar todos los códigos">
+                            <button class="btn btn-icon btn-sm" onclick="CampaignsModule.copyAllCodes('${campaign.id}')" title="Copiar todos los códigos">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                                 </svg>
                             </button>
-                            <button class="btn btn-icon btn-sm" onclick="CampaignsModule.viewCampaignDetails(${campaign.id})" title="Ver detalles">
+                            <button class="btn btn-icon btn-sm" onclick="CampaignsModule.viewCampaignDetails('${campaign.id}')" title="Ver detalles">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                                     <circle cx="12" cy="12" r="3"></circle>
                                 </svg>
                             </button>
-                            <button class="btn btn-icon btn-sm btn-danger-light" onclick="CampaignsModule.deleteCampaign(${campaign.id})" title="Eliminar">
+                            <button class="btn btn-icon btn-sm btn-danger-light" onclick="CampaignsModule.deleteCampaign('${campaign.id}')" title="Eliminar">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="3 6 5 6 21 6"></polyline>
                                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -735,9 +747,23 @@ const CampaignsModule = {
         }).join('');
     },
 
+    // Toggle active / inactive status of a campaign
+    toggleCampaignStatus(campaignId, active) {
+        const campaign = this.generatedCampaigns.find(c => String(c.id) === String(campaignId));
+        if (campaign) {
+            campaign.active = active;
+            this.saveCampaigns();
+            if (window.Database && window.Database.saveCampaign) {
+                try { window.Database.saveCampaign(campaign); } catch(e){}
+            }
+            this.renderHistory();
+            Utils.showNotification(`Campaña ${campaign.code || ''} ${active ? 'activada 🟢' : 'desactivada 🔴'}`, active ? 'success' : 'info');
+        }
+    },
+
     // View campaign details in a modal/popup
     viewCampaignDetails(campaignId) {
-        const campaign = this.generatedCampaigns.find(c => c.id === campaignId);
+        const campaign = this.generatedCampaigns.find(c => String(c.id) === String(campaignId));
         if (!campaign) return;
 
         this.ensureAdDetails(campaign);
@@ -809,7 +835,7 @@ const CampaignsModule = {
                         <div style="font-weight: 600; color: #8b5cf6;">
                             📢 Anuncios (${campaign.adCodes.length})
                         </div>
-                        <button class="btn btn-sm btn-secondary" onclick="CampaignsModule.openAdDetailsModal(${campaign.id})" style="font-size: 0.75rem;">
+                        <button class="btn btn-sm btn-secondary" onclick="CampaignsModule.openAdDetailsModal('${campaign.id}')" style="font-size: 0.75rem;">
                             ✏️ Editar Post IDs y Compras
                         </button>
                     </div>
@@ -842,13 +868,13 @@ const CampaignsModule = {
 
         detailsHtml += `
                 <div style="margin-top: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
-                    <button class="btn btn-secondary" onclick="CampaignsModule.openEditCampaignModal(${campaign.id})">
+                    <button class="btn btn-secondary" onclick="CampaignsModule.openEditCampaignModal('${campaign.id}')">
                         ✏️ Editar Campaña
                     </button>
-                    <button class="btn btn-success" onclick="CampaignsModule.openAdDetailsModal(${campaign.id})">
+                    <button class="btn btn-success" onclick="CampaignsModule.openAdDetailsModal('${campaign.id}')">
                         📢 Post IDs y Compras
                     </button>
-                    <button class="btn btn-primary" onclick="CampaignsModule.copyAllCodes(${campaign.id})">
+                    <button class="btn btn-primary" onclick="CampaignsModule.copyAllCodes('${campaign.id}')">
                         📋 Copiar Todo
                     </button>
                     <button class="btn btn-secondary" onclick="CampaignsModule.closeDetailsModal()">Cerrar</button>
@@ -907,7 +933,7 @@ const CampaignsModule = {
 
     // Open edit campaign modal
     openEditCampaignModal(campaignId) {
-        const campaign = this.generatedCampaigns.find(c => c.id === campaignId);
+        const campaign = this.generatedCampaigns.find(c => String(c.id) === String(campaignId));
         if (!campaign) return;
 
         document.getElementById('editCampaignId').value = campaign.id;
@@ -918,6 +944,9 @@ const CampaignsModule = {
         document.getElementById('editCampaignProduct').value = campaign.product || '';
         document.getElementById('editCampaignAdSets').value = campaign.adSets || 0;
         document.getElementById('editCampaignAds').value = campaign.ads || 0;
+        
+        const activeCheck = document.getElementById('editCampaignActive');
+        if (activeCheck) activeCheck.checked = campaign.active !== false;
 
         this.closeDetailsModal();
         Utils.openModal('modalEditCampaign');
@@ -945,8 +974,8 @@ const CampaignsModule = {
     // Submit edit campaign form
     handleEditCampaignSubmit(e) {
         e.preventDefault();
-        const id = parseInt(document.getElementById('editCampaignId').value);
-        const campaign = this.generatedCampaigns.find(c => c.id === id);
+        const id = document.getElementById('editCampaignId').value;
+        const campaign = this.generatedCampaigns.find(c => String(c.id) === String(id));
         if (!campaign) return;
 
         const country = document.getElementById('editCampaignCountry').value;
@@ -956,6 +985,8 @@ const CampaignsModule = {
         const product = document.getElementById('editCampaignProduct').value.trim();
         const adSets = parseInt(document.getElementById('editCampaignAdSets').value) || 0;
         const ads = parseInt(document.getElementById('editCampaignAds').value) || 0;
+        const activeCheck = document.getElementById('editCampaignActive');
+        if (activeCheck) campaign.active = activeCheck.checked;
 
         const formattedDate = this.formatDate(dateStr);
         const formattedProduct = product.toUpperCase().replace(/\s+/g, '-');
@@ -991,11 +1022,11 @@ const CampaignsModule = {
 
     // Open modal to manage Ads, Post IDs and Purchases
     openAdDetailsModal(campaignId) {
-        const campaign = this.generatedCampaigns.find(c => c.id === campaignId);
+        const campaign = this.generatedCampaigns.find(c => String(c.id) === String(campaignId));
         if (!campaign) return;
 
         this.ensureAdDetails(campaign);
-        this.currentEditingCampaignId = campaignId;
+        this.currentEditingCampaignId = campaign.id;
 
         const headerEl = document.getElementById('modalEditAdDetailsHeader');
         if (headerEl) {
@@ -1061,7 +1092,7 @@ const CampaignsModule = {
     // Save ad details, Post IDs and purchases from modal
     saveAdDetailsFromModal() {
         if (!this.currentEditingCampaignId) return;
-        const campaign = this.generatedCampaigns.find(c => c.id === this.currentEditingCampaignId);
+        const campaign = this.generatedCampaigns.find(c => String(c.id) === String(this.currentEditingCampaignId));
         if (!campaign) return;
 
         this.ensureAdDetails(campaign);
@@ -1173,7 +1204,8 @@ const CampaignsModule = {
 
     // Delete a campaign from history
     deleteCampaign(campaignId) {
-        const index = this.generatedCampaigns.findIndex(c => c.id === campaignId);
+        if (!confirm('¿Está seguro de eliminar esta campaña?')) return;
+        const index = this.generatedCampaigns.findIndex(c => String(c.id) === String(campaignId));
         if (index > -1) {
             const campaign = this.generatedCampaigns[index];
 
