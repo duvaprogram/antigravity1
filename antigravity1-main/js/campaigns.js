@@ -705,6 +705,12 @@ const CampaignsModule = {
                     <td style="font-size: 0.75rem; color: var(--text-muted);">${formattedDate}</td>
                     <td>
                         <div style="display: flex; gap: 0.25rem;">
+                            <button class="btn btn-icon btn-sm" onclick="CampaignsModule.openAdDetailsModal(${campaign.id})" title="Anuncios, Post IDs y Compras">
+                                📢
+                            </button>
+                            <button class="btn btn-icon btn-sm" onclick="CampaignsModule.openEditCampaignModal(${campaign.id})" title="Editar Campaña">
+                                ✏️
+                            </button>
                             <button class="btn btn-icon btn-sm" onclick="CampaignsModule.copyAllCodes(${campaign.id})" title="Copiar todos los códigos">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -733,6 +739,8 @@ const CampaignsModule = {
     viewCampaignDetails(campaignId) {
         const campaign = this.generatedCampaigns.find(c => c.id === campaignId);
         if (!campaign) return;
+
+        this.ensureAdDetails(campaign);
 
         let detailsHtml = `
             <div style="padding: 1.5rem;">
@@ -797,18 +805,35 @@ const CampaignsModule = {
         if (campaign.adCodes && campaign.adCodes.length > 0) {
             detailsHtml += `
                 <div style="margin-bottom: 1rem; padding: 1rem; background: var(--surface-hover); border-radius: var(--radius-md); border-left: 4px solid #8b5cf6;">
-                    <div style="font-weight: 600; color: #8b5cf6; margin-bottom: 0.75rem;">
-                        📢 Códigos de Anuncios (${campaign.adCodes.length})
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <div style="font-weight: 600; color: #8b5cf6;">
+                            📢 Anuncios (${campaign.adCodes.length})
+                        </div>
+                        <button class="btn btn-sm btn-secondary" onclick="CampaignsModule.openAdDetailsModal(${campaign.id})" style="font-size: 0.75rem;">
+                            ✏️ Editar Post IDs y Compras
+                        </button>
                     </div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                        ${campaign.adCodes.map(code => `
-                            <span onclick="CampaignsModule.copyCode('${code}')" 
-                                  style="font-family: monospace; padding: 0.5rem 0.75rem; background: rgba(139, 92, 246, 0.1); 
-                                         color: #8b5cf6; border-radius: var(--radius-sm); cursor: pointer;
-                                         font-weight: 600;"
-                                  title="Clic para copiar">
-                                ${code}
-                            </span>
+                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        ${(campaign.adDetails || []).map(ad => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-primary); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                                <span onclick="CampaignsModule.copyCode('${ad.code}')" 
+                                      style="font-family: monospace; color: #8b5cf6; cursor: pointer; font-weight: 700;"
+                                      title="Clic para copiar código de anuncio">
+                                    ${ad.code}
+                                </span>
+                                <div style="display: flex; gap: 0.75rem; align-items: center; font-size: 0.85rem;">
+                                    ${ad.postId ? `
+                                        <span onclick="CampaignsModule.copyCode('${ad.postId}')" 
+                                              style="font-family: monospace; background: rgba(99, 102, 241, 0.1); color: var(--primary); padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer;"
+                                              title="Clic para copiar Post ID">
+                                            🆔 ${ad.postId}
+                                        </span>
+                                    ` : `<span style="color: var(--text-muted); font-size: 0.75rem;">Sin Post ID</span>`}
+                                    <span style="font-weight: 700; color: ${ad.purchases > 0 ? '#10b981' : 'var(--text-muted)'};">
+                                        🛒 ${ad.purchases || 0} compras
+                                    </span>
+                                </div>
+                            </div>
                         `).join('')}
                     </div>
                 </div>
@@ -816,13 +841,15 @@ const CampaignsModule = {
         }
 
         detailsHtml += `
-                <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem; justify-content: center;">
+                <div style="margin-top: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
+                    <button class="btn btn-secondary" onclick="CampaignsModule.openEditCampaignModal(${campaign.id})">
+                        ✏️ Editar Campaña
+                    </button>
+                    <button class="btn btn-success" onclick="CampaignsModule.openAdDetailsModal(${campaign.id})">
+                        📢 Post IDs y Compras
+                    </button>
                     <button class="btn btn-primary" onclick="CampaignsModule.copyAllCodes(${campaign.id})">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                        </svg>
-                        Copiar Todo
+                        📋 Copiar Todo
                     </button>
                     <button class="btn btn-secondary" onclick="CampaignsModule.closeDetailsModal()">Cerrar</button>
                 </div>
@@ -835,7 +862,7 @@ const CampaignsModule = {
             modal = document.createElement('div');
             modal.id = 'campaignDetailsModal';
             modal.className = 'modal';
-            modal.innerHTML = `<div class="modal-content" style="max-width: 550px;"></div>`;
+            modal.innerHTML = `<div class="modal-content" style="max-width: 580px;"></div>`;
             document.body.appendChild(modal);
 
             // Close on backdrop click
@@ -858,6 +885,275 @@ const CampaignsModule = {
             modal.classList.remove('active');
             document.body.style.overflow = '';
         }
+    },
+
+    // Ensure adDetails array exists for a campaign
+    ensureAdDetails(campaign) {
+        if (!campaign.adDetails) campaign.adDetails = [];
+        const existingMap = new Map(campaign.adDetails.map(a => [a.code, a]));
+
+        const updatedAdDetails = (campaign.adCodes || []).map(code => {
+            const existing = existingMap.get(code);
+            return {
+                code: code,
+                postId: existing?.postId || '',
+                purchases: existing?.purchases || 0,
+                spent: existing?.spent || 0
+            };
+        });
+
+        campaign.adDetails = updatedAdDetails;
+    },
+
+    // Open edit campaign modal
+    openEditCampaignModal(campaignId) {
+        const campaign = this.generatedCampaigns.find(c => c.id === campaignId);
+        if (!campaign) return;
+
+        document.getElementById('editCampaignId').value = campaign.id;
+        document.getElementById('editCampaignCountry').value = campaign.country || 'ECU';
+        document.getElementById('editCampaignType').value = campaign.type || 'ABO';
+        document.getElementById('editCampaignObjective').value = campaign.objective || 'COMPRAS';
+        document.getElementById('editCampaignDate').value = this.parseDateInputFormat(campaign.date);
+        document.getElementById('editCampaignProduct').value = campaign.product || '';
+        document.getElementById('editCampaignAdSets').value = campaign.adSets || 0;
+        document.getElementById('editCampaignAds').value = campaign.ads || 0;
+
+        this.closeDetailsModal();
+        Utils.openModal('modalEditCampaign');
+    },
+
+    // Helper to format date for input[type="date"]
+    parseDateInputFormat(dateStr) {
+        if (!dateStr) return '';
+        if (dateStr.includes('-')) {
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                if (parts[0].length === 4) return dateStr;
+                const monthIndex = Object.values(this.monthNames).indexOf(parts[1]);
+                if (monthIndex > -1) {
+                    const day = parts[0].padStart(2, '0');
+                    const month = String(monthIndex + 1).padStart(2, '0');
+                    const year = parts[2];
+                    return `${year}-${month}-${day}`;
+                }
+            }
+        }
+        return dateStr;
+    },
+
+    // Submit edit campaign form
+    handleEditCampaignSubmit(e) {
+        e.preventDefault();
+        const id = parseInt(document.getElementById('editCampaignId').value);
+        const campaign = this.generatedCampaigns.find(c => c.id === id);
+        if (!campaign) return;
+
+        const country = document.getElementById('editCampaignCountry').value;
+        const type = document.getElementById('editCampaignType').value;
+        const objective = document.getElementById('editCampaignObjective').value;
+        const dateStr = document.getElementById('editCampaignDate').value;
+        const product = document.getElementById('editCampaignProduct').value.trim();
+        const adSets = parseInt(document.getElementById('editCampaignAdSets').value) || 0;
+        const ads = parseInt(document.getElementById('editCampaignAds').value) || 0;
+
+        const formattedDate = this.formatDate(dateStr);
+        const formattedProduct = product.toUpperCase().replace(/\s+/g, '-');
+        const campaignCode = campaign.code || this.generateCampaignCode();
+
+        campaign.country = country;
+        campaign.type = type;
+        campaign.objective = objective;
+        campaign.date = formattedDate;
+        campaign.product = formattedProduct;
+        campaign.name = `${country}-${type}-${objective}-${formattedDate}-${formattedProduct}-${campaignCode}`;
+
+        if (campaign.adSets !== adSets) {
+            campaign.adSets = adSets;
+            campaign.adSetCodes = this.generateAdSetCodes(campaignCode, adSets);
+        }
+        if (campaign.ads !== ads) {
+            campaign.ads = ads;
+            campaign.adCodes = this.generateAdCodes(campaignCode, ads);
+        }
+
+        this.ensureAdDetails(campaign);
+
+        this.saveCampaigns();
+        if (window.Database && window.Database.saveCampaign) {
+            try { window.Database.saveCampaign(campaign); } catch(e){}
+        }
+
+        Utils.closeModal('modalEditCampaign');
+        this.renderHistory();
+        Utils.showNotification('¡Campaña actualizada con éxito!', 'success');
+    },
+
+    // Open modal to manage Ads, Post IDs and Purchases
+    openAdDetailsModal(campaignId) {
+        const campaign = this.generatedCampaigns.find(c => c.id === campaignId);
+        if (!campaign) return;
+
+        this.ensureAdDetails(campaign);
+        this.currentEditingCampaignId = campaignId;
+
+        const headerEl = document.getElementById('modalEditAdDetailsHeader');
+        if (headerEl) {
+            headerEl.innerHTML = `
+                <div style="font-weight: 700; font-size: 1.1rem; color: var(--primary);">
+                    Campaña: ${campaign.code}
+                </div>
+                <div style="font-family: monospace; font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem; word-break: break-all;">
+                    ${campaign.name}
+                </div>
+            `;
+        }
+
+        const tbody = document.getElementById('modalEditAdDetailsTableBody');
+        if (tbody) {
+            if (!campaign.adDetails || campaign.adDetails.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+                            Esta campaña no tiene anuncios individuales asignados. Edita la campaña para agregar anuncios.
+                        </td>
+                    </tr>
+                `;
+            } else {
+                tbody.innerHTML = campaign.adDetails.map(ad => `
+                    <tr>
+                        <td>
+                            <span onclick="CampaignsModule.copyCode('${ad.code}')" 
+                                  style="font-family: monospace; padding: 0.35rem 0.6rem; background: rgba(139, 92, 246, 0.1); 
+                                         color: #8b5cf6; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer;"
+                                  title="Clic para copiar código">
+                                ${ad.code}
+                            </span>
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 0.35rem; align-items: center;">
+                                <input type="text" class="form-control form-control-sm ad-post-id-field" data-code="${ad.code}" 
+                                       value="${ad.postId || ''}" placeholder="Ej: 1202058493821034" style="font-family: monospace;">
+                                ${ad.postId ? `
+                                    <button type="button" class="btn btn-icon btn-sm" onclick="CampaignsModule.copyCode('${ad.postId}')" title="Copiar Post ID">
+                                        📋
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm ad-purchases-field" data-code="${ad.code}" 
+                                   value="${ad.purchases || 0}" min="0" style="text-align: center; font-weight: 700; color: #10b981;">
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm ad-spent-field" data-code="${ad.code}" 
+                                   value="${ad.spent || 0}" step="0.01" min="0" style="text-align: right; font-family: monospace;">
+                        </td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        this.closeDetailsModal();
+        Utils.openModal('modalEditAdDetails');
+    },
+
+    // Save ad details, Post IDs and purchases from modal
+    saveAdDetailsFromModal() {
+        if (!this.currentEditingCampaignId) return;
+        const campaign = this.generatedCampaigns.find(c => c.id === this.currentEditingCampaignId);
+        if (!campaign) return;
+
+        this.ensureAdDetails(campaign);
+
+        const postIdInputs = document.querySelectorAll('.ad-post-id-field');
+        const purchasesInputs = document.querySelectorAll('.ad-purchases-field');
+        const spentInputs = document.querySelectorAll('.ad-spent-field');
+
+        let totalPurchases = 0;
+        let totalSpent = 0;
+
+        postIdInputs.forEach(input => {
+            const code = input.dataset.code;
+            const adObj = campaign.adDetails.find(a => a.code === code);
+            if (adObj) adObj.postId = input.value.trim();
+        });
+
+        purchasesInputs.forEach(input => {
+            const code = input.dataset.code;
+            const adObj = campaign.adDetails.find(a => a.code === code);
+            const val = parseInt(input.value) || 0;
+            if (adObj) adObj.purchases = val;
+            totalPurchases += val;
+        });
+
+        spentInputs.forEach(input => {
+            const code = input.dataset.code;
+            const adObj = campaign.adDetails.find(a => a.code === code);
+            const val = parseFloat(input.value) || 0;
+            if (adObj) adObj.spent = val;
+            totalSpent += val;
+        });
+
+        // Sync performanceData
+        this.loadPerformanceData();
+        let perfItem = this.performanceData.find(p => p.code === campaign.code);
+        if (perfItem) {
+            perfItem.purchases = totalPurchases;
+            if (totalSpent > 0) perfItem.spent = totalSpent;
+            if (perfItem.spent && perfItem.purchases) {
+                perfItem.costPerPurchase = perfItem.spent / perfItem.purchases;
+            }
+        } else {
+            this.performanceData.push({
+                code: campaign.code,
+                originalName: campaign.name,
+                spent: totalSpent,
+                purchases: totalPurchases,
+                costPerPurchase: totalSpent && totalPurchases ? (totalSpent / totalPurchases) : 0
+            });
+        }
+        this.savePerformanceData();
+
+        this.saveCampaigns();
+        if (window.Database && window.Database.saveCampaign) {
+            try { window.Database.saveCampaign(campaign); } catch(e){}
+        }
+
+        Utils.closeModal('modalEditAdDetails');
+        this.renderHistory();
+        this.renderPerformanceTable();
+        Utils.showNotification('¡Post IDs y compras guardados exitosamente!', 'success');
+    },
+
+    // Edit performance item directly from performance table
+    editPerformanceItem(code) {
+        const campaign = this.generatedCampaigns.find(c => c.code === code);
+        if (campaign) {
+            this.openAdDetailsModal(campaign.id);
+            return;
+        }
+
+        const item = this.performanceData.find(p => p.code === code);
+        if (!item) return;
+
+        const newPurchasesStr = prompt(`Editar compras para ${code}:`, item.purchases || 0);
+        if (newPurchasesStr === null) return;
+        const newPurchases = parseInt(newPurchasesStr) || 0;
+
+        const newSpentStr = prompt(`Editar gasto total para ${code}:`, item.spent || 0);
+        if (newSpentStr === null) return;
+        const newSpent = parseFloat(newSpentStr) || 0;
+
+        item.purchases = newPurchases;
+        item.spent = newSpent;
+        if (newSpent && newPurchases) {
+            item.costPerPurchase = newSpent / newPurchases;
+        }
+
+        this.savePerformanceData();
+        this.renderPerformanceTable();
+        Utils.showNotification('Rendimiento actualizado', 'success');
     },
 
     // Copy a campaign from history
@@ -1589,6 +1885,11 @@ const CampaignsModule = {
                     <td style="font-size: 0.75rem; color: var(--text-muted);">
                         ${item.startDate || '-'} - ${item.endDate || '-'}
                     </td>
+                    <td>
+                        <button class="btn btn-icon btn-sm" onclick="CampaignsModule.editPerformanceItem('${item.code}')" title="Editar compras / rendimiento">
+                            ✏️
+                        </button>
+                    </td>
                 </tr>
             `;
         }).join('') + `
@@ -1596,7 +1897,7 @@ const CampaignsModule = {
                 <td colspan="2" style="text-align: right;">TOTALES:</td>
                 <td style="text-align: right; font-family: monospace; color: var(--primary);">$${this.formatCurrency(totals.spent)}</td>
                 <td style="text-align: center; color: #10b981;">${totals.purchases}</td>
-                <td colspan="4"></td>
+                <td colspan="5"></td>
             </tr>
         `;
     },

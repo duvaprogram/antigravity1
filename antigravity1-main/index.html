@@ -2784,11 +2784,12 @@
                                         <th style="text-align: right;">CPM</th>
                                         <th style="text-align: right;">Costo/Compra</th>
                                         <th>Período</th>
+                                        <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="campaignPerformanceTable">
                                     <tr>
-                                        <td colspan="8"
+                                        <td colspan="9"
                                             style="text-align: center; color: var(--text-muted); padding: 2rem;">
                                             No hay datos de rendimiento. Sube un reporte para ver el rendimiento.
                                         </td>
@@ -5008,6 +5009,100 @@
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
                 <button type="button" class="btn btn-secondary" data-close="modalJournalBackup">Cancelar</button>
                 <button type="button" class="btn btn-primary" onclick="JournalModule.processPasteBackup()">Cargar e Importar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Campaign -->
+    <div class="modal" id="modalEditCampaign">
+        <div class="modal-content" style="max-width: 650px;">
+            <div class="modal-header">
+                <h2>Editar Campaña</h2>
+                <button class="modal-close" data-close="modalEditCampaign">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem 0;">
+                <form id="editCampaignForm" onsubmit="CampaignsModule.handleEditCampaignSubmit(event)">
+                    <input type="hidden" id="editCampaignId">
+                    <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                        <div class="form-group">
+                            <label for="editCampaignCountry">País *</label>
+                            <select id="editCampaignCountry" class="form-control" required>
+                                <option value="ECU">🇪🇨 Ecuador (ECU)</option>
+                                <option value="VEN">🇻🇪 Venezuela (VEN)</option>
+                                <option value="COL">🇨🇴 Colombia (COL)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editCampaignType">Tipo *</label>
+                            <select id="editCampaignType" class="form-control" required>
+                                <option value="ABO">ABO</option>
+                                <option value="CBO">CBO</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editCampaignObjective">Objetivo *</label>
+                            <select id="editCampaignObjective" class="form-control" required>
+                                <option value="MENSAJES">Mensajes</option>
+                                <option value="COMPRAS">Compras</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="editCampaignDate">Fecha *</label>
+                            <input type="date" id="editCampaignDate" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editCampaignProduct">Producto *</label>
+                            <input type="text" id="editCampaignProduct" class="form-control" placeholder="Nombre del producto" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="editCampaignAdSets">Conjuntos de Anuncios</label>
+                            <input type="number" id="editCampaignAdSets" class="form-control" min="0" max="100">
+                        </div>
+                        <div class="form-group">
+                            <label for="editCampaignAds">Anuncios</label>
+                            <input type="number" id="editCampaignAds" class="form-control" min="0" max="100">
+                        </div>
+                    </div>
+                    <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" data-close="modalEditCampaign">Cancelar</button>
+                        <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Ads, Post IDs and Purchases -->
+    <div class="modal modal-large" id="modalEditAdDetails">
+        <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-header">
+                <h2>📢 Anuncios, Post IDs y Compras</h2>
+                <button class="modal-close" data-close="modalEditAdDetails">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1rem 0;">
+                <div id="modalEditAdDetailsHeader" style="margin-bottom: 1rem; padding: 0.75rem; background: var(--surface-hover); border-radius: var(--radius-md);"></div>
+                <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Código Anuncio</th>
+                                <th>Post ID (Facebook / IG)</th>
+                                <th style="width: 130px; text-align: center;">Compras</th>
+                                <th style="width: 140px; text-align: right;">Gasto (USD/COP)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modalEditAdDetailsTableBody">
+                            <!-- Dynamic rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+                <span style="font-size: 0.8rem; color: var(--text-muted);">Los Post IDs y compras se guardarán en esta campaña y actualizarán su rendimiento.</span>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="button" class="btn btn-secondary" data-close="modalEditAdDetails">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="CampaignsModule.saveAdDetailsFromModal()">Guardar Anuncios y Compras</button>
+                </div>
             </div>
         </div>
     </div>
