@@ -9,8 +9,8 @@ const JournalModule = {
     currentMood: null,
     editingGoalId: null,
 
-    init() {
-        this.loadData();
+    async init() {
+        await this.loadData();
         this.bindEvents();
     },
     
@@ -33,62 +33,91 @@ const JournalModule = {
         }
     },
 
-    loadData() {
-        const savedEntries = localStorage.getItem('journal_entries');
-        const savedGoals = localStorage.getItem('journal_goals');
-        const savedPrinciples = localStorage.getItem('journal_principles');
-        
-        if (savedEntries) {
-            this.entries = JSON.parse(savedEntries);
-        } else if (typeof JournalSeedData !== 'undefined') {
-            this.entries = [...JournalSeedData.entries];
-            localStorage.setItem('journal_entries', JSON.stringify(this.entries));
-        } else {
-            this.entries = [];
+    async loadData() {
+        const localEntries = JSON.parse(localStorage.getItem('journal_entries') || 'null');
+        const localGoals = JSON.parse(localStorage.getItem('journal_goals') || 'null');
+        const localPrinciples = JSON.parse(localStorage.getItem('journal_principles') || 'null');
+
+        if (!window.supabaseClient || !window.AuthModule || !window.AuthModule.currentUser) {
+            console.error("Supabase or user not initialized, falling back to local storage");
+            this.entries = localEntries || [];
+            this.goals = localGoals || [];
+            this.principles = localPrinciples || { principles: [], rules: [], actions: [], improvements: [] };
+            return;
         }
 
-        if (savedGoals) {
-            this.goals = JSON.parse(savedGoals);
-        } else if (typeof JournalSeedData !== 'undefined') {
-            this.goals = [...JournalSeedData.goals];
-            localStorage.setItem('journal_goals', JSON.stringify(this.goals));
-        } else {
-            this.goals = [];
-        }
+        const userId = window.AuthModule.currentUser.id;
 
-        if (savedPrinciples) {
-            this.principles = JSON.parse(savedPrinciples);
-            
-            // Migration: Add areas to existing items if missing
-            if (typeof JournalSeedData !== 'undefined' && JournalSeedData.principles) {
-                let migrated = false;
-                for (const category in this.principles) {
-                    if (this.principles[category] && Array.isArray(this.principles[category])) {
-                        this.principles[category].forEach(item => {
-                            if (!item.area) {
-                                const seedItem = JournalSeedData.principles[category]?.find(s => s.id === item.id);
-                                item.area = seedItem && seedItem.area ? seedItem.area : 'Personal';
-                                migrated = true;
-                            }
-                        });
-                    }
-                }
-                if (migrated) {
-                    localStorage.setItem('journal_principles', JSON.stringify(this.principles));
+        try {
+            const { data, error } = await supabaseClient
+                .from('user_journals')
+                .select('*')
+                .eq('user_id', userId)
+                .single();
+
+            if (error && error.code !== 'PGRST116') {
+                throw error;
+            }
+
+            if (data) {
+                // Load from DB
+                this.entries = data.entries || [];
+                this.goals = data.goals || [];
+                this.principles = data.principles || { principles: [], rules: [], actions: [], improvements: [] };
+            } else {
+                // Try to migrate from localStorage if DB is empty
+                if (localEntries || localGoals || localPrinciples) {
+                    this.entries = localEntries || [];
+                    this.goals = localGoals || [];
+                    this.principles = localPrinciples || { principles: [], rules: [], actions: [], improvements: [] };
+                    // Save to DB now
+                    await this.saveData();
+                } else if (typeof JournalSeedData !== 'undefined') {
+                    this.entries = [...JournalSeedData.entries];
+                    this.goals = [...JournalSeedData.goals];
+                    this.principles = JSON.parse(JSON.stringify(JournalSeedData.principles));
+                    await this.saveData();
+                } else {
+                    this.entries = [];
+                    this.goals = [];
+                    this.principles = { principles: [], rules: [], actions: [], improvements: [] };
                 }
             }
-        } else if (typeof JournalSeedData !== 'undefined' && JournalSeedData.principles) {
-            this.principles = JSON.parse(JSON.stringify(JournalSeedData.principles));
-            localStorage.setItem('journal_principles', JSON.stringify(this.principles));
-        } else {
-            this.principles = { principles: [], rules: [], actions: [], improvements: [] };
+        } catch (err) {
+            console.error('Error loading journal from DB', err);
+            Utils.showToast('Error cargando el diario de la nube', 'error');
+            this.entries = localEntries || [];
+            this.goals = localGoals || [];
+            this.principles = localPrinciples || { principles: [], rules: [], actions: [], improvements: [] };
         }
     },
 
-    saveData() {
+    async saveData() {
+        // Always save to localStorage as backup/offline caching
         localStorage.setItem('journal_entries', JSON.stringify(this.entries));
         localStorage.setItem('journal_goals', JSON.stringify(this.goals));
         localStorage.setItem('journal_principles', JSON.stringify(this.principles));
+
+        if (!window.supabaseClient || !window.AuthModule || !window.AuthModule.currentUser) return;
+        
+        const userId = window.AuthModule.currentUser.id;
+
+        try {
+            const { error } = await supabaseClient
+                .from('user_journals')
+                .upsert({
+                    user_id: userId,
+                    entries: this.entries,
+                    goals: this.goals,
+                    principles: this.principles,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+            if (error) throw error;
+        } catch (err) {
+            console.error('Error saving journal to DB', err);
+            Utils.showToast('Error guardando en la nube', 'error');
+        }
     },
 
     bindEvents() {
@@ -122,6 +151,11 @@ const JournalModule = {
 
         if (goalForm) {
             goalForm.addEventListener('submit', (e) => this.handleSaveGoal(e));
+        }
+
+        const btnDownloadJournalPDF = document.getElementById('btnDownloadJournalPDF');
+        if (btnDownloadJournalPDF) {
+            btnDownloadJournalPDF.addEventListener('click', () => this.downloadJournalPDF());
         }
 
         // Principles Events
@@ -363,6 +397,151 @@ const JournalModule = {
         this.saveData();
         this.renderGoals();
         Utils.showToast('Meta eliminada', 'success');
+    },
+
+    downloadJournalPDF() {
+        const { jsPDF } = window.jspdf;
+        if (!jsPDF) {
+            Utils.showToast('Error: No se pudo cargar el generador de PDF', 'error');
+            return;
+        }
+
+        const doc = new jsPDF();
+        let y = 20;
+
+        doc.setFontSize(22);
+        doc.setFont("helvetica", "bold");
+        doc.text("Reporte de Diario y Metas", 105, y, null, null, "center");
+        y += 15;
+
+        // --- 1. METAS ---
+        if (this.goals.length > 0) {
+            if (y > 270) { doc.addPage(); y = 20; }
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text("Mis Metas", 20, y);
+            y += 10;
+
+            const sortedGoals = [...this.goals].sort((a, b) => {
+                if (a.completed === b.completed) return new Date(a.targetDate) - new Date(b.targetDate);
+                return a.completed ? 1 : -1;
+            });
+
+            doc.setFontSize(12);
+            sortedGoals.forEach((goal, index) => {
+                if (y > 270) { doc.addPage(); y = 20; }
+                const status = goal.completed ? "[Completada]" : "[Pendiente]";
+                const dateStr = new Date(goal.targetDate).toLocaleDateString('es-EC');
+
+                doc.setFont("helvetica", "bold");
+                doc.text(`${index + 1}. ${goal.title} ${status}`, 20, y);
+                y += 7;
+
+                doc.setFont("helvetica", "normal");
+                doc.text(`Categoría: ${goal.category} | Fecha Límite: ${dateStr}`, 25, y);
+                y += 7;
+
+                if (goal.plan) {
+                    const splitPlan = doc.splitTextToSize(`Plan: ${goal.plan}`, 160);
+                    doc.text(splitPlan, 25, y);
+                    y += (splitPlan.length * 7);
+                }
+                y += 5;
+            });
+            y += 5;
+        }
+
+        // --- 2. DIARIO ---
+        if (this.entries.length > 0) {
+            if (y > 270) { doc.addPage(); y = 20; }
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text("Entradas del Diario", 20, y);
+            y += 10;
+
+            doc.setFontSize(12);
+            this.entries.forEach((entry, index) => {
+                if (y > 260) { doc.addPage(); y = 20; }
+                const dateStr = new Date(entry.date).toLocaleDateString('es-EC', { 
+                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' 
+                });
+                
+                const moodMap = {
+                    'amazing': '[Increíble]',
+                    'happy': '[Feliz]',
+                    'neutral': '[Neutral]',
+                    'sad': '[Triste]',
+                    'stressed': '[Estresado]'
+                };
+                const moodText = moodMap[entry.mood] || '[Desconocido]';
+
+                doc.setFont("helvetica", "bold");
+                doc.text(`${moodText} ${dateStr}`, 20, y);
+                y += 7;
+
+                doc.setFont("helvetica", "normal");
+                doc.setFont(undefined, "bold");
+                doc.text("Que hice bien:", 25, y);
+                doc.setFont(undefined, "normal");
+                const splitWell = doc.splitTextToSize(entry.doneWell, 155);
+                doc.text(splitWell, 30, y + 6);
+                y += (splitWell.length * 6) + 8;
+
+                if (y > 260) { doc.addPage(); y = 20; }
+                doc.setFont(undefined, "bold");
+                doc.text("Que debo mejorar:", 25, y);
+                doc.setFont(undefined, "normal");
+                const splitWrong = doc.splitTextToSize(entry.doneWrong, 155);
+                doc.text(splitWrong, 30, y + 6);
+                y += (splitWrong.length * 6) + 12;
+            });
+        }
+
+        // --- 3. PRINCIPIOS Y REGLAS ---
+        const principleCategories = [
+            { key: 'principles', label: 'Principios y Valores' },
+            { key: 'rules', label: 'Reglas de Vida' },
+            { key: 'actions', label: 'Cómo actuaré' },
+            { key: 'improvements', label: 'Cosas que mejorar' }
+        ];
+
+        let hasPrinciples = false;
+        principleCategories.forEach(cat => {
+            if (this.principles[cat.key] && this.principles[cat.key].length > 0) hasPrinciples = true;
+        });
+
+        if (hasPrinciples) {
+            if (y > 270) { doc.addPage(); y = 20; }
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text("Principios y Reglas", 20, y);
+            y += 10;
+
+            principleCategories.forEach(cat => {
+                const items = this.principles[cat.key] || [];
+                if (items.length > 0) {
+                    if (y > 270) { doc.addPage(); y = 20; }
+                    doc.setFontSize(14);
+                    doc.setFont("helvetica", "bold");
+                    doc.text(cat.label, 20, y);
+                    y += 8;
+
+                    doc.setFontSize(12);
+                    doc.setFont("helvetica", "normal");
+                    items.forEach(item => {
+                        if (y > 280) { doc.addPage(); y = 20; }
+                        const areaText = item.area ? `[${item.area}] ` : '';
+                        const splitItem = doc.splitTextToSize(`- ${areaText}${item.text}`, 160);
+                        doc.text(splitItem, 25, y);
+                        y += (splitItem.length * 6) + 2;
+                    });
+                    y += 5;
+                }
+            });
+        }
+
+        doc.save("Reporte_Diario_y_Metas.pdf");
+        Utils.showToast('Reporte PDF descargado exitosamente', 'success');
     },
 
     handleAddPrinciple(e) {

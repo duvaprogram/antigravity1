@@ -1502,6 +1502,81 @@ const Database = {
             console.error('Error deleting PF snapshot:', error);
             throw error;
         }
+    },
+
+    // ========================================
+    // CAMPAIGNS
+    // ========================================
+    async getCampaigns() {
+        try {
+            if (supabaseClient) {
+                const { data, error } = await supabaseClient
+                    .from('campaigns')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (!error && data && data.length > 0) {
+                    return data.map(c => ({
+                        id: c.id,
+                        name: c.name,
+                        code: c.code,
+                        country: c.country,
+                        type: c.type,
+                        objective: c.objective,
+                        date: c.date,
+                        product: c.product,
+                        adSets: c.ad_sets,
+                        ads: c.ads,
+                        adSetCodes: c.ad_set_codes,
+                        adCodes: c.ad_codes,
+                        createdAt: c.created_at
+                    }));
+                }
+            }
+        } catch (error) {
+            console.warn('Supabase getCampaigns fallback to localStorage:', error);
+        }
+        const saved = localStorage.getItem('generatedCampaigns');
+        return saved ? JSON.parse(saved) : [];
+    },
+
+    async saveCampaign(campaign) {
+        try {
+            if (supabaseClient) {
+                await supabaseClient
+                    .from('campaigns')
+                    .upsert({
+                        id: campaign.id,
+                        name: campaign.name,
+                        code: campaign.code,
+                        country: campaign.country,
+                        type: campaign.type,
+                        objective: campaign.objective,
+                        date: campaign.date,
+                        product: campaign.product,
+                        ad_sets: campaign.adSets,
+                        ads: campaign.ads,
+                        ad_set_codes: campaign.adSetCodes,
+                        ad_codes: campaign.adCodes,
+                        created_at: campaign.createdAt
+                    });
+            }
+        } catch (error) {
+            console.warn('Supabase saveCampaign fallback:', error);
+        }
+    },
+
+    async deleteCampaign(id) {
+        try {
+            if (supabaseClient) {
+                await supabaseClient
+                    .from('campaigns')
+                    .delete()
+                    .eq('id', id);
+            }
+        } catch (error) {
+            console.warn('Supabase deleteCampaign fallback:', error);
+        }
     }
 };
 

@@ -1,6 +1,20 @@
 const JournalSeedData = {
     entries: [
         {
+            id: new Date('2026-07-03T09:39:00').getTime().toString(),
+            date: new Date('2026-07-03T09:39:00').toISOString(),
+            mood: "neutral",
+            doneWell: "Voy bien cumpliendo los objetivos,",
+            doneWrong: "Tengo que mejorar en Testear mas cosas ejecutar mas rapido"
+        },
+        {
+            id: new Date('2026-06-29T19:31:00').getTime().toString(),
+            date: new Date('2026-06-29T19:31:00').toISOString(),
+            mood: "happy",
+            doneWell: "Me siento bien. He estado reflexionando y observando cómo muchas personas a mi alrededor, incluidos algunos conocidos, están cumpliendo sus objetivos. Lejos de desanimarme, eso me llena de esperanza y fortalece mi confianza en que las cosas también saldrán bien para mí. En este momento estoy partiendo de una sola cuenta publicitaria (AA), pero durante el último mes logré mantener el control y obtener estabilidad. Eso me ha demostrado que soy capaz de mantener el enfoque. Hoy me siento seguro de mis pensamientos y de mi capacidad para mantener la concentración, evitar cualquier tentación que pueda desviarme de mi camino y trabajar con disciplina e intensidad para alcanzar mis metas. Confío en el proceso y sé que, si sigo siendo constante, los resultados llegarán. llego de hacer un break de playa que me gusto mucho. tengo referentes que están haciendo las cosas bien debo seguir por el mismo camino",
+            doneWrong: ""
+        },
+        {
             id: new Date('2026-04-19T10:00:00').getTime().toString(),
             date: new Date('2026-04-19T10:00:00').toISOString(),
             mood: "amazing",
@@ -193,66 +207,97 @@ const JournalSeedData = {
     goals: [
         {
             id: "goal_1",
-            title: "Conseguir 30 mil dólares",
-            targetDate: "2024-12-31",
-            category: "Finanzas",
-            completed: true,
-            createdAt: new Date('2024-02-20').toISOString()
+            title: "Crear y publicar videos constantemente (Marca Personal)",
+            targetDate: "2026-04-30",
+            category: "Trabajo",
+            completed: false,
+            createdAt: new Date('2024-01-01').toISOString()
         },
         {
             id: "goal_2",
-            title: "Comprar carro",
-            targetDate: "2025-04-01",
-            category: "Personal",
-            completed: true,
-            createdAt: new Date('2024-03-10').toISOString()
+            title: "Pagar deuda de 8 millones",
+            targetDate: "2026-05-31",
+            category: "Finanzas",
+            completed: false,
+            createdAt: new Date('2024-01-01').toISOString()
         },
         {
             id: "goal_3",
-            title: "Mudarme a vivir solo",
-            targetDate: "2026-03-01",
+            title: "Eliminar y alejarme de redes sociales",
+            targetDate: "2026-07-29",
             category: "Personal",
-            completed: true,
-            createdAt: new Date('2025-11-04').toISOString()
+            completed: false,
+            plan: "Mi decisión sobre el uso de redes sociales: He llegado a la conclusión de que, en este momento, las redes sociales me están aportando mucho menos de lo que me están quitando. Paso demasiado tiempo desplazándome sin sentido entre videos y publicaciones que, al terminar de verlas, no me dejan ningún aprendizaje ni me acercan a mis objetivos. Cada minuto que dedico a consumir contenido irrelevante es un minuto que podría invertir en entrenar, aprender una habilidad, trabajar en mis proyectos o simplemente descansar de manera consciente. Por eso, a partir de ahora estableceré las siguientes reglas: Limitaré TikTok a 20 minutos al día. Evitaré abrir redes sociales por aburrimiento o por costumbre. Configuraré el algoritmo de TikTok para que solo me muestre contenido de valor: negocios, marketing, inteligencia artificial, entrenamiento, nutrición, productividad, desarrollo personal y cualquier tema que contribuya a mi crecimiento. Dejaré de consumir contenido de entretenimiento vacío, chismes, discusiones, bromas repetitivas y videos que solo buscan captar mi atención sin aportar nada. ¿Por qué hago este cambio? Las redes sociales están diseñadas para mantener a las personas el mayor tiempo posible dentro de la aplicación. Cuanto más tiempo paso haciendo scroll, más difícil se vuelve mantener la concentración en tareas importantes. Mi cerebro se acostumbra a recibir recompensas rápidas y pierde la capacidad de enfocarse durante largos periodos. Además: El tiempo es mi recurso más valioso. No puedo recuperarlo una vez que se ha ido. Las personas que logran grandes resultados suelen proteger su atención como uno de sus mayores activos. Mi éxito dependerá mucho más de las horas que dedique a construir que de las horas que dedique a consumir contenido. Reducir las distracciones me permitirá pensar con mayor claridad, tomar mejores decisiones y avanzar más rápido hacia mis objetivos. No necesito estar informado de todo lo que ocurre en internet; necesito ejecutar mis propios planes.",
+            createdAt: new Date('2024-01-01').toISOString()
         },
         {
             id: "goal_4",
-            title: "Pagar deuda de 8 millones",
-            targetDate: "2026-06-01",
-            category: "Finanzas",
+            title: "Pesar 60kg llegar a 12 % de grasa",
+            targetDate: "2026-08-29",
+            category: "Personal",
             completed: false,
-            createdAt: new Date('2026-04-19').toISOString()
+            plan: "Plan de alimentación y entrenamiento. Alimentación: Mantener un déficit calórico todos los días. Controlar la cantidad de calorías consumidas. Reducir al máximo el consumo de azúcar. Eliminar la leche de mi alimentación. Practicar ayuno intermitente. Incluir gelatina como opción de snack baja en calorías. Actividad física diaria: Quemar un mínimo de 200 calorías cada día. Hacer barras (dominadas y ejercicios en barra) todos los días en casa. Plan semanal de ejercicio: Natación: 1 veces por semana. Ciclismo: 3 salida por semana. Running: 1 vez por semana. Domingo: realizar una sesión de ejercicio más larga para quemar aproximadamente 2.000 calorías.",
+            createdAt: new Date('2024-01-01').toISOString()
         },
         {
             id: "goal_5",
-            title: "Vender carro en 35M y comprar moto",
-            targetDate: "2026-05-30",
+            title: "Utilidades de 10 millones mensuales",
+            targetDate: "2026-09-30",
             category: "Personal",
             completed: false,
-            createdAt: new Date('2026-04-19').toISOString()
+            plan: "La Idea es tener utilidades de 10 millones mensuales. Reducción de gastos: Actualmente tengo unos gastos mensuales aproximadamente, paso de gastar 4.083.000 a 2.833.000 que es prácticamente un 10% del mínimo. Plan de expansion: Pulseras, Mexico enviarlas mediante ups o algo. enviarlas y venderlas y testearlas Ventas en Venezuela, Colombia, Ecuador, constantemente. Pulsera en Peru pasándolas por ecuador. Debo pensar lo siguiente debo construir marcas a largo plazo con contenido orgánico porque es el futuro. Debo hacer contenido de calidad de los relojes comentándolos y hacer un plan para hacer anuncios con Monica. combinando esos dos anuncios. Plan pulseras : Ecuador, Peru, venezuela . Aprovechar tendencias como las nike mind 001 seguir intentando Tambien debo llevar un produto de capitalizacion a Caracas y aprovechar los cpa",
+            createdAt: new Date('2024-01-01').toISOString()
         },
         {
             id: "goal_6",
             title: "Hablar inglés con fluidez",
-            targetDate: "2026-12-31",
+            targetDate: "2026-12-30",
             category: "Personal",
             completed: false,
-            createdAt: new Date('2024-12-31').toISOString()
+            createdAt: new Date('2024-01-01').toISOString()
         },
         {
             id: "goal_7",
-            title: "Crear y publicar videos constantemente (Marca Personal)",
-            targetDate: "2026-05-01",
-            category: "Trabajo",
-            completed: false,
-            createdAt: new Date('2026-03-03').toISOString()
+            title: "Conseguir 30 mil dólares",
+            targetDate: "2024-12-30",
+            category: "Finanzas",
+            completed: true,
+            createdAt: new Date('2024-01-01').toISOString()
+        },
+        {
+            id: "goal_8",
+            title: "Comprar carro",
+            targetDate: "2025-03-31",
+            category: "Personal",
+            completed: true,
+            createdAt: new Date('2024-01-01').toISOString()
+        },
+        {
+            id: "goal_9",
+            title: "Mudarme a vivir solo",
+            targetDate: "2026-02-28",
+            category: "Personal",
+            completed: true,
+            createdAt: new Date('2024-01-01').toISOString()
+        },
+        {
+            id: "goal_10",
+            title: "Vender carro en 35M y comprar moto",
+            targetDate: "2026-05-29",
+            category: "Personal",
+            completed: true,
+            createdAt: new Date('2024-01-01').toISOString()
         }
     ],
     principles: {
         principles: [
             { id: "p1", text: "Soy un ser puro con buenos sentimientos sin presumir nada viviendo en la realidad buena.", area: "Personal" },
             { id: "p2", text: "Tengo valores sólidos. Tengo un propósito firme.", area: "Personal" },
-            { id: "p3", text: "Yo soy mejor en todos los aspectos, y no desde el ego, sino desde el trabajo, la disciplina y la convicción.", area: "Trabajo" }
+            { id: "p3", text: "Yo soy mejor en todos los aspectos, y no desde el ego, sino desde el trabajo, la disciplina y la convicción.", area: "Trabajo" },
+            { id: "p4", text: "No robar, no ser envidioso, no procrastinar, cumplir mis objetivos, ser un buen hijo ser una buena persona.", area: "Personal" },
+            { id: "p5", text: "# Enfoque y filosofía personal Decido alejarme de los propósitos vacíos que muchas veces promueve el consumismo: la necesidad de aparentar lo que no tengo, compararme constantemente con los demás o medir mi valor por las cosas materiales que poseen otras personas. No quiero vivir persiguiendo una imagen para impresionar a los demás. Mi valor no depende de un carro, un reloj, una casa o cualquier símbolo de estatus. Tampoco tiene sentido sentirme mal por los logros o las posesiones de otros, porque cada persona tiene un camino, circunstancias y tiempos diferentes. No me interesa tener el carro más bonito, la moto más costosa o el último objeto de moda solo para generar admiración. Si algún día compro esas cosas, será porque realmente puedo hacerlo sin comprometer mi estabilidad financiera y porque tienen un propósito para mi vida, no para alimentar mi ego ni buscar aprobación. Mi prioridad será cuidar mis finanzas personales. Antes que gastar para aparentar, elegiré ahorrar, invertir y hacer crecer mi patrimonio. Cada peso que administre con inteligencia será un paso más hacia mi libertad financiera. Quiero que mi capital trabaje para mí y aumentar mi patrimonio de manera constante, tomando decisiones financieras responsables y pensando siempre en el largo plazo. Prefiero invertir mi energía en construir una vida con propósito, basada en el conocimiento, la disciplina y el crecimiento personal. Quiero desarrollar mi capacidad intelectual, aprender continuamente y tomar decisiones guiadas por mis propios principios, no por la necesidad de aprobación externa. No necesito que los demás validen quién soy. Mi atención debe estar puesta en cumplir mis objetivos, mejorar cada día y convertirme en una persona más competente, fuerte y disciplinada. Mi éxito no se medirá por lo que otros piensen de mí, sino por la capacidad de mantenerme fiel a mis valores, cumplir las metas que me proponga y construir una vida sólida, con estabilidad financiera, crecimiento continuo y una libertad que nadie pueda quitarme.", area: "Personal" },
+            { id: "p6", text: "Respetuosos", area: "Personal" },
+            { id: "p7", text: "No Fap, No lujuria, permitido 1 sola vez al mes tener relaciones y 1 sola vez mas, y no ver nada absolutamente nada", area: "Personal" }
         ],
         rules: [
             { id: "r1", text: "Me levanto a las 6:00 AM (tres horas antes que los débiles).", area: "Salud" },

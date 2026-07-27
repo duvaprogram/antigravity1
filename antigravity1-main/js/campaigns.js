@@ -596,7 +596,7 @@ const CampaignsModule = {
     },
 
     // Add campaign to history
-    addToHistory(campaignName, details) {
+    async addToHistory(campaignName, details) {
         const campaign = {
             id: Date.now(),
             name: campaignName,
@@ -611,6 +611,9 @@ const CampaignsModule = {
         }
 
         this.saveCampaigns();
+        if (window.Database && window.Database.saveCampaign) {
+            try { await window.Database.saveCampaign(campaign); } catch(e){}
+        }
         this.renderHistory();
     },
 
@@ -620,7 +623,27 @@ const CampaignsModule = {
     },
 
     // Load saved campaigns
-    loadSavedCampaigns() {
+    async loadSavedCampaigns() {
+        if (window.Database && window.Database.getCampaigns) {
+            try {
+                const dbCampaigns = await window.Database.getCampaigns();
+                if (dbCampaigns && dbCampaigns.length > 0) {
+                    this.generatedCampaigns = dbCampaigns;
+                    this.saveCampaigns();
+                    // Rebuild used codes from database campaigns
+                    this.generatedCampaigns.forEach(c => {
+                        if (c.code) this.usedCodes.add(c.code);
+                        if (c.adSetCodes) c.adSetCodes.forEach(code => this.usedCodes.add(code));
+                        if (c.adCodes) c.adCodes.forEach(code => this.usedCodes.add(code));
+                    });
+                    this.saveUsedCodes();
+                    this.renderHistory();
+                    return;
+                }
+            } catch (e) {
+                console.warn('Could not load campaigns from DB, fallback to localStorage:', e);
+            }
+        }
         const saved = localStorage.getItem('generatedCampaigns');
         if (saved) {
             try {
@@ -884,6 +907,173 @@ const CampaignsModule = {
             document.getElementById('campaignResult').style.display = 'none';
             Utils.showNotification('Historial limpiado', 'info');
         }
+    },
+
+    // Export backup JSON file
+    exportBackup() {
+        if (this.generatedCampaigns.length === 0 && (!this.performanceData || this.performanceData.length === 0)) {
+            Utils.showNotification('No hay datos de campañas para exportar', 'warning');
+            return;
+        }
+
+        const backupData = {
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            generatedCampaigns: this.generatedCampaigns,
+            usedCodes: Array.from(this.usedCodes),
+            performanceData: this.performanceData || []
+        };
+
+        const jsonStr = JSON.stringify(backupData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.href = url;
+        a.download = `campanas_backup_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        Utils.showNotification('¡Copia de seguridad exportada en archivo JSON!', 'success');
+    },
+
+    // Trigger file picker for import
+    triggerImportBackup() {
+        const input = document.getElementById('campaignBackupInput');
+        if (input) input.click();
+    },
+
+    // Import backup file
+    importBackupFile(inputEl) {
+        const file = inputEl.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                this.applyBackupData(data);
+                inputEl.value = '';
+                Utils.showNotification('¡Copia de seguridad importada con éxito!', 'success');
+            } catch (err) {
+                console.error('Error al importar backup:', err);
+                Utils.showNotification('El archivo no tiene un formato de backup JSON válido', 'error');
+            }
+        };
+        reader.readAsText(file);
+    },
+
+    // Copy all campaign data to clipboard as JSON text
+    copyBackupToClipboard() {
+        const backupData = {
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            generatedCampaigns: this.generatedCampaigns,
+            usedCodes: Array.from(this.usedCodes),
+            performanceData: this.performanceData || []
+        };
+
+        const jsonStr = JSON.stringify(backupData);
+        navigator.clipboard.writeText(jsonStr).then(() => {
+            Utils.showNotification('¡Datos copiados al portapapeles! Ahora abre tu otro navegador y haz clic en "Pegar / Cargar"', 'success');
+        }).catch(() => {
+            const textArea = document.createElement('textarea');
+            textArea.value = jsonStr;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            Utils.showNotification('¡Datos copiados al portapapeles! Haz clic en "Pegar / Cargar" en el otro navegador', 'success');
+        });
+    },
+
+    // Show paste modal
+    pasteBackupModal() {
+        const textEl = document.getElementById('campaignBackupText');
+        if (textEl) textEl.value = '';
+        Utils.openModal('modalCampaignBackup');
+    },
+
+    // Process pasted JSON backup
+    processPasteBackup() {
+        const textEl = document.getElementById('campaignBackupText');
+        const content = textEl ? textEl.value.trim() : '';
+
+        if (!content) {
+            Utils.showNotification('Por favor pega el contenido de la copia de seguridad', 'warning');
+            return;
+        }
+
+        try {
+            const data = JSON.parse(content);
+            this.applyBackupData(data);
+            Utils.closeModal('modalCampaignBackup');
+            if (textEl) textEl.value = '';
+            Utils.showNotification('¡Campañas y rendimiento restaurados exitosamente!', 'success');
+        } catch (err) {
+            console.error('Error procesando texto de backup:', err);
+            Utils.showNotification('El texto pegado no es un JSON de backup válido', 'error');
+        }
+    },
+
+    // Apply backup data
+    applyBackupData(data) {
+        if (!data || (typeof data !== 'object')) {
+            throw new Error('Formato inválido');
+        }
+
+        let campaigns = [];
+        let codes = [];
+        let performance = [];
+
+        if (Array.isArray(data)) {
+            campaigns = data;
+        } else {
+            campaigns = data.generatedCampaigns || [];
+            codes = data.usedCodes || [];
+            performance = data.performanceData || [];
+        }
+
+        const existingIds = new Set(this.generatedCampaigns.map(c => c.id));
+        const existingCodes = new Set(this.generatedCampaigns.map(c => c.code));
+
+        campaigns.forEach(c => {
+            if (!existingIds.has(c.id) && !existingCodes.has(c.code)) {
+                this.generatedCampaigns.push(c);
+            }
+        });
+
+        this.generatedCampaigns.sort((a, b) => (b.id || 0) - (a.id || 0));
+
+        this.generatedCampaigns.forEach(c => {
+            if (c.code) this.usedCodes.add(c.code);
+            if (c.adSetCodes) c.adSetCodes.forEach(code => this.usedCodes.add(code));
+            if (c.adCodes) c.adCodes.forEach(code => this.usedCodes.add(code));
+        });
+        codes.forEach(code => this.usedCodes.add(code));
+
+        if (performance && performance.length > 0) {
+            const perfMap = new Map((this.performanceData || []).map(p => [p.code, p]));
+            performance.forEach(p => {
+                if (p.code) perfMap.set(p.code, p);
+            });
+            this.performanceData = Array.from(perfMap.values());
+            this.savePerformanceData();
+        }
+
+        this.saveCampaigns();
+        this.saveUsedCodes();
+
+        if (window.Database && window.Database.saveCampaign) {
+            this.generatedCampaigns.forEach(c => {
+                try { window.Database.saveCampaign(c); } catch (e) {}
+            });
+        }
+
+        this.renderHistory();
+        this.renderPerformanceTable();
     },
 
     // Reset form
