@@ -3520,13 +3520,45 @@
                         <p class="journal-subtitle">Un espacio para reflexionar, planificar y crecer.</p>
                     </div>
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="JournalModule.exportBackup()" title="Descargar archivo JSON con todo el diario y metas">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Exportar Backup
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="JournalModule.triggerImportBackup()" title="Cargar archivo JSON de backup guardado">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            Importar Backup
+                        </button>
+                        <input type="file" id="journalBackupInput" accept=".json" style="display: none;" onchange="JournalModule.importBackupFile(this)">
+
+                        <button type="button" class="btn btn-sm btn-primary" onclick="JournalModule.copyBackupToClipboard()" title="Copiar todo el diario y metas para pegar en Incógnito / otro navegador">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                            Copiar Datos
+                        </button>
+                        <button type="button" class="btn btn-sm btn-success" onclick="JournalModule.pasteBackupModal()" title="Pegar diario y metas copiados de otro navegador">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                            </svg>
+                            Pegar / Cargar
+                        </button>
                         <button class="btn btn-sm btn-secondary" id="btnDownloadJournalPDF" title="Descargar Reporte Completo en PDF">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                            Descargar Reporte PDF
+                            Reporte PDF
                         </button>
                         <button class="btn btn-sm btn-secondary" onclick="JournalModule.restoreSeedData()" title="Restaurar el historial si se borró">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
-                            Restaurar Historial
+                            Restaurar Semilla
                         </button>
                     </div>
                 </div>
@@ -4953,6 +4985,29 @@
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
                 <button type="button" class="btn btn-secondary" data-close="modalCampaignBackup">Cancelar</button>
                 <button type="button" class="btn btn-primary" onclick="CampaignsModule.processPasteBackup()">Cargar e Importar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Journal & Goals Backup Import / Paste -->
+    <div class="modal" id="modalJournalBackup">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Copia de Seguridad del Diario y Metas</h2>
+                <button class="modal-close" data-close="modalJournalBackup">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem 0;">
+                <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+                    Pega aquí los datos en formato JSON copiados desde Internet Explorer o tu otro navegador para restaurar inmediatamente todas tus entradas del diario, metas y principios:
+                </p>
+                <div class="form-group">
+                    <label for="journalBackupText" style="font-weight: 600; margin-bottom: 0.5rem; display: block;">Datos JSON de Backup (Diario y Metas):</label>
+                    <textarea id="journalBackupText" class="form-control" rows="8" placeholder='Pega el contenido JSON aquí...' style="font-family: monospace; font-size: 0.85rem; width: 100%;"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+                <button type="button" class="btn btn-secondary" data-close="modalJournalBackup">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="JournalModule.processPasteBackup()">Cargar e Importar</button>
             </div>
         </div>
     </div>

@@ -615,6 +615,160 @@ const JournalModule = {
         this.saveData();
         this.renderPrinciples();
         Utils.showToast('Elemento eliminado', 'success');
+    },
+
+    // Export backup JSON file
+    exportBackup() {
+        if (this.entries.length === 0 && this.goals.length === 0 && (!this.principles || Object.values(this.principles).every(arr => arr.length === 0))) {
+            Utils.showToast('No hay datos en el diario para exportar', 'warning');
+            return;
+        }
+
+        const backupData = {
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            entries: this.entries,
+            goals: this.goals,
+            principles: this.principles
+        };
+
+        const jsonStr = JSON.stringify(backupData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.href = url;
+        a.download = `diario_metas_backup_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        Utils.showToast('¡Copia de seguridad del diario exportada en JSON!', 'success');
+    },
+
+    // Trigger file picker for import
+    triggerImportBackup() {
+        const input = document.getElementById('journalBackupInput');
+        if (input) input.click();
+    },
+
+    // Import backup file
+    importBackupFile(inputEl) {
+        const file = inputEl.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                this.applyBackupData(data);
+                inputEl.value = '';
+                Utils.showToast('¡Copia de seguridad del diario importada con éxito!', 'success');
+            } catch (err) {
+                console.error('Error al importar backup del diario:', err);
+                Utils.showToast('El archivo no tiene un formato de backup JSON válido', 'error');
+            }
+        };
+        reader.readAsText(file);
+    },
+
+    // Copy all journal & goals data to clipboard as JSON text
+    copyBackupToClipboard() {
+        const backupData = {
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            entries: this.entries,
+            goals: this.goals,
+            principles: this.principles
+        };
+
+        const jsonStr = JSON.stringify(backupData);
+        navigator.clipboard.writeText(jsonStr).then(() => {
+            Utils.showToast('¡Datos copiados al portapapeles! Ahora abre tu otro navegador y haz clic en "Pegar / Cargar"', 'success');
+        }).catch(() => {
+            const textArea = document.createElement('textarea');
+            textArea.value = jsonStr;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            Utils.showToast('¡Datos copiados al portapapeles! Haz clic en "Pegar / Cargar" en el otro navegador', 'success');
+        });
+    },
+
+    // Show paste modal
+    pasteBackupModal() {
+        const textEl = document.getElementById('journalBackupText');
+        if (textEl) textEl.value = '';
+        Utils.openModal('modalJournalBackup');
+    },
+
+    // Process pasted JSON backup
+    processPasteBackup() {
+        const textEl = document.getElementById('journalBackupText');
+        const content = textEl ? textEl.value.trim() : '';
+
+        if (!content) {
+            Utils.showToast('Por favor pega el contenido de la copia de seguridad', 'warning');
+            return;
+        }
+
+        try {
+            const data = JSON.parse(content);
+            this.applyBackupData(data);
+            Utils.closeModal('modalJournalBackup');
+            if (textEl) textEl.value = '';
+            Utils.showToast('¡Diario y metas restaurados exitosamente!', 'success');
+        } catch (err) {
+            console.error('Error procesando texto de backup del diario:', err);
+            Utils.showToast('El texto pegado no es un JSON de backup válido', 'error');
+        }
+    },
+
+    // Apply backup data
+    applyBackupData(data) {
+        if (!data || (typeof data !== 'object')) {
+            throw new Error('Formato inválido');
+        }
+
+        const newEntries = data.entries || [];
+        const newGoals = data.goals || [];
+        const newPrinciples = data.principles || { principles: [], rules: [], actions: [], improvements: [] };
+
+        // Merge entries by ID
+        const entryMap = new Map(this.entries.map(e => [e.id, e]));
+        newEntries.forEach(e => {
+            if (e.id) entryMap.set(e.id, e);
+        });
+        this.entries = Array.from(entryMap.values());
+        this.entries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+        // Merge goals by ID
+        const goalMap = new Map(this.goals.map(g => [g.id, g]));
+        newGoals.forEach(g => {
+            if (g.id) goalMap.set(g.id, g);
+        });
+        this.goals = Array.from(goalMap.values());
+
+        // Merge principles
+        if (newPrinciples && typeof newPrinciples === 'object') {
+            ['principles', 'rules', 'actions', 'improvements'].forEach(cat => {
+                const currentCatArr = this.principles[cat] || [];
+                const newCatArr = newPrinciples[cat] || [];
+                const pMap = new Map(currentCatArr.map(p => [p.id, p]));
+                newCatArr.forEach(p => {
+                    if (p.id) pMap.set(p.id, p);
+                });
+                this.principles[cat] = Array.from(pMap.values());
+            });
+        }
+
+        // Save
+        this.saveData();
+
+        // Render
+        this.render();
     }
 };
 
