@@ -913,6 +913,15 @@ const CampaignsModule = {
         }
     },
 
+    // Close any modal by ID
+    closeModalId(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            modal.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    },
+
     // Ensure adDetails array exists for a campaign
     ensureAdDetails(campaign) {
         if (!campaign.adDetails) campaign.adDetails = [];
@@ -934,22 +943,97 @@ const CampaignsModule = {
     // Open edit campaign modal
     openEditCampaignModal(campaignId) {
         const campaign = this.generatedCampaigns.find(c => String(c.id) === String(campaignId));
-        if (!campaign) return;
+        if (!campaign) {
+            Utils.showNotification('Campaña no encontrada', 'error');
+            return;
+        }
 
-        document.getElementById('editCampaignId').value = campaign.id;
-        document.getElementById('editCampaignCountry').value = campaign.country || 'ECU';
-        document.getElementById('editCampaignType').value = campaign.type || 'ABO';
-        document.getElementById('editCampaignObjective').value = campaign.objective || 'COMPRAS';
-        document.getElementById('editCampaignDate').value = this.parseDateInputFormat(campaign.date);
-        document.getElementById('editCampaignProduct').value = campaign.product || '';
-        document.getElementById('editCampaignAdSets').value = campaign.adSets || 0;
-        document.getElementById('editCampaignAds').value = campaign.ads || 0;
-        
-        const activeCheck = document.getElementById('editCampaignActive');
-        if (activeCheck) activeCheck.checked = campaign.active !== false;
+        const dateVal = this.parseDateInputFormat(campaign.date);
+        const isActive = campaign.active !== false;
+
+        let modal = document.getElementById('modalEditCampaign');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalEditCampaign';
+            modal.className = 'modal';
+            document.body.appendChild(modal);
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) this.closeModalId('modalEditCampaign');
+            });
+        }
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 650px;">
+                <div class="modal-header">
+                    <h2>✏️ Editar Campaña (${campaign.code || ''})</h2>
+                    <button class="modal-close" onclick="CampaignsModule.closeModalId('modalEditCampaign')">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 1.5rem 0;">
+                    <form id="editCampaignForm" onsubmit="CampaignsModule.handleEditCampaignSubmit(event)">
+                        <input type="hidden" id="editCampaignId" value="${campaign.id}">
+                        <div class="form-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                            <div class="form-group">
+                                <label for="editCampaignCountry">País *</label>
+                                <select id="editCampaignCountry" class="form-control" required>
+                                    <option value="ECU" ${campaign.country === 'ECU' ? 'selected' : ''}>🇪🇨 Ecuador (ECU)</option>
+                                    <option value="VEN" ${campaign.country === 'VEN' ? 'selected' : ''}>🇻🇪 Venezuela (VEN)</option>
+                                    <option value="COL" ${campaign.country === 'COL' ? 'selected' : ''}>🇨🇴 Colombia (COL)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="editCampaignType">Tipo *</label>
+                                <select id="editCampaignType" class="form-control" required>
+                                    <option value="ABO" ${campaign.type === 'ABO' ? 'selected' : ''}>ABO</option>
+                                    <option value="CBO" ${campaign.type === 'CBO' ? 'selected' : ''}>CBO</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="editCampaignObjective">Objetivo *</label>
+                                <select id="editCampaignObjective" class="form-control" required>
+                                    <option value="MENSAJES" ${campaign.objective === 'MENSAJES' ? 'selected' : ''}>Mensajes</option>
+                                    <option value="COMPRAS" ${campaign.objective === 'COMPRAS' ? 'selected' : ''}>Compras</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="editCampaignDate">Fecha *</label>
+                                <input type="date" id="editCampaignDate" class="form-control" value="${dateVal}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editCampaignProduct">Producto *</label>
+                                <input type="text" id="editCampaignProduct" class="form-control" value="${campaign.product || ''}" placeholder="Nombre del producto" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="editCampaignAdSets">Conjuntos de Anuncios</label>
+                                <input type="number" id="editCampaignAdSets" class="form-control" value="${campaign.adSets || 0}" min="0" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label for="editCampaignAds">Anuncios</label>
+                                <input type="number" id="editCampaignAds" class="form-control" value="${campaign.ads || 0}" min="0" max="100">
+                            </div>
+                            <div class="form-group">
+                                <label>Estado de Campaña</label>
+                                <div style="padding-top: 0.5rem; display: flex; align-items: center;">
+                                    <label class="switch">
+                                        <input type="checkbox" id="editCampaignActive" ${isActive ? 'checked' : ''}>
+                                        <span class="slider"></span>
+                                        <span class="switch-label" style="margin-left: 6px; font-weight: 600;">Activa</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                            <button type="button" class="btn btn-secondary" onclick="CampaignsModule.closeModalId('modalEditCampaign')">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
 
         this.closeDetailsModal();
-        Utils.openModal('modalEditCampaign');
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
     },
 
     // Helper to format date for input[type="date"]
@@ -976,7 +1060,10 @@ const CampaignsModule = {
         e.preventDefault();
         const id = document.getElementById('editCampaignId').value;
         const campaign = this.generatedCampaigns.find(c => String(c.id) === String(id));
-        if (!campaign) return;
+        if (!campaign) {
+            Utils.showNotification('Campaña no encontrada', 'error');
+            return;
+        }
 
         const country = document.getElementById('editCampaignCountry').value;
         const type = document.getElementById('editCampaignType').value;
@@ -1015,7 +1102,7 @@ const CampaignsModule = {
             try { window.Database.saveCampaign(campaign); } catch(e){}
         }
 
-        Utils.closeModal('modalEditCampaign');
+        this.closeModalId('modalEditCampaign');
         this.renderHistory();
         Utils.showNotification('¡Campaña actualizada con éxito!', 'success');
     },
@@ -1023,70 +1110,108 @@ const CampaignsModule = {
     // Open modal to manage Ads, Post IDs and Purchases
     openAdDetailsModal(campaignId) {
         const campaign = this.generatedCampaigns.find(c => String(c.id) === String(campaignId));
-        if (!campaign) return;
+        if (!campaign) {
+            Utils.showNotification('Campaña no encontrada', 'error');
+            return;
+        }
 
         this.ensureAdDetails(campaign);
         this.currentEditingCampaignId = campaign.id;
 
-        const headerEl = document.getElementById('modalEditAdDetailsHeader');
-        if (headerEl) {
-            headerEl.innerHTML = `
-                <div style="font-weight: 700; font-size: 1.1rem; color: var(--primary);">
-                    Campaña: ${campaign.code}
-                </div>
-                <div style="font-family: monospace; font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem; word-break: break-all;">
-                    ${campaign.name}
-                </div>
-            `;
+        let modal = document.getElementById('modalEditAdDetails');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalEditAdDetails';
+            modal.className = 'modal modal-large';
+            document.body.appendChild(modal);
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) this.closeModalId('modalEditAdDetails');
+            });
         }
 
-        const tbody = document.getElementById('modalEditAdDetailsTableBody');
-        if (tbody) {
-            if (!campaign.adDetails || campaign.adDetails.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
-                            Esta campaña no tiene anuncios individuales asignados. Edita la campaña para agregar anuncios.
-                        </td>
-                    </tr>
-                `;
-            } else {
-                tbody.innerHTML = campaign.adDetails.map(ad => `
-                    <tr>
-                        <td>
-                            <span onclick="CampaignsModule.copyCode('${ad.code}')" 
-                                  style="font-family: monospace; padding: 0.35rem 0.6rem; background: rgba(139, 92, 246, 0.1); 
-                                         color: #8b5cf6; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer;"
-                                  title="Clic para copiar código">
-                                ${ad.code}
-                            </span>
-                        </td>
-                        <td>
-                            <div style="display: flex; gap: 0.35rem; align-items: center;">
-                                <input type="text" class="form-control form-control-sm ad-post-id-field" data-code="${ad.code}" 
-                                       value="${ad.postId || ''}" placeholder="Ej: 1202058493821034" style="font-family: monospace;">
-                                ${ad.postId ? `
-                                    <button type="button" class="btn btn-icon btn-sm" onclick="CampaignsModule.copyCode('${ad.postId}')" title="Copiar Post ID">
-                                        📋
-                                    </button>
-                                ` : ''}
-                            </div>
-                        </td>
-                        <td>
-                            <input type="number" class="form-control form-control-sm ad-purchases-field" data-code="${ad.code}" 
-                                   value="${ad.purchases || 0}" min="0" style="text-align: center; font-weight: 700; color: #10b981;">
-                        </td>
-                        <td>
-                            <input type="number" class="form-control form-control-sm ad-spent-field" data-code="${ad.code}" 
-                                   value="${ad.spent || 0}" step="0.01" min="0" style="text-align: right; font-family: monospace;">
-                        </td>
-                    </tr>
-                `).join('');
-            }
-        }
+        const adRowsHtml = (!campaign.adDetails || campaign.adDetails.length === 0) ? `
+            <tr>
+                <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+                    Esta campaña no tiene anuncios individuales asignados. Edita la campaña para aumentar el número de anuncios.
+                </td>
+            </tr>
+        ` : campaign.adDetails.map(ad => `
+            <tr>
+                <td>
+                    <span onclick="CampaignsModule.copyCode('${ad.code}')" 
+                          style="font-family: monospace; padding: 0.35rem 0.6rem; background: rgba(139, 92, 246, 0.1); 
+                                 color: #8b5cf6; border-radius: var(--radius-sm); font-weight: 700; cursor: pointer;"
+                          title="Clic para copiar código">
+                        ${ad.code}
+                    </span>
+                </td>
+                <td>
+                    <div style="display: flex; gap: 0.35rem; align-items: center;">
+                        <input type="text" class="form-control form-control-sm ad-post-id-field" data-code="${ad.code}" 
+                               value="${ad.postId || ''}" placeholder="Ej: 1202058493821034" style="font-family: monospace;">
+                        ${ad.postId ? `
+                            <button type="button" class="btn btn-icon btn-sm" onclick="CampaignsModule.copyCode('${ad.postId}')" title="Copiar Post ID">
+                                📋
+                            </button>
+                        ` : ''}
+                    </div>
+                </td>
+                <td>
+                    <input type="number" class="form-control form-control-sm ad-purchases-field" data-code="${ad.code}" 
+                           value="${ad.purchases || 0}" min="0" style="text-align: center; font-weight: 700; color: #10b981;">
+                </td>
+                <td>
+                    <input type="number" class="form-control form-control-sm ad-spent-field" data-code="${ad.code}" 
+                           value="${ad.spent || 0}" step="0.01" min="0" style="text-align: right; font-family: monospace;">
+                </td>
+            </tr>
+        `).join('');
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 800px;">
+                <div class="modal-header">
+                    <h2>📢 Anuncios, Post IDs y Compras</h2>
+                    <button class="modal-close" onclick="CampaignsModule.closeModalId('modalEditAdDetails')">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 1rem 0;">
+                    <div style="margin-bottom: 1rem; padding: 0.75rem; background: var(--surface-hover); border-radius: var(--radius-md);">
+                        <div style="font-weight: 700; font-size: 1.1rem; color: var(--primary);">
+                            Campaña: ${campaign.code || ''}
+                        </div>
+                        <div style="font-family: monospace; font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.25rem; word-break: break-all;">
+                            ${campaign.name || ''}
+                        </div>
+                    </div>
+                    <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Código Anuncio</th>
+                                    <th>Post ID (Facebook / IG)</th>
+                                    <th style="width: 130px; text-align: center;">Compras</th>
+                                    <th style="width: 140px; text-align: right;">Gasto (USD/COP)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${adRowsHtml}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Los Post IDs y compras se guardarán en esta campaña.</span>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="CampaignsModule.closeModalId('modalEditAdDetails')">Cancelar</button>
+                        <button type="button" class="btn btn-success" onclick="CampaignsModule.saveAdDetailsFromModal()">Guardar Anuncios y Compras</button>
+                    </div>
+                </div>
+            </div>
+        `;
 
         this.closeDetailsModal();
-        Utils.openModal('modalEditAdDetails');
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
     },
 
     // Save ad details, Post IDs and purchases from modal
@@ -1151,7 +1276,7 @@ const CampaignsModule = {
             try { window.Database.saveCampaign(campaign); } catch(e){}
         }
 
-        Utils.closeModal('modalEditAdDetails');
+        this.closeModalId('modalEditAdDetails');
         this.renderHistory();
         this.renderPerformanceTable();
         Utils.showNotification('¡Post IDs y compras guardados exitosamente!', 'success');
