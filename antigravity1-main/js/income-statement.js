@@ -493,8 +493,15 @@ const IncomeStatementModule = {
             totalRow.totalAdSpend += countryAdSpend;
             totalRow.orderCount += row.orderCount;
             totalRow.unitsSold += row.unitsSold;
-            const grossProfit = row.totalRevenue - row.totalCost - row.totalShipping - countryFreight;
+
+            // Restar publicidad de la Utilidad Bruta
+            const grossProfit = row.totalRevenue - row.totalCost - row.totalShipping - countryFreight - countryAdSpend;
             const margin = row.totalRevenue > 0 ? ((grossProfit / row.totalRevenue) * 100).toFixed(1) : '0.0';
+
+            // Porcentajes sobre las ventas
+            const costPct = row.totalRevenue > 0 ? ((row.totalCost / row.totalRevenue) * 100).toFixed(1) : '0.0';
+            const shippingPct = row.totalRevenue > 0 ? ((row.totalShipping / row.totalRevenue) * 100).toFixed(1) : '0.0';
+            const adPct = row.totalRevenue > 0 ? ((countryAdSpend / row.totalRevenue) * 100).toFixed(1) : '0.0';
 
             return `
                 <tr>
@@ -507,10 +514,19 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 600;">${row.orderCount}</td>
                     <td style="text-align: right;">${row.unitsSold}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(row.totalRevenue)}</td>
-                    <td style="text-align: right; color: var(--danger);">${this.formatCurrency(row.totalCost)}</td>
-                    <td style="text-align: right; color: var(--danger);">${this.formatCurrency(row.totalShipping)}</td>
+                    <td style="text-align: right; color: var(--danger);">
+                        <div>${this.formatCurrency(row.totalCost)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${costPct}%</div>
+                    </td>
+                    <td style="text-align: right; color: var(--danger);">
+                        <div>${this.formatCurrency(row.totalShipping)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${shippingPct}%</div>
+                    </td>
                     <td style="text-align: right; color: var(--warning);">${this.formatCurrency(countryFreight)}</td>
-                    <td style="text-align: right; color: #ec4899; font-weight: 500;">${this.formatCurrency(countryAdSpend)}</td>
+                    <td style="text-align: right; color: #ec4899; font-weight: 500;">
+                        <div>${this.formatCurrency(countryAdSpend)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.85; font-weight: 500;">${adPct}%</div>
+                    </td>
                     <td style="text-align: right; font-weight: 600; color: ${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
                         ${this.formatCurrency(grossProfit)}
                     </td>
@@ -529,18 +545,31 @@ const IncomeStatementModule = {
         }).join('');
 
         // Total row
-        const totalGross = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalFreight;
+        const totalGross = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalFreight - totalRow.totalAdSpend;
         const totalMargin = totalRow.totalRevenue > 0 ? ((totalGross / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
+        const totalCostPct = totalRow.totalRevenue > 0 ? ((totalRow.totalCost / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
+        const totalShippingPct = totalRow.totalRevenue > 0 ? ((totalRow.totalShipping / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
+        const totalAdPct = totalRow.totalRevenue > 0 ? ((totalRow.totalAdSpend / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
+
         tbody.innerHTML += `
             <tr class="is-total-row">
                 <td><strong>TOTAL</strong></td>
                 <td style="text-align: right; font-weight: 700;">${totalRow.orderCount}</td>
                 <td style="text-align: right; font-weight: 700;">${totalRow.unitsSold}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.totalRevenue)}</td>
-                <td style="text-align: right; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalRow.totalCost)}</td>
-                <td style="text-align: right; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalRow.totalShipping)}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--danger);">
+                    <div>${this.formatCurrency(totalRow.totalCost)}</div>
+                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalCostPct}%</div>
+                </td>
+                <td style="text-align: right; font-weight: 700; color: var(--danger);">
+                    <div>${this.formatCurrency(totalRow.totalShipping)}</div>
+                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalShippingPct}%</div>
+                </td>
                 <td style="text-align: right; font-weight: 700; color: var(--warning);">${this.formatCurrency(totalRow.totalFreight)}</td>
-                <td style="text-align: right; font-weight: 700; color: #ec4899;">${this.formatCurrency(totalRow.totalAdSpend)}</td>
+                <td style="text-align: right; font-weight: 700; color: #ec4899;">
+                    <div>${this.formatCurrency(totalRow.totalAdSpend)}</div>
+                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalAdPct}%</div>
+                </td>
                 <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
                 <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
                 <td></td>
@@ -590,12 +619,16 @@ const IncomeStatementModule = {
             const adSpend = adMap[country] || 0;
 
             const totalOrders = guideData.orderCount + extData.delivered;
-            const totalUnits = guideData.unitsSold; // External sales doesn't track units sold explicitly
+            const totalUnits = guideData.unitsSold;
             const totalRevenue = guideData.totalRevenue + extData.revenue;
             const totalCost = guideData.totalCost + extData.cost;
             const totalShipping = guideData.totalShipping + extData.shipping;
-            const grossProfit = totalRevenue - totalCost - totalShipping - freight;
+            const grossProfit = totalRevenue - totalCost - totalShipping - freight - adSpend;
             const margin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0.0';
+
+            const costPct = totalRevenue > 0 ? ((totalCost / totalRevenue) * 100).toFixed(1) : '0.0';
+            const shippingPct = totalRevenue > 0 ? ((totalShipping / totalRevenue) * 100).toFixed(1) : '0.0';
+            const adPct = totalRevenue > 0 ? ((adSpend / totalRevenue) * 100).toFixed(1) : '0.0';
 
             return {
                 country,
@@ -607,7 +640,10 @@ const IncomeStatementModule = {
                 freight,
                 adSpend,
                 grossProfit,
-                margin
+                margin,
+                costPct,
+                shippingPct,
+                adPct
             };
         });
 
@@ -645,10 +681,19 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 600;">${row.orderCount}</td>
                     <td style="text-align: right;">${row.unitsSold || '-'}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(row.totalRevenue)}</td>
-                    <td style="text-align: right; color: var(--danger);">${this.formatCurrency(row.totalCost)}</td>
-                    <td style="text-align: right; color: var(--danger);">${this.formatCurrency(row.totalShipping)}</td>
+                    <td style="text-align: right; color: var(--danger);">
+                        <div>${this.formatCurrency(row.totalCost)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${row.costPct}%</div>
+                    </td>
+                    <td style="text-align: right; color: var(--danger);">
+                        <div>${this.formatCurrency(row.totalShipping)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${row.shippingPct}%</div>
+                    </td>
                     <td style="text-align: right; color: var(--warning);">${this.formatCurrency(row.freight)}</td>
-                    <td style="text-align: right; color: #ec4899; font-weight: 500;">${this.formatCurrency(row.adSpend)}</td>
+                    <td style="text-align: right; color: #ec4899; font-weight: 500;">
+                        <div>${this.formatCurrency(row.adSpend)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.85; font-weight: 500;">${row.adPct}%</div>
+                    </td>
                     <td style="text-align: right; font-weight: 600; color: ${row.grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
                         ${this.formatCurrency(row.grossProfit)}
                     </td>
@@ -659,8 +704,11 @@ const IncomeStatementModule = {
         }).join('');
 
         // Total row
-        const totalGross = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalFreight;
+        const totalGross = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalFreight - totalRow.totalAdSpend;
         const totalMargin = totalRow.totalRevenue > 0 ? ((totalGross / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
+        const totalCostPct = totalRow.totalRevenue > 0 ? ((totalRow.totalCost / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
+        const totalShippingPct = totalRow.totalRevenue > 0 ? ((totalRow.totalShipping / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
+        const totalAdPct = totalRow.totalRevenue > 0 ? ((totalRow.totalAdSpend / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
 
         tbody.innerHTML += `
             <tr class="is-total-row">
@@ -668,10 +716,19 @@ const IncomeStatementModule = {
                 <td style="text-align: right; font-weight: 700;">${totalRow.orderCount}</td>
                 <td style="text-align: right; font-weight: 700;">${totalRow.unitsSold}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.totalRevenue)}</td>
-                <td style="text-align: right; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalRow.totalCost)}</td>
-                <td style="text-align: right; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalRow.totalShipping)}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--danger);">
+                    <div>${this.formatCurrency(totalRow.totalCost)}</div>
+                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalCostPct}%</div>
+                </td>
+                <td style="text-align: right; font-weight: 700; color: var(--danger);">
+                    <div>${this.formatCurrency(totalRow.totalShipping)}</div>
+                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalShippingPct}%</div>
+                </td>
                 <td style="text-align: right; font-weight: 700; color: var(--warning);">${this.formatCurrency(totalRow.totalFreight)}</td>
-                <td style="text-align: right; font-weight: 700; color: #ec4899;">${this.formatCurrency(totalRow.totalAdSpend)}</td>
+                <td style="text-align: right; font-weight: 700; color: #ec4899;">
+                    <div>${this.formatCurrency(totalRow.totalAdSpend)}</div>
+                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalAdPct}%</div>
+                </td>
                 <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
                 <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
             </tr>`;
