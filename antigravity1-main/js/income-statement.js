@@ -104,13 +104,33 @@ const IncomeStatementModule = {
             await this.loadAllData();
             this.renderSummaryCards();
             this.renderSalesTable();
+            this.renderConsolidatedSalesTable();
             this.renderAdExpensesTable();
             this.renderOperationalExpensesTable();
             this.renderExternalSalesTable();
             this.renderPLStatement();
         } catch (error) {
-            console.error('Error rendering income statement:', error);
+            console.error('Error rendering Income Statement:', error);
+            Utils.showToast('Error al cargar el estado de resultados', 'error');
         }
+    },
+
+    renderConsolidatedSalesTable() {
+        const container = document.getElementById('isConsolidatedSalesTableBody');
+        if (!container) return;
+
+        const data = this.getSalesByCountry();
+        container.innerHTML = data.map(item => `
+            <tr>
+                <td>${item.country}</td>
+                <td>${item.orderCount}</td>
+                <td>${item.unitsSold}</td>
+                <td>${Utils.formatCurrency(item.totalRevenue)}</td>
+                <td>${Utils.formatCurrency(item.totalCost)}</td>
+                <td>${Utils.formatCurrency(item.totalShipping)}</td>
+                <td>${Utils.formatCurrency(item.totalRevenue - item.totalCost - item.totalShipping)}</td>
+            </tr>
+        `).join('');
     },
 
     async loadAllData() {
@@ -524,6 +544,136 @@ const IncomeStatementModule = {
                 <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
                 <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
                 <td></td>
+            </tr>`;
+    },
+
+    renderConsolidatedSalesTable() {
+        const tbody = document.getElementById('isConsolidatedSalesTable');
+        if (!tbody) return;
+
+        const salesByCountry = this.getSalesByCountry();
+        const freightsByCountry = this.getFreightsByCountry();
+        const adExpensesByCountry = this.getAdExpensesByCountry();
+        const externalSales = this.getFilteredExternalSales();
+
+        // Build mapping for external sales per country
+        const extByCountry = {};
+        externalSales.forEach(s => {
+            const c = s.country || 'Global';
+            if (!extByCountry[c]) {
+                extByCountry[c] = { revenue: 0, cost: 0, shipping: 0, delivered: 0 };
+            }
+            extByCountry[c].revenue += parseFloat(s.revenue || 0);
+            extByCountry[c].cost += parseFloat(s.product_cost || 0);
+            extByCountry[c].shipping += parseFloat(s.shipping_cost || 0);
+            extByCountry[c].delivered += (parseInt(s.delivered || 0) + parseInt(s.returned || 0));
+        });
+
+        // Ad spend map
+        const adMap = {};
+        adExpensesByCountry.forEach(item => {
+            adMap[item.country] = item.totalSpent || 0;
+        });
+
+        // Unique set of countries
+        const countriesSet = new Set([
+            ...salesByCountry.map(s => s.country),
+            ...Object.keys(extByCountry).filter(c => c !== 'Todos' && c !== 'Global')
+        ]);
+
+        const consolidatedList = Array.from(countriesSet).map(country => {
+            const guideData = salesByCountry.find(s => s.country === country) || {
+                orderCount: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0
+            };
+            const extData = extByCountry[country] || { revenue: 0, cost: 0, shipping: 0, delivered: 0 };
+            const freight = freightsByCountry[country]?.totalFreight || 0;
+            const adSpend = adMap[country] || 0;
+
+            const totalOrders = guideData.orderCount + extData.delivered;
+            const totalUnits = guideData.unitsSold; // External sales doesn't track units sold explicitly
+            const totalRevenue = guideData.totalRevenue + extData.revenue;
+            const totalCost = guideData.totalCost + extData.cost;
+            const totalShipping = guideData.totalShipping + extData.shipping;
+            const grossProfit = totalRevenue - totalCost - totalShipping - freight;
+            const margin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0.0';
+
+            return {
+                country,
+                orderCount: totalOrders,
+                unitsSold: totalUnits,
+                totalRevenue,
+                totalCost,
+                totalShipping,
+                freight,
+                adSpend,
+                grossProfit,
+                margin
+            };
+        });
+
+        if (consolidatedList.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        No hay ventas consolidadas en este período.
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        const totalRow = {
+            orderCount: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0, totalFreight: 0, totalAdSpend: 0
+        };
+
+        tbody.innerHTML = consolidatedList.map(row => {
+            totalRow.orderCount += row.orderCount;
+            totalRow.unitsSold += row.unitsSold;
+            totalRow.totalRevenue += row.totalRevenue;
+            totalRow.totalCost += row.totalCost;
+            totalRow.totalShipping += row.totalShipping;
+            totalRow.totalFreight += row.freight;
+            totalRow.totalAdSpend += row.adSpend;
+
+            return `
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span class="country-flag">${this.getCountryFlag(row.country)}</span>
+                            <strong>${row.country}</strong>
+                        </div>
+                    </td>
+                    <td style="text-align: right; font-weight: 600;">${row.orderCount}</td>
+                    <td style="text-align: right;">${row.unitsSold || '-'}</td>
+                    <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(row.totalRevenue)}</td>
+                    <td style="text-align: right; color: var(--danger);">${this.formatCurrency(row.totalCost)}</td>
+                    <td style="text-align: right; color: var(--danger);">${this.formatCurrency(row.totalShipping)}</td>
+                    <td style="text-align: right; color: var(--warning);">${this.formatCurrency(row.freight)}</td>
+                    <td style="text-align: right; color: #ec4899; font-weight: 500;">${this.formatCurrency(row.adSpend)}</td>
+                    <td style="text-align: right; font-weight: 600; color: ${row.grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                        ${this.formatCurrency(row.grossProfit)}
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="is-margin-badge ${parseFloat(row.margin) >= 30 ? 'good' : parseFloat(row.margin) >= 15 ? 'warning' : 'bad'}">${row.margin}%</span>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        // Total row
+        const totalGross = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalFreight;
+        const totalMargin = totalRow.totalRevenue > 0 ? ((totalGross / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
+
+        tbody.innerHTML += `
+            <tr class="is-total-row">
+                <td><strong>TOTAL CONSOLIDADO</strong></td>
+                <td style="text-align: right; font-weight: 700;">${totalRow.orderCount}</td>
+                <td style="text-align: right; font-weight: 700;">${totalRow.unitsSold}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.totalRevenue)}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalRow.totalCost)}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalRow.totalShipping)}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--warning);">${this.formatCurrency(totalRow.totalFreight)}</td>
+                <td style="text-align: right; font-weight: 700; color: #ec4899;">${this.formatCurrency(totalRow.totalAdSpend)}</td>
+                <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
+                <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
             </tr>`;
     },
 
