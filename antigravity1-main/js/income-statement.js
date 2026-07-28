@@ -443,7 +443,7 @@ const IncomeStatementModule = {
         if (salesData.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 0.5rem; opacity: 0.3;">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14 2 14 8 20 8"></polyline>
@@ -481,6 +481,7 @@ const IncomeStatementModule = {
                     <td style="text-align: right;">${row.unitsSold}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(row.totalRevenue)}</td>
                     <td style="text-align: right; color: var(--danger);">${this.formatCurrency(row.totalCost)}</td>
+                    <td style="text-align: right; color: var(--danger);">${this.formatCurrency(row.totalShipping)}</td>
                     <td style="text-align: right; color: var(--warning);">${this.formatCurrency(countryFreight)}</td>
                     <td style="text-align: right; font-weight: 600; color: ${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
                         ${this.formatCurrency(grossProfit)}
@@ -509,6 +510,7 @@ const IncomeStatementModule = {
                 <td style="text-align: right; font-weight: 700;">${totalRow.unitsSold}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.totalRevenue)}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalRow.totalCost)}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalRow.totalShipping)}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--warning);">${this.formatCurrency(totalRow.totalFreight)}</td>
                 <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
                 <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
