@@ -2336,7 +2336,7 @@ const IncomeStatementModule = {
         if (sales.length === 0) {
             tableBody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         No hay pedidos para ${country} en el período seleccionado.
                     </td>
                 </tr>`;
@@ -2359,7 +2359,7 @@ const IncomeStatementModule = {
                     });
                 }
                 const profit = revenue - cost - shipping;
-                const dateStr = this.formatDate(guide.created_at);
+                const dateStr = guide.created_at ? this.formatDate(guide.created_at.split('T')[0]) : '-';
                 const statusClass = status === 'Pagado' ? 'color: var(--success);' : 'color: var(--primary);';
 
                 return `
@@ -2373,6 +2373,7 @@ const IncomeStatementModule = {
                         <td style="text-align: center;">${units}</td>
                         <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(revenue)}</td>
                         <td style="text-align: right; color: var(--danger);">${this.formatCurrency(cost)}</td>
+                        <td style="text-align: right; color: var(--danger);">${this.formatCurrency(shipping)}</td>
                         <td style="text-align: right; font-weight: 600; color: ${profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(profit)}</td>
                         <td style="font-size: 0.8rem;">
                             <div>${dateStr}</div>
