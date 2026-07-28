@@ -10,6 +10,7 @@ const IncomeStatementModule = {
     operationalExpenses: [],
     operationalExpenses: [],
     externalSales: [],
+    freights: [],
     products: [],
 
     // Current filters
@@ -156,6 +157,21 @@ const IncomeStatementModule = {
             if (extError) throw extError;
             this.externalSales = extSales || [];
 
+            // Load freights
+            try {
+                const { data: freightsData, error: freightsError } = await supabaseClient
+                    .from('freights')
+                    .select('*')
+                    .order('date', { ascending: false });
+
+                if (!freightsError) {
+                    this.freights = freightsData || [];
+                }
+            } catch (e) {
+                console.log('Freights table not available:', e);
+                this.freights = [];
+            }
+
         } catch (error) {
             console.error('Error loading data:', error);
         }
@@ -244,6 +260,62 @@ const IncomeStatementModule = {
     },
 
     // ========================================
+    // FREIGHT COSTS DATA
+    // ========================================
+    getFreightDestinationCountry(route) {
+        if (!route) return null;
+        const r = route.toLowerCase();
+        // For routes like "Colombia -> Ecuador", extract the destination
+        const parts = route.split('->');
+        if (parts.length === 2) {
+            const dest = parts[1].trim();
+            if (dest === 'Colombia') return 'Colombia';
+            if (dest === 'Ecuador') return 'Ecuador';
+            if (dest === 'Venezuela') return 'Venezuela';
+        }
+        if (r.includes('ecuador')) return 'Ecuador';
+        if (r.includes('venezuela')) return 'Venezuela';
+        if (r.includes('colombia')) return 'Colombia';
+        return null;
+    },
+
+    getFilteredFreights() {
+        return this.freights.filter(f => {
+            if (!f.date) return false;
+            const freightDate = f.date;
+
+            if (this.filters.dateFrom && freightDate < this.filters.dateFrom) return false;
+            if (this.filters.dateTo && freightDate > this.filters.dateTo) return false;
+
+            if (this.filters.country) {
+                const destCountry = this.getFreightDestinationCountry(f.route);
+                if (destCountry !== this.filters.country) return false;
+            }
+
+            return true;
+        });
+    },
+
+    getFreightsByCountry() {
+        const freights = this.getFilteredFreights();
+        const byCountry = {};
+
+        freights.forEach(f => {
+            const country = this.getFreightDestinationCountry(f.route);
+            if (!country) return;
+
+            if (!byCountry[country]) {
+                byCountry[country] = { country, totalFreight: 0, count: 0 };
+            }
+
+            byCountry[country].totalFreight += parseFloat(f.amount || 0);
+            byCountry[country].count++;
+        });
+
+        return byCountry;
+    },
+
+    // ========================================
     // AD EXPENSES DATA
     // ========================================
     getFilteredAdExpenses() {
@@ -321,13 +393,15 @@ const IncomeStatementModule = {
         const salesData = this.getSalesByCountry();
         const adExpData = this.getAdExpensesByCountry();
         const opExpData = this.getOpExpensesByCountry();
+        const freightsByCountry = this.getFreightsByCountry();
+        const totalFreightCost = Object.values(freightsByCountry).reduce((s, c) => s + c.totalFreight, 0);
 
         const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
         const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0);
         const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0);
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
-        const grossProfit = totalRevenue - totalCOGS - totalShipping;
+        const grossProfit = totalRevenue - totalCOGS - totalShipping - totalFreightCost;
         const netProfit = grossProfit - totalAdSpend - totalOpExp;
         const totalOrders = salesData.reduce((s, c) => s + c.orderCount, 0);
 
@@ -366,11 +440,12 @@ const IncomeStatementModule = {
         if (!tbody) return;
 
         const salesData = this.getSalesByCountry();
+        const freightsByCountry = this.getFreightsByCountry();
 
         if (salesData.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 0.5rem; opacity: 0.3;">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14 2 14 8 20 8"></polyline>
@@ -382,16 +457,18 @@ const IncomeStatementModule = {
         }
 
         const totalRow = {
-            totalRevenue: 0, totalCost: 0, totalShipping: 0, orderCount: 0, unitsSold: 0
+            totalRevenue: 0, totalCost: 0, totalShipping: 0, totalFreight: 0, orderCount: 0, unitsSold: 0
         };
 
         tbody.innerHTML = salesData.map(row => {
+            const countryFreight = freightsByCountry[row.country]?.totalFreight || 0;
             totalRow.totalRevenue += row.totalRevenue;
             totalRow.totalCost += row.totalCost;
             totalRow.totalShipping += row.totalShipping;
+            totalRow.totalFreight += countryFreight;
             totalRow.orderCount += row.orderCount;
             totalRow.unitsSold += row.unitsSold;
-            const grossProfit = row.totalRevenue - row.totalCost - row.totalShipping;
+            const grossProfit = row.totalRevenue - row.totalCost - row.totalShipping - countryFreight;
             const margin = row.totalRevenue > 0 ? ((grossProfit / row.totalRevenue) * 100).toFixed(1) : '0.0';
 
             return `
@@ -406,17 +483,26 @@ const IncomeStatementModule = {
                     <td style="text-align: right;">${row.unitsSold}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(row.totalRevenue)}</td>
                     <td style="text-align: right; color: var(--danger);">${this.formatCurrency(row.totalCost)}</td>
+                    <td style="text-align: right; color: var(--warning);">${this.formatCurrency(countryFreight)}</td>
                     <td style="text-align: right; font-weight: 600; color: ${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
                         ${this.formatCurrency(grossProfit)}
                     </td>
                     <td style="text-align: center;">
                         <span class="is-margin-badge ${parseFloat(margin) >= 30 ? 'good' : parseFloat(margin) >= 15 ? 'warning' : 'bad'}">${margin}%</span>
                     </td>
+                    <td style="text-align: center;">
+                        <button class="btn btn-icon btn-sm is-detail-btn" onclick="IncomeStatementModule.showOrdersDetail('${row.country}')" title="Ver detalle de pedidos de ${row.country}">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                        </button>
+                    </td>
                 </tr>`;
         }).join('');
 
         // Total row
-        const totalGross = totalRow.totalRevenue - totalRow.totalCost;
+        const totalGross = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalFreight;
         const totalMargin = totalRow.totalRevenue > 0 ? ((totalGross / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
         tbody.innerHTML += `
             <tr class="is-total-row">
@@ -425,8 +511,10 @@ const IncomeStatementModule = {
                 <td style="text-align: right; font-weight: 700;">${totalRow.unitsSold}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.totalRevenue)}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalRow.totalCost)}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--warning);">${this.formatCurrency(totalRow.totalFreight)}</td>
                 <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
                 <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
+                <td></td>
             </tr>`;
     },
 
@@ -754,11 +842,13 @@ const IncomeStatementModule = {
         const adExpData = this.getAdExpensesByCountry();
         const opExpData = this.getOpExpensesByCountry();
         const extSalesSummary = this.getExternalSalesSummary();
+        const freightsByCountry = this.getFreightsByCountry();
+        const totalFreightCost = Object.values(freightsByCountry).reduce((s, c) => s + c.totalFreight, 0);
 
         const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0) + extSalesSummary.totalRevenue;
         const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0) + extSalesSummary.totalCost;
         const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping;
-        const grossProfit = totalRevenue - totalCOGS - totalShipping;
+        const grossProfit = totalRevenue - totalCOGS - totalShipping - totalFreightCost;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
         const totalExpenses = totalAdSpend + totalOpExp;
@@ -808,8 +898,12 @@ const IncomeStatementModule = {
                     <span style="color: var(--danger);">${this.formatCurrency(totalCOGS)}</span>
                 </div>
                 <div class="is-pl-row">
-                    <span style="padding-left: 1rem;">Costo de Fletes (Envíos)</span>
+                    <span style="padding-left: 1rem;">Costo de Envíos (Guías)</span>
                     <span style="color: var(--danger);">${this.formatCurrency(totalShipping)}</span>
+                </div>
+                <div class="is-pl-row">
+                    <span style="padding-left: 1rem;">Costo de Fletes (Transporte)</span>
+                    <span style="color: var(--danger);">${this.formatCurrency(totalFreightCost)}</span>
                 </div>
                 <div class="is-pl-row is-pl-subtotal highlight-green">
                     <span>UTILIDAD BRUTA</span>
@@ -2115,11 +2209,13 @@ const IncomeStatementModule = {
         const adExpData = this.getAdExpensesByCountry();
         const opExpData = this.getOpExpensesByCountry();
         const extSalesSummary = this.getExternalSalesSummary();
+        const freightsByCountry = this.getFreightsByCountry();
+        const totalFreightCost = Object.values(freightsByCountry).reduce((s, c) => s + c.totalFreight, 0);
 
         const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0) + extSalesSummary.totalRevenue;
         const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0) + extSalesSummary.totalCost;
         const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping;
-        const grossProfit = totalRevenue - totalCOGS - totalShipping;
+        const grossProfit = totalRevenue - totalCOGS - totalShipping - totalFreightCost;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
         const netProfit = grossProfit - totalAdSpend - totalOpExp;
@@ -2130,7 +2226,8 @@ const IncomeStatementModule = {
         csv += 'Concepto,Monto\n';
         csv += `Ventas Netas,${totalRevenue.toFixed(2)}\n`;
         csv += `Costo de Mercancía,${totalCOGS.toFixed(2)}\n`;
-        csv += `Costo de Fletes,${totalShipping.toFixed(2)}\n`;
+        csv += `Costo de Envíos (Guías),${totalShipping.toFixed(2)}\n`;
+        csv += `Costo de Fletes (Transporte),${totalFreightCost.toFixed(2)}\n`;
         csv += `Utilidad Bruta,${grossProfit.toFixed(2)}\n`;
         csv += `Gastos Publicitarios,${totalAdSpend.toFixed(2)}\n`;
         csv += `Gastos Operativos,${totalOpExp.toFixed(2)}\n`;
@@ -2167,6 +2264,137 @@ const IncomeStatementModule = {
             'Colombia': '🇨🇴'
         };
         return flags[country] || '🏳️';
+    },
+
+    // ========================================
+    // ORDERS DETAIL MODAL
+    // ========================================
+    showOrdersDetail(country) {
+        const sales = this.getFilteredSales().filter(guide => {
+            return this.getCountryFromCity(guide.cities) === country;
+        });
+
+        const modal = document.getElementById('modalOrdersDetail');
+        if (!modal) return;
+
+        const titleEl = document.getElementById('ordersDetailTitle');
+        if (titleEl) {
+            titleEl.innerHTML = `${this.getCountryFlag(country)} Detalle de Pedidos — ${country}`;
+        }
+
+        const summaryEl = document.getElementById('ordersDetailSummary');
+        const tableBody = document.getElementById('ordersDetailTable');
+        if (!tableBody) return;
+
+        // Calculate summary
+        let totalRevenue = 0, totalCost = 0, totalShipping = 0, totalUnits = 0;
+        sales.forEach(g => {
+            totalRevenue += parseFloat(g.total_amount || 0);
+            totalShipping += parseFloat(g.shipping_cost || 0);
+            if (g.guide_items) {
+                g.guide_items.forEach(item => {
+                    const qty = parseInt(item.quantity || 0);
+                    const cost = parseFloat(item.products?.cost || 0) * 40000;
+                    totalCost += qty * cost;
+                    totalUnits += qty;
+                });
+            }
+        });
+
+        // Freight cost for this country
+        const freightsByCountry = this.getFreightsByCountry();
+        const countryFreight = freightsByCountry[country]?.totalFreight || 0;
+        const grossProfit = totalRevenue - totalCost - totalShipping - countryFreight;
+
+        if (summaryEl) {
+            summaryEl.innerHTML = `
+                <div class="orders-detail-summary-grid">
+                    <div class="orders-summary-item">
+                        <span class="orders-summary-label">Pedidos</span>
+                        <span class="orders-summary-value">${sales.length}</span>
+                    </div>
+                    <div class="orders-summary-item">
+                        <span class="orders-summary-label">Unidades</span>
+                        <span class="orders-summary-value">${totalUnits}</span>
+                    </div>
+                    <div class="orders-summary-item">
+                        <span class="orders-summary-label">Ventas</span>
+                        <span class="orders-summary-value" style="color: var(--success);">${this.formatCurrency(totalRevenue)}</span>
+                    </div>
+                    <div class="orders-summary-item">
+                        <span class="orders-summary-label">Costo Prod.</span>
+                        <span class="orders-summary-value" style="color: var(--danger);">${this.formatCurrency(totalCost)}</span>
+                    </div>
+                    <div class="orders-summary-item">
+                        <span class="orders-summary-label">Envíos</span>
+                        <span class="orders-summary-value" style="color: var(--danger);">${this.formatCurrency(totalShipping)}</span>
+                    </div>
+                    <div class="orders-summary-item">
+                        <span class="orders-summary-label">Fletes</span>
+                        <span class="orders-summary-value" style="color: var(--warning);">${this.formatCurrency(countryFreight)}</span>
+                    </div>
+                    <div class="orders-summary-item orders-summary-highlight">
+                        <span class="orders-summary-label">Utilidad Bruta</span>
+                        <span class="orders-summary-value" style="color: ${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'}; font-size: 1.1rem;">${this.formatCurrency(grossProfit)}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (sales.length === 0) {
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        No hay pedidos para ${country} en el período seleccionado.
+                    </td>
+                </tr>`;
+        } else {
+            tableBody.innerHTML = sales.map((guide, idx) => {
+                const city = guide.cities?.name || '-';
+                const status = guide.guide_statuses?.name || '-';
+                const revenue = parseFloat(guide.total_amount || 0);
+                const shipping = parseFloat(guide.shipping_cost || 0);
+                let cost = 0, units = 0;
+                const products = [];
+                if (guide.guide_items) {
+                    guide.guide_items.forEach(item => {
+                        const qty = parseInt(item.quantity || 0);
+                        const unitCost = parseFloat(item.products?.cost || 0) * 40000;
+                        cost += qty * unitCost;
+                        units += qty;
+                        products.push(`${item.products?.name || 'Producto'} x${qty}`);
+                    });
+                }
+                const profit = revenue - cost - shipping;
+                const dateStr = this.formatDate(guide.created_at);
+                const statusClass = status === 'Pagado' ? 'color: var(--success);' : 'color: var(--primary);';
+
+                return `
+                    <tr>
+                        <td style="font-weight: 600; color: var(--text-muted); font-size: 0.8rem;">${idx + 1}</td>
+                        <td>
+                            <div style="font-weight: 600; font-size: 0.85rem;">${guide.customer_name || guide.guide_number || '-'}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">${city}</div>
+                        </td>
+                        <td style="font-size: 0.8rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${products.join(', ')}">${products.join(', ') || '-'}</td>
+                        <td style="text-align: center;">${units}</td>
+                        <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(revenue)}</td>
+                        <td style="text-align: right; color: var(--danger);">${this.formatCurrency(cost)}</td>
+                        <td style="text-align: right; font-weight: 600; color: ${profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(profit)}</td>
+                        <td style="font-size: 0.8rem;">
+                            <div>${dateStr}</div>
+                            <div style="${statusClass} font-size: 0.75rem; font-weight: 500;">${status}</div>
+                        </td>
+                    </tr>`;
+            }).join('');
+        }
+
+        modal.classList.add('active');
+    },
+
+    closeOrdersDetailModal() {
+        const modal = document.getElementById('modalOrdersDetail');
+        if (modal) modal.classList.remove('active');
     }
 };
 
