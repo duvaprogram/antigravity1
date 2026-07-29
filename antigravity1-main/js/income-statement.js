@@ -1619,7 +1619,7 @@ const IncomeStatementModule = {
                 if (!productGroupMap[groupKey]) {
                     productGroupMap[groupKey] = {
                         country: 'Ecuador',
-                        sale_date: new Date().toISOString().split('T')[0],
+                        sale_date: this.filters.dateFrom || new Date().toISOString().split('T')[0],
                         description: finalProductName,
                         stock_id: stockId,
                         revenue: 0,
@@ -1867,7 +1867,7 @@ const IncomeStatementModule = {
         const preparedRecords = recordsToSave.map(r => ({
             id: this.generateUUID(),
             country: r.country || 'Ecuador',
-            sale_date: r.sale_date || new Date().toISOString().split('T')[0],
+            sale_date: r.sale_date || this.filters.dateFrom || new Date().toISOString().split('T')[0],
             description: r.description || 'Producto Externo',
             revenue: parseFloat(r.revenue) || 0,
             product_cost: parseFloat(r.product_cost) || 0,
@@ -2783,7 +2783,7 @@ const IncomeStatementModule = {
                 dateStart = this.parseMonthToDate(mapped.month, rowYear);
             }
             if (!dateStart) {
-                dateStart = new Date().toISOString().split('T')[0];
+                dateStart = this.filters.dateFrom || new Date().toISOString().split('T')[0];
             }
 
             // Convert monetary metrics if needed
