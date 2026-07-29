@@ -799,7 +799,7 @@ const IncomeStatementModule = {
         if (expenses.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="12" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="13" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 0.5rem; opacity: 0.3;">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M8 12h8"></path>
@@ -835,6 +835,9 @@ const IncomeStatementModule = {
 
             return `
                 <tr>
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="ad-expense-checkbox" value="${exp.id}" onchange="IncomeStatementModule.updateSelectedAdExpensesCount()" style="cursor: pointer;">
+                    </td>
                     <td>
                         <span class="country-flag">${this.getCountryFlag(exp.country)}</span>
                         ${exp.country}
@@ -3209,6 +3212,124 @@ const IncomeStatementModule = {
         } catch (error) {
             console.error('Error saving operational expense:', error);
             Utils.showToast('Error al guardar: ' + error.message, 'error');
+        }
+    },
+
+    toggleSelectAllAdExpenses(checked) {
+        const checkboxes = document.querySelectorAll('.ad-expense-checkbox');
+        checkboxes.forEach(cb => cb.checked = checked);
+        this.updateSelectedAdExpensesCount();
+    },
+
+    updateSelectedAdExpensesCount() {
+        const checked = document.querySelectorAll('.ad-expense-checkbox:checked').length;
+        const btnDeleteSelected = document.getElementById('btnDeleteSelectedAdExpenses');
+        const countSpan = document.getElementById('selectedAdExpensesCount');
+        if (countSpan) countSpan.textContent = checked;
+        if (btnDeleteSelected) btnDeleteSelected.style.display = checked > 0 ? 'inline-flex' : 'none';
+        
+        const groupToolbar = document.getElementById('adExpensesGroupToolbar');
+        const groupBtn = document.getElementById('btnGroupAdExpenses');
+        const groupCount = document.getElementById('groupAdExpensesCount');
+        if (groupToolbar) groupToolbar.style.display = checked > 0 ? 'flex' : 'none';
+        if (groupCount) groupCount.textContent = checked;
+        if (groupBtn) groupBtn.disabled = (checked < 2);
+    },
+
+    async deleteSelectedAdExpenses() {
+        const checked = Array.from(document.querySelectorAll('.ad-expense-checkbox:checked')).map(cb => String(cb.value));
+        if (checked.length === 0) return;
+
+        if (!confirm(`¿Estás seguro de eliminar las ${checked.length} campañas seleccionadas?`)) return;
+
+        Utils.showToast(`Eliminando ${checked.length} campañas...`, 'info');
+
+        try {
+            await supabaseClient.from('ad_expenses').delete().in('id', checked);
+            Utils.showToast(`Se eliminaron ${checked.length} campañas`, 'success');
+            await this.render();
+        } catch (err) {
+            Utils.showToast('Error al eliminar: ' + err.message, 'error');
+        }
+    },
+
+    async deleteAllAdExpenses() {
+        const expenses = this.adExpenses;
+        const count = expenses.length;
+        if (count === 0) return;
+
+        if (!confirm(`⚠️ ¿Estás seguro de ELIMINAR TODOS los ${count} registros de gastos publicitarios? Esta acción no se puede deshacer.`)) return;
+
+        Utils.showToast('Vaciando registros...', 'info');
+
+        const idsToDelete = expenses.map(s => String(s.id));
+
+        try {
+            await supabaseClient.from('ad_expenses').delete().in('id', idsToDelete);
+            Utils.showToast(`Se eliminaron todos los registros (${count})`, 'success');
+            await this.render();
+        } catch (err) {
+            Utils.showToast('Error al vaciar: ' + err.message, 'error');
+        }
+    },
+
+    async manualGroupAdExpenses() {
+        const checkedBoxes = document.querySelectorAll('.ad-expense-checkbox:checked');
+        if (checkedBoxes.length < 2) {
+            Utils.showToast('Selecciona al menos 2 campañas para agrupar.', 'warning');
+            return;
+        }
+
+        const idsToMerge = Array.from(checkedBoxes).map(cb => String(cb.value));
+        const recordsToMerge = this.adExpenses.filter(s => idsToMerge.includes(String(s.id)));
+
+        if (recordsToMerge.length < 2) return;
+
+        const mergedNames = [...new Set(recordsToMerge.map(r => r.campaign_name))];
+        const defaultName = mergedNames.length <= 3 ? mergedNames.join(' + ') : `${mergedNames[0]} (+${mergedNames.length - 1} más)`;
+        
+        const groupName = prompt('Nombre del grupo fusionado:', defaultName);
+        if (!groupName) return;
+
+        // Create the merged record
+        const merged = {
+            id: this.generateUUID(),
+            country: recordsToMerge[0].country,
+            source: recordsToMerge[0].source || 'Facebook',
+            campaign_name: groupName.trim(),
+            product_name: recordsToMerge[0].product_name || '', // Keep the first product if any
+            amount_spent: 0,
+            impressions: 0,
+            clicks: 0,
+            purchases: 0,
+            date_start: recordsToMerge[0].date_start
+        };
+
+        for (const src of recordsToMerge) {
+            merged.amount_spent += (parseFloat(src.amount_spent) || 0);
+            merged.impressions += (parseInt(src.impressions) || 0);
+            merged.clicks += (parseInt(src.clicks) || 0);
+            merged.purchases += (parseInt(src.purchases) || 0);
+        }
+
+        Utils.showToast('Agrupando campañas...', 'info');
+
+        try {
+            // Delete old records
+            await supabaseClient.from('ad_expenses').delete().in('id', idsToMerge);
+            // Insert new merged record
+            await supabaseClient.from('ad_expenses').insert(merged);
+            
+            Utils.showToast(`Se agruparon ${recordsToMerge.length} campañas en "${merged.campaign_name}"`, 'success');
+            
+            // clear selected checkbox all state
+            const selectAllCb = document.getElementById('selectAllAdExpenses');
+            if (selectAllCb) selectAllCb.checked = false;
+            
+            await this.render();
+        } catch (e) {
+            console.warn('Error syncing group to Supabase', e);
+            Utils.showToast('Error al agrupar: ' + e.message, 'error');
         }
     },
 

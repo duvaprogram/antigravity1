@@ -3234,11 +3234,38 @@
                                 id="adFilterSummary"></div>
                         </div>
 
+                        <!-- Ad Expenses Grouping Toolbar and Delete Actions -->
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+                            <button type="button" class="btn btn-danger-light btn-sm" id="btnDeleteSelectedAdExpenses" onclick="IncomeStatementModule.deleteSelectedAdExpenses()" style="display:none;">
+                                🗑️ Eliminar Seleccionados (<span id="selectedAdExpensesCount">0</span>)
+                            </button>
+                            <button type="button" class="btn btn-danger-light btn-sm" id="btnDeleteAllAdExpenses" onclick="IncomeStatementModule.deleteAllAdExpenses()" style="display:none;">
+                                ⚠️ Vaciar Todo
+                            </button>
+                        </div>
+                        <div id="adExpensesGroupToolbar" style="display: none; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.65rem 0.75rem; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: var(--radius-md);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                            </svg>
+                            <span style="font-size: 0.8rem; color: var(--text); flex: 1;">
+                                <strong>Agrupar:</strong> Selecciona 2+ campañas y fusiónalas en una sola
+                            </span>
+                            <button type="button" id="btnGroupAdExpenses" class="btn btn-primary btn-sm" onclick="IncomeStatementModule.manualGroupAdExpenses()" style="background: #8b5cf6; border-color: #8b5cf6; font-size: 0.78rem; padding: 0.35rem 0.85rem; white-space: nowrap;" disabled>
+                                🔗 Agrupar (<span id="groupAdExpensesCount">0</span>)
+                            </button>
+                        </div>
+
                         <!-- Ad Expenses Table -->
                         <div class="table-container">
                             <table class="table">
                                 <thead>
                                     <tr>
+                                        <th style="width: 36px; text-align: center;">
+                                            <input type="checkbox" id="selectAllAdExpenses" onchange="IncomeStatementModule.toggleSelectAllAdExpenses(this.checked)" title="Seleccionar Todos" style="cursor: pointer;">
+                                        </th>
                                         <th>País</th>
                                         <th>Plataforma</th>
                                         <th>Campaña</th>
