@@ -1374,11 +1374,11 @@ const IncomeStatementModule = {
             // Use defval: '' to ensure exact 0-based array indexes even for empty cells
             const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
-            if (!rows || rows.length === 0) {
+            if (!rows || rows.length < 2) {
                 this.showImportErrorModal(
-                    'Hoja Vacía',
-                    `La hoja "${sheetName}" del archivo Excel no contiene filas de datos.`,
-                    'Causa: La primera hoja de cálculo está totalmente en blanco.'
+                    'Archivo sin Datos',
+                    'El archivo seleccionado está vacío o no contiene filas con datos de ventas.',
+                    `Hoja detectada: "${sheetName}" | Filas totales: ${rows ? rows.length : 0}`
                 );
                 e.target.value = '';
                 return;
@@ -1400,7 +1400,7 @@ const IncomeStatementModule = {
             let stockIdx = 13; // Col N
             let contentIdx = 15; // Col P
             let recaudoIdx = 25; // Col Z
-            let costoIdx = 26; // Col AA
+            let costoIdx = 26; // Col AA (Costo de Producto)
             let safeFleteEntregaIdx = 27; // Col AB
             let safeFleteDevIdx = 28; // Col AC
 
@@ -1409,17 +1409,21 @@ const IncomeStatementModule = {
             if (headerRowIndex !== -1) {
                 startRowIndex = headerRowIndex + 1;
                 const headers = (rows[headerRowIndex] || []).map(c => String(c || '').trim().toLowerCase());
-                const findCol = (keywords, fallbackIdx) => {
-                    const idx = headers.findIndex(h => keywords.some(k => h.includes(k)));
+                
+                const findColExact = (keywords, fallbackIdx) => {
+                    let idx = headers.findIndex(h => keywords.some(k => h === k));
+                    if (idx === -1) {
+                        idx = headers.findIndex(h => keywords.some(k => h.includes(k)));
+                    }
                     return idx !== -1 ? idx : fallbackIdx;
                 };
 
-                statusIdx = findCol(['estado'], 2);
-                productIdx = findCol(['producto'], 12);
-                stockIdx = findCol(['stock', 'sku'], 13);
-                contentIdx = findCol(['contenido'], 15);
-                recaudoIdx = findCol(['recaudo'], 25);
-                costoIdx = findCol(['costo'], 26);
+                statusIdx = findColExact(['estado', 'estado guia', 'estado del pedido'], 2);
+                productIdx = findColExact(['producto', 'nombre producto', 'articulo'], 12);
+                stockIdx = findColExact(['id del stock', 'stock id', 'sku', 'id stock'], 13);
+                contentIdx = findColExact(['contenido del producto', 'contenido', 'detalle'], 15);
+                recaudoIdx = findColExact(['recaudo', 'valor recaudo', 'monto recaudo'], 25);
+                costoIdx = findColExact(['costo del producto', 'costo producto', 'costo prod', 'costo'], 26);
 
                 const fleteEntregaIdx = headers.findIndex(h => h.includes('flete') && !h.includes('devoluc'));
                 const fleteDevIdx = headers.findIndex(h => h.includes('devoluc') || h.includes('flete por dev'));
@@ -1454,10 +1458,10 @@ const IncomeStatementModule = {
                 // Skip header text row if encountered
                 if (status.toLowerCase() === 'estado' || rawProduct.toLowerCase() === 'producto') continue;
 
-                const recaudo = parseFloat(String(row[recaudoIdx]).replace(/[^0-9.-]/g, '')) || 0;
-                const costoProd = parseFloat(String(row[costoIdx]).replace(/[^0-9.-]/g, '')) || 0;
-                const fleteEntrega = parseFloat(String(row[safeFleteEntregaIdx]).replace(/[^0-9.-]/g, '')) || 0;
-                const fleteDevolucion = parseFloat(String(row[safeFleteDevIdx]).replace(/[^0-9.-]/g, '')) || 0;
+                const recaudo = this.parseExcelNumber(row[recaudoIdx]);
+                const costoProd = this.parseExcelNumber(row[costoIdx]);
+                const fleteEntrega = this.parseExcelNumber(row[safeFleteEntregaIdx]);
+                const fleteDevolucion = this.parseExcelNumber(row[safeFleteDevIdx]);
 
                 const statusLower = status.toLowerCase();
                 const isReturned = statusLower.includes('devuelt') || statusLower.includes('cancel');
