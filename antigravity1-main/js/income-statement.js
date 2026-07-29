@@ -1939,7 +1939,7 @@ const IncomeStatementModule = {
             this.hideImportLoadingOverlay();
             Utils.showToast(`Se guardaron ${preparedRecords.length} registros en almacenamiento local. Error de sincronización.`, 'success');
         }
-
+    },
 
     renderProductProfitTable() {
         const tbody = document.getElementById('isProductProfitTable');
