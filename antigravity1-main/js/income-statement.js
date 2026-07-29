@@ -1588,43 +1588,47 @@ const IncomeStatementModule = {
         this.pendingImportRecords = [];
     },
 
+    generateUUID() {
+        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+            try { return crypto.randomUUID(); } catch (e) {}
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    },
+
     async confirmImportExternalSales() {
-        if (!this.pendingImportRecords || this.pendingImportRecords.length === 0) return;
-
-        const records = this.pendingImportRecords.map((r, idx) => ({
-            id: 'ext_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substring(2, 6),
-            country: r.country,
-            sale_date: r.sale_date,
-            description: r.description,
-            revenue: r.revenue,
-            product_cost: r.product_cost,
-            shipping_cost: r.shipping_cost,
-            delivered: r.delivered,
-            returned: r.returned
-        }));
-
-        this.closeImportPreviewModal();
-        Utils.showToast(`Guardando ${records.length} registros...`, 'info');
-
-        // Update in-memory externalSales and save to localStorage backup immediately
-        this.externalSales = [...records, ...this.externalSales];
-        this.saveExternalSalesToLocal();
-
-        // Attempt background insert in Supabase
-        try {
-            const batchSize = 50;
-            for (let b = 0; b < records.length; b += batchSize) {
-                const batch = records.slice(b, b + batchSize);
-                const { error } = await supabaseClient.from('external_sales').insert(batch);
-                if (error) console.warn('Alerta al insertar lote en Supabase:', error);
-            }
-            Utils.showToast(`¡Importación exitosa! ${records.length} registros guardados.`, 'success');
-        } catch (dbErr) {
-            console.warn('Alerta de base de datos Supabase, guardado local activo:', dbErr);
-            Utils.showToast(`Importados ${records.length} registros localmente.`, 'success');
+        if (!this.pendingImportRecords || this.pendingImportRecords.length === 0) {
+            this.closeImportPreviewModal();
+            return;
         }
 
-        // Render UI directly using updated memory state without clearing
+        const recordsToSave = [...this.pendingImportRecords];
+        this.closeImportPreviewModal();
+
+        Utils.showToast(`Guardando ${recordsToSave.length} registros...`, 'info');
+
+        // Create objects with valid UUIDs for memory and local storage
+        const preparedRecords = recordsToSave.map(r => ({
+            id: this.generateUUID(),
+            country: r.country || 'Ecuador',
+            sale_date: r.sale_date || new Date().toISOString().split('T')[0],
+            description: r.description || 'Producto Externo',
+            revenue: parseFloat(r.revenue) || 0,
+            product_cost: parseFloat(r.product_cost) || 0,
+            shipping_cost: parseFloat(r.shipping_cost) || 0,
+            delivered: parseInt(r.delivered) || 0,
+            returned: parseInt(r.returned) || 0
+        }));
+
+        // 1. Update in-memory externalSales
+        this.externalSales = [...preparedRecords, ...this.externalSales];
+
+        // 2. Save to LocalStorage immediately
+        this.saveExternalSalesToLocal();
+
+        // 3. Render UI components immediately
         this.renderSummaryCards();
         this.renderSalesTable();
         this.renderConsolidatedSalesTable();
@@ -1633,6 +1637,35 @@ const IncomeStatementModule = {
         this.renderExternalSalesTable();
         this.renderProductProfitTable();
         this.renderPLStatement();
+
+        // 4. Background sync with Supabase
+        try {
+            const supabasePayload = preparedRecords.map(r => ({
+                id: r.id,
+                country: r.country,
+                sale_date: r.sale_date,
+                description: r.description,
+                revenue: r.revenue,
+                product_cost: r.product_cost,
+                shipping_cost: r.shipping_cost,
+                delivered: r.delivered,
+                returned: r.returned
+            }));
+
+            const batchSize = 50;
+            for (let b = 0; b < supabasePayload.length; b += batchSize) {
+                const batch = supabasePayload.slice(b, b + batchSize);
+                const { error } = await supabaseClient.from('external_sales').insert(batch);
+                if (error) {
+                    const batchNoId = batch.map(({ id, ...rest }) => rest);
+                    await supabaseClient.from('external_sales').insert(batchNoId);
+                }
+            }
+            Utils.showToast(`¡Importación completada! ${preparedRecords.length} registros guardados.`, 'success');
+        } catch (dbErr) {
+            console.warn('Nota: Guardado local activo. Supabase:', dbErr);
+            Utils.showToast(`Se guardaron ${preparedRecords.length} registros en almacenamiento local.`, 'success');
+        }
     },
 
     renderProductProfitTable() {
