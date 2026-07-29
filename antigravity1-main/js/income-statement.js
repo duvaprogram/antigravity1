@@ -1714,6 +1714,10 @@ const IncomeStatementModule = {
                 const fleteDevIdx = headers.findIndex(h => h.includes('devoluc') || h.includes('flete por dev'));
                 if (fleteEntregaIdx !== -1) safeFleteEntregaIdx = fleteEntregaIdx;
                 if (fleteDevIdx !== -1) safeFleteDevIdx = fleteDevIdx;
+                
+                // Forzar columnas Dropi Ecuador según indicaciones:
+                statusIdx = 2; // Columna C
+                safeFleteDevIdx = 28; // Columna AC
             }
 
             this.updateImportProgress(35, 'Columnas identificadas. Cargando productos del catálogo...');
@@ -1763,7 +1767,7 @@ const IncomeStatementModule = {
                 const fleteDevolucion = this.parseExcelNumber(row[safeFleteDevIdx]);
 
                 const statusLower = status.toLowerCase();
-                const isReturned = statusLower.includes('devuelt') || statusLower.includes('cancel');
+                const isReturned = statusLower.includes('devuelt') || statusLower.includes('devol') || statusLower.includes('cancel') || statusLower.includes('rechazad');
 
                 if (isReturned) totalReturnedGuides++;
                 else totalDeliveredGuides++;
