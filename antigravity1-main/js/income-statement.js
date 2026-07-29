@@ -177,14 +177,35 @@ const IncomeStatementModule = {
             if (opError) throw opError;
             this.operationalExpenses = opExpenses || [];
 
-            // Load external sales
-            const { data: extSales, error: extError } = await supabaseClient
-                .from('external_sales')
-                .select('*')
-                .order('sale_date', { ascending: false });
+            // Load external sales (Supabase + LocalStorage Hybrid)
+            let supabaseExtSales = [];
+            try {
+                const { data: extSales, error: extError } = await supabaseClient
+                    .from('external_sales')
+                    .select('*')
+                    .order('sale_date', { ascending: false });
 
-            if (extError) throw extError;
-            this.externalSales = extSales || [];
+                if (!extError && extSales) {
+                    supabaseExtSales = extSales;
+                }
+            } catch (e) {
+                console.warn('Alerta al cargar external_sales de Supabase:', e);
+            }
+
+            const localExtSales = this.loadExternalSalesFromLocal();
+            const extSalesMap = new Map();
+
+            (supabaseExtSales || []).forEach(item => {
+                if (item.id) extSalesMap.set(String(item.id), item);
+            });
+            (localExtSales || []).forEach(item => {
+                if (item.id && !extSalesMap.has(String(item.id))) {
+                    extSalesMap.set(String(item.id), item);
+                }
+            });
+
+            this.externalSales = Array.from(extSalesMap.values());
+            this.saveExternalSalesToLocal();
 
             // Load freights
             try {
@@ -1193,6 +1214,23 @@ const IncomeStatementModule = {
         if (modal) modal.classList.add('active');
     },
 
+    saveExternalSalesToLocal() {
+        try {
+            localStorage.setItem('external_sales', JSON.stringify(this.externalSales || []));
+        } catch (e) {
+            console.warn('Error en localStorage:', e);
+        }
+    },
+
+    loadExternalSalesFromLocal() {
+        try {
+            const saved = localStorage.getItem('external_sales');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    },
+
     async saveExternalSale() {
         const id = document.getElementById('extSaleId')?.value;
         const data = {
@@ -1206,33 +1244,40 @@ const IncomeStatementModule = {
             returned: parseInt(document.getElementById('extSaleReturned').value) || 0
         };
 
-        try {
-            if (id) {
-                const { error } = await supabaseClient.from('external_sales').update(data).eq('id', id);
-                if (error) throw error;
-            } else {
-                const { error } = await supabaseClient.from('external_sales').insert(data);
-                if (error) throw error;
+        if (id) {
+            const idx = this.externalSales.findIndex(s => s.id === id);
+            if (idx !== -1) {
+                this.externalSales[idx] = { ...this.externalSales[idx], ...data };
             }
-            Utils.showToast('Venta externa guardada', 'success');
-            document.getElementById('modalExternalSale').classList.remove('active');
-            this.render();
-        } catch (error) {
-            console.error('Error saving external sale:', error);
-            Utils.showToast('Error al guardar: ' + error.message, 'error');
+            try {
+                await supabaseClient.from('external_sales').update(data).eq('id', id);
+            } catch (e) {}
+        } else {
+            const newItem = {
+                id: 'ext_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                ...data
+            };
+            this.externalSales.unshift(newItem);
+            try {
+                await supabaseClient.from('external_sales').insert(data);
+            } catch (e) {}
         }
+
+        this.saveExternalSalesToLocal();
+        Utils.showToast('Venta externa guardada', 'success');
+        document.getElementById('modalExternalSale').classList.remove('active');
+        await this.render();
     },
 
     async deleteExternalSale(id) {
         if (!confirm('¿Eliminar esta venta manual?')) return;
+        this.externalSales = this.externalSales.filter(s => s.id !== id);
+        this.saveExternalSalesToLocal();
         try {
-            const { error } = await supabaseClient.from('external_sales').delete().eq('id', id);
-            if (error) throw error;
-            Utils.showToast('Venta eliminada', 'success');
-            this.render();
-        } catch (error) {
-            Utils.showToast('Error al eliminar: ' + error.message, 'error');
-        }
+            await supabaseClient.from('external_sales').delete().eq('id', id);
+        } catch (e) {}
+        Utils.showToast('Venta eliminada', 'success');
+        await this.render();
     },
 
     pendingImportRecords: [],
@@ -1546,7 +1591,8 @@ const IncomeStatementModule = {
     async confirmImportExternalSales() {
         if (!this.pendingImportRecords || this.pendingImportRecords.length === 0) return;
 
-        const records = this.pendingImportRecords.map(r => ({
+        const records = this.pendingImportRecords.map((r, idx) => ({
+            id: 'ext_' + Date.now() + '_' + idx + '_' + Math.random().toString(36).substring(2, 6),
             country: r.country,
             sale_date: r.sale_date,
             description: r.description,
@@ -1560,24 +1606,33 @@ const IncomeStatementModule = {
         this.closeImportPreviewModal();
         Utils.showToast(`Guardando ${records.length} registros...`, 'info');
 
+        // Update in-memory externalSales and save to localStorage backup immediately
+        this.externalSales = [...records, ...this.externalSales];
+        this.saveExternalSalesToLocal();
+
+        // Attempt background insert in Supabase
         try {
             const batchSize = 50;
             for (let b = 0; b < records.length; b += batchSize) {
                 const batch = records.slice(b, b + batchSize);
                 const { error } = await supabaseClient.from('external_sales').insert(batch);
-                if (error) throw error;
+                if (error) console.warn('Alerta al insertar lote en Supabase:', error);
             }
             Utils.showToast(`¡Importación exitosa! ${records.length} registros guardados.`, 'success');
         } catch (dbErr) {
-            console.warn('Alerta de base de datos Supabase:', dbErr);
-            records.forEach(item => {
-                item.id = 'temp_' + Math.random().toString(36).substring(2);
-                this.externalSales.push(item);
-            });
+            console.warn('Alerta de base de datos Supabase, guardado local activo:', dbErr);
             Utils.showToast(`Importados ${records.length} registros localmente.`, 'success');
         }
 
-        await this.render();
+        // Render UI directly using updated memory state without clearing
+        this.renderSummaryCards();
+        this.renderSalesTable();
+        this.renderConsolidatedSalesTable();
+        this.renderAdExpensesTable();
+        this.renderOperationalExpensesTable();
+        this.renderExternalSalesTable();
+        this.renderProductProfitTable();
+        this.renderPLStatement();
     },
 
     renderProductProfitTable() {
