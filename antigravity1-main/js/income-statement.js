@@ -1668,27 +1668,39 @@ const IncomeStatementModule = {
                     if (isReturned) totalReturnedGuides++;
                     else totalDeliveredGuides++;
 
-                    // Product name matching
+                    // Grouping Key by Col N (Stock ID / Referencia) first, fallback to Col M / Col P
+                    let groupKey = '';
+                    if (stockId) {
+                        groupKey = stockId.toLowerCase();
+                    } else if (rawProduct) {
+                        groupKey = rawProduct.toLowerCase();
+                    } else if (content) {
+                        groupKey = content.toLowerCase();
+                    } else {
+                        groupKey = 'sin_referencia';
+                    }
+
+                    // Display Name from Col M (Nombre de la referencia), fallback to Col P, Col N
                     let matchedProduct = null;
                     if (stockId) {
                         const cleanStock = stockId.split(' ')[0];
                         matchedProduct = productsList.find(p => String(p.sku || p.code || p.id).toLowerCase() === cleanStock.toLowerCase());
                     }
-                    if (!matchedProduct && (content || rawProduct)) {
-                        const searchStr = (content || rawProduct).toLowerCase();
+                    if (!matchedProduct && (rawProduct || content)) {
+                        const searchStr = (rawProduct || content).toLowerCase();
                         matchedProduct = productsList.find(p => searchStr.includes((p.name || '').toLowerCase()) || (p.name || '').toLowerCase().includes(searchStr));
                     }
 
-                    let finalProductName = matchedProduct ? matchedProduct.name : (content || rawProduct || stockId || 'Producto Externo');
-                    // Clean leading digits/spaces like "1 PULSERA..." -> "PULSERA..."
+                    let finalProductName = matchedProduct ? matchedProduct.name : (rawProduct || content || (stockId ? `Ref: ${stockId}` : 'Producto Externo'));
                     finalProductName = finalProductName.replace(/^\d+\s+/, '').trim();
-                    if (!finalProductName) finalProductName = 'Producto Externo';
+                    if (!finalProductName) finalProductName = stockId || 'Producto Externo';
 
-                    if (!productGroupMap[finalProductName]) {
-                        productGroupMap[finalProductName] = {
+                    if (!productGroupMap[groupKey]) {
+                        productGroupMap[groupKey] = {
                             country: 'Ecuador',
                             sale_date: new Date().toISOString().split('T')[0],
                             description: finalProductName,
+                            stock_id: stockId,
                             revenue: 0,
                             product_cost: 0,
                             shipping_cost: 0,
@@ -1697,16 +1709,16 @@ const IncomeStatementModule = {
                         };
                     }
 
-                    const grp = productGroupMap[finalProductName];
+                    const grp = productGroupMap[groupKey];
 
                     if (isReturned) {
                         grp.returned += 1;
                         grp.shipping_cost += (fleteDevolucion > 0 ? fleteDevolucion : fleteEntrega);
                     } else {
                         grp.delivered += 1;
-                        grp.revenue += recaudo;
-                        grp.product_cost += costoProd;
-                        grp.shipping_cost += fleteEntrega;
+                        grp.revenue += recaudo; // Sum Col Z (Total Recaudo)
+                        grp.product_cost += costoProd; // Sum Col AA (Costo)
+                        grp.shipping_cost += fleteEntrega; // Sum Col AB
                     }
                 }
 
@@ -1717,7 +1729,7 @@ const IncomeStatementModule = {
                     this.showImportErrorModal(
                         'No se Detectaron Registros de Ventas',
                         `Se escanearon ${totalScannedGuides} filas en la hoja "${sheetName}", pero ninguna contenía el formato válido de ventas.`,
-                        `Causa: No se encontraron datos de ventas legibles en las columnas de Estado (Col. C), Recaudo (Col. Z), Costo (Col. AA) o Fletes (Col. AB/AC).`
+                        `Causa: No se encontraron datos de ventas legibles en las columnas de Estado (Col. C), Total Recaudo (Col. Z), Costo (Col. AA) o Fletes (Col. AB/AC).`
                     );
                     e.target.value = '';
                     return;
@@ -1727,7 +1739,7 @@ const IncomeStatementModule = {
                 recordsToInsert.totalDeliveredGuides = totalDeliveredGuides;
                 recordsToInsert.totalReturnedGuides = totalReturnedGuides;
 
-                // Hide overlay and open preview modal
+                // Hide overlay and open preview modal immediately
                 this.hideImportLoadingOverlay();
                 this.pendingImportRecords = recordsToInsert;
                 this.openImportPreviewModal(recordsToInsert, file.name);
@@ -1748,7 +1760,10 @@ const IncomeStatementModule = {
 
     openImportPreviewModal(records, fileName) {
         const modal = document.getElementById('modalImportExcelPreview');
-        if (!modal) return;
+        if (!modal) {
+            console.error('Modal modalImportExcelPreview not found');
+            return;
+        }
 
         let totalRev = 0;
         let totalCost = 0;
@@ -1757,9 +1772,9 @@ const IncomeStatementModule = {
         let returnedCount = 0;
 
         records.forEach(r => {
-            totalRev += r.revenue;
-            totalCost += r.product_cost;
-            totalShip += r.shipping_cost;
+            totalRev += (r.revenue || 0);
+            totalCost += (r.product_cost || 0);
+            totalShip += (r.shipping_cost || 0);
             deliveredCount += (r.delivered || 0);
             returnedCount += (r.returned || 0);
         });
@@ -1776,14 +1791,14 @@ const IncomeStatementModule = {
                     <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${records.length} referencias agrupadas</div>
                 </div>
                 <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">Ingresos Recaudados</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Total Recaudo (Col. Z)</div>
                     <div style="font-size: 1.4rem; font-weight: 700; color: #60a5fa;">$${totalRev.toFixed(2)}</div>
                     <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${deliveredCount} entregados</div>
                 </div>
                 <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
                     <div style="font-size: 0.75rem; color: var(--text-muted);">Costos & Fletes Total</div>
                     <div style="font-size: 1.4rem; font-weight: 700; color: #f87171;">$${(totalCost + totalShip).toFixed(2)}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Prod: $${totalCost.toFixed(2)} | Fletes: $${totalShip.toFixed(2)}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Prod (Col. AA): $${totalCost.toFixed(2)} | Fletes: $${totalShip.toFixed(2)}</div>
                 </div>`;
         }
 
@@ -1792,7 +1807,7 @@ const IncomeStatementModule = {
         if (badgesEl) {
             badgesEl.innerHTML = records.map(r => `
                 <span class="badge" style="background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); padding: 0.3rem 0.6rem; font-size: 0.78rem;">
-                    📦 <strong>${r.description}</strong> (${r.delivered} ent. / ${r.returned} dev.)
+                    📦 <strong>${r.description}</strong> ${r.stock_id ? `<span style="opacity:0.7;">(Ref: ${r.stock_id})</span>` : ''} (${r.delivered} ent. / ${r.returned} dev.)
                 </span>`).join('');
         }
 
@@ -1801,7 +1816,10 @@ const IncomeStatementModule = {
         if (tableBody) {
             tableBody.innerHTML = records.map(r => `
                 <tr>
-                    <td style="font-weight: 600; color: var(--text);">${r.description}</td>
+                    <td style="font-weight: 600; color: var(--text);">
+                        ${r.description}
+                        ${r.stock_id ? `<div style="font-size:0.72rem; color:var(--text-muted);">Ref Col N: ${r.stock_id}</div>` : ''}
+                    </td>
                     <td style="text-align: center; color: var(--success); font-weight: 600;">${r.delivered}</td>
                     <td style="text-align: center; color: var(--danger);">${r.returned}</td>
                     <td style="text-align: right; color: var(--success); font-weight: 600;">$${r.revenue.toFixed(2)}</td>
@@ -1812,12 +1830,24 @@ const IncomeStatementModule = {
 
         const confirmBtn = document.getElementById('btnConfirmImportExcel');
         if (confirmBtn) {
-            confirmBtn.innerText = `Confirmar e Importar ${records.length} Productos Agrupados`;
+            confirmBtn.innerText = `Confirmar e Importar ${records.length} Referencias Agrupadas`;
         }
 
-        modal.classList.add('active');
+        // Explicitly activate modal display and z-index
         modal.style.display = 'flex';
-        modal.style.zIndex = '99999';
+        modal.style.opacity = '1';
+        modal.style.visibility = 'visible';
+        modal.style.zIndex = '999999';
+        modal.classList.add('active');
+    },
+
+    closeImportPreviewModal() {
+        const modal = document.getElementById('modalImportExcelPreview');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+        }
+        this.pendingImportRecords = [];
     },
 
     closeImportPreviewModal() {
