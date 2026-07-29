@@ -1999,6 +1999,7 @@
                     </div>
                 </div>
 
+
                 <!-- Purchases Table -->
                 <div class="card">
                     <div class="card-header">
@@ -3064,20 +3065,46 @@
                         </h3>
                     </div>
                     <div class="card-body">
+                        <!-- Controls for Consolidated Countries -->
+                        <div style="display: flex; gap: 1rem; margin-bottom: 0.75rem; align-items: center; flex-wrap: wrap;">
+                            <div style="position: relative; flex: 1; min-width: 200px; max-width: 300px;">
+                                <svg style="position: absolute; left: 10px; top: 8px; color: var(--text-muted);" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                                <input type="text" id="consolidatedCountriesSearch" class="form-control" placeholder="Buscar país o descripción..." style="padding-left: 2rem; border-radius: 20px; font-size: 0.85rem; height: 32px;" onkeyup="IncomeStatementModule.filterConsolidatedCountries()">
+                            </div>
+                            
+                            <!-- Manual Grouping Toolbar for Countries -->
+                            <div id="unifiedCountriesGroupToolbar" style="display: none; align-items: center; gap: 0.75rem; padding: 0.35rem 0.75rem; background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: var(--radius-md); flex: 2; min-width: 300px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2">
+                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                                </svg>
+                                <span style="font-size: 0.8rem; color: var(--text); flex: 1;">
+                                    <strong>Agrupar Visualmente:</strong> Selecciona 2+ registros para verlos consolidados.
+                                </span>
+                                <button type="button" id="btnGroupUnifiedCountries" class="btn btn-primary btn-sm" onclick="IncomeStatementModule.visualGroupConsolidatedCountries()" style="background: #6366f1; border-color: #6366f1; font-size: 0.78rem; padding: 0.35rem 0.85rem; white-space: nowrap;" disabled>
+                                    🔗 Agrupar (<span id="groupUnifiedCountriesCount">0</span>)
+                                </button>
+                            </div>
+                        </div>
                         <div class="table-container">
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th>País</th>
+                                        <th style="width: 36px; text-align: center;">
+                                            <input type="checkbox" id="selectAllUnifiedCountries" onchange="IncomeStatementModule.toggleSelectAllUnifiedCountries(this.checked)" title="Seleccionar Todos" style="cursor: pointer;">
+                                        </th>
+                                        <th>País / Origen</th>
                                         <th style="text-align: right;">Pedidos</th>
                                         <th style="text-align: right;">Unidades</th>
                                         <th style="text-align: right;">Ventas Totales</th>
                                         <th style="text-align: right;">Costo Prod.</th>
-                                        <th style="text-align: right;">Costo Envíos</th>
-                                        <th style="text-align: right;">Costo Fletes</th>
-                                        <th style="text-align: right;">Publicidad</th>
+                                        <th style="text-align: right;">Costo Envíos / Dev.</th>
                                         <th style="text-align: right;">Util. Bruta</th>
                                         <th style="text-align: center;">Margen</th>
+                                        <th></th>
                                     </tr>
                                 </thead>
                                 <tbody id="isConsolidatedSalesTable">

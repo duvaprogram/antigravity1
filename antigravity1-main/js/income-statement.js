@@ -8,10 +8,13 @@ const IncomeStatementModule = {
     guideItems: [],
     adExpenses: [],
     operationalExpenses: [],
-    operationalExpenses: [],
     externalSales: [],
     freights: [],
     products: [],
+    productMappings: {},
+    visualMergedGroups: [],
+    visualMergedGroupsCountry: [],
+    isModuleInitialized: false,
 
     // Current filters
     filters: {
@@ -610,76 +613,115 @@ const IncomeStatementModule = {
 
         const salesByCountry = this.getSalesByCountry();
         const freightsByCountry = this.getFreightsByCountry();
-        const adExpensesByCountry = this.getAdExpensesByCountry();
         const externalSales = this.getFilteredExternalSales();
+        const allAdExpenses = this.getFilteredAdExpenses();
 
-        // Build mapping for external sales per country
-        const extByCountry = {};
+        let countryList = [];
+
+        // 1. Process Dropi Countries
+        salesByCountry.forEach(row => {
+            const countryFreight = freightsByCountry[row.country]?.totalFreight || 0;
+            const id = `Dropi_${row.country}`;
+            
+            let adSpend = 0;
+            allAdExpenses.forEach(exp => {
+                if (exp.product_name === id) {
+                    adSpend += parseFloat(exp.amount_spent || 0);
+                } else if (!exp.product_name && exp.country === row.country) {
+                    adSpend += parseFloat(exp.amount_spent || 0);
+                }
+            });
+            
+            countryList.push({
+                id: id,
+                name: `${row.country} (Dropi)`,
+                isDropi: true,
+                country: row.country,
+                orderCount: row.orderCount,
+                unitsSold: row.unitsSold,
+                totalRevenue: row.totalRevenue,
+                totalCost: row.totalCost,
+                totalShipping: row.totalShipping,
+                freight: countryFreight,
+                adSpend: adSpend
+            });
+        });
+
+        // 2. Process External Sales (Individually)
         externalSales.forEach(s => {
-            const c = s.country || 'Global';
-            if (!extByCountry[c]) {
-                extByCountry[c] = { revenue: 0, cost: 0, shipping: 0, delivered: 0 };
+            const id = `Ext_${s.id}`;
+            const name = s.description ? `${s.country} - ${s.description} (Excel)` : `${s.country} (Excel)`;
+            
+            let adSpend = 0;
+            allAdExpenses.forEach(exp => {
+                if (exp.product_name === id) {
+                    adSpend += parseFloat(exp.amount_spent || 0);
+                }
+            });
+            
+            countryList.push({
+                id: id,
+                name: name,
+                isDropi: false,
+                country: s.country,
+                orderCount: parseInt(s.delivered || 0) + parseInt(s.returned || 0),
+                unitsSold: parseInt(s.delivered || 0) + parseInt(s.returned || 0),
+                totalRevenue: parseFloat(s.revenue || 0),
+                totalCost: parseFloat(s.product_cost || 0),
+                totalShipping: parseFloat(s.shipping_cost || 0) + parseFloat(s.return_shipping_cost || 0),
+                freight: 0,
+                adSpend: adSpend,
+                extId: s.id
+            });
+        });
+
+        // Apply Visual Groups for Countries
+        (this.visualMergedGroupsCountry || []).forEach((group, index) => {
+            const mergedItem = {
+                id: `Group_${index}`,
+                name: group.name, 
+                orderCount: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0, freight: 0, adSpend: 0,
+                isVisualGroup: true,
+                groupId: index
+            };
+            
+            let groupDirectAdSpend = 0;
+            allAdExpenses.forEach(exp => {
+                if (exp.product_name === mergedItem.id) {
+                    groupDirectAdSpend += parseFloat(exp.amount_spent || 0);
+                }
+            });
+            mergedItem.adSpend += groupDirectAdSpend;
+            
+            let foundAny = false;
+            countryList = countryList.filter(c => {
+                if (group.items.includes(c.id)) {
+                    mergedItem.orderCount += c.orderCount;
+                    mergedItem.unitsSold += c.unitsSold;
+                    mergedItem.totalRevenue += c.totalRevenue;
+                    mergedItem.totalCost += c.totalCost;
+                    mergedItem.totalShipping += c.totalShipping;
+                    mergedItem.freight += c.freight;
+                    mergedItem.adSpend += c.adSpend;
+                    foundAny = true;
+                    return false;
+                }
+                return true;
+            });
+            
+            if (foundAny) {
+                countryList.push(mergedItem);
             }
-            extByCountry[c].revenue += parseFloat(s.revenue || 0);
-            extByCountry[c].cost += parseFloat(s.product_cost || 0);
-            extByCountry[c].shipping += parseFloat(s.shipping_cost || 0);
-            extByCountry[c].delivered += (parseInt(s.delivered || 0) + parseInt(s.returned || 0));
         });
 
-        // Ad spend map
-        const adMap = {};
-        adExpensesByCountry.forEach(item => {
-            adMap[item.country] = item.totalSpent || 0;
-        });
+        // Sort by revenue
+        countryList.sort((a, b) => b.totalRevenue - a.totalRevenue);
 
-        // Unique set of countries
-        const countriesSet = new Set([
-            ...salesByCountry.map(s => s.country),
-            ...Object.keys(extByCountry).filter(c => c !== 'Todos' && c !== 'Global')
-        ]);
-
-        const consolidatedList = Array.from(countriesSet).map(country => {
-            const guideData = salesByCountry.find(s => s.country === country) || {
-                orderCount: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0
-            };
-            const extData = extByCountry[country] || { revenue: 0, cost: 0, shipping: 0, delivered: 0 };
-            const freight = freightsByCountry[country]?.totalFreight || 0;
-            const adSpend = adMap[country] || 0;
-
-            const totalOrders = guideData.orderCount + extData.delivered;
-            const totalUnits = guideData.unitsSold;
-            const totalRevenue = guideData.totalRevenue + extData.revenue;
-            const totalCost = guideData.totalCost + extData.cost;
-            const totalShipping = guideData.totalShipping + extData.shipping;
-            const grossProfit = totalRevenue - totalCost - totalShipping - freight - adSpend;
-            const margin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0.0';
-
-            const costPct = totalRevenue > 0 ? ((totalCost / totalRevenue) * 100).toFixed(1) : '0.0';
-            const shippingPct = totalRevenue > 0 ? ((totalShipping / totalRevenue) * 100).toFixed(1) : '0.0';
-            const adPct = totalRevenue > 0 ? ((adSpend / totalRevenue) * 100).toFixed(1) : '0.0';
-
-            return {
-                country,
-                orderCount: totalOrders,
-                unitsSold: totalUnits,
-                totalRevenue,
-                totalCost,
-                totalShipping,
-                freight,
-                adSpend,
-                grossProfit,
-                margin,
-                costPct,
-                shippingPct,
-                adPct
-            };
-        });
-
-        if (consolidatedList.length === 0) {
+        if (countryList.length === 0) {
             tbody.innerHTML = `
                 <tr>
                     <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                        No hay ventas consolidadas en este período.
+                        No hay datos en el período seleccionado.
                     </td>
                 </tr>`;
             return;
@@ -689,7 +731,7 @@ const IncomeStatementModule = {
             orderCount: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0, totalFreight: 0, totalAdSpend: 0
         };
 
-        tbody.innerHTML = consolidatedList.map(row => {
+        tbody.innerHTML = countryList.map(row => {
             totalRow.orderCount += row.orderCount;
             totalRow.unitsSold += row.unitsSold;
             totalRow.totalRevenue += row.totalRevenue;
@@ -697,13 +739,57 @@ const IncomeStatementModule = {
             totalRow.totalShipping += row.totalShipping;
             totalRow.totalFreight += row.freight;
             totalRow.totalAdSpend += row.adSpend;
+            
+            const grossProfit = row.totalRevenue - row.totalCost - row.totalShipping - row.freight - row.adSpend;
+            const margin = row.totalRevenue > 0 ? ((grossProfit / row.totalRevenue) * 100).toFixed(1) : '0.0';
+            const costPct = row.totalRevenue > 0 ? ((row.totalCost / row.totalRevenue) * 100).toFixed(1) : '0.0';
+            const shippingPct = row.totalRevenue > 0 ? ((row.totalShipping / row.totalRevenue) * 100).toFixed(1) : '0.0';
+            const adPct = row.totalRevenue > 0 ? ((row.adSpend / row.totalRevenue) * 100).toFixed(1) : '0.0';
+
+            const escapedId = row.id.replace(/"/g, '&quot;');
+            
+            let actionHtml = `<div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                <button class="btn btn-icon btn-sm" style="color: #8b5cf6; background: rgba(139, 92, 246, 0.1); border: none; margin-right: 2px;" onclick="IncomeStatementModule.openLinkCampaignsForProduct('${escapedId}')" title="Vincular Campañas">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                </button>
+                <button class="btn btn-icon btn-sm is-detail-btn" onclick="IncomeStatementModule.showCountryDetail('${escapedId}', ${row.isVisualGroup ? 'true' : 'false'}, ${row.groupId !== undefined ? row.groupId : 'null'})" title="Ver detalle de ${row.name}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>`;
+
+            if (row.isVisualGroup) {
+                actionHtml += `
+                <button class="btn btn-icon btn-sm btn-danger-light" onclick="IncomeStatementModule.ungroupVisualGroupCountry(${row.groupId})" title="Desagrupar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>`;
+            }
+            actionHtml += `</div>`;
+
+            let nameHtml = `<strong>${row.name}</strong>`;
+            if (row.isVisualGroup) {
+                nameHtml = `<div style="display:flex; align-items:center; gap:0.5rem;">
+                                <strong>${row.name}</strong>
+                                <span style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; padding: 2px 6px; border-radius: 12px; font-weight: 600;">Grupo</span>
+                            </div>`;
+            }
 
             return `
                 <tr>
+                    <td style="text-align: center;">
+                        ${!row.isVisualGroup ? `<input type="checkbox" class="unified-country-checkbox" value="${escapedId}" onchange="IncomeStatementModule.updateSelectedUnifiedCountriesCount()">` : ''}
+                    </td>
                     <td>
                         <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <span class="country-flag">${this.getCountryFlag(row.country)}</span>
-                            <strong>${row.country}</strong>
+                            ${row.country && !row.isVisualGroup ? `<span class="country-flag">${this.getCountryFlag(row.country)}</span>` : ''}
+                            ${nameHtml}
                         </div>
                     </td>
                     <td style="text-align: right; font-weight: 600;">${row.orderCount}</td>
@@ -711,22 +797,20 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(row.totalRevenue)}</td>
                     <td style="text-align: right; color: var(--danger);">
                         <div>${this.formatCurrency(row.totalCost)}</div>
-                        <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${row.costPct}%</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${costPct}%</div>
                     </td>
                     <td style="text-align: right; color: var(--danger);">
-                        <div>${this.formatCurrency(row.totalShipping)}</div>
-                        <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${row.shippingPct}%</div>
+                        <div>${this.formatCurrency(row.totalShipping + row.freight)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${shippingPct}%</div>
                     </td>
-                    <td style="text-align: right; color: var(--warning);">${this.formatCurrency(row.freight)}</td>
-                    <td style="text-align: right; color: #ec4899; font-weight: 500;">
-                        <div>${this.formatCurrency(row.adSpend)}</div>
-                        <div style="font-size: 0.72rem; opacity: 0.85; font-weight: 500;">${row.adPct}%</div>
-                    </td>
-                    <td style="text-align: right; font-weight: 600; color: ${row.grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
-                        ${this.formatCurrency(row.grossProfit)}
+                    <td style="text-align: right; font-weight: 600; color: ${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                        ${this.formatCurrency(grossProfit)}
                     </td>
                     <td style="text-align: center;">
-                        <span class="is-margin-badge ${parseFloat(row.margin) >= 30 ? 'good' : parseFloat(row.margin) >= 15 ? 'warning' : 'bad'}">${row.margin}%</span>
+                        <span class="is-margin-badge ${parseFloat(margin) >= 30 ? 'good' : parseFloat(margin) >= 15 ? 'warning' : 'bad'}">${margin}%</span>
+                    </td>
+                    <td style="text-align: center;">
+                        ${actionHtml}
                     </td>
                 </tr>`;
         }).join('');
@@ -735,12 +819,11 @@ const IncomeStatementModule = {
         const totalGross = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalFreight - totalRow.totalAdSpend;
         const totalMargin = totalRow.totalRevenue > 0 ? ((totalGross / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
         const totalCostPct = totalRow.totalRevenue > 0 ? ((totalRow.totalCost / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
-        const totalShippingPct = totalRow.totalRevenue > 0 ? ((totalRow.totalShipping / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
-        const totalAdPct = totalRow.totalRevenue > 0 ? ((totalRow.totalAdSpend / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
+        const totalShippingPct = totalRow.totalRevenue > 0 ? (((totalRow.totalShipping + totalRow.totalFreight) / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
 
         tbody.innerHTML += `
             <tr class="is-total-row">
-                <td><strong>TOTAL CONSOLIDADO</strong></td>
+                <td colspan="2"><strong>TOTAL</strong></td>
                 <td style="text-align: right; font-weight: 700;">${totalRow.orderCount}</td>
                 <td style="text-align: right; font-weight: 700;">${totalRow.unitsSold}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.totalRevenue)}</td>
@@ -749,23 +832,17 @@ const IncomeStatementModule = {
                     <div style="font-size: 0.72rem; opacity: 0.9;">${totalCostPct}%</div>
                 </td>
                 <td style="text-align: right; font-weight: 700; color: var(--danger);">
-                    <div>${this.formatCurrency(totalRow.totalShipping)}</div>
+                    <div>${this.formatCurrency(totalRow.totalShipping + totalRow.totalFreight)}</div>
                     <div style="font-size: 0.72rem; opacity: 0.9;">${totalShippingPct}%</div>
-                </td>
-                <td style="text-align: right; font-weight: 700; color: var(--warning);">${this.formatCurrency(totalRow.totalFreight)}</td>
-                <td style="text-align: right; font-weight: 700; color: #ec4899;">
-                    <div>${this.formatCurrency(totalRow.totalAdSpend)}</div>
-                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalAdPct}%</div>
                 </td>
                 <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
                 <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
+                <td></td>
             </tr>`;
     },
 
     renderAdExpensesTable() {
         const tbody = document.getElementById('isAdExpensesTable');
-        if (!tbody) return;
-
         // Comenzar con TODOS los gastos para que los filtros locales puedan sobrescribir los globales
         let expenses = this.adExpenses;
 
@@ -4282,6 +4359,249 @@ const IncomeStatementModule = {
         Utils.showToast('Grupo visual desagrupado.', 'success');
         this.renderProductProfitTable();
         this.updateSelectedUnifiedSalesCount();
+    },
+
+    toggleSelectAllUnifiedCountries(checked) {
+        const checkboxes = document.querySelectorAll('.unified-country-checkbox');
+        checkboxes.forEach(cb => {
+            const tr = cb.closest('tr');
+            if (tr.style.display !== 'none') {
+                cb.checked = checked;
+            }
+        });
+        this.updateSelectedUnifiedCountriesCount();
+    },
+
+    updateSelectedUnifiedCountriesCount() {
+        const selected = document.querySelectorAll('.unified-country-checkbox:checked').length;
+        const toolbar = document.getElementById('unifiedCountriesGroupToolbar');
+        const countSpan = document.getElementById('groupUnifiedCountriesCount');
+        const btn = document.getElementById('btnGroupUnifiedCountries');
+        
+        if (toolbar && countSpan && btn) {
+            countSpan.textContent = selected;
+            if (selected >= 2) {
+                toolbar.style.display = 'flex';
+                btn.disabled = false;
+            } else if (selected === 1) {
+                toolbar.style.display = 'flex';
+                btn.disabled = true;
+            } else {
+                toolbar.style.display = 'none';
+                btn.disabled = true;
+            }
+        }
+    },
+
+    visualGroupConsolidatedCountries() {
+        const checkedBoxes = Array.from(document.querySelectorAll('.unified-country-checkbox:checked'));
+        if (checkedBoxes.length < 2) return;
+        
+        const items = checkedBoxes.map(cb => cb.value);
+        
+        const name = prompt('Ingresa un nombre para este grupo de países/plataformas:', 'Nuevo Grupo');
+        if (!name || name.trim() === '') return;
+        
+        this.visualMergedGroupsCountry.push({
+            name: name.trim(),
+            items: items
+        });
+        
+        Utils.showToast(`Grupo visual "${name}" creado.`, 'success');
+        this.renderConsolidatedSalesTable();
+        
+        const selectAll = document.getElementById('selectAllUnifiedCountries');
+        if(selectAll) selectAll.checked = false;
+        this.updateSelectedUnifiedCountriesCount();
+    },
+
+    ungroupVisualGroupCountry(groupId) {
+        if (!confirm('¿Deshacer este grupo visual?')) return;
+        
+        this.visualMergedGroupsCountry.splice(groupId, 1);
+        Utils.showToast('Grupo visual desagrupado.', 'success');
+        this.renderConsolidatedSalesTable();
+        this.updateSelectedUnifiedCountriesCount();
+    },
+
+    filterConsolidatedCountries() {
+        const searchInput = document.getElementById('consolidatedCountriesSearch');
+        if (!searchInput) return;
+        const query = searchInput.value.toLowerCase();
+        
+        const tbody = document.getElementById('isConsolidatedSalesTable');
+        if (!tbody) return;
+        
+        const rows = Array.from(tbody.querySelectorAll('tr:not(.is-total-row)'));
+        let hasVisible = false;
+        
+        rows.forEach(row => {
+            const countryCell = row.cells[1];
+            if (!countryCell) return;
+            const text = countryCell.textContent.toLowerCase();
+            
+            if (text.includes(query)) {
+                row.style.display = '';
+                hasVisible = true;
+            } else {
+                row.style.display = 'none';
+                const cb = row.querySelector('.unified-country-checkbox');
+                if (cb) cb.checked = false;
+            }
+        });
+        
+        this.updateSelectedUnifiedCountriesCount();
+    },
+
+    showCountryDetail(id, isGroup, groupId) {
+        // Find which items this represents
+        let itemIds = [];
+        if (isGroup && groupId !== null) {
+            const group = this.visualMergedGroupsCountry[groupId];
+            if (group) {
+                itemIds = group.items;
+            }
+        } else {
+            itemIds = [id];
+        }
+        
+        // Use the existing logic to find orders based on itemIds
+        let allOrders = [];
+        
+        itemIds.forEach(itemId => {
+            if (itemId.startsWith('Dropi_')) {
+                const country = itemId.replace('Dropi_', '');
+                const countryOrders = this.guides.filter(g => 
+                    g.country === country && 
+                    g.status !== 'CANCELLED' && 
+                    g.status !== 'ANULADO'
+                );
+                // Attach source
+                countryOrders.forEach(o => {
+                    allOrders.push({
+                        ...o,
+                        __source: 'Dropi',
+                        __sourceName: `Dropi (${country})`
+                    });
+                });
+            } else if (itemId.startsWith('Ext_')) {
+                const extId = itemId.replace('Ext_', '');
+                const extSale = this.externalSales.find(s => s.id === extId);
+                if (extSale) {
+                    allOrders.push({
+                        ...extSale,
+                        __source: 'Excel',
+                        __sourceName: 'Otras Plataformas'
+                    });
+                }
+            }
+        });
+        
+        if (allOrders.length === 0) {
+            Utils.showToast('No se encontraron pedidos.', 'warning');
+            return;
+        }
+        
+        // Show the detail using an adapted version of the existing modal
+        this.populateAndShowOrdersDetail(allOrders, isGroup ? 'Grupo de Países' : id);
+    },
+
+    populateAndShowOrdersDetail(allOrders, title) {
+        const modal = document.getElementById('modalProductOrdersDetail');
+        if (!modal) return;
+        
+        const tbody = document.getElementById('productOrdersDetailTable');
+        const titleEl = document.getElementById('productOrdersDetailTitle');
+        const countEl = document.getElementById('productOrdersDetailCount');
+        const statsEl = document.getElementById('productOrdersDetailStats');
+        
+        if (!tbody || !titleEl || !countEl) return;
+        
+        titleEl.textContent = `Desglose: ${title.replace(/Dropi_|Ext_/, '')}`;
+        countEl.textContent = `${allOrders.length} registros`;
+        
+        let totalRev = 0;
+        let totalCost = 0;
+        let totalShip = 0;
+        let orderCount = 0;
+        
+        let html = '';
+        allOrders.forEach(o => {
+            if (o.__source === 'Dropi') {
+                orderCount++;
+                const rev = parseFloat(o.total_amount || 0);
+                const ship = parseFloat(o.shipping_cost || 0);
+                const items = o.products || o.items || [];
+                const cost = items.reduce((s, item) => s + (ProductsModule.getRealCost(item) * (item.quantity || 1)), 0);
+                
+                totalRev += rev;
+                totalCost += cost;
+                totalShip += ship;
+                
+                const date = o.created_at ? o.created_at.split('T')[0] : (o.date || '');
+                html += `
+                    <tr>
+                        <td style="font-size: 0.8rem; color: var(--text-muted);">${date}</td>
+                        <td>
+                            <div style="font-weight: 500;">${o.id || o.guide_number || 'N/A'}</div>
+                            <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">Dropi</span>
+                        </td>
+                        <td>${o.client_name || o.customer_name || 'Desconocido'}</td>
+                        <td>
+                            <span class="badge ${o.status === 'DELIVERED' ? 'bg-success' : 'bg-secondary'}">${o.status}</span>
+                        </td>
+                        <td style="text-align: right; color: var(--success); font-weight: 600;">${this.formatCurrency(rev)}</td>
+                        <td style="text-align: right;">${this.formatCurrency(cost)}</td>
+                        <td style="text-align: right;">${this.formatCurrency(ship)}</td>
+                    </tr>`;
+            } else if (o.__source === 'Excel') {
+                const qty = parseInt(o.delivered || 0) + parseInt(o.returned || 0);
+                orderCount += qty;
+                const rev = parseFloat(o.revenue || 0);
+                const cost = parseFloat(o.product_cost || 0);
+                const ship = parseFloat(o.shipping_cost || 0) + parseFloat(o.return_shipping_cost || 0);
+                
+                totalRev += rev;
+                totalCost += cost;
+                totalShip += ship;
+                
+                html += `
+                    <tr>
+                        <td style="font-size: 0.8rem; color: var(--text-muted);">${o.date || 'N/A'}</td>
+                        <td>
+                            <div style="font-weight: 500;">${o.country}</div>
+                            <span class="badge" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">Excel</span>
+                        </td>
+                        <td>${o.product_name || o.description || 'N/A'}</td>
+                        <td>
+                            <span class="badge bg-success">Entregados: ${o.delivered || 0}</span>
+                            ${o.returned > 0 ? `<br><span class="badge bg-danger mt-1">Devueltos: ${o.returned}</span>` : ''}
+                        </td>
+                        <td style="text-align: right; color: var(--success); font-weight: 600;">${this.formatCurrency(rev)}</td>
+                        <td style="text-align: right;">${this.formatCurrency(cost)}</td>
+                        <td style="text-align: right;">${this.formatCurrency(ship)}</td>
+                    </tr>`;
+            }
+        });
+        
+        tbody.innerHTML = html;
+        
+        if (statsEl) {
+            statsEl.innerHTML = `
+                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                    <div style="background: var(--surface-hover); padding: 0.5rem 1rem; border-radius: var(--radius-sm);">
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">Ventas Totales</div>
+                        <div style="font-weight: 600; color: var(--success);">${this.formatCurrency(totalRev)}</div>
+                    </div>
+                    <div style="background: var(--surface-hover); padding: 0.5rem 1rem; border-radius: var(--radius-sm);">
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">Pedidos</div>
+                        <div style="font-weight: 600;">${orderCount}</div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        modal.classList.add('active');
     },
 
     closeProductOrdersDetailModal() {
