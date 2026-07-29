@@ -1029,6 +1029,22 @@ const IncomeStatementModule = {
         this.updateSelectedExtSalesCount();
     },
 
+    updateSelectedExtSalesCount() {
+        const checked = document.querySelectorAll('.ext-sale-checkbox:checked').length;
+        // Update delete selected button
+        const btnDeleteSelected = document.getElementById('btnDeleteSelectedExtSales');
+        const countSpan = document.getElementById('selectedExtSalesCount');
+        if (countSpan) countSpan.textContent = checked;
+        if (btnDeleteSelected) btnDeleteSelected.style.display = checked > 0 ? 'inline-flex' : 'none';
+        // Update group toolbar visibility and button
+        const groupToolbar = document.getElementById('extSalesGroupToolbar');
+        const groupBtn = document.getElementById('btnGroupExtSales');
+        const groupCount = document.getElementById('groupExtSalesCount');
+        if (groupToolbar) groupToolbar.style.display = checked > 0 ? 'flex' : 'none';
+        if (groupCount) groupCount.textContent = checked;
+        if (groupBtn) groupBtn.disabled = (checked < 2);
+    },
+
     getRecordFingerprint(item) {
         if (!item) return '';
         const desc = String(item.description || item.product_name || '').trim().toLowerCase();
@@ -1118,6 +1134,74 @@ const IncomeStatementModule = {
         this.renderExternalSalesTable();
         this.renderProductProfitTable();
         this.renderPLStatement();
+    },
+
+    async manualGroupExternalSales() {
+        const checkedBoxes = document.querySelectorAll('.ext-sale-checkbox:checked');
+        if (checkedBoxes.length < 2) {
+            Utils.showToast('Selecciona al menos 2 registros para agrupar.', 'warning');
+            return;
+        }
+
+        const idsToMerge = Array.from(checkedBoxes).map(cb => cb.value);
+        const recordsToMerge = this.externalSales.filter(s => idsToMerge.includes(String(s.id)));
+
+        if (recordsToMerge.length < 2) return;
+
+        const mergedNames = [...new Set(recordsToMerge.map(r => r.description))];
+        const defaultName = mergedNames.length <= 3 ? mergedNames.join(' + ') : `${mergedNames[0]} (+${mergedNames.length - 1} más)`;
+        
+        const groupName = prompt('Nombre del grupo fusionado:', defaultName);
+        if (!groupName) return;
+
+        // Create the merged record
+        const merged = {
+            id: this.generateUUID(),
+            country: recordsToMerge[0].country,
+            sale_date: recordsToMerge[0].sale_date,
+            description: groupName.trim(),
+            revenue: 0,
+            product_cost: 0,
+            shipping_cost: 0,
+            delivered: 0,
+            returned: 0
+        };
+
+        for (const src of recordsToMerge) {
+            merged.revenue += (parseFloat(src.revenue) || 0);
+            merged.product_cost += (parseFloat(src.product_cost) || 0);
+            merged.shipping_cost += (parseFloat(src.shipping_cost) || 0);
+            merged.delivered += (parseInt(src.delivered) || 0);
+            merged.returned += (parseInt(src.returned) || 0);
+        }
+
+        // Show loading toast
+        Utils.showToast('Agrupando registros...', 'info');
+
+        // Update memory immediately: remove the old ones, add the merged one
+        this.externalSales = this.externalSales.filter(s => !idsToMerge.includes(String(s.id)));
+        this.externalSales.unshift(merged);
+        this.saveExternalSalesToLocal();
+
+        // Update UI immediately
+        const selectAllCb = document.getElementById('selectAllExtSales');
+        if (selectAllCb) selectAllCb.checked = false;
+        this.renderExternalSalesTable();
+        this.renderSummaryCards();
+        this.renderProductProfitTable();
+        this.renderPLStatement();
+        this.updateSelectedExtSalesCount();
+
+        // Update Supabase in background
+        try {
+            // Delete old records
+            await supabaseClient.from('external_sales').delete().in('id', idsToMerge);
+            // Insert new merged record
+            await supabaseClient.from('external_sales').insert(merged);
+            Utils.showToast(`Se agruparon ${recordsToMerge.length} registros en "${merged.description}"`, 'success');
+        } catch (e) {
+            console.warn('Error syncing group to Supabase', e);
+        }
     },
 
     renderExternalSalesTable() {
@@ -1758,6 +1842,7 @@ const IncomeStatementModule = {
         });
     },
 
+
     async confirmImportExternalSales() {
         if (!this.pendingImportRecords || this.pendingImportRecords.length === 0) {
             this.closeImportPreviewModal();
@@ -1767,7 +1852,13 @@ const IncomeStatementModule = {
         const recordsToSave = [...this.pendingImportRecords];
         this.closeImportPreviewModal();
 
-        Utils.showToast(`Guardando ${recordsToSave.length} registros...`, 'info');
+        this.showImportLoadingOverlay('Guardando Registros...', 'Preparando datos para almacenamiento local y en la nube...');
+        
+        // Let overlay render
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        this.updateImportProgress(10, 'Generando identificadores únicos...');
+        await new Promise(r => setTimeout(r, 50));
 
         // Create objects with valid UUIDs for memory and local storage
         const preparedRecords = recordsToSave.map(r => ({
@@ -1782,11 +1873,17 @@ const IncomeStatementModule = {
             returned: parseInt(r.returned) || 0
         }));
 
+        this.updateImportProgress(30, 'Actualizando datos locales...');
+        await new Promise(r => setTimeout(r, 50));
+
         // 1. Update in-memory externalSales with fingerprint deduplication
         this.externalSales = this.deduplicateExternalSales([...preparedRecords, ...this.externalSales]);
 
         // 2. Save to LocalStorage immediately
         this.saveExternalSalesToLocal();
+
+        this.updateImportProgress(50, 'Actualizando tablas e indicadores en la interfaz...');
+        await new Promise(r => setTimeout(r, 50));
 
         // 3. Render UI components immediately
         this.renderSummaryCards();
@@ -1797,6 +1894,9 @@ const IncomeStatementModule = {
         this.renderExternalSalesTable();
         this.renderProductProfitTable();
         this.renderPLStatement();
+
+        this.updateImportProgress(70, 'Sincronizando con la base de datos (Supabase)...');
+        await new Promise(r => setTimeout(r, 50));
 
         // 4. Background sync with Supabase
         try {
@@ -1813,7 +1913,12 @@ const IncomeStatementModule = {
             }));
 
             const batchSize = 50;
-            for (let b = 0; b < supabasePayload.length; b += batchSize) {
+            const totalBatches = Math.ceil(supabasePayload.length / batchSize);
+            
+            for (let b = 0, i = 0; b < supabasePayload.length; b += batchSize, i++) {
+                const pct = 70 + (i / totalBatches) * 25;
+                this.updateImportProgress(pct, `Sincronizando lote ${i + 1} de ${totalBatches}...`);
+                
                 const batch = supabasePayload.slice(b, b + batchSize);
                 const { error } = await supabaseClient.from('external_sales').insert(batch);
                 if (error) {
@@ -1821,12 +1926,17 @@ const IncomeStatementModule = {
                     await supabaseClient.from('external_sales').insert(batchNoId);
                 }
             }
+            
+            this.updateImportProgress(100, `¡Importación completada! ${preparedRecords.length} registros guardados.`);
+            await new Promise(r => setTimeout(r, 500));
+            this.hideImportLoadingOverlay();
             Utils.showToast(`¡Importación completada! ${preparedRecords.length} registros guardados.`, 'success');
         } catch (dbErr) {
             console.warn('Nota: Guardado local activo. Supabase:', dbErr);
-            Utils.showToast(`Se guardaron ${preparedRecords.length} registros en almacenamiento local.`, 'success');
+            this.hideImportLoadingOverlay();
+            Utils.showToast(`Se guardaron ${preparedRecords.length} registros en almacenamiento local. Error de sincronización.`, 'success');
         }
-    },
+
 
     renderProductProfitTable() {
         const tbody = document.getElementById('isProductProfitTable');

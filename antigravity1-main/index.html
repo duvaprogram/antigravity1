@@ -3355,6 +3355,21 @@
                         </button>
                     </div>
                     <div class="card-body">
+                        <!-- Manual Grouping Toolbar for Main Table -->
+                        <div id="extSalesGroupToolbar" style="display: none; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.65rem 0.75rem; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: var(--radius-md);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                            </svg>
+                            <span style="font-size: 0.8rem; color: var(--text); flex: 1;">
+                                <strong>Agrupar:</strong> Selecciona 2+ registros y fusiónalos en uno solo
+                            </span>
+                            <button type="button" id="btnGroupExtSales" class="btn btn-primary btn-sm" onclick="IncomeStatementModule.manualGroupExternalSales()" style="background: #8b5cf6; border-color: #8b5cf6; font-size: 0.78rem; padding: 0.35rem 0.85rem; white-space: nowrap;" disabled>
+                                🔗 Agrupar (<span id="groupExtSalesCount">0</span>)
+                            </button>
+                        </div>
                         <div class="table-container">
                             <table class="table">
                                 <thead>
