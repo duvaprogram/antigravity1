@@ -75,6 +75,14 @@ const IncomeStatementModule = {
                 this.saveExternalSale();
             });
         }
+
+        // Import External Sales Excel Button
+        const btnImportExt = document.getElementById('btnImportExternalSales');
+        const inputImportExt = document.getElementById('inputImportExternalSales');
+        if (btnImportExt && inputImportExt) {
+            btnImportExt.addEventListener('click', () => inputImportExt.click());
+            inputImportExt.addEventListener('change', (e) => this.handleExternalSalesFileUpload(e));
+        }
     },
 
     setDefaultFilters() {
@@ -1125,10 +1133,10 @@ const IncomeStatementModule = {
         if (!file) return;
 
         try {
-            Utils.showToast('Leyendo archivo Excel...', 'info');
+            Utils.showToast('Procesando archivo Excel...', 'info');
             const data = await file.arrayBuffer();
             if (typeof XLSX === 'undefined') {
-                throw new Error('Librería XLSX no cargada');
+                throw new Error('Librería SheetJS (XLSX) no disponible');
             }
             const workbook = XLSX.read(data, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
@@ -1137,8 +1145,39 @@ const IncomeStatementModule = {
 
             if (!rows || rows.length < 2) {
                 Utils.showToast('El archivo no contiene filas de datos', 'error');
+                e.target.value = '';
                 return;
             }
+
+            // Detect header row index
+            let headerRowIndex = 0;
+            for (let i = 0; i < Math.min(rows.length, 5); i++) {
+                const r = rows[i] || [];
+                const rStr = r.map(c => String(c).toLowerCase()).join(' ');
+                if (rStr.includes('estado') || rStr.includes('recaudo') || rStr.includes('flete')) {
+                    headerRowIndex = i;
+                    break;
+                }
+            }
+
+            const headers = (rows[headerRowIndex] || []).map(c => String(c || '').trim().toLowerCase());
+
+            const findCol = (keywords, fallbackIdx) => {
+                const idx = headers.findIndex(h => keywords.some(k => h.includes(k)));
+                return idx !== -1 ? idx : fallbackIdx;
+            };
+
+            const statusIdx = findCol(['estado'], 2);
+            const productIdx = findCol(['producto'], 12);
+            const stockIdx = findCol(['stock', 'sku'], 13);
+            const contentIdx = findCol(['contenido'], 15);
+            const recaudoIdx = findCol(['recaudo'], 25);
+            const costoIdx = findCol(['costo'], 26);
+            const fleteEntregaIdx = headers.findIndex(h => h.includes('flete') && !h.includes('devoluc'));
+            const fleteDevIdx = headers.findIndex(h => h.includes('devoluc') || h.includes('flete por dev'));
+
+            const safeFleteEntregaIdx = fleteEntregaIdx !== -1 ? fleteEntregaIdx : 27;
+            const safeFleteDevIdx = fleteDevIdx !== -1 ? fleteDevIdx : 28;
 
             let productsList = Database.products || [];
             if (productsList.length === 0 && typeof Database.getProducts === 'function') {
@@ -1148,28 +1187,23 @@ const IncomeStatementModule = {
             let importedCount = 0;
             let deliveredCount = 0;
             let returnedCount = 0;
-
             const recordsToInsert = [];
 
-            // Loop through data rows (skip header row 0)
-            for (let i = 1; i < rows.length; i++) {
+            for (let i = headerRowIndex + 1; i < rows.length; i++) {
                 const row = rows[i];
                 if (!row || row.length === 0) continue;
 
-                // Col C (index 2): Estado
-                const status = String(row[2] || '').trim();
+                const status = String(row[statusIdx] || '').trim();
                 if (!status) continue;
 
-                // Col M (index 12): Producto, Col N (index 13): ID stock/SKU, Col P (index 15): Contenido
-                const rawProduct = String(row[12] || '').trim();
-                const stockId = String(row[13] || '').trim();
-                const content = String(row[15] || '').trim();
+                const rawProduct = String(row[productIdx] || '').trim();
+                const stockId = String(row[stockIdx] || '').trim();
+                const content = String(row[contentIdx] || '').trim();
 
-                // Recaudo Z (index 25), Costo AA (index 26), Flete AB (index 27), Flete Dev AC (index 28)
-                const recaudo = parseFloat(row[25]) || 0;
-                const costoProd = parseFloat(row[26]) || 0;
-                const fleteEntrega = parseFloat(row[27]) || 0;
-                const fleteDevolucion = parseFloat(row[28]) || 0;
+                const recaudo = parseFloat(row[recaudoIdx]) || 0;
+                const costoProd = parseFloat(row[costoIdx]) || 0;
+                const fleteEntrega = parseFloat(row[safeFleteEntregaIdx]) || 0;
+                const fleteDevolucion = parseFloat(row[safeFleteDevIdx]) || 0;
 
                 const statusLower = status.toLowerCase();
                 const isReturned = statusLower.includes('devuelt') || statusLower.includes('cancel');
@@ -1183,18 +1217,18 @@ const IncomeStatementModule = {
                 if (isReturned) {
                     rev = 0;
                     cost = 0;
-                    shipping = fleteDevolucion > 0 ? fleteDevolucion : fleteEntrega; // Casilla AC: Flete por devolución
+                    shipping = fleteDevolucion > 0 ? fleteDevolucion : fleteEntrega;
                     ret = 1;
                     returnedCount++;
                 } else {
                     rev = recaudo;
                     cost = costoProd;
-                    shipping = fleteEntrega; // Casilla AB: Flete de entrega
+                    shipping = fleteEntrega;
                     del = 1;
                     deliveredCount++;
                 }
 
-                // Match product by Stock ID (Col N) OR by Name/Content (Col P / Col M)
+                // Match product
                 let matchedProduct = null;
                 if (stockId) {
                     matchedProduct = productsList.find(p => String(p.sku || p.code || p.id).toLowerCase() === stockId.toLowerCase());
@@ -1210,8 +1244,6 @@ const IncomeStatementModule = {
                     country: 'Ecuador',
                     sale_date: new Date().toISOString().split('T')[0],
                     description: finalProductName,
-                    product_name: finalProductName,
-                    stock_id: stockId,
                     revenue: rev,
                     product_cost: cost,
                     shipping_cost: shipping,
@@ -1223,7 +1255,8 @@ const IncomeStatementModule = {
             }
 
             if (recordsToInsert.length === 0) {
-                Utils.showToast('No se encontraron filas válidas para importar', 'warning');
+                Utils.showToast('No se encontraron filas de ventas en el archivo', 'warning');
+                e.target.value = '';
                 return;
             }
 
@@ -1240,7 +1273,8 @@ const IncomeStatementModule = {
 
         } catch (error) {
             console.error('Error importing Excel:', error);
-            Utils.showToast('Error al importar el archivo Excel: ' + error.message, 'error');
+            Utils.showToast('Error al importar Excel: ' + error.message, 'error');
+            e.target.value = '';
         }
     },
 
