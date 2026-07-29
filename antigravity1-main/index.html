@@ -3341,12 +3341,17 @@
                             Importar Informe Excel/CSV
                         </button>
                         <button class="btn btn-secondary btn-sm" onclick="IncomeStatementModule.openExternalSalesModal()">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                             </svg>
                             Registrar Venta Extra
+                        </button>
+                        <button type="button" class="btn btn-danger-light btn-sm" id="btnDeleteSelectedExtSales" onclick="IncomeStatementModule.deleteSelectedExternalSales()" style="display:none;">
+                            🗑️ Eliminar Seleccionados (<span id="selectedExtSalesCount">0</span>)
+                        </button>
+                        <button type="button" class="btn btn-danger-light btn-sm" id="btnDeleteAllExtSales" onclick="IncomeStatementModule.deleteAllExternalSales()" style="display:none;">
+                            ⚠️ Vaciar Todo
                         </button>
                     </div>
                     <div class="card-body">
@@ -3354,6 +3359,9 @@
                             <table class="table">
                                 <thead>
                                     <tr>
+                                        <th style="width: 36px; text-align: center;">
+                                            <input type="checkbox" id="selectAllExtSales" onchange="IncomeStatementModule.toggleSelectAllExternalSales(this.checked)" title="Seleccionar Todos" style="cursor: pointer;">
+                                        </th>
                                         <th>País</th>
                                         <th>Descripción</th>
                                         <th style="text-align: right; color: var(--success);">Ingresos (USD)</th>
@@ -3368,7 +3376,7 @@
                                 </thead>
                                 <tbody id="isExternalSalesTable">
                                     <tr>
-                                        <td colspan="7"
+                                        <td colspan="11"
                                             style="text-align: center; color: var(--text-muted); padding: 2rem;">
                                             Cargando ventas externas...
                                         </td>
@@ -3376,6 +3384,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div id="extSalesExpandContainer" style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);"></div>
                     </div>
                 </div>
 

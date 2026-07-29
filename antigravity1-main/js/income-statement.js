@@ -1004,23 +1004,113 @@ const IncomeStatementModule = {
         return { totalRevenue, totalCost, totalShipping };
     },
 
+    isExternalSalesExpanded: false,
+
+    toggleExpandExternalSales() {
+        this.isExternalSalesExpanded = !this.isExternalSalesExpanded;
+        this.renderExternalSalesTable();
+    },
+
+    toggleSelectAllExternalSales(checked) {
+        const checkboxes = document.querySelectorAll('.ext-sale-checkbox');
+        checkboxes.forEach(cb => cb.checked = checked);
+        this.updateSelectedExtSalesCount();
+    },
+
+    updateSelectedExtSalesCount() {
+        const checked = document.querySelectorAll('.ext-sale-checkbox:checked');
+        const btnDeleteSelected = document.getElementById('btnDeleteSelectedExtSales');
+        const countSpan = document.getElementById('selectedExtSalesCount');
+
+        if (countSpan) countSpan.innerText = checked.length;
+
+        if (btnDeleteSelected) {
+            btnDeleteSelected.style.display = checked.length > 0 ? 'inline-flex' : 'none';
+        }
+
+        const selectAllCb = document.getElementById('selectAllExtSales');
+        const allCbs = document.querySelectorAll('.ext-sale-checkbox');
+        if (selectAllCb && allCbs.length > 0) {
+            selectAllCb.checked = checked.length === allCbs.length;
+        }
+    },
+
+    async deleteSelectedExternalSales() {
+        const checked = Array.from(document.querySelectorAll('.ext-sale-checkbox:checked')).map(cb => cb.value);
+        if (checked.length === 0) return;
+
+        if (!confirm(`¿Estás seguro de eliminar los ${checked.length} registros seleccionados?`)) return;
+
+        try {
+            Utils.showToast(`Eliminando ${checked.length} registros...`, 'info');
+            const { error } = await supabaseClient.from('external_sales').delete().in('id', checked);
+            if (error) console.warn('Alerta al eliminar en Supabase:', error);
+
+            this.externalSales = this.externalSales.filter(s => !checked.includes(s.id));
+            Utils.showToast(`Se eliminaron ${checked.length} registros`, 'success');
+            await this.render();
+        } catch (err) {
+            console.error('Error deleting selected sales:', err);
+            Utils.showToast('Error al eliminar: ' + err.message, 'error');
+        }
+    },
+
+    async deleteAllExternalSales() {
+        const sales = this.getFilteredExternalSales();
+        if (sales.length === 0) return;
+
+        if (!confirm(`⚠️ ¿Estás seguro de ELIMINAR TODOS los ${sales.length} registros de ventas externas? Esta acción no se puede deshacer.`)) return;
+
+        try {
+            Utils.showToast('Eliminando todos los registros...', 'info');
+            const idsToDelete = sales.map(s => s.id);
+            const { error } = await supabaseClient.from('external_sales').delete().in('id', idsToDelete);
+            if (error) console.warn('Alerta al vaciar en Supabase:', error);
+
+            this.externalSales = this.externalSales.filter(s => !idsToDelete.includes(s.id));
+            Utils.showToast(`Se eliminaron todos los registros (${idsToDelete.length})`, 'success');
+            this.isExternalSalesExpanded = false;
+            await this.render();
+        } catch (err) {
+            console.error('Error clearing all sales:', err);
+            Utils.showToast('Error al vaciar registros: ' + err.message, 'error');
+        }
+    },
+
     renderExternalSalesTable() {
         const tbody = document.getElementById('isExternalSalesTable');
+        const expandContainer = document.getElementById('extSalesExpandContainer');
+        const btnDeleteAll = document.getElementById('btnDeleteAllExtSales');
+        const btnDeleteSelected = document.getElementById('btnDeleteSelectedExtSales');
+
         if (!tbody) return;
 
         const sales = this.getFilteredExternalSales();
 
+        if (btnDeleteAll) {
+            btnDeleteAll.style.display = sales.length > 0 ? 'inline-flex' : 'none';
+        }
+        if (btnDeleteSelected) {
+            btnDeleteSelected.style.display = 'none';
+        }
+        const selectAllCb = document.getElementById('selectAllExtSales');
+        if (selectAllCb) selectAllCb.checked = false;
+
         if (sales.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                        No hay ventas manuales registradas en este período.
+                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        No hay ventas manuales o importadas registradas en este período.
                     </td>
                 </tr>`;
+            if (expandContainer) expandContainer.innerHTML = '';
             return;
         }
 
-        tbody.innerHTML = sales.map(sale => {
+        const limit = 5;
+        const visibleSales = this.isExternalSalesExpanded ? sales : sales.slice(0, limit);
+
+        tbody.innerHTML = visibleSales.map(sale => {
             const delivered = sale.delivered || 0;
             const returned = sale.returned || 0;
             const totalOrders = delivered + returned;
@@ -1028,11 +1118,14 @@ const IncomeStatementModule = {
 
             return `
                 <tr>
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="ext-sale-checkbox" value="${sale.id}" onchange="IncomeStatementModule.updateSelectedExtSalesCount()" style="cursor: pointer;">
+                    </td>
                     <td>
                         <span class="country-flag">${this.getCountryFlag(sale.country === 'Todos' ? sale.country : sale.country)}</span>
                         ${sale.country}
                     </td>
-                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${sale.description || '-'}</td>
+                    <td style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${sale.description || ''}">${sale.description || '-'}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(sale.revenue)}</td>
                     <td style="text-align: right; color: var(--danger);">${this.formatCurrency(sale.product_cost)}</td>
                     <td style="text-align: right; color: var(--primary);">${this.formatCurrency(sale.shipping_cost)}</td>
@@ -1056,6 +1149,20 @@ const IncomeStatementModule = {
                     </td>
                 </tr>`;
         }).join('');
+
+        if (expandContainer) {
+            if (sales.length > limit) {
+                expandContainer.innerHTML = `
+                    <span style="font-size: 0.82rem; color: var(--text-muted);">
+                        Mostrando ${visibleSales.length} de ${sales.length} registros cargados
+                    </span>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="IncomeStatementModule.toggleExpandExternalSales()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border); font-size: 0.82rem;">
+                        ${this.isExternalSalesExpanded ? '🔼 Plegar Lista (Ver menos)' : '🔽 Desglosar Todos (' + sales.length + ' registros)'}
+                    </button>`;
+            } else {
+                expandContainer.innerHTML = `<span style="font-size: 0.82rem; color: var(--text-muted);">${sales.length} registros en total</span>`;
+            }
+        }
     },
 
     openExternalSalesModal() {
