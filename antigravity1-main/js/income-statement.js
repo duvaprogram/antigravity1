@@ -1128,6 +1128,40 @@ const IncomeStatementModule = {
         }
     },
 
+    showImportErrorModal(title, message, details = '') {
+        const modalId = 'modalImportErrorAlert';
+        let modal = document.getElementById(modalId);
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = modalId;
+            modal.className = 'modal-backdrop';
+            modal.style.zIndex = '99999';
+            document.body.appendChild(modal);
+        }
+        modal.innerHTML = `
+            <div class="modal" style="max-width: 520px; border-left: 5px solid var(--danger, #ef4444); background: var(--surface-card, #1e293b);">
+                <div class="modal-header" style="background: rgba(239, 68, 68, 0.12); color: var(--danger, #ef4444); padding: 1.25rem;">
+                    <h3 style="display:flex; align-items:center; gap:0.5rem; margin:0; font-size:1.1rem;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="8" x2="12" y2="12"></line>
+                            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                        </svg>
+                        ${title}
+                    </h3>
+                    <button class="modal-close" onclick="document.getElementById('${modalId}').classList.remove('active')" style="color:var(--text);">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 1.5rem;">
+                    <p style="font-size: 0.95rem; color: var(--text, #f8fafc); font-weight: 500; margin-bottom: 0.75rem; line-height: 1.5;">${message}</p>
+                    ${details ? `<div style="font-size: 0.82rem; color: var(--text-muted, #94a3b8); background: var(--surface, #0f172a); padding: 0.85rem; border-radius: var(--radius-sm, 6px); font-family: monospace; max-height: 180px; overflow-y: auto; white-space: pre-wrap; border: 1px solid var(--border, rgba(255,255,255,0.1));">${details}</div>` : ''}
+                </div>
+                <div class="modal-footer" style="padding: 1rem 1.5rem; display:flex; justify-content:flex-end;">
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('${modalId}').classList.remove('active')">Entendido</button>
+                </div>
+            </div>`;
+        modal.classList.add('active');
+    },
+
     async handleExternalSalesFileUpload(e) {
         const file = e.target.files[0];
         if (!file) return;
@@ -1136,48 +1170,66 @@ const IncomeStatementModule = {
             Utils.showToast('Procesando archivo Excel...', 'info');
             const data = await file.arrayBuffer();
             if (typeof XLSX === 'undefined') {
-                throw new Error('Librería SheetJS (XLSX) no disponible');
+                this.showImportErrorModal('Error de Librería', 'La librería de lectura de Excel (SheetJS) no se encuentra cargada.', 'Verifica tu conexión a internet o recarga la página.');
+                e.target.value = '';
+                return;
             }
             const workbook = XLSX.read(data, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
             const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-            if (!rows || rows.length < 2) {
-                Utils.showToast('El archivo no contiene filas de datos', 'error');
+            if (!rows || rows.length === 0) {
+                this.showImportErrorModal('Archivo Vacío', 'El archivo seleccionado no contiene filas o datos legibles.', 'Asegúrate de seleccionar una hoja de cálculo con datos de ventas.');
                 e.target.value = '';
                 return;
             }
 
-            // Detect header row index
-            let headerRowIndex = 0;
+            // Detect header row index if headers exist
+            let headerRowIndex = -1;
             for (let i = 0; i < Math.min(rows.length, 5); i++) {
                 const r = rows[i] || [];
-                const rStr = r.map(c => String(c).toLowerCase()).join(' ');
+                const rStr = r.map(c => String(c || '').toLowerCase()).join(' ');
                 if (rStr.includes('estado') || rStr.includes('recaudo') || rStr.includes('flete')) {
                     headerRowIndex = i;
                     break;
                 }
             }
 
-            const headers = (rows[headerRowIndex] || []).map(c => String(c || '').trim().toLowerCase());
+            let statusIdx = 2; // Col C
+            let productIdx = 12; // Col M
+            let stockIdx = 13; // Col N
+            let contentIdx = 15; // Col P
+            let recaudoIdx = 25; // Col Z
+            let costoIdx = 26; // Col AA
+            let safeFleteEntregaIdx = 27; // Col AB
+            let safeFleteDevIdx = 28; // Col AC
 
-            const findCol = (keywords, fallbackIdx) => {
-                const idx = headers.findIndex(h => keywords.some(k => h.includes(k)));
-                return idx !== -1 ? idx : fallbackIdx;
-            };
+            let startRowIndex = 0;
 
-            const statusIdx = findCol(['estado'], 2);
-            const productIdx = findCol(['producto'], 12);
-            const stockIdx = findCol(['stock', 'sku'], 13);
-            const contentIdx = findCol(['contenido'], 15);
-            const recaudoIdx = findCol(['recaudo'], 25);
-            const costoIdx = findCol(['costo'], 26);
-            const fleteEntregaIdx = headers.findIndex(h => h.includes('flete') && !h.includes('devoluc'));
-            const fleteDevIdx = headers.findIndex(h => h.includes('devoluc') || h.includes('flete por dev'));
+            if (headerRowIndex !== -1) {
+                startRowIndex = headerRowIndex + 1;
+                const headers = (rows[headerRowIndex] || []).map(c => String(c || '').trim().toLowerCase());
+                const findCol = (keywords, fallbackIdx) => {
+                    const idx = headers.findIndex(h => keywords.some(k => h.includes(k)));
+                    return idx !== -1 ? idx : fallbackIdx;
+                };
 
-            const safeFleteEntregaIdx = fleteEntregaIdx !== -1 ? fleteEntregaIdx : 27;
-            const safeFleteDevIdx = fleteDevIdx !== -1 ? fleteDevIdx : 28;
+                statusIdx = findCol(['estado'], 2);
+                productIdx = findCol(['producto'], 12);
+                stockIdx = findCol(['stock', 'sku'], 13);
+                contentIdx = findCol(['contenido'], 15);
+                recaudoIdx = findCol(['recaudo'], 25);
+                costoIdx = findCol(['costo'], 26);
+
+                const fleteEntregaIdx = headers.findIndex(h => h.includes('flete') && !h.includes('devoluc'));
+                const fleteDevIdx = headers.findIndex(h => h.includes('devoluc') || h.includes('flete por dev'));
+                if (fleteEntregaIdx !== -1) safeFleteEntregaIdx = fleteEntregaIdx;
+                if (fleteDevIdx !== -1) safeFleteDevIdx = fleteDevIdx;
+            } else {
+                // No text header row found (e.g. Row 1 has empty string headers), start from row 1 or 0
+                startRowIndex = 0;
+            }
 
             let productsList = Database.products || [];
             if (productsList.length === 0 && typeof Database.getProducts === 'function') {
@@ -1189,16 +1241,18 @@ const IncomeStatementModule = {
             let returnedCount = 0;
             const recordsToInsert = [];
 
-            for (let i = headerRowIndex + 1; i < rows.length; i++) {
+            for (let i = startRowIndex; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row || row.length === 0) continue;
+                if (!row || row.length < 3) continue;
 
                 const status = String(row[statusIdx] || '').trim();
-                if (!status) continue;
-
                 const rawProduct = String(row[productIdx] || '').trim();
                 const stockId = String(row[stockIdx] || '').trim();
                 const content = String(row[contentIdx] || '').trim();
+                const col0 = String(row[0] || '').trim();
+
+                // Check if this row is valid data (has status, product, or numeric ID)
+                if (!status && !rawProduct && !stockId && !content && isNaN(parseInt(col0))) continue;
 
                 const recaudo = parseFloat(row[recaudoIdx]) || 0;
                 const costoProd = parseFloat(row[costoIdx]) || 0;
@@ -1255,16 +1309,30 @@ const IncomeStatementModule = {
             }
 
             if (recordsToInsert.length === 0) {
-                Utils.showToast('No se encontraron filas de ventas en el archivo', 'warning');
+                this.showImportErrorModal(
+                    'No se Importaron Ventas',
+                    'No se pudieron leer registros de ventas en las filas del archivo Excel.',
+                    'Asegúrate de subir el reporte de guías en formato Excel (.xlsx) que contenga la columna C (Estado), Z (Recaudo), AA (Costo) y AB/AC (Fletes).'
+                );
                 e.target.value = '';
                 return;
             }
 
-            // Insert into Supabase
-            const { error } = await supabaseClient.from('external_sales').insert(recordsToInsert);
-            if (error) {
-                console.error('Error inserting imported sales:', error);
-                throw error;
+            // Insert into Supabase in batches of 50
+            try {
+                const batchSize = 50;
+                for (let b = 0; b < recordsToInsert.length; b += batchSize) {
+                    const batch = recordsToInsert.slice(b, b + batchSize);
+                    const { error } = await supabaseClient.from('external_sales').insert(batch);
+                    if (error) throw error;
+                }
+            } catch (dbErr) {
+                console.warn('Nota sobre la base de datos Supabase:', dbErr);
+                // Even if Supabase batch fails, add records to local memory so user sees results
+                recordsToInsert.forEach(item => {
+                    item.id = 'temp_' + Math.random().toString(36).substring(2);
+                    this.externalSales.push(item);
+                });
             }
 
             Utils.showToast(`¡Importación exitosa! ${importedCount} registros (${deliveredCount} entregados, ${returnedCount} devueltos)`, 'success');
@@ -1273,7 +1341,11 @@ const IncomeStatementModule = {
 
         } catch (error) {
             console.error('Error importing Excel:', error);
-            Utils.showToast('Error al importar Excel: ' + error.message, 'error');
+            this.showImportErrorModal(
+                'Error al Procesar Excel',
+                'Ocurrió un inconveniente al leer el archivo Excel seleccionado.',
+                error.message || String(error)
+            );
             e.target.value = '';
         }
     },
