@@ -3242,6 +3242,7 @@
                                         <th>País</th>
                                         <th>Plataforma</th>
                                         <th>Campaña</th>
+                                        <th style="width: 180px;">Producto Vinculado</th>
                                         <th style="text-align: right;">Gastado (USD)</th>
                                         <th style="text-align: right;">Impresiones</th>
                                         <th style="text-align: right;">Clicks</th>
@@ -3254,7 +3255,7 @@
                                 </thead>
                                 <tbody id="isAdExpensesTable">
                                     <tr>
-                                        <td colspan="11"
+                                        <td colspan="12"
                                             style="text-align: center; color: var(--text-muted); padding: 2rem;">
                                             Cargando gastos publicitarios...
                                         </td>
@@ -3330,9 +3331,16 @@
                             </svg>
                             Otras Plataformas (Ajustes Manuales)
                         </h3>
-                        <button class="btn btn-sm"
-                            style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);"
-                            onclick="IncomeStatementModule.openExternalSalesModal()">
+                               <input type="file" id="inputImportExternalSales" accept=".xlsx,.xls,.csv" style="display:none;" onchange="IncomeStatementModule.handleExternalSalesFileUpload(event)">
+                        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('inputImportExternalSales').click()" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            Importar Informe Excel/CSV
+                        </button>
+                        <button class="btn btn-secondary btn-sm" onclick="IncomeStatementModule.openExternalSalesModal()">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -3363,6 +3371,51 @@
                                         <td colspan="7"
                                             style="text-align: center; color: var(--text-muted); padding: 2rem;">
                                             Cargando ventas externas...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Utilidad Bruta por Producto (Consolidado) -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header"
+                        style="background: linear-gradient(135deg, #0ea5e9, #6366f1); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                        <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
+                                <polyline points="7.5 19.79 7.5 14.6 3 12"></polyline>
+                                <polyline points="21 12 16.5 14.6 16.5 19.79"></polyline>
+                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                            </svg>
+                            Utilidad Bruta por Producto (Consolidado)
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Producto / SKU</th>
+                                        <th style="text-align: right;">Pedidos</th>
+                                        <th style="text-align: right;">Unidades</th>
+                                        <th style="text-align: right;">Ventas Totales</th>
+                                        <th style="text-align: right;">Costo Prod.</th>
+                                        <th style="text-align: right;">Costo Envíos / Dev.</th>
+                                        <th style="text-align: right;">Publicidad</th>
+                                        <th style="text-align: right;">Util. Bruta</th>
+                                        <th style="text-align: center;">Margen</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="isProductProfitTable">
+                                    <tr>
+                                        <td colspan="9"
+                                            style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                                            Cargando análisis por producto...
                                         </td>
                                     </tr>
                                 </tbody>

@@ -108,6 +108,7 @@ const IncomeStatementModule = {
             this.renderAdExpensesTable();
             this.renderOperationalExpensesTable();
             this.renderExternalSalesTable();
+            this.renderProductProfitTable();
             this.renderPLStatement();
         } catch (error) {
             console.error('Error rendering Income Statement:', error);
@@ -778,7 +779,7 @@ const IncomeStatementModule = {
         if (expenses.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="12" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 0.5rem; opacity: 0.3;">
                             <circle cx="12" cy="12" r="10"></circle>
                             <path d="M8 12h8"></path>
@@ -794,6 +795,24 @@ const IncomeStatementModule = {
             const ctr = exp.impressions > 0 ? ((exp.clicks / exp.impressions) * 100) : 0;
             const sourceIcon = exp.source === 'TikTok' ? '🎵' : '🔵';
             const sourceName = exp.source || 'Facebook';
+
+            let productCell = '';
+            if (exp.product_name) {
+                productCell = `
+                    <div class="product-linked-badge">
+                        <span title="${exp.product_name}">${exp.product_name}</span>
+                        <button onclick="IncomeStatementModule.unlinkProductFromAdExpense('${exp.id}')" title="Desvincular">✕</button>
+                    </div>`;
+            } else {
+                productCell = `
+                    <div class="predictive-search-container" id="adProdSearchContainer_${exp.id}">
+                        <input type="text" class="predictive-search-input" placeholder="🔍 Vincular producto..." 
+                            onfocus="IncomeStatementModule.showProductPredictiveList('${exp.id}', this.value)" 
+                            oninput="IncomeStatementModule.showProductPredictiveList('${exp.id}', this.value)">
+                        <div class="predictive-search-results" id="adProdSearchResults_${exp.id}" style="display:none;"></div>
+                    </div>`;
+            }
+
             return `
                 <tr>
                     <td>
@@ -806,7 +825,8 @@ const IncomeStatementModule = {
                             <span style="font-size: 0.8rem; color: var(--text-muted);">${sourceName}</span>
                         </div>
                     </td>
-                    <td style="font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${exp.campaign_name || ''}">${exp.campaign_name || '-'}</td>
+                    <td style="font-size: 0.8rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${exp.campaign_name || ''}">${exp.campaign_name || '-'}</td>
+                    <td>${productCell}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--danger);">$${parseFloat(exp.amount_spent).toFixed(2)}</td>
                     <td style="text-align: right;">${(exp.impressions || 0).toLocaleString()}</td>
                     <td style="text-align: right;">${exp.clicks || 0}</td>
@@ -832,6 +852,74 @@ const IncomeStatementModule = {
                     </td>
                 </tr>`;
         }).join('');
+    },
+
+    // Predictive Search for Ad Expense Product Linking
+    async linkProductToAdExpense(adExpenseId, productId, productName) {
+        const exp = this.adExpenses.find(e => e.id === adExpenseId);
+        if (exp) {
+            exp.product_id = productId;
+            exp.product_name = productName;
+        }
+        try {
+            await supabaseClient.from('ad_expenses').update({ product_id: productId, product_name: productName }).eq('id', adExpenseId);
+            Utils.showToast('Producto vinculado a la campaña', 'success');
+        } catch (err) {
+            console.warn('Nota: Guardado localmente el producto vinculado en la campaña.');
+        }
+        this.renderAdExpensesTable();
+        this.renderProductProfitTable();
+    },
+
+    async unlinkProductFromAdExpense(adExpenseId) {
+        const exp = this.adExpenses.find(e => e.id === adExpenseId);
+        if (exp) {
+            exp.product_id = null;
+            exp.product_name = null;
+        }
+        try {
+            await supabaseClient.from('ad_expenses').update({ product_id: null, product_name: null }).eq('id', adExpenseId);
+            Utils.showToast('Producto desvinculado', 'info');
+        } catch (err) {
+            console.warn('Producto desvinculado localmente');
+        }
+        this.renderAdExpensesTable();
+        this.renderProductProfitTable();
+    },
+
+    async showProductPredictiveList(adExpenseId, query) {
+        const resultsEl = document.getElementById(`adProdSearchResults_${adExpenseId}`);
+        if (!resultsEl) return;
+
+        let products = Database.products || [];
+        if (products.length === 0 && typeof Database.getProducts === 'function') {
+            products = await Database.getProducts();
+        }
+
+        const q = (query || '').toLowerCase().trim();
+        const filtered = products.filter(p => 
+            (p.name || '').toLowerCase().includes(q) || 
+            (p.sku || p.code || '').toLowerCase().includes(q)
+        ).slice(0, 8);
+
+        if (filtered.length === 0) {
+            resultsEl.innerHTML = `<div style="padding: 0.5rem; font-size:0.75rem; color:var(--text-muted); text-align:center;">Sin coincidencias</div>`;
+        } else {
+            resultsEl.innerHTML = filtered.map(p => {
+                const escapedName = (p.name || '').replace(/'/g, "\\'");
+                return `
+                    <div class="predictive-search-item" onclick="IncomeStatementModule.linkProductToAdExpense('${adExpenseId}', '${p.id}', '${escapedName}')">
+                        <span style="font-weight:500;">${p.name}</span>
+                        <span class="predictive-search-sku">${p.sku || p.code || ''}</span>
+                    </div>`;
+            }).join('');
+        }
+        resultsEl.style.display = 'block';
+    },
+
+    closeProductPredictiveList(adExpenseId) {
+        const resultsEl = document.getElementById(`adProdSearchResults_${adExpenseId}`);
+        if (resultsEl) resultsEl.style.display = 'none';
     },
 
     renderOperationalExpensesTable() {
@@ -1030,6 +1118,284 @@ const IncomeStatementModule = {
         } catch (error) {
             Utils.showToast('Error al eliminar: ' + error.message, 'error');
         }
+    },
+
+    async handleExternalSalesFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+            Utils.showToast('Leyendo archivo Excel...', 'info');
+            const data = await file.arrayBuffer();
+            if (typeof XLSX === 'undefined') {
+                throw new Error('Librería XLSX no cargada');
+            }
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+            if (!rows || rows.length < 2) {
+                Utils.showToast('El archivo no contiene filas de datos', 'error');
+                return;
+            }
+
+            let productsList = Database.products || [];
+            if (productsList.length === 0 && typeof Database.getProducts === 'function') {
+                productsList = await Database.getProducts();
+            }
+
+            let importedCount = 0;
+            let deliveredCount = 0;
+            let returnedCount = 0;
+
+            const recordsToInsert = [];
+
+            // Loop through data rows (skip header row 0)
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length === 0) continue;
+
+                // Col C (index 2): Estado
+                const status = String(row[2] || '').trim();
+                if (!status) continue;
+
+                // Col M (index 12): Producto, Col N (index 13): ID stock/SKU, Col P (index 15): Contenido
+                const rawProduct = String(row[12] || '').trim();
+                const stockId = String(row[13] || '').trim();
+                const content = String(row[15] || '').trim();
+
+                // Recaudo Z (index 25), Costo AA (index 26), Flete AB (index 27), Flete Dev AC (index 28)
+                const recaudo = parseFloat(row[25]) || 0;
+                const costoProd = parseFloat(row[26]) || 0;
+                const fleteEntrega = parseFloat(row[27]) || 0;
+                const fleteDevolucion = parseFloat(row[28]) || 0;
+
+                const statusLower = status.toLowerCase();
+                const isReturned = statusLower.includes('devuelt') || statusLower.includes('cancel');
+
+                let rev = 0;
+                let cost = 0;
+                let shipping = 0;
+                let del = 0;
+                let ret = 0;
+
+                if (isReturned) {
+                    rev = 0;
+                    cost = 0;
+                    shipping = fleteDevolucion > 0 ? fleteDevolucion : fleteEntrega; // Casilla AC: Flete por devolución
+                    ret = 1;
+                    returnedCount++;
+                } else {
+                    rev = recaudo;
+                    cost = costoProd;
+                    shipping = fleteEntrega; // Casilla AB: Flete de entrega
+                    del = 1;
+                    deliveredCount++;
+                }
+
+                // Match product by Stock ID (Col N) OR by Name/Content (Col P / Col M)
+                let matchedProduct = null;
+                if (stockId) {
+                    matchedProduct = productsList.find(p => String(p.sku || p.code || p.id).toLowerCase() === stockId.toLowerCase());
+                }
+                if (!matchedProduct && (content || rawProduct)) {
+                    const searchStr = (content || rawProduct).toLowerCase();
+                    matchedProduct = productsList.find(p => searchStr.includes((p.name || '').toLowerCase()) || (p.name || '').toLowerCase().includes(searchStr));
+                }
+
+                const finalProductName = matchedProduct ? matchedProduct.name : (content || rawProduct || stockId || 'Producto Externo');
+
+                recordsToInsert.push({
+                    country: 'Ecuador',
+                    sale_date: new Date().toISOString().split('T')[0],
+                    description: finalProductName,
+                    product_name: finalProductName,
+                    stock_id: stockId,
+                    revenue: rev,
+                    product_cost: cost,
+                    shipping_cost: shipping,
+                    delivered: del,
+                    returned: ret
+                });
+
+                importedCount++;
+            }
+
+            if (recordsToInsert.length === 0) {
+                Utils.showToast('No se encontraron filas válidas para importar', 'warning');
+                return;
+            }
+
+            // Insert into Supabase
+            const { error } = await supabaseClient.from('external_sales').insert(recordsToInsert);
+            if (error) {
+                console.error('Error inserting imported sales:', error);
+                throw error;
+            }
+
+            Utils.showToast(`¡Importación exitosa! ${importedCount} registros (${deliveredCount} entregados, ${returnedCount} devueltos)`, 'success');
+            e.target.value = '';
+            await this.render();
+
+        } catch (error) {
+            console.error('Error importing Excel:', error);
+            Utils.showToast('Error al importar el archivo Excel: ' + error.message, 'error');
+        }
+    },
+
+    renderProductProfitTable() {
+        const tbody = document.getElementById('isProductProfitTable');
+        if (!tbody) return;
+
+        const productMap = {};
+
+        // 1. Process Guides (Orders)
+        const filteredGuides = this.guides || [];
+        filteredGuides.forEach(g => {
+            if (g.status === 'CANCELLED' || g.status === 'ANULADO') return;
+            if (this.filters.country && g.country !== this.filters.country) return;
+            const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
+            if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
+            if (this.filters.dateTo && gDate > this.filters.dateTo) return;
+
+            const items = g.products || g.items || [];
+            const shippingPerItem = items.length > 0 ? (parseFloat(g.shipping_cost || 0) / items.length) : 0;
+            const totalRev = parseFloat(g.total_amount || g.revenue || 0);
+            const totalItemsCost = items.reduce((s, item) => s + (ProductsModule.getRealCost(item) * (item.quantity || 1)), 0);
+
+            items.forEach(item => {
+                const name = item.name || 'Producto Desconocido';
+                const qty = parseInt(item.quantity || 1);
+                const realCost = ProductsModule.getRealCost(item) * qty;
+                const revProp = totalItemsCost > 0 ? (realCost / totalItemsCost) * totalRev : (totalRev / items.length);
+
+                if (!productMap[name]) {
+                    productMap[name] = {
+                        name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0
+                    };
+                }
+                productMap[name].orders += 1;
+                productMap[name].units += qty;
+                productMap[name].revenue += revProp;
+                productMap[name].cost += realCost;
+                productMap[name].shipping += shippingPerItem;
+            });
+        });
+
+        // 2. Process External Sales (Otras Plataformas)
+        const extSales = this.getFilteredExternalSales();
+        extSales.forEach(s => {
+            const name = s.product_name || s.description || 'Venta Manual';
+            if (!productMap[name]) {
+                productMap[name] = {
+                    name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0
+                };
+            }
+            productMap[name].orders += (parseInt(s.delivered || 0) + parseInt(s.returned || 0));
+            productMap[name].revenue += parseFloat(s.revenue || 0);
+            productMap[name].cost += parseFloat(s.product_cost || 0);
+            productMap[name].shipping += parseFloat(s.shipping_cost || 0);
+        });
+
+        // 3. Process Ad Expenses per Product
+        const adExpenses = this.getFilteredAdExpenses();
+        adExpenses.forEach(exp => {
+            const name = exp.product_name;
+            if (name && productMap[name]) {
+                productMap[name].adSpend += parseFloat(exp.amount_spent || 0);
+            } else if (name) {
+                productMap[name] = {
+                    name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: parseFloat(exp.amount_spent || 0)
+                };
+            }
+        });
+
+        const productList = Object.values(productMap);
+
+        if (productList.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        No hay datos de productos en el período seleccionado.
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        const totalRow = {
+            orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: 0
+        };
+
+        tbody.innerHTML = productList.map(p => {
+            const grossProfit = p.revenue - p.cost - p.shipping - p.freight - p.adSpend;
+            const margin = p.revenue > 0 ? ((grossProfit / p.revenue) * 100).toFixed(1) : '0.0';
+            const costPct = p.revenue > 0 ? ((p.cost / p.revenue) * 100).toFixed(1) : '0.0';
+            const shippingPct = p.revenue > 0 ? ((p.shipping / p.revenue) * 100).toFixed(1) : '0.0';
+            const adPct = p.revenue > 0 ? ((p.adSpend / p.revenue) * 100).toFixed(1) : '0.0';
+
+            totalRow.orders += p.orders;
+            totalRow.units += p.units;
+            totalRow.revenue += p.revenue;
+            totalRow.cost += p.cost;
+            totalRow.shipping += p.shipping;
+            totalRow.adSpend += p.adSpend;
+
+            return `
+                <tr>
+                    <td><strong>${p.name}</strong></td>
+                    <td style="text-align: right; font-weight: 600;">${p.orders}</td>
+                    <td style="text-align: right;">${p.units || '-'}</td>
+                    <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(p.revenue)}</td>
+                    <td style="text-align: right; color: var(--danger);">
+                        <div>${this.formatCurrency(p.cost)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8;">${costPct}%</div>
+                    </td>
+                    <td style="text-align: right; color: var(--danger);">
+                        <div>${this.formatCurrency(p.shipping)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8;">${shippingPct}%</div>
+                    </td>
+                    <td style="text-align: right; color: #ec4899; font-weight: 500;">
+                        <div>${this.formatCurrency(p.adSpend)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.85;">${adPct}%</div>
+                    </td>
+                    <td style="text-align: right; font-weight: 600; color: ${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                        ${this.formatCurrency(grossProfit)}
+                    </td>
+                    <td style="text-align: center;">
+                        <span class="is-margin-badge ${parseFloat(margin) >= 30 ? 'good' : parseFloat(margin) >= 15 ? 'warning' : 'bad'}">${margin}%</span>
+                    </td>
+                </tr>`;
+        }).join('');
+
+        // Total row
+        const totalGross = totalRow.revenue - totalRow.cost - totalRow.shipping - totalRow.adSpend;
+        const totalMargin = totalRow.revenue > 0 ? ((totalGross / totalRow.revenue) * 100).toFixed(1) : '0.0';
+        const totalCostPct = totalRow.revenue > 0 ? ((totalRow.cost / totalRow.revenue) * 100).toFixed(1) : '0.0';
+        const totalShippingPct = totalRow.revenue > 0 ? ((totalRow.shipping / totalRow.revenue) * 100).toFixed(1) : '0.0';
+        const totalAdPct = totalRow.revenue > 0 ? ((totalRow.adSpend / totalRow.revenue) * 100).toFixed(1) : '0.0';
+
+        tbody.innerHTML += `
+            <tr class="is-total-row">
+                <td><strong>TOTAL PRODUCTOS</strong></td>
+                <td style="text-align: right; font-weight: 700;">${totalRow.orders}</td>
+                <td style="text-align: right; font-weight: 700;">${totalRow.units}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.revenue)}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--danger);">
+                    <div>${this.formatCurrency(totalRow.cost)}</div>
+                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalCostPct}%</div>
+                </td>
+                <td style="text-align: right; font-weight: 700; color: var(--danger);">
+                    <div>${this.formatCurrency(totalRow.shipping)}</div>
+                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalShippingPct}%</div>
+                </td>
+                <td style="text-align: right; font-weight: 700; color: #ec4899;">
+                    <div>${this.formatCurrency(totalRow.adSpend)}</div>
+                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalAdPct}%</div>
+                </td>
+                <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
+                <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
+            </tr>`;
     },
 
     renderPLStatement() {
