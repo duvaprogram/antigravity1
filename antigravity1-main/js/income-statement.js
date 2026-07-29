@@ -2258,13 +2258,21 @@ const IncomeStatementModule = {
             totalRow.adSpend += p.adSpend;
 
             const escapedName = p.name.replace(/"/g, '&quot;');
-            let actionHtml = '';
+            let actionHtml = `<div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                <button class="btn btn-icon btn-sm is-detail-btn" onclick="IncomeStatementModule.showProductOrdersDetail('${escapedName}', ${p.isVisualGroup ? 'true' : 'false'}, ${p.groupId !== undefined ? p.groupId : 'null'})" title="Ver detalle de pedidos de ${escapedName}">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>`;
+                
             if (p.isVisualGroup) {
-                actionHtml = `<button class="btn btn-sm" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="IncomeStatementModule.ungroupVisualGroup(${p.groupId})">
+                actionHtml += `<button class="btn btn-sm" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="IncomeStatementModule.ungroupVisualGroup(${p.groupId})">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     Desagrupar
                 </button>`;
             }
+            actionHtml += `</div>`;
 
             return `
                 <tr ${p.isVisualGroup ? 'style="background: rgba(14, 165, 233, 0.05);"' : ''}>
@@ -4245,6 +4253,170 @@ const IncomeStatementModule = {
         Utils.showToast('Grupo visual desagrupado.', 'success');
         this.renderProductProfitTable();
         this.updateSelectedUnifiedSalesCount();
+    },
+
+    closeProductOrdersDetailModal() {
+        const modal = document.getElementById('modalProductOrdersDetail');
+        if (modal) modal.classList.remove('active');
+    },
+
+    showProductOrdersDetail(name, isVisualGroup, groupId) {
+        const modal = document.getElementById('modalProductOrdersDetail');
+        if (!modal) return;
+        
+        let targetProductNames = [name];
+        if (isVisualGroup && groupId !== null) {
+            const group = this.visualMergedGroups[groupId];
+            if (group) targetProductNames = group.products;
+        }
+
+        const titleEl = document.getElementById('productOrdersDetailTitle');
+        if (titleEl) {
+            titleEl.innerHTML = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg> Detalle de Pedidos — ${name}`;
+        }
+        
+        // Find matching orders
+        const matchingOrders = [];
+        let totalQty = 0, totalRev = 0, totalCost = 0, totalShip = 0;
+        
+        // 1. From Dropi API Guides
+        const filteredGuides = this.guides || [];
+        filteredGuides.forEach(g => {
+            if (g.status === 'CANCELLED' || g.status === 'ANULADO') return;
+            if (this.filters.country && g.country !== this.filters.country) return;
+            const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
+            if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
+            if (this.filters.dateTo && gDate > this.filters.dateTo) return;
+            
+            const items = g.products || g.items || [];
+            let includedItems = [];
+            items.forEach(item => {
+                const rawName = item.name || 'Producto Desconocido';
+                const mappedName = this.productMappings[rawName] || rawName;
+                if (targetProductNames.includes(mappedName)) {
+                    includedItems.push(item);
+                }
+            });
+            
+            if (includedItems.length > 0) {
+                const shippingPerItem = items.length > 0 ? (parseFloat(g.shipping_cost || 0) / items.length) : 0;
+                const totalGuideRev = parseFloat(g.total_amount || g.revenue || 0);
+                const totalItemsCost = items.reduce((s, it) => s + (ProductsModule.getRealCost(it) * (it.quantity || 1)), 0);
+                
+                includedItems.forEach(item => {
+                    const qty = parseInt(item.quantity || 1);
+                    const realCost = ProductsModule.getRealCost(item) * qty;
+                    const revProp = totalItemsCost > 0 ? (realCost / totalItemsCost) * totalGuideRev : (totalGuideRev / items.length);
+                    
+                    totalQty += qty;
+                    totalRev += revProp;
+                    totalCost += realCost;
+                    totalShip += shippingPerItem;
+                    
+                    matchingOrders.push({
+                        date: gDate,
+                        origin: 'Guía Dropi',
+                        location: `${g.country || ''} - ${this.getCountryFromCity(g.cities) || g.cities || ''}`,
+                        status: g.status || '',
+                        originalName: item.name,
+                        qty: qty,
+                        revenue: revProp,
+                        cost: realCost,
+                        shipping: shippingPerItem
+                    });
+                });
+            }
+        });
+        
+        // 2. From External Sales
+        const extSales = this.getFilteredExternalSales();
+        extSales.forEach(s => {
+            const rawName = s.product_name || s.description || 'Venta Manual';
+            const mappedName = this.productMappings[rawName] || rawName;
+            
+            if (targetProductNames.includes(mappedName)) {
+                const qty = parseInt(s.delivered || 0) + parseInt(s.returned || 0);
+                const rev = parseFloat(s.revenue || 0);
+                const cost = parseFloat(s.product_cost || 0);
+                const ship = parseFloat(s.shipping_cost || 0) + parseFloat(s.return_shipping_cost || 0);
+                
+                totalQty += qty;
+                totalRev += rev;
+                totalCost += cost;
+                totalShip += ship;
+                
+                matchingOrders.push({
+                    date: s.date || '',
+                    origin: s.country ? `Excel (${s.country})` : 'Otras Plataformas',
+                    location: s.country || 'N/A',
+                    status: s.status || 'Completado',
+                    originalName: rawName,
+                    qty: qty,
+                    revenue: rev,
+                    cost: cost,
+                    shipping: ship
+                });
+            }
+        });
+        
+        // Update Summary
+        const summaryEl = document.getElementById('productOrdersDetailSummary');
+        if (summaryEl) {
+            summaryEl.innerHTML = `
+                <div class="orders-detail-summary-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                    <div class="orders-summary-item" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <span class="orders-summary-label" style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">Pedidos / Registros</span>
+                        <span class="orders-summary-value" style="font-size: 1.2rem; font-weight: 700;">${matchingOrders.length}</span>
+                    </div>
+                    <div class="orders-summary-item" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <span class="orders-summary-label" style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">Unidades Totales</span>
+                        <span class="orders-summary-value" style="font-size: 1.2rem; font-weight: 700;">${totalQty}</span>
+                    </div>
+                    <div class="orders-summary-item" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <span class="orders-summary-label" style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">Ventas Atribuidas</span>
+                        <span class="orders-summary-value" style="font-size: 1.2rem; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRev)}</span>
+                    </div>
+                    <div class="orders-summary-item" style="background: rgba(255,255,255,0.05); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <span class="orders-summary-label" style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.25rem;">Costo + Envíos</span>
+                        <span class="orders-summary-value" style="font-size: 1.2rem; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalCost + totalShip)}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Update Table
+        const tbody = document.getElementById('productOrdersDetailTable');
+        if (tbody) {
+            if (matchingOrders.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">No se encontraron pedidos.</td></tr>`;
+            } else {
+                // Sort by date descending
+                matchingOrders.sort((a, b) => b.date.localeCompare(a.date));
+                
+                tbody.innerHTML = matchingOrders.map(o => `
+                    <tr>
+                        <td>${o.date}</td>
+                        <td>
+                            <span style="font-size: 0.75rem; padding: 2px 6px; background: ${o.origin.includes('Excel') ? 'rgba(14, 165, 233, 0.1)' : 'rgba(16, 185, 129, 0.1)'}; color: ${o.origin.includes('Excel') ? '#0ea5e9' : '#10b981'}; border-radius: 12px; font-weight: 600;">
+                                ${o.origin}
+                            </span>
+                        </td>
+                        <td><div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;" title="${o.location}">${o.location}</div></td>
+                        <td>${o.status}</td>
+                        <td><div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="${o.originalName}">${o.originalName}</div></td>
+                        <td style="text-align: right; font-weight: 600;">${o.qty}</td>
+                        <td style="text-align: right; color: var(--success);">${this.formatCurrency(o.revenue)}</td>
+                        <td style="text-align: right; color: var(--danger);">${this.formatCurrency(o.cost)}</td>
+                        <td style="text-align: right; color: var(--danger);">${this.formatCurrency(o.shipping)}</td>
+                    </tr>
+                `).join('');
+            }
+        }
+        
+        modal.classList.add('active');
     }
 };
 
