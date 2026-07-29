@@ -1295,6 +1295,7 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(sale.revenue)}</td>
                     <td style="text-align: right; color: var(--danger);">${this.formatCurrency(sale.product_cost)}</td>
                     <td style="text-align: right; color: var(--primary);">${this.formatCurrency(sale.shipping_cost)}</td>
+                    <td style="text-align: right; color: var(--danger);">${this.formatCurrency(sale.return_shipping_cost || 0)}</td>
                     <td style="text-align: right; color: var(--warning);">${this.formatCurrency(adSpend)}</td>
                     <td style="text-align: right;">${delivered}</td>
                     <td style="text-align: right;">${returned}</td>
