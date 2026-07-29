@@ -19,6 +19,7 @@ const IncomeStatementModule = {
         dateFrom: null,
         dateTo: null
     },
+    visualMergedGroups: [],
 
     // FB Import state
     fbImportData: null,
@@ -2194,12 +2195,44 @@ const IncomeStatementModule = {
             }
         });
 
-        const productList = Object.values(productMap);
+        let productList = Object.values(productMap);
+
+        // Apply Visual Groups
+        (this.visualMergedGroups || []).forEach((group, index) => {
+            const mergedProduct = {
+                name: group.name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0,
+                isVisualGroup: true,
+                groupId: index
+            };
+            
+            let foundAny = false;
+            productList = productList.filter(p => {
+                if (group.products.includes(p.name)) {
+                    mergedProduct.orders += p.orders;
+                    mergedProduct.units += p.units;
+                    mergedProduct.revenue += p.revenue;
+                    mergedProduct.cost += p.cost;
+                    mergedProduct.shipping += p.shipping;
+                    mergedProduct.freight += p.freight;
+                    mergedProduct.adSpend += p.adSpend;
+                    foundAny = true;
+                    return false;
+                }
+                return true;
+            });
+            
+            if (foundAny) {
+                productList.push(mergedProduct);
+            }
+        });
+
+        // Sort by revenue
+        productList.sort((a, b) => b.revenue - a.revenue);
 
         if (productList.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         No hay datos de productos en el período seleccionado.
                     </td>
                 </tr>`;
@@ -2224,9 +2257,24 @@ const IncomeStatementModule = {
             totalRow.shipping += p.shipping;
             totalRow.adSpend += p.adSpend;
 
+            const escapedName = p.name.replace(/"/g, '&quot;');
+            let actionHtml = '';
+            if (p.isVisualGroup) {
+                actionHtml = `<button class="btn btn-sm" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="IncomeStatementModule.ungroupVisualGroup(${p.groupId})">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    Desagrupar
+                </button>`;
+            }
+
             return `
-                <tr>
-                    <td><strong>${p.name}</strong></td>
+                <tr ${p.isVisualGroup ? 'style="background: rgba(14, 165, 233, 0.05);"' : ''}>
+                    <td style="text-align: center;">
+                        ${!p.isVisualGroup ? `<input type="checkbox" class="unified-sale-checkbox" value="${escapedName}" onchange="IncomeStatementModule.updateSelectedUnifiedSalesCount()">` : ''}
+                    </td>
+                    <td>
+                        <strong>${p.name}</strong>
+                        ${p.isVisualGroup ? `<span style="margin-left: 0.5rem; font-size: 0.65rem; padding: 2px 6px; background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border-radius: 12px; font-weight: 600; border: 1px solid rgba(14, 165, 233, 0.3);">Grupo Visual</span>` : ''}
+                    </td>
                     <td style="text-align: right; font-weight: 600;">${p.orders}</td>
                     <td style="text-align: right;">${p.units || '-'}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(p.revenue)}</td>
@@ -2248,6 +2296,7 @@ const IncomeStatementModule = {
                     <td style="text-align: center;">
                         <span class="is-margin-badge ${parseFloat(margin) >= 30 ? 'good' : parseFloat(margin) >= 15 ? 'warning' : 'bad'}">${margin}%</span>
                     </td>
+                    <td style="text-align: right;">${actionHtml}</td>
                 </tr>`;
         }).join('');
 
@@ -2260,7 +2309,7 @@ const IncomeStatementModule = {
 
         tbody.innerHTML += `
             <tr class="is-total-row">
-                <td><strong>TOTAL PRODUCTOS</strong></td>
+                <td colspan="2"><strong>TOTAL PRODUCTOS</strong></td>
                 <td style="text-align: right; font-weight: 700;">${totalRow.orders}</td>
                 <td style="text-align: right; font-weight: 700;">${totalRow.units}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.revenue)}</td>
@@ -2278,7 +2327,10 @@ const IncomeStatementModule = {
                 </td>
                 <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
                 <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
+                <td></td>
             </tr>`;
+            
+        this.updateSelectedUnifiedSalesCount();
     },
 
     renderPLStatement() {
@@ -4140,6 +4192,59 @@ const IncomeStatementModule = {
     closeOrdersDetailModal() {
         const modal = document.getElementById('modalOrdersDetail');
         if (modal) modal.classList.remove('active');
+    },
+
+    toggleSelectAllUnifiedSales(checked) {
+        const checkboxes = document.querySelectorAll('.unified-sale-checkbox');
+        checkboxes.forEach(cb => cb.checked = checked);
+        this.updateSelectedUnifiedSalesCount();
+    },
+
+    updateSelectedUnifiedSalesCount() {
+        const selected = document.querySelectorAll('.unified-sale-checkbox:checked');
+        const count = selected.length;
+        const btn = document.getElementById('btnGroupUnifiedSales');
+        const countSpan = document.getElementById('groupUnifiedSalesCount');
+        const toolbar = document.getElementById('unifiedSalesGroupToolbar');
+        
+        if (countSpan) countSpan.innerText = count;
+        if (btn) btn.disabled = count < 2;
+        
+        // Show toolbar if at least one checkbox exists
+        if (toolbar) {
+            const anyCheckbox = document.querySelector('.unified-sale-checkbox');
+            toolbar.style.display = anyCheckbox ? 'flex' : 'none';
+        }
+    },
+
+    visualGroupConsolidatedProducts() {
+        const selected = document.querySelectorAll('.unified-sale-checkbox:checked');
+        if (selected.length < 2) return;
+        
+        const products = Array.from(selected).map(cb => cb.value);
+        const name = prompt('Ingresa un nombre para este grupo visual (Ej: Combos Belleza):');
+        if (!name) return;
+        
+        this.visualMergedGroups.push({
+            name: name,
+            products: products
+        });
+        
+        Utils.showToast(`Grupo visual "${name}" creado.`, 'success');
+        this.renderProductProfitTable();
+        
+        const selectAll = document.getElementById('selectAllUnifiedSales');
+        if(selectAll) selectAll.checked = false;
+        this.updateSelectedUnifiedSalesCount();
+    },
+
+    ungroupVisualGroup(groupId) {
+        if (!confirm('¿Deshacer este grupo visual?')) return;
+        
+        this.visualMergedGroups.splice(groupId, 1);
+        Utils.showToast('Grupo visual desagrupado.', 'success');
+        this.renderProductProfitTable();
+        this.updateSelectedUnifiedSalesCount();
     }
 };
 
