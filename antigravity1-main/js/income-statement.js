@@ -1536,6 +1536,216 @@ const IncomeStatementModule = {
         }
     },
 
+    showImportLoadingOverlay(title = 'Procesando Archivo Excel...', subtitle = 'Analizando registros, identificando referencias y agrupando productos por lote.') {
+        const overlay = document.getElementById('importExcelLoadingOverlay');
+        if (overlay) {
+            const titleEl = document.getElementById('importLoadingTitle');
+            const subEl = document.getElementById('importLoadingSubtitle');
+            if (titleEl) titleEl.innerText = title;
+            if (subEl) subEl.innerText = subtitle;
+            overlay.classList.add('active');
+            overlay.style.display = 'flex';
+        }
+    },
+
+    hideImportLoadingOverlay() {
+        const overlay = document.getElementById('importExcelLoadingOverlay');
+        if (overlay) {
+            overlay.classList.remove('active');
+            overlay.style.display = 'none';
+        }
+    },
+
+    async handleExternalSalesFileUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        this.showImportLoadingOverlay(`Analizando ${file.name}...`, 'Leyendo filas de Excel y agrupando productos por referencia...');
+
+        setTimeout(async () => {
+            try {
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+                if (!rows || rows.length < 2) {
+                    this.hideImportLoadingOverlay();
+                    this.showImportErrorModal(
+                        'Archivo sin Datos',
+                        'El archivo seleccionado está vacío o no contiene filas con datos de ventas.',
+                        `Hoja detectada: "${sheetName}" | Filas totales: ${rows ? rows.length : 0}`
+                    );
+                    e.target.value = '';
+                    return;
+                }
+
+                let headerRowIndex = -1;
+                for (let i = 0; i < Math.min(rows.length, 10); i++) {
+                    const r = rows[i] || [];
+                    const rStr = r.map(c => String(c || '').toLowerCase()).join(' ');
+                    if (rStr.includes('estado') || rStr.includes('recaudo') || rStr.includes('flete')) {
+                        headerRowIndex = i;
+                        break;
+                    }
+                }
+
+                let statusIdx = 2; // Col C
+                let productIdx = 12; // Col M
+                let stockIdx = 13; // Col N
+                let contentIdx = 15; // Col P
+                let recaudoIdx = 25; // Col Z
+                let costoIdx = 26; // Col AA (Costo de Producto)
+                let safeFleteEntregaIdx = 27; // Col AB
+                let safeFleteDevIdx = 28; // Col AC
+
+                let startRowIndex = 0;
+
+                if (headerRowIndex !== -1) {
+                    startRowIndex = headerRowIndex + 1;
+                    const headers = (rows[headerRowIndex] || []).map(c => String(c || '').trim().toLowerCase());
+                    
+                    const findColExact = (keywords, fallbackIdx) => {
+                        let idx = headers.findIndex(h => keywords.some(k => h === k));
+                        if (idx === -1) {
+                            idx = headers.findIndex(h => keywords.some(k => h.includes(k)));
+                        }
+                        return idx !== -1 ? idx : fallbackIdx;
+                    };
+
+                    statusIdx = findColExact(['estado', 'estado guia', 'estado del pedido'], 2);
+                    productIdx = findColExact(['producto', 'nombre producto', 'articulo'], 12);
+                    stockIdx = findColExact(['id del stock', 'stock id', 'sku', 'id stock'], 13);
+                    contentIdx = findColExact(['contenido del producto', 'contenido', 'detalle'], 15);
+                    recaudoIdx = findColExact(['recaudo', 'valor recaudo', 'monto recaudo'], 25);
+                    costoIdx = findColExact(['costo del producto', 'costo producto', 'costo prod', 'costo'], 26);
+
+                    const fleteEntregaIdx = headers.findIndex(h => h.includes('flete') && !h.includes('devoluc'));
+                    const fleteDevIdx = headers.findIndex(h => h.includes('devoluc') || h.includes('flete por dev'));
+                    if (fleteEntregaIdx !== -1) safeFleteEntregaIdx = fleteEntregaIdx;
+                    if (fleteDevIdx !== -1) safeFleteDevIdx = fleteDevIdx;
+                } else {
+                    startRowIndex = 0;
+                }
+
+                let productsList = Database.products || [];
+                if (productsList.length === 0 && typeof Database.getProducts === 'function') {
+                    productsList = await Database.getProducts();
+                }
+
+                const productGroupMap = {};
+                let totalScannedGuides = 0;
+                let totalDeliveredGuides = 0;
+                let totalReturnedGuides = 0;
+
+                for (let i = startRowIndex; i < rows.length; i++) {
+                    const row = rows[i];
+                    if (!row || row.length === 0) continue;
+
+                    const status = String(row[statusIdx] || '').trim();
+                    const rawProduct = String(row[productIdx] || '').trim();
+                    const stockId = String(row[stockIdx] || '').trim();
+                    const content = String(row[contentIdx] || '').trim();
+                    const col0 = String(row[0] || '').trim();
+
+                    // Skip non-data rows
+                    if (!status && !rawProduct && !stockId && !content && (isNaN(parseInt(col0)) || col0 === '')) continue;
+                    if (status.toLowerCase() === 'estado' || rawProduct.toLowerCase() === 'producto') continue;
+
+                    totalScannedGuides++;
+
+                    const recaudo = this.parseExcelNumber(row[recaudoIdx]);
+                    const costoProd = this.parseExcelNumber(row[costoIdx]);
+                    const fleteEntrega = this.parseExcelNumber(row[safeFleteEntregaIdx]);
+                    const fleteDevolucion = this.parseExcelNumber(row[safeFleteDevIdx]);
+
+                    const statusLower = status.toLowerCase();
+                    const isReturned = statusLower.includes('devuelt') || statusLower.includes('cancel');
+
+                    if (isReturned) totalReturnedGuides++;
+                    else totalDeliveredGuides++;
+
+                    // Product name matching
+                    let matchedProduct = null;
+                    if (stockId) {
+                        const cleanStock = stockId.split(' ')[0];
+                        matchedProduct = productsList.find(p => String(p.sku || p.code || p.id).toLowerCase() === cleanStock.toLowerCase());
+                    }
+                    if (!matchedProduct && (content || rawProduct)) {
+                        const searchStr = (content || rawProduct).toLowerCase();
+                        matchedProduct = productsList.find(p => searchStr.includes((p.name || '').toLowerCase()) || (p.name || '').toLowerCase().includes(searchStr));
+                    }
+
+                    let finalProductName = matchedProduct ? matchedProduct.name : (content || rawProduct || stockId || 'Producto Externo');
+                    // Clean leading digits/spaces like "1 PULSERA..." -> "PULSERA..."
+                    finalProductName = finalProductName.replace(/^\d+\s+/, '').trim();
+                    if (!finalProductName) finalProductName = 'Producto Externo';
+
+                    if (!productGroupMap[finalProductName]) {
+                        productGroupMap[finalProductName] = {
+                            country: 'Ecuador',
+                            sale_date: new Date().toISOString().split('T')[0],
+                            description: finalProductName,
+                            revenue: 0,
+                            product_cost: 0,
+                            shipping_cost: 0,
+                            delivered: 0,
+                            returned: 0
+                        };
+                    }
+
+                    const grp = productGroupMap[finalProductName];
+
+                    if (isReturned) {
+                        grp.returned += 1;
+                        grp.shipping_cost += (fleteDevolucion > 0 ? fleteDevolucion : fleteEntrega);
+                    } else {
+                        grp.delivered += 1;
+                        grp.revenue += recaudo;
+                        grp.product_cost += costoProd;
+                        grp.shipping_cost += fleteEntrega;
+                    }
+                }
+
+                const recordsToInsert = Object.values(productGroupMap);
+
+                if (recordsToInsert.length === 0) {
+                    this.hideImportLoadingOverlay();
+                    this.showImportErrorModal(
+                        'No se Detectaron Registros de Ventas',
+                        `Se escanearon ${totalScannedGuides} filas en la hoja "${sheetName}", pero ninguna contenía el formato válido de ventas.`,
+                        `Causa: No se encontraron datos de ventas legibles en las columnas de Estado (Col. C), Recaudo (Col. Z), Costo (Col. AA) o Fletes (Col. AB/AC).`
+                    );
+                    e.target.value = '';
+                    return;
+                }
+
+                recordsToInsert.totalScannedGuides = totalScannedGuides;
+                recordsToInsert.totalDeliveredGuides = totalDeliveredGuides;
+                recordsToInsert.totalReturnedGuides = totalReturnedGuides;
+
+                // Hide overlay and open preview modal
+                this.hideImportLoadingOverlay();
+                this.pendingImportRecords = recordsToInsert;
+                this.openImportPreviewModal(recordsToInsert, file.name);
+                e.target.value = '';
+
+            } catch (error) {
+                console.error('Error reading Excel:', error);
+                this.hideImportLoadingOverlay();
+                this.showImportErrorModal(
+                    'Error al Leer el Archivo Excel',
+                    'Ocurrió una falla técnica inesperada al procesar la hoja de cálculo.',
+                    error.stack || error.message || String(error)
+                );
+                e.target.value = '';
+            }
+        }, 50);
+    },
+
     openImportPreviewModal(records, fileName) {
         const modal = document.getElementById('modalImportExcelPreview');
         if (!modal) return;
@@ -1545,55 +1755,55 @@ const IncomeStatementModule = {
         let totalShip = 0;
         let deliveredCount = 0;
         let returnedCount = 0;
-        const productsFound = new Set();
 
         records.forEach(r => {
             totalRev += r.revenue;
             totalCost += r.product_cost;
             totalShip += r.shipping_cost;
-            if (r.delivered) deliveredCount++;
-            if (r.returned) returnedCount++;
-            if (r.description) productsFound.add(r.description);
+            deliveredCount += (r.delivered || 0);
+            returnedCount += (r.returned || 0);
         });
+
+        const totalScanned = records.totalScannedGuides || (deliveredCount + returnedCount);
 
         // Summary Cards
         const cardsEl = document.getElementById('importPreviewSummaryCards');
         if (cardsEl) {
             cardsEl.innerHTML = `
                 <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">Registros Totales</div>
-                    <div style="font-size: 1.4rem; font-weight: 700; color: #34d399;">${records.length}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${deliveredCount} Entregados | ${returnedCount} Devueltos</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Pedidos Procesados</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: #34d399;">${totalScanned} pedidos</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${records.length} referencias agrupadas</div>
                 </div>
                 <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
                     <div style="font-size: 0.75rem; color: var(--text-muted);">Ingresos Recaudados</div>
                     <div style="font-size: 1.4rem; font-weight: 700; color: #60a5fa;">$${totalRev.toFixed(2)}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Ventas pagadas</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${deliveredCount} entregados</div>
                 </div>
                 <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">Costos & Fletes</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Costos & Fletes Total</div>
                     <div style="font-size: 1.4rem; font-weight: 700; color: #f87171;">$${(totalCost + totalShip).toFixed(2)}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Prod: $${totalCost.toFixed(2)} | Flete: $${totalShip.toFixed(2)}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Prod: $${totalCost.toFixed(2)} | Fletes: $${totalShip.toFixed(2)}</div>
                 </div>`;
         }
 
         // Products Badges
         const badgesEl = document.getElementById('importPreviewProductsBadge');
         if (badgesEl) {
-            badgesEl.innerHTML = Array.from(productsFound).map(p => `
-                <span class="badge" style="background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); padding: 0.25rem 0.5rem; font-size: 0.78rem;">
-                    📦 ${p}
+            badgesEl.innerHTML = records.map(r => `
+                <span class="badge" style="background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); padding: 0.3rem 0.6rem; font-size: 0.78rem;">
+                    📦 <strong>${r.description}</strong> (${r.delivered} ent. / ${r.returned} dev.)
                 </span>`).join('');
         }
 
         // Table Sample
         const tableBody = document.getElementById('importPreviewTableBody');
         if (tableBody) {
-            const sample = records.slice(0, 5);
-            tableBody.innerHTML = sample.map(r => `
+            tableBody.innerHTML = records.map(r => `
                 <tr>
-                    <td><span class="badge ${r.returned ? 'badge-danger' : 'badge-success'}">${r.status_text || (r.returned ? 'Devuelto' : 'Pagado')}</span></td>
-                    <td style="font-weight: 500;">${r.description}</td>
+                    <td style="font-weight: 600; color: var(--text);">${r.description}</td>
+                    <td style="text-align: center; color: var(--success); font-weight: 600;">${r.delivered}</td>
+                    <td style="text-align: center; color: var(--danger);">${r.returned}</td>
                     <td style="text-align: right; color: var(--success); font-weight: 600;">$${r.revenue.toFixed(2)}</td>
                     <td style="text-align: right; color: var(--danger);">$${r.product_cost.toFixed(2)}</td>
                     <td style="text-align: right; color: var(--primary);">$${r.shipping_cost.toFixed(2)}</td>
@@ -1602,10 +1812,12 @@ const IncomeStatementModule = {
 
         const confirmBtn = document.getElementById('btnConfirmImportExcel');
         if (confirmBtn) {
-            confirmBtn.innerText = `Confirmar e Importar ${records.length} Registros`;
+            confirmBtn.innerText = `Confirmar e Importar ${records.length} Productos Agrupados`;
         }
 
         modal.classList.add('active');
+        modal.style.display = 'flex';
+        modal.style.zIndex = '99999';
     },
 
     closeImportPreviewModal() {
