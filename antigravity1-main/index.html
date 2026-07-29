@@ -4718,6 +4718,57 @@
         </div>
     </div>
 
+    <!-- Modal: Resumen de Importación Excel (Vista Previa) -->
+    <div class="modal" id="modalImportExcelPreview">
+        <div class="modal-content" style="max-width: 700px; width: 95vw;">
+            <div class="modal-header" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
+                <h2 style="display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.15rem; color: white;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                        <polyline points="10 9 9 9 8 9"></polyline>
+                    </svg>
+                    Resumen de Importación del Archivo
+                </h2>
+                <button type="button" class="modal-close" style="color: white;" onclick="IncomeStatementModule.closeImportPreviewModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.5rem;">
+                <div id="importPreviewSummaryCards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+                    <!-- Target for Summary Stat Cards -->
+                </div>
+                <div style="margin-bottom: 1.25rem;">
+                    <h4 style="margin-bottom: 0.5rem; color: var(--text); font-size: 0.9rem;">Productos Detectados</h4>
+                    <div id="importPreviewProductsBadge" style="display: flex; flex-wrap: wrap; gap: 0.5rem; max-height: 90px; overflow-y: auto; padding: 0.6rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md);"></div>
+                </div>
+                <div>
+                    <h4 style="margin-bottom: 0.5rem; color: var(--text); font-size: 0.9rem;">Vista Previa (Primeros 5 Registros)</h4>
+                    <div class="table-container" style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-md);">
+                        <table class="table" style="font-size: 0.8rem; margin: 0;">
+                            <thead>
+                                <tr>
+                                    <th>Estado</th>
+                                    <th>Producto</th>
+                                    <th style="text-align: right;">Recaudo</th>
+                                    <th style="text-align: right;">Costo</th>
+                                    <th style="text-align: right;">Flete</th>
+                                </tr>
+                            </thead>
+                            <tbody id="importPreviewTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="form-actions" style="padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); margin: 0;">
+                <button type="button" class="btn btn-secondary" onclick="IncomeStatementModule.closeImportPreviewModal()">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnConfirmImportExcel" style="background: var(--success); color: white; border: none; font-weight: 600;" onclick="IncomeStatementModule.confirmImportExternalSales()">
+                    Confirmar e Importar Registros
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Orders Detail (Magnifying Glass) -->
     <div class="modal" id="modalOrdersDetail">
         <div class="modal-content" style="max-width: 1100px; width: 95vw;">

@@ -1128,6 +1128,8 @@ const IncomeStatementModule = {
         }
     },
 
+    pendingImportRecords: [],
+
     showImportErrorModal(title, message, details = '') {
         const modalId = 'modalImportErrorAlert';
         let modal = document.getElementById(modalId);
@@ -1167,27 +1169,50 @@ const IncomeStatementModule = {
         if (!file) return;
 
         try {
-            Utils.showToast('Procesando archivo Excel...', 'info');
-            const data = await file.arrayBuffer();
+            Utils.showToast('Analizando archivo Excel...', 'info');
+            const arrayBuffer = await file.arrayBuffer();
+            const data = new Uint8Array(arrayBuffer);
+
             if (typeof XLSX === 'undefined') {
-                this.showImportErrorModal('Error de Librería', 'La librería de lectura de Excel (SheetJS) no se encuentra cargada.', 'Verifica tu conexión a internet o recarga la página.');
+                this.showImportErrorModal(
+                    'Librería XLSX No Disponible',
+                    'No se pudo encontrar la librería de procesamiento de hojas de cálculo SheetJS (XLSX).',
+                    'Causa: El script CDN https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js no se cargó correctamente en la página.'
+                );
                 e.target.value = '';
                 return;
             }
+
             const workbook = XLSX.read(data, { type: 'array' });
+            if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
+                this.showImportErrorModal(
+                    'Archivo No Válido',
+                    'El archivo seleccionado no contiene hojas de cálculo legibles.',
+                    'Causa: El archivo está vacío, dañado o no es un libro Excel válido.'
+                );
+                e.target.value = '';
+                return;
+            }
+
             const sheetName = workbook.SheetNames[0];
             const sheet = workbook.Sheets[sheetName];
-            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+            
+            // Use defval: '' to ensure exact 0-based array indexes even for empty cells
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
             if (!rows || rows.length === 0) {
-                this.showImportErrorModal('Archivo Vacío', 'El archivo seleccionado no contiene filas o datos legibles.', 'Asegúrate de seleccionar una hoja de cálculo con datos de ventas.');
+                this.showImportErrorModal(
+                    'Hoja Vacía',
+                    `La hoja "${sheetName}" del archivo Excel no contiene filas de datos.`,
+                    'Causa: La primera hoja de cálculo está totalmente en blanco.'
+                );
                 e.target.value = '';
                 return;
             }
 
-            // Detect header row index if headers exist
+            // Find header row or use default column indexes
             let headerRowIndex = -1;
-            for (let i = 0; i < Math.min(rows.length, 5); i++) {
+            for (let i = 0; i < Math.min(rows.length, 10); i++) {
                 const r = rows[i] || [];
                 const rStr = r.map(c => String(c || '').toLowerCase()).join(' ');
                 if (rStr.includes('estado') || rStr.includes('recaudo') || rStr.includes('flete')) {
@@ -1227,7 +1252,6 @@ const IncomeStatementModule = {
                 if (fleteEntregaIdx !== -1) safeFleteEntregaIdx = fleteEntregaIdx;
                 if (fleteDevIdx !== -1) safeFleteDevIdx = fleteDevIdx;
             } else {
-                // No text header row found (e.g. Row 1 has empty string headers), start from row 1 or 0
                 startRowIndex = 0;
             }
 
@@ -1236,14 +1260,13 @@ const IncomeStatementModule = {
                 productsList = await Database.getProducts();
             }
 
-            let importedCount = 0;
-            let deliveredCount = 0;
-            let returnedCount = 0;
             const recordsToInsert = [];
+            let totalRowsScanned = 0;
 
             for (let i = startRowIndex; i < rows.length; i++) {
                 const row = rows[i];
-                if (!row || row.length < 3) continue;
+                if (!row || row.length === 0) continue;
+                totalRowsScanned++;
 
                 const status = String(row[statusIdx] || '').trim();
                 const rawProduct = String(row[productIdx] || '').trim();
@@ -1251,13 +1274,16 @@ const IncomeStatementModule = {
                 const content = String(row[contentIdx] || '').trim();
                 const col0 = String(row[0] || '').trim();
 
-                // Check if this row is valid data (has status, product, or numeric ID)
-                if (!status && !rawProduct && !stockId && !content && isNaN(parseInt(col0))) continue;
+                // Skip non-data rows
+                if (!status && !rawProduct && !stockId && !content && (isNaN(parseInt(col0)) || col0 === '')) continue;
 
-                const recaudo = parseFloat(row[recaudoIdx]) || 0;
-                const costoProd = parseFloat(row[costoIdx]) || 0;
-                const fleteEntrega = parseFloat(row[safeFleteEntregaIdx]) || 0;
-                const fleteDevolucion = parseFloat(row[safeFleteDevIdx]) || 0;
+                // Skip header text row if encountered
+                if (status.toLowerCase() === 'estado' || rawProduct.toLowerCase() === 'producto') continue;
+
+                const recaudo = parseFloat(String(row[recaudoIdx]).replace(/[^0-9.-]/g, '')) || 0;
+                const costoProd = parseFloat(String(row[costoIdx]).replace(/[^0-9.-]/g, '')) || 0;
+                const fleteEntrega = parseFloat(String(row[safeFleteEntregaIdx]).replace(/[^0-9.-]/g, '')) || 0;
+                const fleteDevolucion = parseFloat(String(row[safeFleteDevIdx]).replace(/[^0-9.-]/g, '')) || 0;
 
                 const statusLower = status.toLowerCase();
                 const isReturned = statusLower.includes('devuelt') || statusLower.includes('cancel');
@@ -1273,19 +1299,18 @@ const IncomeStatementModule = {
                     cost = 0;
                     shipping = fleteDevolucion > 0 ? fleteDevolucion : fleteEntrega;
                     ret = 1;
-                    returnedCount++;
                 } else {
                     rev = recaudo;
                     cost = costoProd;
                     shipping = fleteEntrega;
                     del = 1;
-                    deliveredCount++;
                 }
 
                 // Match product
                 let matchedProduct = null;
                 if (stockId) {
-                    matchedProduct = productsList.find(p => String(p.sku || p.code || p.id).toLowerCase() === stockId.toLowerCase());
+                    const cleanStock = stockId.split(' ')[0];
+                    matchedProduct = productsList.find(p => String(p.sku || p.code || p.id).toLowerCase() === cleanStock.toLowerCase());
                 }
                 if (!matchedProduct && (content || rawProduct)) {
                     const searchStr = (content || rawProduct).toLowerCase();
@@ -1298,56 +1323,154 @@ const IncomeStatementModule = {
                     country: 'Ecuador',
                     sale_date: new Date().toISOString().split('T')[0],
                     description: finalProductName,
+                    status_text: status,
                     revenue: rev,
                     product_cost: cost,
                     shipping_cost: shipping,
                     delivered: del,
                     returned: ret
                 });
-
-                importedCount++;
             }
 
             if (recordsToInsert.length === 0) {
                 this.showImportErrorModal(
-                    'No se Importaron Ventas',
-                    'No se pudieron leer registros de ventas en las filas del archivo Excel.',
-                    'Asegúrate de subir el reporte de guías en formato Excel (.xlsx) que contenga la columna C (Estado), Z (Recaudo), AA (Costo) y AB/AC (Fletes).'
+                    'No se Detectaron Registros de Ventas',
+                    `Se escanearon ${totalRowsScanned} filas en la hoja "${sheetName}", pero ninguna contenía el formato válido de ventas.`,
+                    `Causa: No se encontraron datos de ventas legibles en las columnas de Estado (Col. C), Recaudo (Col. Z), Costo (Col. AA) o Fletes (Col. AB/AC).`
                 );
                 e.target.value = '';
                 return;
             }
 
-            // Insert into Supabase in batches of 50
-            try {
-                const batchSize = 50;
-                for (let b = 0; b < recordsToInsert.length; b += batchSize) {
-                    const batch = recordsToInsert.slice(b, b + batchSize);
-                    const { error } = await supabaseClient.from('external_sales').insert(batch);
-                    if (error) throw error;
-                }
-            } catch (dbErr) {
-                console.warn('Nota sobre la base de datos Supabase:', dbErr);
-                // Even if Supabase batch fails, add records to local memory so user sees results
-                recordsToInsert.forEach(item => {
-                    item.id = 'temp_' + Math.random().toString(36).substring(2);
-                    this.externalSales.push(item);
-                });
-            }
-
-            Utils.showToast(`¡Importación exitosa! ${importedCount} registros (${deliveredCount} entregados, ${returnedCount} devueltos)`, 'success');
+            // Store records and open preview modal
+            this.pendingImportRecords = recordsToInsert;
+            this.openImportPreviewModal(recordsToInsert, file.name);
             e.target.value = '';
-            await this.render();
 
         } catch (error) {
-            console.error('Error importing Excel:', error);
+            console.error('Error reading Excel:', error);
             this.showImportErrorModal(
-                'Error al Procesar Excel',
-                'Ocurrió un inconveniente al leer el archivo Excel seleccionado.',
-                error.message || String(error)
+                'Error al Leer el Archivo Excel',
+                'Ocurrió una falla técnica inesperada al procesar la hoja de cálculo.',
+                error.stack || error.message || String(error)
             );
             e.target.value = '';
         }
+    },
+
+    openImportPreviewModal(records, fileName) {
+        const modal = document.getElementById('modalImportExcelPreview');
+        if (!modal) return;
+
+        let totalRev = 0;
+        let totalCost = 0;
+        let totalShip = 0;
+        let deliveredCount = 0;
+        let returnedCount = 0;
+        const productsFound = new Set();
+
+        records.forEach(r => {
+            totalRev += r.revenue;
+            totalCost += r.product_cost;
+            totalShip += r.shipping_cost;
+            if (r.delivered) deliveredCount++;
+            if (r.returned) returnedCount++;
+            if (r.description) productsFound.add(r.description);
+        });
+
+        // Summary Cards
+        const cardsEl = document.getElementById('importPreviewSummaryCards');
+        if (cardsEl) {
+            cardsEl.innerHTML = `
+                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Registros Totales</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: #34d399;">${records.length}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${deliveredCount} Entregados | ${returnedCount} Devueltos</div>
+                </div>
+                <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Ingresos Recaudados</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: #60a5fa;">$${totalRev.toFixed(2)}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Ventas pagadas</div>
+                </div>
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Costos & Fletes</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: #f87171;">$${(totalCost + totalShip).toFixed(2)}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Prod: $${totalCost.toFixed(2)} | Flete: $${totalShip.toFixed(2)}</div>
+                </div>`;
+        }
+
+        // Products Badges
+        const badgesEl = document.getElementById('importPreviewProductsBadge');
+        if (badgesEl) {
+            badgesEl.innerHTML = Array.from(productsFound).map(p => `
+                <span class="badge" style="background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); padding: 0.25rem 0.5rem; font-size: 0.78rem;">
+                    📦 ${p}
+                </span>`).join('');
+        }
+
+        // Table Sample
+        const tableBody = document.getElementById('importPreviewTableBody');
+        if (tableBody) {
+            const sample = records.slice(0, 5);
+            tableBody.innerHTML = sample.map(r => `
+                <tr>
+                    <td><span class="badge ${r.returned ? 'badge-danger' : 'badge-success'}">${r.status_text || (r.returned ? 'Devuelto' : 'Pagado')}</span></td>
+                    <td style="font-weight: 500;">${r.description}</td>
+                    <td style="text-align: right; color: var(--success); font-weight: 600;">$${r.revenue.toFixed(2)}</td>
+                    <td style="text-align: right; color: var(--danger);">$${r.product_cost.toFixed(2)}</td>
+                    <td style="text-align: right; color: var(--primary);">$${r.shipping_cost.toFixed(2)}</td>
+                </tr>`).join('');
+        }
+
+        const confirmBtn = document.getElementById('btnConfirmImportExcel');
+        if (confirmBtn) {
+            confirmBtn.innerText = `Confirmar e Importar ${records.length} Registros`;
+        }
+
+        modal.classList.add('active');
+    },
+
+    closeImportPreviewModal() {
+        const modal = document.getElementById('modalImportExcelPreview');
+        if (modal) modal.classList.remove('active');
+        this.pendingImportRecords = [];
+    },
+
+    async confirmImportExternalSales() {
+        if (!this.pendingImportRecords || this.pendingImportRecords.length === 0) return;
+
+        const records = this.pendingImportRecords.map(r => ({
+            country: r.country,
+            sale_date: r.sale_date,
+            description: r.description,
+            revenue: r.revenue,
+            product_cost: r.product_cost,
+            shipping_cost: r.shipping_cost,
+            delivered: r.delivered,
+            returned: r.returned
+        }));
+
+        this.closeImportPreviewModal();
+        Utils.showToast(`Guardando ${records.length} registros...`, 'info');
+
+        try {
+            const batchSize = 50;
+            for (let b = 0; b < records.length; b += batchSize) {
+                const batch = records.slice(b, b + batchSize);
+                const { error } = await supabaseClient.from('external_sales').insert(batch);
+                if (error) throw error;
+            }
+            Utils.showToast(`¡Importación exitosa! ${records.length} registros guardados.`, 'success');
+        } catch (dbErr) {
+            console.warn('Alerta de base de datos Supabase:', dbErr);
+            records.forEach(item => {
+                item.id = 'temp_' + Math.random().toString(36).substring(2);
+                this.externalSales.push(item);
+            });
+            Utils.showToast(`Importados ${records.length} registros localmente.`, 'success');
+        }
+
+        await this.render();
     },
 
     renderProductProfitTable() {
