@@ -3801,7 +3801,16 @@ const IncomeStatementModule = {
         return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
     },
 
-    getCountryFlag(co    // ========================================
+    getCountryFlag(country) {
+        const flags = {
+            'Ecuador': '🇪🇨',
+            'Venezuela': '🇻🇪',
+            'Colombia': '🇨🇴'
+        };
+        return flags[country] || '🏳️';
+    },
+
+    // ========================================
     // ORDERS DETAIL MODAL & GROUPING
     // ========================================
     ordersDetailCurrentTab: 'grouped',
