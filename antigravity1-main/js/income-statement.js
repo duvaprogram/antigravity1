@@ -177,7 +177,7 @@ const IncomeStatementModule = {
             if (opError) throw opError;
             this.operationalExpenses = opExpenses || [];
 
-            // Load external sales (Supabase + LocalStorage Hybrid)
+            // Load external sales (Supabase + LocalStorage Hybrid with Deduplication)
             let supabaseExtSales = [];
             try {
                 const { data: extSales, error: extError } = await supabaseClient
@@ -193,18 +193,9 @@ const IncomeStatementModule = {
             }
 
             const localExtSales = this.loadExternalSalesFromLocal();
-            const extSalesMap = new Map();
+            const combinedExtSales = [...supabaseExtSales, ...localExtSales];
 
-            (supabaseExtSales || []).forEach(item => {
-                if (item.id) extSalesMap.set(String(item.id), item);
-            });
-            (localExtSales || []).forEach(item => {
-                if (item.id && !extSalesMap.has(String(item.id))) {
-                    extSalesMap.set(String(item.id), item);
-                }
-            });
-
-            this.externalSales = Array.from(extSalesMap.values());
+            this.externalSales = this.deduplicateExternalSales(combinedExtSales);
             this.saveExternalSalesToLocal();
 
             // Load freights
@@ -1038,64 +1029,95 @@ const IncomeStatementModule = {
         this.updateSelectedExtSalesCount();
     },
 
-    updateSelectedExtSalesCount() {
-        const checked = document.querySelectorAll('.ext-sale-checkbox:checked');
-        const btnDeleteSelected = document.getElementById('btnDeleteSelectedExtSales');
-        const countSpan = document.getElementById('selectedExtSalesCount');
+    getRecordFingerprint(item) {
+        if (!item) return '';
+        const desc = String(item.description || item.product_name || '').trim().toLowerCase();
+        const date = String(item.sale_date || '').split('T')[0];
+        const rev = parseFloat(item.revenue || 0).toFixed(2);
+        const cost = parseFloat(item.product_cost || 0).toFixed(2);
+        const ship = parseFloat(item.shipping_cost || 0).toFixed(2);
+        const del = parseInt(item.delivered || 0);
+        const ret = parseInt(item.returned || 0);
+        return `${desc}|${date}|${rev}|${cost}|${ship}|${del}|${ret}`;
+    },
 
-        if (countSpan) countSpan.innerText = checked.length;
-
-        if (btnDeleteSelected) {
-            btnDeleteSelected.style.display = checked.length > 0 ? 'inline-flex' : 'none';
+    deduplicateExternalSales(salesList) {
+        const seen = new Set();
+        const result = [];
+        for (const item of (salesList || [])) {
+            if (!item) continue;
+            const fp = this.getRecordFingerprint(item);
+            if (!seen.has(fp)) {
+                seen.add(fp);
+                result.push(item);
+            }
         }
-
-        const selectAllCb = document.getElementById('selectAllExtSales');
-        const allCbs = document.querySelectorAll('.ext-sale-checkbox');
-        if (selectAllCb && allCbs.length > 0) {
-            selectAllCb.checked = checked.length === allCbs.length;
-        }
+        return result;
     },
 
     async deleteSelectedExternalSales() {
-        const checked = Array.from(document.querySelectorAll('.ext-sale-checkbox:checked')).map(cb => cb.value);
+        const checked = Array.from(document.querySelectorAll('.ext-sale-checkbox:checked')).map(cb => String(cb.value));
         if (checked.length === 0) return;
 
         if (!confirm(`¿Estás seguro de eliminar los ${checked.length} registros seleccionados?`)) return;
 
-        try {
-            Utils.showToast(`Eliminando ${checked.length} registros...`, 'info');
-            const { error } = await supabaseClient.from('external_sales').delete().in('id', checked);
-            if (error) console.warn('Alerta al eliminar en Supabase:', error);
+        Utils.showToast(`Eliminando ${checked.length} registros...`, 'info');
 
-            this.externalSales = this.externalSales.filter(s => !checked.includes(s.id));
-            Utils.showToast(`Se eliminaron ${checked.length} registros`, 'success');
-            await this.render();
+        // Remove from memory immediately
+        this.externalSales = this.externalSales.filter(s => !checked.includes(String(s.id)));
+        this.saveExternalSalesToLocal();
+
+        // Delete from Supabase in background
+        try {
+            await supabaseClient.from('external_sales').delete().in('id', checked);
         } catch (err) {
-            console.error('Error deleting selected sales:', err);
-            Utils.showToast('Error al eliminar: ' + err.message, 'error');
+            console.warn('Alerta al eliminar en Supabase:', err);
         }
+
+        Utils.showToast(`Se eliminaron ${checked.length} registros`, 'success');
+
+        this.renderSummaryCards();
+        this.renderSalesTable();
+        this.renderConsolidatedSalesTable();
+        this.renderAdExpensesTable();
+        this.renderOperationalExpensesTable();
+        this.renderExternalSalesTable();
+        this.renderProductProfitTable();
+        this.renderPLStatement();
     },
 
     async deleteAllExternalSales() {
-        const sales = this.getFilteredExternalSales();
-        if (sales.length === 0) return;
+        const count = this.externalSales.length;
+        if (count === 0) return;
 
-        if (!confirm(`⚠️ ¿Estás seguro de ELIMINAR TODOS los ${sales.length} registros de ventas externas? Esta acción no se puede deshacer.`)) return;
+        if (!confirm(`⚠️ ¿Estás seguro de ELIMINAR TODOS los ${count} registros de ventas externas? Esta acción no se puede deshacer.`)) return;
 
+        Utils.showToast('Vaclando todos los registros...', 'info');
+
+        const idsToDelete = this.externalSales.map(s => String(s.id));
+
+        // 1. Clear memory & localStorage immediately
+        this.externalSales = [];
+        this.saveExternalSalesToLocal();
+        this.isExternalSalesExpanded = false;
+
+        // 2. Clear Supabase in background
         try {
-            Utils.showToast('Eliminando todos los registros...', 'info');
-            const idsToDelete = sales.map(s => s.id);
-            const { error } = await supabaseClient.from('external_sales').delete().in('id', idsToDelete);
-            if (error) console.warn('Alerta al vaciar en Supabase:', error);
-
-            this.externalSales = this.externalSales.filter(s => !idsToDelete.includes(s.id));
-            Utils.showToast(`Se eliminaron todos los registros (${idsToDelete.length})`, 'success');
-            this.isExternalSalesExpanded = false;
-            await this.render();
+            await supabaseClient.from('external_sales').delete().in('id', idsToDelete);
         } catch (err) {
-            console.error('Error clearing all sales:', err);
-            Utils.showToast('Error al vaciar registros: ' + err.message, 'error');
+            console.warn('Alerta al vaciar en Supabase:', err);
         }
+
+        Utils.showToast(`Se eliminaron todos los registros (${count})`, 'success');
+
+        this.renderSummaryCards();
+        this.renderSalesTable();
+        this.renderConsolidatedSalesTable();
+        this.renderAdExpensesTable();
+        this.renderOperationalExpensesTable();
+        this.renderExternalSalesTable();
+        this.renderProductProfitTable();
+        this.renderPLStatement();
     },
 
     renderExternalSalesTable() {
@@ -1622,8 +1644,8 @@ const IncomeStatementModule = {
             returned: parseInt(r.returned) || 0
         }));
 
-        // 1. Update in-memory externalSales
-        this.externalSales = [...preparedRecords, ...this.externalSales];
+        // 1. Update in-memory externalSales with fingerprint deduplication
+        this.externalSales = this.deduplicateExternalSales([...preparedRecords, ...this.externalSales]);
 
         // 2. Save to LocalStorage immediately
         this.saveExternalSalesToLocal();
