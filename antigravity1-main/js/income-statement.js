@@ -1437,13 +1437,10 @@ const IncomeStatementModule = {
         await this.render();
     },
 
-    openLinkCampaignsModal(saleId) {
-        const sale = this.externalSales.find(s => s.id === saleId);
-        if (!sale) return;
-        
-        document.getElementById('linkCampaignsSaleId').value = sale.id;
-        document.getElementById('linkCampaignsSaleName').value = sale.description || '';
-        document.getElementById('linkCampaignsProductName').innerText = sale.description || 'Sin descripción';
+    openLinkCampaignsForProduct(productName) {
+        document.getElementById('linkCampaignsSaleId').value = '';
+        document.getElementById('linkCampaignsSaleName').value = productName;
+        document.getElementById('linkCampaignsProductName').innerText = productName;
         
         const searchInput = document.getElementById('linkCampaignsSearch');
         if (searchInput) searchInput.value = '';
@@ -1466,8 +1463,8 @@ const IncomeStatementModule = {
         } else {
             const campaignsArray = Object.values(uniqueCampaigns).sort((a, b) => a.name.localeCompare(b.name));
             listEl.innerHTML = campaignsArray.map(camp => {
-                const isLinkedToThis = (camp.linkedTo === sale.description) && sale.description;
-                const isLinkedToOther = camp.linkedTo && camp.linkedTo !== sale.description;
+                const isLinkedToThis = (camp.linkedTo === productName) && productName;
+                const isLinkedToOther = camp.linkedTo && camp.linkedTo !== productName;
                 
                 let extraText = '';
                 if (isLinkedToOther) {
@@ -1485,6 +1482,12 @@ const IncomeStatementModule = {
         }
         
         document.getElementById('modalLinkCampaigns').classList.add('active');
+    },
+
+    openLinkCampaignsModal(saleId) {
+        const sale = this.externalSales.find(s => s.id === saleId);
+        if (!sale) return;
+        this.openLinkCampaignsForProduct(sale.description || '');
     },
 
     filterLinkCampaigns() {
@@ -2259,6 +2262,12 @@ const IncomeStatementModule = {
 
             const escapedName = p.name.replace(/"/g, '&quot;');
             let actionHtml = `<div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                <button class="btn btn-icon btn-sm" style="color: #8b5cf6; background: rgba(139, 92, 246, 0.1); border: none;" onclick="IncomeStatementModule.openLinkCampaignsForProduct('${escapedName}')" title="Vincular Campañas">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                </button>
                 <button class="btn btn-icon btn-sm is-detail-btn" onclick="IncomeStatementModule.showProductOrdersDetail('${escapedName}', ${p.isVisualGroup ? 'true' : 'false'}, ${p.groupId !== undefined ? p.groupId : 'null'})" title="Ver detalle de pedidos de ${escapedName}">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="11" cy="11" r="8"></circle>
@@ -4223,6 +4232,26 @@ const IncomeStatementModule = {
             const anyCheckbox = document.querySelector('.unified-sale-checkbox');
             toolbar.style.display = anyCheckbox ? 'flex' : 'none';
         }
+    },
+
+    filterConsolidatedProducts() {
+        const query = (document.getElementById('unifiedSalesSearch')?.value || '').toLowerCase();
+        const tbody = document.getElementById('isProductProfitTable');
+        if (!tbody) return;
+        
+        const rows = tbody.querySelectorAll('tr:not(.is-total-row)');
+        
+        rows.forEach(row => {
+            // Check if it's the empty message row
+            if (row.cells.length === 1 && row.cells[0].colSpan > 5) return;
+            
+            const text = row.textContent.toLowerCase();
+            if (text.includes(query)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
     },
 
     visualGroupConsolidatedProducts() {

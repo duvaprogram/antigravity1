@@ -56,7 +56,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.4</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.5</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -3452,18 +3452,29 @@
                         </h3>
                     </div>
                     <div class="card-body">
-                        <!-- Manual Grouping Toolbar for Products -->
-                        <div id="unifiedSalesGroupToolbar" style="display: none; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.65rem 0.75rem; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: var(--radius-md);">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2">
-                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
-                            </svg>
-                            <span style="font-size: 0.8rem; color: var(--text); flex: 1;">
-                                <strong>Agrupar Visualmente:</strong> Selecciona 2+ productos para verlos consolidados.
-                            </span>
-                            <button type="button" id="btnGroupUnifiedSales" class="btn btn-primary btn-sm" onclick="IncomeStatementModule.visualGroupConsolidatedProducts()" style="background: #0ea5e9; border-color: #0ea5e9; font-size: 0.78rem; padding: 0.35rem 0.85rem; white-space: nowrap;" disabled>
-                                🔗 Agrupar (<span id="groupUnifiedSalesCount">0</span>)
-                            </button>
+                        <!-- Controls for Products -->
+                        <div style="display: flex; gap: 1rem; margin-bottom: 0.75rem; align-items: center; flex-wrap: wrap;">
+                            <div style="position: relative; flex: 1; min-width: 200px; max-width: 300px;">
+                                <svg style="position: absolute; left: 10px; top: 8px; color: var(--text-muted);" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                                <input type="text" id="unifiedSalesSearch" class="form-control" placeholder="Buscar producto..." style="padding-left: 2rem; border-radius: 20px; font-size: 0.85rem; height: 32px;" onkeyup="IncomeStatementModule.filterConsolidatedProducts()">
+                            </div>
+                            
+                            <!-- Manual Grouping Toolbar for Products -->
+                            <div id="unifiedSalesGroupToolbar" style="display: none; align-items: center; gap: 0.75rem; padding: 0.35rem 0.75rem; background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); border-radius: var(--radius-md); flex: 2; min-width: 300px;">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2">
+                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                                    <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                                </svg>
+                                <span style="font-size: 0.8rem; color: var(--text); flex: 1;">
+                                    <strong>Agrupar Visualmente:</strong> Selecciona 2+ productos para verlos consolidados.
+                                </span>
+                                <button type="button" id="btnGroupUnifiedSales" class="btn btn-primary btn-sm" onclick="IncomeStatementModule.visualGroupConsolidatedProducts()" style="background: #0ea5e9; border-color: #0ea5e9; font-size: 0.78rem; padding: 0.35rem 0.85rem; white-space: nowrap;" disabled>
+                                    🔗 Agrupar (<span id="groupUnifiedSalesCount">0</span>)
+                                </button>
+                            </div>
                         </div>
                         <div class="table-container">
                             <table class="table">
