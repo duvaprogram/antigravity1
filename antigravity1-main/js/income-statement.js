@@ -75,6 +75,14 @@ const IncomeStatementModule = {
                 this.saveExternalSale();
             });
         }
+        // Link Campaigns form
+        const linkCampForm = document.getElementById('formLinkCampaigns');
+        if (linkCampForm) {
+            linkCampForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.submitLinkCampaigns();
+            });
+        }
 
         // Import External Sales Excel Button
         const btnImportExt = document.getElementById('btnImportExternalSales');
@@ -1267,6 +1275,12 @@ const IncomeStatementModule = {
                     <td style="text-align: center;">${returnRate}%</td>
                     <td style="font-size: 0.85rem;">${this.formatDate(sale.sale_date)}</td>
                     <td style="white-space: nowrap;">
+                        <button class="btn btn-icon btn-sm" style="color: #8b5cf6; background: rgba(139, 92, 246, 0.1); border: none; margin-right: 4px;" onclick="IncomeStatementModule.openLinkCampaignsModal('${sale.id}')" title="Vincular Campañas">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                            </svg>
+                        </button>
                         <button class="btn btn-icon btn-sm" style="color: var(--primary); background: rgba(59, 130, 246, 0.1); border: none; margin-right: 4px;" onclick="IncomeStatementModule.editExternalSale('${sale.id}')" title="Editar">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M12 20h9"></path>
@@ -1393,6 +1407,104 @@ const IncomeStatementModule = {
         } catch (e) {}
         Utils.showToast('Venta eliminada', 'success');
         await this.render();
+    },
+
+    openLinkCampaignsModal(saleId) {
+        const sale = this.externalSales.find(s => s.id === saleId);
+        if (!sale) return;
+        
+        document.getElementById('linkCampaignsSaleId').value = sale.id;
+        document.getElementById('linkCampaignsSaleName').value = sale.description || '';
+        document.getElementById('linkCampaignsProductName').innerText = sale.description || 'Sin descripción';
+        
+        const uniqueCampaigns = {};
+        this.adExpenses.forEach(exp => {
+            const campName = exp.campaign_name || 'Sin Nombre de Campaña';
+            if (!uniqueCampaigns[campName]) {
+                uniqueCampaigns[campName] = {
+                    name: campName,
+                    linkedTo: exp.product_name
+                };
+            }
+        });
+        
+        const listEl = document.getElementById('linkCampaignsList');
+        if (Object.keys(uniqueCampaigns).length === 0) {
+            listEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.9rem;">No hay campañas publicitarias registradas.</div>';
+        } else {
+            const campaignsArray = Object.values(uniqueCampaigns).sort((a, b) => a.name.localeCompare(b.name));
+            listEl.innerHTML = campaignsArray.map(camp => {
+                const isLinkedToThis = (camp.linkedTo === sale.description) && sale.description;
+                const isLinkedToOther = camp.linkedTo && camp.linkedTo !== sale.description;
+                
+                let extraText = '';
+                if (isLinkedToOther) {
+                    extraText = `<span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(Vinculada a: ${camp.linkedTo})</span>`;
+                }
+                
+                return `
+                    <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 4px; cursor: pointer;">
+                        <input type="checkbox" name="linked_campaigns" value="${camp.name.replace(/"/g, '&quot;')}" ${isLinkedToThis ? 'checked' : ''}>
+                        <span style="font-size: 0.9rem; flex: 1;">${camp.name}</span>
+                        ${extraText}
+                    </label>
+                `;
+            }).join('');
+        }
+        
+        document.getElementById('modalLinkCampaigns').classList.add('active');
+    },
+
+    async submitLinkCampaigns() {
+        const saleName = document.getElementById('linkCampaignsSaleName').value;
+        if (!saleName) {
+            Utils.showToast('La venta debe tener una descripción/nombre para poder vincular campañas', 'error');
+            return;
+        }
+        
+        const checkboxes = document.querySelectorAll('#linkCampaignsList input[type="checkbox"]');
+        const selectedCampaigns = [];
+        const unselectedCampaigns = [];
+        
+        checkboxes.forEach(cb => {
+            if (cb.checked) selectedCampaigns.push(cb.value);
+            else unselectedCampaigns.push(cb.value);
+        });
+        
+        let recordsUpdated = 0;
+        
+        document.getElementById('modalLinkCampaigns').classList.remove('active');
+        this.showImportLoadingOverlay('Vinculando Campañas...', 'Actualizando base de datos...');
+        
+        for (let exp of this.adExpenses) {
+            const campName = exp.campaign_name || 'Sin Nombre de Campaña';
+            
+            if (selectedCampaigns.includes(campName)) {
+                if (exp.product_name !== saleName) {
+                    exp.product_name = saleName;
+                    recordsUpdated++;
+                    try {
+                        await supabaseClient.from('ad_expenses').update({ product_name: saleName }).eq('id', exp.id);
+                    } catch(e) {}
+                }
+            } else if (unselectedCampaigns.includes(campName) && exp.product_name === saleName) {
+                exp.product_name = null;
+                recordsUpdated++;
+                try {
+                    await supabaseClient.from('ad_expenses').update({ product_name: null }).eq('id', exp.id);
+                } catch(e) {}
+            }
+        }
+        
+        this.hideImportLoadingOverlay();
+        
+        if (recordsUpdated > 0) {
+            this.saveAdExpensesToLocal();
+            Utils.showToast(`Se actualizaron ${recordsUpdated} registros de campañas`, 'success');
+            await this.render();
+        } else {
+            Utils.showToast('No hubo cambios en las vinculaciones', 'info');
+        }
     },
 
     pendingImportRecords: [],

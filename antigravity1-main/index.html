@@ -4714,6 +4714,37 @@
     </div>
 
     <!-- Modal: External Sale -->
+    <!-- Modal: Vincular Campañas a Venta Externa -->
+    <div class="modal" id="modalLinkCampaigns">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Vincular Campañas</h2>
+                <button class="modal-close" data-close="modalLinkCampaigns">&times;</button>
+            </div>
+            <div style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--surface-hover);">
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.25rem;">Producto:</div>
+                <div id="linkCampaignsProductName" style="font-size: 1.1rem; font-weight: 600; color: var(--primary);"></div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">
+                    Selecciona las campañas que deseas asociar a este producto. Las campañas seleccionadas actualizarán automáticamente su nombre de producto para coincidir y agruparse en el Estado de Resultados.
+                </div>
+            </div>
+            <form id="formLinkCampaigns">
+                <input type="hidden" id="linkCampaignsSaleId">
+                <input type="hidden" id="linkCampaignsSaleName">
+                <div style="max-height: 400px; overflow-y: auto; padding: 1rem;">
+                    <div id="linkCampaignsList" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Checkboxes cargados por JS -->
+                    </div>
+                </div>
+                <div class="form-actions" style="padding: 1rem; border-top: 1px solid var(--border);">
+                    <button type="button" class="btn btn-secondary" data-close="modalLinkCampaigns">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="background: #8b5cf6; border-color: #8b5cf6;">Guardar Vinculación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: External Sale -->
     <div class="modal" id="modalExternalSale">
         <div class="modal-content">
             <div class="modal-header">
