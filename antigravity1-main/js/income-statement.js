@@ -1266,12 +1266,21 @@ const IncomeStatementModule = {
 
         const limit = 5;
         const visibleSales = this.isExternalSalesExpanded ? sales : sales.slice(0, limit);
+        const filteredAdExpenses = this.getFilteredAdExpenses();
 
         tbody.innerHTML = visibleSales.map(sale => {
             const delivered = sale.delivered || 0;
             const returned = sale.returned || 0;
             const totalOrders = delivered + returned;
             const returnRate = totalOrders > 0 ? ((returned / totalOrders) * 100).toFixed(1) : '0.0';
+            
+            // Sum Ad Spend linked to this sale
+            let adSpend = 0;
+            if (sale.description) {
+                adSpend = filteredAdExpenses
+                    .filter(exp => exp.product_name === sale.description)
+                    .reduce((sum, exp) => sum + parseFloat(exp.amount_spent || 0), 0);
+            }
 
             return `
                 <tr>
@@ -1286,6 +1295,7 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(sale.revenue)}</td>
                     <td style="text-align: right; color: var(--danger);">${this.formatCurrency(sale.product_cost)}</td>
                     <td style="text-align: right; color: var(--primary);">${this.formatCurrency(sale.shipping_cost)}</td>
+                    <td style="text-align: right; color: var(--warning);">${this.formatCurrency(adSpend)}</td>
                     <td style="text-align: right;">${delivered}</td>
                     <td style="text-align: right;">${returned}</td>
                     <td style="text-align: center;">${returnRate}%</td>
@@ -1433,8 +1443,12 @@ const IncomeStatementModule = {
         document.getElementById('linkCampaignsSaleName').value = sale.description || '';
         document.getElementById('linkCampaignsProductName').innerText = sale.description || 'Sin descripción';
         
+        const searchInput = document.getElementById('linkCampaignsSearch');
+        if (searchInput) searchInput.value = '';
+        
         const uniqueCampaigns = {};
-        this.adExpenses.forEach(exp => {
+        const filteredExpenses = this.getFilteredAdExpenses();
+        filteredExpenses.forEach(exp => {
             const campName = exp.campaign_name || 'Sin Nombre de Campaña';
             if (!uniqueCampaigns[campName]) {
                 uniqueCampaigns[campName] = {
@@ -1446,7 +1460,7 @@ const IncomeStatementModule = {
         
         const listEl = document.getElementById('linkCampaignsList');
         if (Object.keys(uniqueCampaigns).length === 0) {
-            listEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.9rem;">No hay campañas publicitarias registradas.</div>';
+            listEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.9rem;">No hay campañas publicitarias registradas en este período.</div>';
         } else {
             const campaignsArray = Object.values(uniqueCampaigns).sort((a, b) => a.name.localeCompare(b.name));
             listEl.innerHTML = campaignsArray.map(camp => {
@@ -1459,9 +1473,9 @@ const IncomeStatementModule = {
                 }
                 
                 return `
-                    <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 4px; cursor: pointer;">
-                        <input type="checkbox" name="linked_campaigns" value="${camp.name.replace(/"/g, '&quot;')}" ${isLinkedToThis ? 'checked' : ''}>
-                        <span style="font-size: 0.9rem; flex: 1;">${camp.name}</span>
+                    <label class="link-campaign-item" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 4px; cursor: pointer;">
+                        <input type="checkbox" name="link_campaigns" value="${camp.name.replace(/"/g, '&quot;')}" ${isLinkedToThis ? 'checked' : ''}>
+                        <span class="link-campaign-name" style="font-size: 0.9rem; flex: 1;">${camp.name}</span>
                         ${extraText}
                     </label>
                 `;
@@ -1469,6 +1483,22 @@ const IncomeStatementModule = {
         }
         
         document.getElementById('modalLinkCampaigns').classList.add('active');
+    },
+
+    filterLinkCampaigns() {
+        const query = document.getElementById('linkCampaignsSearch').value.toLowerCase();
+        const items = document.querySelectorAll('.link-campaign-item');
+        items.forEach(item => {
+            const nameEl = item.querySelector('.link-campaign-name');
+            if (nameEl) {
+                const name = nameEl.innerText.toLowerCase();
+                if (name.includes(query)) {
+                    item.style.display = 'flex';
+                } else {
+                    item.style.display = 'none';
+                }
+            }
+        });
     },
 
     async submitLinkCampaigns() {

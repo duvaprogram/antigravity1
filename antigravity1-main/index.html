@@ -4731,6 +4731,15 @@
             <form id="formLinkCampaigns">
                 <input type="hidden" id="linkCampaignsSaleId">
                 <input type="hidden" id="linkCampaignsSaleName">
+                <div style="padding: 1rem 1rem 0 1rem;">
+                    <div class="search-container" style="max-width: 100%;">
+                        <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="linkCampaignsSearch" class="search-input" placeholder="Buscar campaña por nombre..." onkeyup="IncomeStatementModule.filterLinkCampaigns()">
+                    </div>
+                </div>
                 <div style="max-height: 400px; overflow-y: auto; padding: 1rem;">
                     <div id="linkCampaignsList" style="display: flex; flex-direction: column; gap: 0.5rem;">
                         <!-- Checkboxes cargados por JS -->
