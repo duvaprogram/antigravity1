@@ -3408,7 +3408,8 @@
                                         <th>Descripción</th>
                                         <th style="text-align: right; color: var(--success);">Ingresos (USD)</th>
                                         <th style="text-align: right; color: var(--danger);">Costo Mercancía (USD)</th>
-                                        <th style="text-align: right; color: var(--primary);">Costo Fletes (USD)</th>
+                                        <th style="text-align: right; color: var(--primary);">Flete Entrega (USD)</th>
+                                        <th style="text-align: right; color: var(--danger);">Flete Devol. (USD)</th>
                                         <th style="text-align: right;">Entregados</th>
                                         <th style="text-align: right;">Devueltos</th>
                                         <th style="text-align: center;">% Devolución</th>
@@ -3418,7 +3419,7 @@
                                 </thead>
                                 <tbody id="isExternalSalesTable">
                                     <tr>
-                                        <td colspan="11"
+                                        <td colspan="12"
                                             style="text-align: center; color: var(--text-muted); padding: 2rem;">
                                             Cargando ventas externas...
                                         </td>
@@ -4749,8 +4750,12 @@
                         <input type="number" id="extSaleProductCost" step="0.01" min="0" required value="0">
                     </div>
                     <div class="form-group">
-                        <label for="extSaleShippingCost">Costo de Fletes (USD) *</label>
+                        <label for="extSaleShippingCost">Flete Entrega (USD) *</label>
                         <input type="number" id="extSaleShippingCost" step="0.01" min="0" required value="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="extSaleReturnShippingCost">Flete Devolución (USD) *</label>
+                        <input type="number" id="extSaleReturnShippingCost" step="0.01" min="0" required value="0">
                     </div>
                     <div class="form-group">
                         <label for="extSaleDelivered">Pedidos Entregados</label>

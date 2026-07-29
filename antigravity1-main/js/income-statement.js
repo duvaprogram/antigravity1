@@ -1010,13 +1010,14 @@ const IncomeStatementModule = {
 
     getExternalSalesSummary() {
         const sales = this.getFilteredExternalSales();
-        let totalRevenue = 0, totalCost = 0, totalShipping = 0;
+        let totalRevenue = 0, totalCost = 0, totalShipping = 0, totalReturnShipping = 0;
         sales.forEach(s => {
             totalRevenue += parseFloat(s.revenue || 0);
             totalCost += parseFloat(s.product_cost || 0);
             totalShipping += parseFloat(s.shipping_cost || 0);
+            totalReturnShipping += parseFloat(s.return_shipping_cost || 0);
         });
-        return { totalRevenue, totalCost, totalShipping };
+        return { totalRevenue, totalCost, totalShipping, totalReturnShipping };
     },
 
     isExternalSalesExpanded: false,
@@ -1166,6 +1167,7 @@ const IncomeStatementModule = {
             revenue: 0,
             product_cost: 0,
             shipping_cost: 0,
+            return_shipping_cost: 0,
             delivered: 0,
             returned: 0
         };
@@ -1174,6 +1176,7 @@ const IncomeStatementModule = {
             merged.revenue += (parseFloat(src.revenue) || 0);
             merged.product_cost += (parseFloat(src.product_cost) || 0);
             merged.shipping_cost += (parseFloat(src.shipping_cost) || 0);
+            merged.return_shipping_cost += (parseFloat(src.return_shipping_cost) || 0);
             merged.delivered += (parseInt(src.delivered) || 0);
             merged.returned += (parseInt(src.returned) || 0);
         }
@@ -1316,6 +1319,8 @@ const IncomeStatementModule = {
         document.getElementById('extSaleRevenue').value = sale.revenue || 0;
         document.getElementById('extSaleProductCost').value = sale.product_cost || 0;
         document.getElementById('extSaleShippingCost').value = sale.shipping_cost || 0;
+        const returnShipEl = document.getElementById('extSaleReturnShippingCost');
+        if (returnShipEl) returnShipEl.value = sale.return_shipping_cost || 0;
         document.getElementById('extSaleDelivered').value = sale.delivered || 0;
         document.getElementById('extSaleReturned').value = sale.returned || 0;
 
@@ -1349,6 +1354,7 @@ const IncomeStatementModule = {
             revenue: parseFloat(document.getElementById('extSaleRevenue').value) || 0,
             product_cost: parseFloat(document.getElementById('extSaleProductCost').value) || 0,
             shipping_cost: parseFloat(document.getElementById('extSaleShippingCost').value) || 0,
+            return_shipping_cost: parseFloat(document.getElementById('extSaleReturnShippingCost') ? document.getElementById('extSaleReturnShippingCost').value : 0) || 0,
             delivered: parseInt(document.getElementById('extSaleDelivered').value) || 0,
             returned: parseInt(document.getElementById('extSaleReturned').value) || 0
         };
@@ -1625,6 +1631,7 @@ const IncomeStatementModule = {
                         revenue: 0,
                         product_cost: 0,
                         shipping_cost: 0,
+                        return_shipping_cost: 0,
                         delivered: 0,
                         returned: 0
                     };
@@ -1633,7 +1640,7 @@ const IncomeStatementModule = {
                 const grp = productGroupMap[groupKey];
                 if (isReturned) {
                     grp.returned += 1;
-                    grp.shipping_cost += fleteDevolucion;
+                    grp.return_shipping_cost += fleteDevolucion;
                 } else {
                     grp.delivered += 1;
                     grp.revenue += recaudo;
@@ -1686,11 +1693,12 @@ const IncomeStatementModule = {
         const modal = document.getElementById('modalImportExcelPreview');
         if (!modal) { console.error('Modal modalImportExcelPreview not found'); return; }
 
-        let totalRev = 0, totalCost = 0, totalShip = 0, deliveredCount = 0, returnedCount = 0;
+        let totalRev = 0, totalCost = 0, totalShip = 0, totalReturnShip = 0, deliveredCount = 0, returnedCount = 0;
         records.forEach(r => {
             totalRev += (r.revenue || 0);
             totalCost += (r.product_cost || 0);
             totalShip += (r.shipping_cost || 0);
+            totalReturnShip += (r.return_shipping_cost || 0);
             deliveredCount += (r.delivered || 0);
             returnedCount += (r.returned || 0);
         });
@@ -1709,10 +1717,10 @@ const IncomeStatementModule = {
                     <div style="font-size: 1.4rem; font-weight: 700; color: #60a5fa;">$${totalRev.toFixed(2)}</div>
                     <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${deliveredCount} entregados / ${returnedCount} devueltos</div>
                 </div>
-                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
+                <div style="flex: 1; min-width: 150px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
                     <div style="font-size: 0.75rem; color: var(--text-muted);">Costos & Fletes</div>
-                    <div style="font-size: 1.4rem; font-weight: 700; color: #f87171;">$${(totalCost + totalShip).toFixed(2)}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Prod: $${totalCost.toFixed(2)} | Fletes: $${totalShip.toFixed(2)}</div>
+                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--danger);">$${(totalCost + totalShip + totalReturnShip).toFixed(2)}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Prod: $${totalCost.toFixed(2)} | Envío: $${totalShip.toFixed(2)} | Dev: $${totalReturnShip.toFixed(2)}</div>
                 </div>`;
         }
 
@@ -1750,6 +1758,7 @@ const IncomeStatementModule = {
                 <td style="text-align: right; color: var(--success); font-weight: 600;">$${(r.revenue || 0).toFixed(2)}</td>
                 <td style="text-align: right; color: var(--danger);">$${(r.product_cost || 0).toFixed(2)}</td>
                 <td style="text-align: right; color: var(--primary);">$${(r.shipping_cost || 0).toFixed(2)}</td>
+                <td style="text-align: right; color: var(--danger);">$${(r.return_shipping_cost || 0).toFixed(2)}</td>
             </tr>`).join('');
     },
 
@@ -1801,6 +1810,7 @@ const IncomeStatementModule = {
             merged.revenue += (src.revenue || 0);
             merged.product_cost += (src.product_cost || 0);
             merged.shipping_cost += (src.shipping_cost || 0);
+            merged.return_shipping_cost += (src.return_shipping_cost || 0);
             if (!mergedNames.includes(src.description)) mergedNames.push(src.description);
         }
 
@@ -1872,6 +1882,7 @@ const IncomeStatementModule = {
             revenue: parseFloat(r.revenue) || 0,
             product_cost: parseFloat(r.product_cost) || 0,
             shipping_cost: parseFloat(r.shipping_cost) || 0,
+            return_shipping_cost: parseFloat(r.return_shipping_cost) || 0,
             delivered: parseInt(r.delivered) || 0,
             returned: parseInt(r.returned) || 0
         }));
@@ -1911,6 +1922,7 @@ const IncomeStatementModule = {
                 revenue: r.revenue,
                 product_cost: r.product_cost,
                 shipping_cost: r.shipping_cost,
+                return_shipping_cost: r.return_shipping_cost,
                 delivered: r.delivered,
                 returned: r.returned
             }));
@@ -1992,7 +2004,7 @@ const IncomeStatementModule = {
             productMap[name].orders += (parseInt(s.delivered || 0) + parseInt(s.returned || 0));
             productMap[name].revenue += parseFloat(s.revenue || 0);
             productMap[name].cost += parseFloat(s.product_cost || 0);
-            productMap[name].shipping += parseFloat(s.shipping_cost || 0);
+            productMap[name].shipping += (parseFloat(s.shipping_cost || 0) + parseFloat(s.return_shipping_cost || 0));
         });
 
         // 3. Process Ad Expenses per Product
@@ -2106,7 +2118,7 @@ const IncomeStatementModule = {
 
         const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0) + extSalesSummary.totalRevenue;
         const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0) + extSalesSummary.totalCost;
-        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping;
+        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping + extSalesSummary.totalReturnShipping;
         const grossProfit = totalRevenue - totalCOGS - totalShipping;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
@@ -2157,7 +2169,7 @@ const IncomeStatementModule = {
                     <span style="color: var(--danger);">${this.formatCurrency(totalCOGS)}</span>
                 </div>
                 <div class="is-pl-row">
-                    <span style="padding-left: 1rem;">Costo de Fletes (Envíos)</span>
+                    <span style="padding-left: 1rem;">Costo de Fletes (Envíos & Devs)</span>
                     <span style="color: var(--danger);">${this.formatCurrency(totalShipping)}</span>
                 </div>
                 <div class="is-pl-row is-pl-subtotal highlight-green">
@@ -3585,7 +3597,7 @@ const IncomeStatementModule = {
 
         const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0) + extSalesSummary.totalRevenue;
         const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0) + extSalesSummary.totalCost;
-        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping;
+        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping + extSalesSummary.totalReturnShipping;
         const grossProfit = totalRevenue - totalCOGS - totalShipping;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
