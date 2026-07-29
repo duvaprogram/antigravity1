@@ -1338,202 +1338,20 @@ const IncomeStatementModule = {
         modal.classList.add('active');
     },
 
-    async handleExternalSalesFileUpload(e) {
-        const file = e.target.files[0];
-        if (!file) return;
 
-        try {
-            Utils.showToast('Analizando archivo Excel...', 'info');
-            const arrayBuffer = await file.arrayBuffer();
-            const data = new Uint8Array(arrayBuffer);
-
-            if (typeof XLSX === 'undefined') {
-                this.showImportErrorModal(
-                    'Librería XLSX No Disponible',
-                    'No se pudo encontrar la librería de procesamiento de hojas de cálculo SheetJS (XLSX).',
-                    'Causa: El script CDN https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js no se cargó correctamente en la página.'
-                );
-                e.target.value = '';
-                return;
-            }
-
-            const workbook = XLSX.read(data, { type: 'array' });
-            if (!workbook || !workbook.SheetNames || workbook.SheetNames.length === 0) {
-                this.showImportErrorModal(
-                    'Archivo No Válido',
-                    'El archivo seleccionado no contiene hojas de cálculo legibles.',
-                    'Causa: El archivo está vacío, dañado o no es un libro Excel válido.'
-                );
-                e.target.value = '';
-                return;
-            }
-
-            const sheetName = workbook.SheetNames[0];
-            const sheet = workbook.Sheets[sheetName];
-            
-            // Use defval: '' to ensure exact 0-based array indexes even for empty cells
-            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-
-            if (!rows || rows.length < 2) {
-                this.showImportErrorModal(
-                    'Archivo sin Datos',
-                    'El archivo seleccionado está vacío o no contiene filas con datos de ventas.',
-                    `Hoja detectada: "${sheetName}" | Filas totales: ${rows ? rows.length : 0}`
-                );
-                e.target.value = '';
-                return;
-            }
-
-            // Find header row or use default column indexes
-            let headerRowIndex = -1;
-            for (let i = 0; i < Math.min(rows.length, 10); i++) {
-                const r = rows[i] || [];
-                const rStr = r.map(c => String(c || '').toLowerCase()).join(' ');
-                if (rStr.includes('estado') || rStr.includes('recaudo') || rStr.includes('flete')) {
-                    headerRowIndex = i;
-                    break;
-                }
-            }
-
-            let statusIdx = 2; // Col C
-            let productIdx = 12; // Col M
-            let stockIdx = 13; // Col N
-            let contentIdx = 15; // Col P
-            let recaudoIdx = 25; // Col Z
-            let costoIdx = 26; // Col AA (Costo de Producto)
-            let safeFleteEntregaIdx = 27; // Col AB
-            let safeFleteDevIdx = 28; // Col AC
-
-            let startRowIndex = 0;
-
-            if (headerRowIndex !== -1) {
-                startRowIndex = headerRowIndex + 1;
-                const headers = (rows[headerRowIndex] || []).map(c => String(c || '').trim().toLowerCase());
-                
-                const findColExact = (keywords, fallbackIdx) => {
-                    let idx = headers.findIndex(h => keywords.some(k => h === k));
-                    if (idx === -1) {
-                        idx = headers.findIndex(h => keywords.some(k => h.includes(k)));
-                    }
-                    return idx !== -1 ? idx : fallbackIdx;
-                };
-
-                statusIdx = findColExact(['estado', 'estado guia', 'estado del pedido'], 2);
-                productIdx = findColExact(['producto', 'nombre producto', 'articulo'], 12);
-                stockIdx = findColExact(['id del stock', 'stock id', 'sku', 'id stock'], 13);
-                contentIdx = findColExact(['contenido del producto', 'contenido', 'detalle'], 15);
-                recaudoIdx = findColExact(['recaudo', 'valor recaudo', 'monto recaudo'], 25);
-                costoIdx = findColExact(['costo del producto', 'costo producto', 'costo prod', 'costo'], 26);
-
-                const fleteEntregaIdx = headers.findIndex(h => h.includes('flete') && !h.includes('devoluc'));
-                const fleteDevIdx = headers.findIndex(h => h.includes('devoluc') || h.includes('flete por dev'));
-                if (fleteEntregaIdx !== -1) safeFleteEntregaIdx = fleteEntregaIdx;
-                if (fleteDevIdx !== -1) safeFleteDevIdx = fleteDevIdx;
-            } else {
-                startRowIndex = 0;
-            }
-
-            let productsList = Database.products || [];
-            if (productsList.length === 0 && typeof Database.getProducts === 'function') {
-                productsList = await Database.getProducts();
-            }
-
-            const recordsToInsert = [];
-            let totalRowsScanned = 0;
-
-            for (let i = startRowIndex; i < rows.length; i++) {
-                const row = rows[i];
-                if (!row || row.length === 0) continue;
-                totalRowsScanned++;
-
-                const status = String(row[statusIdx] || '').trim();
-                const rawProduct = String(row[productIdx] || '').trim();
-                const stockId = String(row[stockIdx] || '').trim();
-                const content = String(row[contentIdx] || '').trim();
-                const col0 = String(row[0] || '').trim();
-
-                // Skip non-data rows
-                if (!status && !rawProduct && !stockId && !content && (isNaN(parseInt(col0)) || col0 === '')) continue;
-
-                // Skip header text row if encountered
-                if (status.toLowerCase() === 'estado' || rawProduct.toLowerCase() === 'producto') continue;
-
-                const recaudo = this.parseExcelNumber(row[recaudoIdx]);
-                const costoProd = this.parseExcelNumber(row[costoIdx]);
-                const fleteEntrega = this.parseExcelNumber(row[safeFleteEntregaIdx]);
-                const fleteDevolucion = this.parseExcelNumber(row[safeFleteDevIdx]);
-
-                const statusLower = status.toLowerCase();
-                const isReturned = statusLower.includes('devuelt') || statusLower.includes('cancel');
-
-                let rev = 0;
-                let cost = 0;
-                let shipping = 0;
-                let del = 0;
-                let ret = 0;
-
-                if (isReturned) {
-                    rev = 0;
-                    cost = 0;
-                    shipping = fleteDevolucion > 0 ? fleteDevolucion : fleteEntrega;
-                    ret = 1;
-                } else {
-                    rev = recaudo;
-                    cost = costoProd;
-                    shipping = fleteEntrega;
-                    del = 1;
-                }
-
-                // Match product
-                let matchedProduct = null;
-                if (stockId) {
-                    const cleanStock = stockId.split(' ')[0];
-                    matchedProduct = productsList.find(p => String(p.sku || p.code || p.id).toLowerCase() === cleanStock.toLowerCase());
-                }
-                if (!matchedProduct && (content || rawProduct)) {
-                    const searchStr = (content || rawProduct).toLowerCase();
-                    matchedProduct = productsList.find(p => searchStr.includes((p.name || '').toLowerCase()) || (p.name || '').toLowerCase().includes(searchStr));
-                }
-
-                const finalProductName = matchedProduct ? matchedProduct.name : (content || rawProduct || stockId || 'Producto Externo');
-
-                recordsToInsert.push({
-                    country: 'Ecuador',
-                    sale_date: new Date().toISOString().split('T')[0],
-                    description: finalProductName,
-                    status_text: status,
-                    revenue: rev,
-                    product_cost: cost,
-                    shipping_cost: shipping,
-                    delivered: del,
-                    returned: ret
-                });
-            }
-
-            if (recordsToInsert.length === 0) {
-                this.showImportErrorModal(
-                    'No se Detectaron Registros de Ventas',
-                    `Se escanearon ${totalRowsScanned} filas en la hoja "${sheetName}", pero ninguna contenía el formato válido de ventas.`,
-                    `Causa: No se encontraron datos de ventas legibles en las columnas de Estado (Col. C), Recaudo (Col. Z), Costo (Col. AA) o Fletes (Col. AB/AC).`
-                );
-                e.target.value = '';
-                return;
-            }
-
-            // Store records and open preview modal
-            this.pendingImportRecords = recordsToInsert;
-            this.openImportPreviewModal(recordsToInsert, file.name);
-            e.target.value = '';
-
-        } catch (error) {
-            console.error('Error reading Excel:', error);
-            this.showImportErrorModal(
-                'Error al Leer el Archivo Excel',
-                'Ocurrió una falla técnica inesperada al procesar la hoja de cálculo.',
-                error.stack || error.message || String(error)
-            );
-            e.target.value = '';
+    parseExcelNumber(val) {
+        if (val === null || val === undefined || val === '') return 0;
+        if (typeof val === 'number') return isNaN(val) ? 0 : val;
+        let str = String(val).trim().replace(/[\$€\s]/g, '');
+        // Handle comma as decimal separator (e.g. "1.234,56" -> "1234.56")
+        if (str.includes(',') && str.includes('.')) {
+            str = str.replace(/\./g, '').replace(',', '.');
+        } else if (str.includes(',') && !str.includes('.')) {
+            str = str.replace(',', '.');
         }
+        const cleaned = str.replace(/[^0-9.\-]/g, '');
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? 0 : num;
     },
 
     showImportLoadingOverlay(title = 'Procesando Archivo Excel...', subtitle = 'Analizando registros, identificando referencias y agrupando productos por lote.') {
@@ -1850,11 +1668,6 @@ const IncomeStatementModule = {
         this.pendingImportRecords = [];
     },
 
-    closeImportPreviewModal() {
-        const modal = document.getElementById('modalImportExcelPreview');
-        if (modal) modal.classList.remove('active');
-        this.pendingImportRecords = [];
-    },
 
     generateUUID() {
         if (typeof crypto !== 'undefined' && crypto.randomUUID) {
