@@ -1633,7 +1633,7 @@ const IncomeStatementModule = {
                 const grp = productGroupMap[groupKey];
                 if (isReturned) {
                     grp.returned += 1;
-                    grp.shipping_cost += (fleteDevolucion > 0 ? fleteDevolucion : fleteEntrega);
+                    grp.shipping_cost += fleteDevolucion;
                 } else {
                     grp.delivered += 1;
                     grp.revenue += recaudo;
