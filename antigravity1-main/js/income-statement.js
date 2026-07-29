@@ -1534,10 +1534,11 @@ const IncomeStatementModule = {
                         const { error } = await supabaseClient.from('ad_expenses').update({ product_name: saleName }).eq('id', exp.id);
                         if (error) {
                             console.error('Supabase update error:', error);
-                            Utils.showToast('Error en la base de datos (quizás falte la columna product_name)', 'error');
+                            alert('ERROR SUPABASE: ' + JSON.stringify(error));
                         }
                     } catch(e) {
                         console.error('Exception updating ad_expenses:', e);
+                        alert('EXCEPCIÓN SUPABASE: ' + e.message);
                     }
                 }
             } else if (unselectedCampaigns.includes(campName) && exp.product_name === saleName) {
@@ -1546,16 +1547,15 @@ const IncomeStatementModule = {
                 try {
                     const { error } = await supabaseClient.from('ad_expenses').update({ product_name: null }).eq('id', exp.id);
                     if (error) {
-                        console.error('Supabase update error:', error);
-                        Utils.showToast('Error en la base de datos (quizás falte la columna product_name)', 'error');
+                        alert('ERROR SUPABASE (Unlink): ' + JSON.stringify(error));
                     }
-                } catch(e) {
-                    console.error('Exception updating ad_expenses:', e);
-                }
+                } catch(e) {}
             }
         }
         
         this.hideImportLoadingOverlay();
+        
+        alert(`INFO DEBUG:\nCampañas seleccionadas en la interfaz: ${selectedCampaigns.length}\nRegistros detectados para actualizar: ${recordsUpdated}\nNombre de venta: ${saleName}`);
         
         if (recordsUpdated > 0) {
             Utils.showToast(`Se actualizaron ${recordsUpdated} registros de campañas`, 'success');
