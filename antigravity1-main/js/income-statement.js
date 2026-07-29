@@ -83,6 +83,22 @@ const IncomeStatementModule = {
                 this.submitLinkCampaigns();
             });
         }
+        
+        // Group References form
+        const groupRefForm = document.getElementById('formGroupReferences');
+        if (groupRefForm) {
+            groupRefForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.submitGroupReferences();
+            });
+        }
+
+        // Load mappings
+        try {
+            this.productMappings = JSON.parse(localStorage.getItem('is_product_mappings')) || {};
+        } catch(e) {
+            this.productMappings = {};
+        }
 
         // Import External Sales Excel Button
         const btnImportExt = document.getElementById('btnImportExternalSales');
@@ -2086,7 +2102,8 @@ const IncomeStatementModule = {
             const totalItemsCost = items.reduce((s, item) => s + (ProductsModule.getRealCost(item) * (item.quantity || 1)), 0);
 
             items.forEach(item => {
-                const name = item.name || 'Producto Desconocido';
+                const rawName = item.name || 'Producto Desconocido';
+                const name = this.productMappings[rawName] || rawName;
                 const qty = parseInt(item.quantity || 1);
                 const realCost = ProductsModule.getRealCost(item) * qty;
                 const revProp = totalItemsCost > 0 ? (realCost / totalItemsCost) * totalRev : (totalRev / items.length);
@@ -2107,7 +2124,8 @@ const IncomeStatementModule = {
         // 2. Process External Sales (Otras Plataformas)
         const extSales = this.getFilteredExternalSales();
         extSales.forEach(s => {
-            const name = s.product_name || s.description || 'Venta Manual';
+            const rawName = s.product_name || s.description || 'Venta Manual';
+            const name = this.productMappings[rawName] || rawName;
             if (!productMap[name]) {
                 productMap[name] = {
                     name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0
@@ -2122,10 +2140,12 @@ const IncomeStatementModule = {
         // 3. Process Ad Expenses per Product
         const adExpenses = this.getFilteredAdExpenses();
         adExpenses.forEach(exp => {
-            const name = exp.product_name;
-            if (name && productMap[name]) {
+            const rawName = exp.product_name;
+            if (!rawName) return;
+            const name = this.productMappings[rawName] || rawName;
+            if (productMap[name]) {
                 productMap[name].adSpend += parseFloat(exp.amount_spent || 0);
-            } else if (name) {
+            } else {
                 productMap[name] = {
                     name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: parseFloat(exp.amount_spent || 0)
                 };
@@ -3751,34 +3771,51 @@ const IncomeStatementModule = {
         return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
     },
 
-    getCountryFlag(country) {
-        const flags = {
-            'Ecuador': '🇪🇨',
-            'Venezuela': '🇻🇪',
-            'Colombia': '🇨🇴'
-        };
-        return flags[country] || '🏳️';
+    getCountryFlag(co    // ========================================
+    // ORDERS DETAIL MODAL & GROUPING
+    // ========================================
+    ordersDetailCurrentTab: 'grouped',
+    ordersDetailCurrentCountry: '',
+
+    setOrdersDetailTab(tab) {
+        this.ordersDetailCurrentTab = tab;
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.style.borderBottom = 'none');
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.style.color = 'var(--text-muted)');
+        
+        const activeBtn = document.getElementById(tab === 'grouped' ? 'tabOrdersDetailGrouped' : 'tabOrdersDetailList');
+        if (activeBtn) {
+            activeBtn.classList.add('active');
+            activeBtn.style.borderBottom = '2px solid var(--primary)';
+            activeBtn.style.color = 'var(--primary)';
+        }
+        this.renderOrdersDetail();
     },
 
-    // ========================================
-    // ORDERS DETAIL MODAL
-    // ========================================
     showOrdersDetail(country) {
-        const sales = this.getFilteredSales().filter(guide => {
-            return this.getCountryFromCity(guide.cities) === country;
-        });
-
+        this.ordersDetailCurrentCountry = country;
         const modal = document.getElementById('modalOrdersDetail');
         if (!modal) return;
-
+        
         const titleEl = document.getElementById('ordersDetailTitle');
         if (titleEl) {
             titleEl.innerHTML = `${this.getCountryFlag(country)} Detalle de Pedidos — ${country}`;
         }
+        
+        this.setOrdersDetailTab(this.ordersDetailCurrentTab);
+        modal.classList.add('active');
+    },
+
+    renderOrdersDetail() {
+        const country = this.ordersDetailCurrentCountry;
+        const sales = this.getFilteredSales().filter(guide => {
+            return this.getCountryFromCity(guide.cities) === country;
+        });
 
         const summaryEl = document.getElementById('ordersDetailSummary');
         const tableBody = document.getElementById('ordersDetailTable');
-        if (!tableBody) return;
+        const tableHead = document.getElementById('ordersDetailThead');
+        if (!tableBody || !tableHead) return;
 
         // Calculate summary
         let totalRevenue = 0, totalCost = 0, totalShipping = 0, totalUnits = 0;
@@ -3837,13 +3874,30 @@ const IncomeStatementModule = {
         }
 
         if (sales.length === 0) {
+            tableHead.innerHTML = '';
             tableBody.innerHTML = `
                 <tr>
                     <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         No hay pedidos para ${country} en el período seleccionado.
                     </td>
                 </tr>`;
-        } else {
+            return;
+        }
+
+        if (this.ordersDetailCurrentTab === 'list') {
+            tableHead.innerHTML = `
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>Cliente / Ciudad</th>
+                    <th>Productos (Ref. Dropi)</th>
+                    <th style="text-align: center;">Uds.</th>
+                    <th style="text-align: right;">Venta</th>
+                    <th style="text-align: right;">Costo Prod.</th>
+                    <th style="text-align: right;">Envío</th>
+                    <th style="text-align: right;">Utilidad</th>
+                    <th>Fecha / Estado</th>
+                </tr>
+            `;
             tableBody.innerHTML = sales.map((guide, idx) => {
                 const city = guide.cities?.name || '-';
                 const status = guide.guide_statuses?.name || '-';
@@ -3858,7 +3912,10 @@ const IncomeStatementModule = {
                         const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
                         cost += qty * unitCost;
                         units += qty;
-                        products.push(`${item.products?.name || 'Producto'} x${qty}`);
+                        
+                        const rawName = item.products?.name || 'Producto Desconocido';
+                        const mappedName = this.productMappings[rawName] || rawName;
+                        products.push(`${mappedName} x${qty}`);
                     });
                 }
                 const profit = revenue - cost - shipping;
@@ -3884,9 +3941,149 @@ const IncomeStatementModule = {
                         </td>
                     </tr>`;
             }).join('');
-        }
+        } else {
+            // Grouped Tab
+            tableHead.innerHTML = `
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>Referencia / Producto (Maestro)</th>
+                    <th style="text-align: right;">Pedidos</th>
+                    <th style="text-align: right;">Uds.</th>
+                    <th style="text-align: right;">Ventas</th>
+                    <th style="text-align: right;">Costo Prod.</th>
+                    <th style="text-align: right;">Costo Envíos</th>
+                    <th style="text-align: right;">Util. Bruta (Sin Fletes)</th>
+                    <th style="text-align: center;">Margen</th>
+                </tr>
+            `;
 
-        modal.classList.add('active');
+            const groupedMap = {};
+            sales.forEach(guide => {
+                const revenue = parseFloat(guide.total_amount || 0);
+                const shipping = parseFloat(guide.shipping_cost || 0);
+                
+                let totalItemsCost = 0;
+                const items = guide.guide_items || [];
+                items.forEach(item => {
+                    const rawCost = parseFloat(item.products?.cost || 0);
+                    const cost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
+                    totalItemsCost += (parseInt(item.quantity || 0) * cost);
+                });
+
+                items.forEach(item => {
+                    const qty = parseInt(item.quantity || 0);
+                    const rawCost = parseFloat(item.products?.cost || 0);
+                    const cost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
+                    const realCost = qty * cost;
+                    
+                    const rawName = item.products?.name || 'Producto Desconocido';
+                    const mappedName = this.productMappings[rawName] || rawName;
+
+                    const shippingProp = items.length > 0 ? (shipping / items.length) : 0;
+                    const revProp = totalItemsCost > 0 ? (realCost / totalItemsCost) * revenue : (revenue / items.length);
+
+                    if (!groupedMap[mappedName]) {
+                        groupedMap[mappedName] = { name: mappedName, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0 };
+                    }
+                    groupedMap[mappedName].orders += 1;
+                    groupedMap[mappedName].units += qty;
+                    groupedMap[mappedName].revenue += revProp;
+                    groupedMap[mappedName].cost += realCost;
+                    groupedMap[mappedName].shipping += shippingProp;
+                });
+            });
+
+            const groupedArray = Object.values(groupedMap).sort((a, b) => b.revenue - a.revenue);
+
+            tableBody.innerHTML = groupedArray.map((prod, idx) => {
+                const profit = prod.revenue - prod.cost - prod.shipping; // Fletes country is omitted from row, only total
+                const margin = prod.revenue > 0 ? ((profit / prod.revenue) * 100).toFixed(1) : '0.0';
+
+                return `
+                    <tr>
+                        <td style="font-weight: 600; color: var(--text-muted); font-size: 0.8rem;">${idx + 1}</td>
+                        <td style="font-weight: 600;">${prod.name}</td>
+                        <td style="text-align: right;">${prod.orders}</td>
+                        <td style="text-align: right;">${prod.units}</td>
+                        <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(prod.revenue)}</td>
+                        <td style="text-align: right; color: var(--danger);">${this.formatCurrency(prod.cost)}</td>
+                        <td style="text-align: right; color: var(--danger);">${this.formatCurrency(prod.shipping)}</td>
+                        <td style="text-align: right; font-weight: 600; color: ${profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(profit)}</td>
+                        <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(margin) >= 30 ? 'good' : parseFloat(margin) >= 15 ? 'warning' : 'bad'}">${margin}%</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+    },
+
+    openGroupReferencesModal() {
+        const sales = this.getFilteredSales();
+        const uniqueRawRefs = {};
+        
+        sales.forEach(guide => {
+            if (guide.guide_items) {
+                guide.guide_items.forEach(item => {
+                    const rawName = item.products?.name;
+                    if (rawName && !uniqueRawRefs[rawName]) {
+                        uniqueRawRefs[rawName] = true;
+                    }
+                });
+            }
+        });
+        
+        const listEl = document.getElementById('groupReferencesList');
+        const refsArray = Object.keys(uniqueRawRefs).sort();
+        
+        if (refsArray.length === 0) {
+            listEl.innerHTML = '<div style="color:var(--text-muted); font-size:0.9rem;">No hay referencias de Dropi disponibles.</div>';
+        } else {
+            listEl.innerHTML = refsArray.map(ref => {
+                const isMapped = this.productMappings[ref];
+                let extraText = '';
+                if (isMapped && isMapped !== ref) {
+                    extraText = `<span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem;">(Agrupado en: ${isMapped})</span>`;
+                }
+                return `
+                    <label style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(255,255,255,0.03); border-radius: 4px; cursor: pointer;">
+                        <input type="checkbox" name="group_refs" value="${ref.replace(/"/g, '&quot;')}">
+                        <span style="font-size: 0.9rem; flex: 1;">${ref}</span>
+                        ${extraText}
+                    </label>
+                `;
+            }).join('');
+        }
+        
+        document.getElementById('groupRefMasterName').value = '';
+        document.getElementById('modalGroupReferences').classList.add('active');
+    },
+
+    async submitGroupReferences() {
+        const masterName = document.getElementById('groupRefMasterName').value.trim();
+        if (!masterName) {
+            Utils.showToast('Debes ingresar un Nombre Maestro', 'error');
+            return;
+        }
+        
+        const checkboxes = document.querySelectorAll('#groupReferencesList input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) {
+            Utils.showToast('Debes seleccionar al menos una referencia', 'error');
+            return;
+        }
+        
+        checkboxes.forEach(cb => {
+            this.productMappings[cb.value] = masterName;
+        });
+        
+        localStorage.setItem('is_product_mappings', JSON.stringify(this.productMappings));
+        
+        Utils.showToast(`Se han agrupado ${checkboxes.length} referencias en "${masterName}"`, 'success');
+        document.getElementById('modalGroupReferences').classList.remove('active');
+        
+        // Re-render
+        if (this.ordersDetailCurrentCountry) {
+            this.renderOrdersDetail();
+        }
+        await this.render();
     },
 
     closeOrdersDetailModal() {

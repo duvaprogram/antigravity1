@@ -4909,6 +4909,37 @@
         </div>
     </div>
 
+    <!-- Modal: Agrupar Referencias Manualmente -->
+    <div class="modal" id="modalGroupReferences">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h2>Agrupar Referencias (Dropi)</h2>
+                <button class="modal-close" data-close="modalGroupReferences">&times;</button>
+            </div>
+            <div style="padding: 1rem; border-bottom: 1px solid var(--border); background: var(--surface-hover);">
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+                    Selecciona varias referencias originales de Dropi y escribe un "Nombre Maestro". Todos los pedidos que contengan estas referencias se sumarán bajo el nuevo nombre.
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="groupRefMasterName">Nombre de Producto Maestro *</label>
+                    <input type="text" id="groupRefMasterName" placeholder="Ej: Reloj Inteligente Serie 8" required>
+                </div>
+            </div>
+            <form id="formGroupReferences">
+                <div style="max-height: 400px; overflow-y: auto; padding: 1rem;">
+                    <div style="font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem;">Referencias Originales de Dropi:</div>
+                    <div id="groupReferencesList" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                        <!-- Checkboxes cargados por JS -->
+                    </div>
+                </div>
+                <div class="form-actions" style="padding: 1rem; border-top: 1px solid var(--border);">
+                    <button type="button" class="btn btn-secondary" data-close="modalGroupReferences">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" style="background: #8b5cf6; border-color: #8b5cf6;">Guardar Agrupación</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal: Orders Detail (Magnifying Glass) -->
     <div class="modal" id="modalOrdersDetail">
         <div class="modal-content" style="max-width: 1100px; width: 95vw;">
@@ -4926,21 +4957,27 @@
                 <!-- Summary KPIs -->
                 <div id="ordersDetailSummary" style="margin-bottom: 1.25rem;"></div>
 
+                <!-- Tabs -->
+                <div style="display: flex; gap: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
+                    <button id="tabOrdersDetailGrouped" class="tab-btn" onclick="IncomeStatementModule.setOrdersDetailTab('grouped')" style="background: none; border: none; padding: 0.5rem 1rem; color: var(--primary); font-weight: 600; border-bottom: 2px solid var(--primary); cursor: pointer;">Agrupado por Referencia</button>
+                    <button id="tabOrdersDetailList" class="tab-btn" onclick="IncomeStatementModule.setOrdersDetailTab('list')" style="background: none; border: none; padding: 0.5rem 1rem; color: var(--text-muted); cursor: pointer;">Todos los Pedidos (Lista)</button>
+                </div>
+
+                <div id="ordersDetailActions" style="margin-bottom: 1rem; display: flex; justify-content: flex-end;">
+                     <button class="btn btn-sm" style="background: var(--surface-hover); border: 1px solid var(--border); color: var(--text);" onclick="IncomeStatementModule.openGroupReferencesModal()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: middle;">
+                            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                            <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                        </svg>
+                        Agrupar Manualmente
+                    </button>
+                </div>
+
                 <!-- Orders Table -->
                 <div class="table-container">
                     <table class="table">
-                        <thead>
-                            <tr>
-                                <th style="width: 40px;">#</th>
-                                <th>Cliente / Ciudad</th>
-                                <th>Productos</th>
-                                <th style="text-align: center;">Uds.</th>
-                                <th style="text-align: right;">Venta</th>
-                                <th style="text-align: right;">Costo Prod.</th>
-                                <th style="text-align: right;">Envío</th>
-                                <th style="text-align: right;">Utilidad</th>
-                                <th>Fecha / Estado</th>
-                            </tr>
+                        <thead id="ordersDetailThead">
+                            <!-- JS fills this -->
                         </thead>
                         <tbody id="ordersDetailTable">
                             <tr>
