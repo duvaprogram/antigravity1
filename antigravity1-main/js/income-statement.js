@@ -1354,13 +1354,14 @@ const IncomeStatementModule = {
         return isNaN(num) ? 0 : num;
     },
 
-    showImportLoadingOverlay(title = 'Procesando Archivo Excel...', subtitle = 'Analizando registros, identificando referencias y agrupando productos por lote.') {
+    showImportLoadingOverlay(title = 'Procesando Archivo Excel...', subtitle = 'Analizando registros y agrupando productos.') {
         const overlay = document.getElementById('importExcelLoadingOverlay');
         if (overlay) {
             const titleEl = document.getElementById('importLoadingTitle');
             const subEl = document.getElementById('importLoadingSubtitle');
             if (titleEl) titleEl.innerText = title;
             if (subEl) subEl.innerText = subtitle;
+            this.updateImportProgress(0, 'Preparando lectura del archivo...');
             overlay.classList.add('active');
             overlay.style.display = 'flex';
         }
@@ -1374,221 +1375,231 @@ const IncomeStatementModule = {
         }
     },
 
+    updateImportProgress(percent, detail) {
+        const bar = document.getElementById('importProgressBar');
+        const text = document.getElementById('importProgressText');
+        const detailEl = document.getElementById('importProgressDetail');
+        if (bar) bar.style.width = `${Math.min(percent, 100)}%`;
+        if (text) text.textContent = `${Math.round(percent)}%`;
+        if (detailEl && detail) detailEl.textContent = detail;
+    },
+
     async handleExternalSalesFileUpload(e) {
         const file = e.target.files[0];
         if (!file) return;
 
         this.showImportLoadingOverlay(`Analizando ${file.name}...`, 'Leyendo filas de Excel y agrupando productos por referencia...');
 
-        setTimeout(async () => {
-            try {
-                const data = await file.arrayBuffer();
-                const workbook = XLSX.read(data, { type: 'array' });
-                
-                const sheetName = workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
+        // Use requestAnimationFrame to ensure the overlay renders before heavy work
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        try {
+            this.updateImportProgress(5, 'Leyendo archivo Excel...');
+            await new Promise(r => setTimeout(r, 50));
 
-                if (!rows || rows.length < 2) {
-                    this.hideImportLoadingOverlay();
-                    this.showImportErrorModal(
-                        'Archivo sin Datos',
-                        'El archivo seleccionado está vacío o no contiene filas con datos de ventas.',
-                        `Hoja detectada: "${sheetName}" | Filas totales: ${rows ? rows.length : 0}`
-                    );
-                    e.target.value = '';
-                    return;
-                }
+            const data = await file.arrayBuffer();
+            this.updateImportProgress(15, 'Decodificando hoja de cálculo...');
+            await new Promise(r => setTimeout(r, 30));
 
-                let headerRowIndex = -1;
-                for (let i = 0; i < Math.min(rows.length, 10); i++) {
-                    const r = rows[i] || [];
-                    const rStr = r.map(c => String(c || '').toLowerCase()).join(' ');
-                    if (rStr.includes('estado') || rStr.includes('recaudo') || rStr.includes('flete')) {
-                        headerRowIndex = i;
-                        break;
-                    }
-                }
+            const workbook = XLSX.read(data, { type: 'array' });
+            this.updateImportProgress(25, 'Identificando columnas y cabeceras...');
+            await new Promise(r => setTimeout(r, 30));
+            
+            const sheetName = workbook.SheetNames[0];
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
 
-                let statusIdx = 2; // Col C
-                let productIdx = 12; // Col M
-                let stockIdx = 13; // Col N
-                let contentIdx = 15; // Col P
-                let recaudoIdx = 25; // Col Z
-                let costoIdx = 26; // Col AA (Costo de Producto)
-                let safeFleteEntregaIdx = 27; // Col AB
-                let safeFleteDevIdx = 28; // Col AC
-
-                let startRowIndex = 0;
-
-                if (headerRowIndex !== -1) {
-                    startRowIndex = headerRowIndex + 1;
-                    const headers = (rows[headerRowIndex] || []).map(c => String(c || '').trim().toLowerCase());
-                    
-                    const findColExact = (keywords, fallbackIdx) => {
-                        let idx = headers.findIndex(h => keywords.some(k => h === k));
-                        if (idx === -1) {
-                            idx = headers.findIndex(h => keywords.some(k => h.includes(k)));
-                        }
-                        return idx !== -1 ? idx : fallbackIdx;
-                    };
-
-                    statusIdx = findColExact(['estado', 'estado guia', 'estado del pedido'], 2);
-                    productIdx = findColExact(['producto', 'nombre producto', 'articulo'], 12);
-                    stockIdx = findColExact(['id del stock', 'stock id', 'sku', 'id stock'], 13);
-                    contentIdx = findColExact(['contenido del producto', 'contenido', 'detalle'], 15);
-                    recaudoIdx = findColExact(['recaudo', 'valor recaudo', 'monto recaudo'], 25);
-                    costoIdx = findColExact(['costo del producto', 'costo producto', 'costo prod', 'costo'], 26);
-
-                    const fleteEntregaIdx = headers.findIndex(h => h.includes('flete') && !h.includes('devoluc'));
-                    const fleteDevIdx = headers.findIndex(h => h.includes('devoluc') || h.includes('flete por dev'));
-                    if (fleteEntregaIdx !== -1) safeFleteEntregaIdx = fleteEntregaIdx;
-                    if (fleteDevIdx !== -1) safeFleteDevIdx = fleteDevIdx;
-                } else {
-                    startRowIndex = 0;
-                }
-
-                let productsList = Database.products || [];
-                if (productsList.length === 0 && typeof Database.getProducts === 'function') {
-                    productsList = await Database.getProducts();
-                }
-
-                const productGroupMap = {};
-                let totalScannedGuides = 0;
-                let totalDeliveredGuides = 0;
-                let totalReturnedGuides = 0;
-
-                for (let i = startRowIndex; i < rows.length; i++) {
-                    const row = rows[i];
-                    if (!row || row.length === 0) continue;
-
-                    const status = String(row[statusIdx] || '').trim();
-                    const rawProduct = String(row[productIdx] || '').trim();
-                    const stockId = String(row[stockIdx] || '').trim();
-                    const content = String(row[contentIdx] || '').trim();
-                    const col0 = String(row[0] || '').trim();
-
-                    // Skip non-data rows
-                    if (!status && !rawProduct && !stockId && !content && (isNaN(parseInt(col0)) || col0 === '')) continue;
-                    if (status.toLowerCase() === 'estado' || rawProduct.toLowerCase() === 'producto') continue;
-
-                    totalScannedGuides++;
-
-                    const recaudo = this.parseExcelNumber(row[recaudoIdx]);
-                    const costoProd = this.parseExcelNumber(row[costoIdx]);
-                    const fleteEntrega = this.parseExcelNumber(row[safeFleteEntregaIdx]);
-                    const fleteDevolucion = this.parseExcelNumber(row[safeFleteDevIdx]);
-
-                    const statusLower = status.toLowerCase();
-                    const isReturned = statusLower.includes('devuelt') || statusLower.includes('cancel');
-
-                    if (isReturned) totalReturnedGuides++;
-                    else totalDeliveredGuides++;
-
-                    // Grouping Key by Col N (Stock ID / Referencia) first, fallback to Col M / Col P
-                    let groupKey = '';
-                    if (stockId) {
-                        groupKey = stockId.toLowerCase();
-                    } else if (rawProduct) {
-                        groupKey = rawProduct.toLowerCase();
-                    } else if (content) {
-                        groupKey = content.toLowerCase();
-                    } else {
-                        groupKey = 'sin_referencia';
-                    }
-
-                    // Display Name from Col M (Nombre de la referencia), fallback to Col P, Col N
-                    let matchedProduct = null;
-                    if (stockId) {
-                        const cleanStock = stockId.split(' ')[0];
-                        matchedProduct = productsList.find(p => String(p.sku || p.code || p.id).toLowerCase() === cleanStock.toLowerCase());
-                    }
-                    if (!matchedProduct && (rawProduct || content)) {
-                        const searchStr = (rawProduct || content).toLowerCase();
-                        matchedProduct = productsList.find(p => searchStr.includes((p.name || '').toLowerCase()) || (p.name || '').toLowerCase().includes(searchStr));
-                    }
-
-                    let finalProductName = matchedProduct ? matchedProduct.name : (rawProduct || content || (stockId ? `Ref: ${stockId}` : 'Producto Externo'));
-                    finalProductName = finalProductName.replace(/^\d+\s+/, '').trim();
-                    if (!finalProductName) finalProductName = stockId || 'Producto Externo';
-
-                    if (!productGroupMap[groupKey]) {
-                        productGroupMap[groupKey] = {
-                            country: 'Ecuador',
-                            sale_date: new Date().toISOString().split('T')[0],
-                            description: finalProductName,
-                            stock_id: stockId,
-                            revenue: 0,
-                            product_cost: 0,
-                            shipping_cost: 0,
-                            delivered: 0,
-                            returned: 0
-                        };
-                    }
-
-                    const grp = productGroupMap[groupKey];
-
-                    if (isReturned) {
-                        grp.returned += 1;
-                        grp.shipping_cost += (fleteDevolucion > 0 ? fleteDevolucion : fleteEntrega);
-                    } else {
-                        grp.delivered += 1;
-                        grp.revenue += recaudo; // Sum Col Z (Total Recaudo)
-                        grp.product_cost += costoProd; // Sum Col AA (Costo)
-                        grp.shipping_cost += fleteEntrega; // Sum Col AB
-                    }
-                }
-
-                const recordsToInsert = Object.values(productGroupMap);
-
-                if (recordsToInsert.length === 0) {
-                    this.hideImportLoadingOverlay();
-                    this.showImportErrorModal(
-                        'No se Detectaron Registros de Ventas',
-                        `Se escanearon ${totalScannedGuides} filas en la hoja "${sheetName}", pero ninguna contenía el formato válido de ventas.`,
-                        `Causa: No se encontraron datos de ventas legibles en las columnas de Estado (Col. C), Total Recaudo (Col. Z), Costo (Col. AA) o Fletes (Col. AB/AC).`
-                    );
-                    e.target.value = '';
-                    return;
-                }
-
-                recordsToInsert.totalScannedGuides = totalScannedGuides;
-                recordsToInsert.totalDeliveredGuides = totalDeliveredGuides;
-                recordsToInsert.totalReturnedGuides = totalReturnedGuides;
-
-                // Hide overlay and open preview modal immediately
-                this.hideImportLoadingOverlay();
-                this.pendingImportRecords = recordsToInsert;
-                this.openImportPreviewModal(recordsToInsert, file.name);
-                e.target.value = '';
-
-            } catch (error) {
-                console.error('Error reading Excel:', error);
+            if (!rows || rows.length < 2) {
                 this.hideImportLoadingOverlay();
                 this.showImportErrorModal(
-                    'Error al Leer el Archivo Excel',
-                    'Ocurrió una falla técnica inesperada al procesar la hoja de cálculo.',
-                    error.stack || error.message || String(error)
+                    'Archivo sin Datos',
+                    'El archivo seleccionado está vacío o no contiene filas con datos de ventas.',
+                    `Hoja detectada: "${sheetName}" | Filas totales: ${rows ? rows.length : 0}`
                 );
                 e.target.value = '';
+                return;
             }
-        }, 50);
+
+            this.updateImportProgress(30, `${rows.length} filas encontradas. Identificando columnas...`);
+            await new Promise(r => setTimeout(r, 30));
+
+            let headerRowIndex = -1;
+            for (let i = 0; i < Math.min(rows.length, 10); i++) {
+                const r = rows[i] || [];
+                const rStr = r.map(c => String(c || '').toLowerCase()).join(' ');
+                if (rStr.includes('estado') || rStr.includes('recaudo') || rStr.includes('flete')) {
+                    headerRowIndex = i;
+                    break;
+                }
+            }
+
+            let statusIdx = 2, productIdx = 12, stockIdx = 13, contentIdx = 15;
+            let recaudoIdx = 25, costoIdx = 26, safeFleteEntregaIdx = 27, safeFleteDevIdx = 28;
+            let startRowIndex = 0;
+
+            if (headerRowIndex !== -1) {
+                startRowIndex = headerRowIndex + 1;
+                const headers = (rows[headerRowIndex] || []).map(c => String(c || '').trim().toLowerCase());
+                const findColExact = (keywords, fallbackIdx) => {
+                    let idx = headers.findIndex(h => keywords.some(k => h === k));
+                    if (idx === -1) idx = headers.findIndex(h => keywords.some(k => h.includes(k)));
+                    return idx !== -1 ? idx : fallbackIdx;
+                };
+                statusIdx = findColExact(['estado', 'estado guia', 'estado del pedido'], 2);
+                productIdx = findColExact(['producto', 'nombre producto', 'articulo'], 12);
+                stockIdx = findColExact(['id del stock', 'stock id', 'sku', 'id stock'], 13);
+                contentIdx = findColExact(['contenido del producto', 'contenido', 'detalle'], 15);
+                recaudoIdx = findColExact(['recaudo', 'valor recaudo', 'monto recaudo'], 25);
+                costoIdx = findColExact(['costo del producto', 'costo producto', 'costo prod', 'costo'], 26);
+                const fleteEntregaIdx = headers.findIndex(h => h.includes('flete') && !h.includes('devoluc'));
+                const fleteDevIdx = headers.findIndex(h => h.includes('devoluc') || h.includes('flete por dev'));
+                if (fleteEntregaIdx !== -1) safeFleteEntregaIdx = fleteEntregaIdx;
+                if (fleteDevIdx !== -1) safeFleteDevIdx = fleteDevIdx;
+            }
+
+            this.updateImportProgress(35, 'Columnas identificadas. Cargando productos del catálogo...');
+            await new Promise(r => setTimeout(r, 30));
+
+            let productsList = Database.products || [];
+            if (productsList.length === 0 && typeof Database.getProducts === 'function') {
+                productsList = await Database.getProducts();
+            }
+
+            this.updateImportProgress(40, 'Procesando pedidos y agrupando por referencia...');
+            await new Promise(r => setTimeout(r, 30));
+
+            const productGroupMap = {};
+            let totalScannedGuides = 0;
+            let totalDeliveredGuides = 0;
+            let totalReturnedGuides = 0;
+            const totalDataRows = rows.length - startRowIndex;
+            const progressStart = 40;
+            const progressEnd = 90;
+
+            for (let i = startRowIndex; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row || row.length === 0) continue;
+
+                // Update progress bar every 20 rows
+                if ((i - startRowIndex) % 20 === 0) {
+                    const pct = progressStart + ((i - startRowIndex) / totalDataRows) * (progressEnd - progressStart);
+                    this.updateImportProgress(pct, `Procesando fila ${i - startRowIndex + 1} de ${totalDataRows}...`);
+                    await new Promise(r => setTimeout(r, 0)); // yield to browser
+                }
+
+                const status = String(row[statusIdx] || '').trim();
+                const rawProduct = String(row[productIdx] || '').trim();
+                const stockId = String(row[stockIdx] || '').trim();
+                const content = String(row[contentIdx] || '').trim();
+                const col0 = String(row[0] || '').trim();
+
+                if (!status && !rawProduct && !stockId && !content && (isNaN(parseInt(col0)) || col0 === '')) continue;
+                if (status.toLowerCase() === 'estado' || rawProduct.toLowerCase() === 'producto') continue;
+
+                totalScannedGuides++;
+
+                const recaudo = this.parseExcelNumber(row[recaudoIdx]);
+                const costoProd = this.parseExcelNumber(row[costoIdx]);
+                const fleteEntrega = this.parseExcelNumber(row[safeFleteEntregaIdx]);
+                const fleteDevolucion = this.parseExcelNumber(row[safeFleteDevIdx]);
+
+                const statusLower = status.toLowerCase();
+                const isReturned = statusLower.includes('devuelt') || statusLower.includes('cancel');
+
+                if (isReturned) totalReturnedGuides++;
+                else totalDeliveredGuides++;
+
+                let groupKey = '';
+                if (stockId) groupKey = stockId.toLowerCase();
+                else if (rawProduct) groupKey = rawProduct.toLowerCase();
+                else if (content) groupKey = content.toLowerCase();
+                else groupKey = 'sin_referencia';
+
+                let matchedProduct = null;
+                if (stockId) {
+                    const cleanStock = stockId.split(' ')[0];
+                    matchedProduct = productsList.find(p => String(p.sku || p.code || p.id).toLowerCase() === cleanStock.toLowerCase());
+                }
+                if (!matchedProduct && (rawProduct || content)) {
+                    const searchStr = (rawProduct || content).toLowerCase();
+                    matchedProduct = productsList.find(p => searchStr.includes((p.name || '').toLowerCase()) || (p.name || '').toLowerCase().includes(searchStr));
+                }
+
+                let finalProductName = matchedProduct ? matchedProduct.name : (rawProduct || content || (stockId ? `Ref: ${stockId}` : 'Producto Externo'));
+                finalProductName = finalProductName.replace(/^\d+\s+/, '').trim();
+                if (!finalProductName) finalProductName = stockId || 'Producto Externo';
+
+                if (!productGroupMap[groupKey]) {
+                    productGroupMap[groupKey] = {
+                        country: 'Ecuador',
+                        sale_date: new Date().toISOString().split('T')[0],
+                        description: finalProductName,
+                        stock_id: stockId,
+                        revenue: 0,
+                        product_cost: 0,
+                        shipping_cost: 0,
+                        delivered: 0,
+                        returned: 0
+                    };
+                }
+
+                const grp = productGroupMap[groupKey];
+                if (isReturned) {
+                    grp.returned += 1;
+                    grp.shipping_cost += (fleteDevolucion > 0 ? fleteDevolucion : fleteEntrega);
+                } else {
+                    grp.delivered += 1;
+                    grp.revenue += recaudo;
+                    grp.product_cost += costoProd;
+                    grp.shipping_cost += fleteEntrega;
+                }
+            }
+
+            this.updateImportProgress(92, 'Finalizando agrupación...');
+            await new Promise(r => setTimeout(r, 50));
+
+            const recordsToInsert = Object.values(productGroupMap);
+
+            if (recordsToInsert.length === 0) {
+                this.hideImportLoadingOverlay();
+                this.showImportErrorModal(
+                    'No se Detectaron Registros de Ventas',
+                    `Se escanearon ${totalScannedGuides} filas en la hoja "${sheetName}", pero ninguna contenía el formato válido de ventas.`,
+                    `Causa: No se encontraron datos de ventas legibles.`
+                );
+                e.target.value = '';
+                return;
+            }
+
+            recordsToInsert.totalScannedGuides = totalScannedGuides;
+            recordsToInsert.totalDeliveredGuides = totalDeliveredGuides;
+            recordsToInsert.totalReturnedGuides = totalReturnedGuides;
+
+            this.updateImportProgress(100, `¡Listo! ${recordsToInsert.length} referencias agrupadas.`);
+            await new Promise(r => setTimeout(r, 400)); // brief pause to show 100%
+
+            this.hideImportLoadingOverlay();
+            this.pendingImportRecords = recordsToInsert;
+            this.openImportPreviewModal(recordsToInsert, file.name);
+            e.target.value = '';
+
+        } catch (error) {
+            console.error('Error reading Excel:', error);
+            this.hideImportLoadingOverlay();
+            this.showImportErrorModal(
+                'Error al Leer el Archivo Excel',
+                'Ocurrió una falla técnica inesperada al procesar la hoja de cálculo.',
+                error.stack || error.message || String(error)
+            );
+            e.target.value = '';
+        }
     },
 
     openImportPreviewModal(records, fileName) {
         const modal = document.getElementById('modalImportExcelPreview');
-        if (!modal) {
-            console.error('Modal modalImportExcelPreview not found');
-            return;
-        }
+        if (!modal) { console.error('Modal modalImportExcelPreview not found'); return; }
 
-        let totalRev = 0;
-        let totalCost = 0;
-        let totalShip = 0;
-        let deliveredCount = 0;
-        let returnedCount = 0;
-
+        let totalRev = 0, totalCost = 0, totalShip = 0, deliveredCount = 0, returnedCount = 0;
         records.forEach(r => {
             totalRev += (r.revenue || 0);
             totalCost += (r.product_cost || 0);
@@ -1596,67 +1607,135 @@ const IncomeStatementModule = {
             deliveredCount += (r.delivered || 0);
             returnedCount += (r.returned || 0);
         });
-
         const totalScanned = records.totalScannedGuides || (deliveredCount + returnedCount);
 
-        // Summary Cards
         const cardsEl = document.getElementById('importPreviewSummaryCards');
         if (cardsEl) {
             cardsEl.innerHTML = `
                 <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
                     <div style="font-size: 0.75rem; color: var(--text-muted);">Pedidos Procesados</div>
-                    <div style="font-size: 1.4rem; font-weight: 700; color: #34d399;">${totalScanned} pedidos</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: #34d399;">${totalScanned}</div>
                     <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${records.length} referencias agrupadas</div>
                 </div>
                 <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
                     <div style="font-size: 0.75rem; color: var(--text-muted);">Total Recaudo (Col. Z)</div>
                     <div style="font-size: 1.4rem; font-weight: 700; color: #60a5fa;">$${totalRev.toFixed(2)}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${deliveredCount} entregados</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${deliveredCount} entregados / ${returnedCount} devueltos</div>
                 </div>
                 <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">Costos & Fletes Total</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">Costos & Fletes</div>
                     <div style="font-size: 1.4rem; font-weight: 700; color: #f87171;">$${(totalCost + totalShip).toFixed(2)}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Prod (Col. AA): $${totalCost.toFixed(2)} | Fletes: $${totalShip.toFixed(2)}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Prod: $${totalCost.toFixed(2)} | Fletes: $${totalShip.toFixed(2)}</div>
                 </div>`;
         }
 
-        // Products Badges
-        const badgesEl = document.getElementById('importPreviewProductsBadge');
-        if (badgesEl) {
-            badgesEl.innerHTML = records.map(r => `
-                <span class="badge" style="background: rgba(255,255,255,0.08); color: var(--text); border: 1px solid var(--border); padding: 0.3rem 0.6rem; font-size: 0.78rem;">
-                    📦 <strong>${r.description}</strong> ${r.stock_id ? `<span style="opacity:0.7;">(Ref: ${r.stock_id})</span>` : ''} (${r.delivered} ent. / ${r.returned} dev.)
-                </span>`).join('');
-        }
-
-        // Table Sample
-        const tableBody = document.getElementById('importPreviewTableBody');
-        if (tableBody) {
-            tableBody.innerHTML = records.map(r => `
-                <tr>
-                    <td style="font-weight: 600; color: var(--text);">
-                        ${r.description}
-                        ${r.stock_id ? `<div style="font-size:0.72rem; color:var(--text-muted);">Ref Col N: ${r.stock_id}</div>` : ''}
-                    </td>
-                    <td style="text-align: center; color: var(--success); font-weight: 600;">${r.delivered}</td>
-                    <td style="text-align: center; color: var(--danger);">${r.returned}</td>
-                    <td style="text-align: right; color: var(--success); font-weight: 600;">$${r.revenue.toFixed(2)}</td>
-                    <td style="text-align: right; color: var(--danger);">$${r.product_cost.toFixed(2)}</td>
-                    <td style="text-align: right; color: var(--primary);">$${r.shipping_cost.toFixed(2)}</td>
-                </tr>`).join('');
-        }
+        this.renderImportPreviewTable(records);
 
         const confirmBtn = document.getElementById('btnConfirmImportExcel');
-        if (confirmBtn) {
-            confirmBtn.innerText = `Confirmar e Importar ${records.length} Referencias Agrupadas`;
-        }
+        if (confirmBtn) confirmBtn.innerText = `Confirmar e Importar ${records.length} Referencias`;
 
-        // Explicitly activate modal display and z-index
+        // Reset select all checkbox
+        const selectAll = document.getElementById('importSelectAll');
+        if (selectAll) selectAll.checked = false;
+        this.updateManualGroupCount();
+
         modal.style.display = 'flex';
         modal.style.opacity = '1';
         modal.style.visibility = 'visible';
         modal.style.zIndex = '999999';
         modal.classList.add('active');
+    },
+
+    renderImportPreviewTable(records) {
+        const tableBody = document.getElementById('importPreviewTableBody');
+        if (!tableBody) return;
+        tableBody.innerHTML = records.map((r, idx) => `
+            <tr data-import-idx="${idx}" style="cursor: pointer;" onclick="IncomeStatementModule.toggleImportRowCheck(${idx}, event)">
+                <td style="text-align: center;" onclick="event.stopPropagation();">
+                    <input type="checkbox" class="import-row-check" data-idx="${idx}" onchange="IncomeStatementModule.updateManualGroupCount()" style="cursor: pointer;">
+                </td>
+                <td style="font-weight: 600; color: var(--text);">
+                    ${r.description}
+                    ${r.stock_id ? `<div style="font-size:0.7rem; color:var(--text-muted);">Ref: ${r.stock_id}</div>` : ''}
+                </td>
+                <td style="text-align: center; color: var(--success); font-weight: 600;">${r.delivered}</td>
+                <td style="text-align: center; color: var(--danger);">${r.returned}</td>
+                <td style="text-align: right; color: var(--success); font-weight: 600;">$${(r.revenue || 0).toFixed(2)}</td>
+                <td style="text-align: right; color: var(--danger);">$${(r.product_cost || 0).toFixed(2)}</td>
+                <td style="text-align: right; color: var(--primary);">$${(r.shipping_cost || 0).toFixed(2)}</td>
+            </tr>`).join('');
+    },
+
+    toggleImportRowCheck(idx, event) {
+        if (event.target.tagName === 'INPUT') return;
+        const cb = document.querySelector(`.import-row-check[data-idx="${idx}"]`);
+        if (cb) {
+            cb.checked = !cb.checked;
+            this.updateManualGroupCount();
+        }
+    },
+
+    toggleSelectAllImport(checked) {
+        document.querySelectorAll('.import-row-check').forEach(cb => cb.checked = checked);
+        this.updateManualGroupCount();
+    },
+
+    updateManualGroupCount() {
+        const checked = document.querySelectorAll('.import-row-check:checked').length;
+        const countEl = document.getElementById('manualGroupCount');
+        const btn = document.getElementById('btnManualGroup');
+        if (countEl) countEl.textContent = checked;
+        if (btn) btn.disabled = (checked < 2);
+    },
+
+    manualGroupSelected() {
+        const records = this.pendingImportRecords;
+        if (!records || records.length === 0) return;
+
+        const checkedBoxes = document.querySelectorAll('.import-row-check:checked');
+        if (checkedBoxes.length < 2) {
+            Utils.showToast('Selecciona al menos 2 productos para agrupar.', 'warning');
+            return;
+        }
+
+        // Get the selected indices (sorted descending for safe splicing)
+        const selectedIdxs = Array.from(checkedBoxes).map(cb => parseInt(cb.dataset.idx)).sort((a, b) => a - b);
+
+        // The first selected becomes the merged record
+        const mergedIdx = selectedIdxs[0];
+        const merged = { ...records[mergedIdx] };
+        const mergedNames = [merged.description];
+
+        // Sum values from all other selected records into merged
+        for (let i = 1; i < selectedIdxs.length; i++) {
+            const src = records[selectedIdxs[i]];
+            merged.delivered += (src.delivered || 0);
+            merged.returned += (src.returned || 0);
+            merged.revenue += (src.revenue || 0);
+            merged.product_cost += (src.product_cost || 0);
+            merged.shipping_cost += (src.shipping_cost || 0);
+            if (!mergedNames.includes(src.description)) mergedNames.push(src.description);
+        }
+
+        // Ask for group name
+        const defaultName = mergedNames.length <= 3 ? mergedNames.join(' + ') : `${mergedNames[0]} (+${mergedNames.length - 1} más)`;
+        const groupName = prompt('Nombre del grupo fusionado:', defaultName);
+        if (!groupName) return; // user cancelled
+
+        merged.description = groupName.trim() || defaultName;
+
+        // Remove selected records (reverse order to maintain indices)
+        for (let i = selectedIdxs.length - 1; i >= 0; i--) {
+            records.splice(selectedIdxs[i], 1);
+        }
+
+        // Insert merged record at the beginning
+        records.unshift(merged);
+
+        // Re-render table and update summary cards
+        this.pendingImportRecords = records;
+        this.openImportPreviewModal(records, '');
+        Utils.showToast(`${selectedIdxs.length} productos agrupados en "${merged.description}"`, 'success');
     },
 
     closeImportPreviewModal() {
