@@ -104,6 +104,12 @@ const IncomeStatementModule = {
             this.productMappings = {};
         }
 
+        try {
+            this.visualMergedGroupsCountry = JSON.parse(localStorage.getItem('is_visual_merged_groups_country')) || [];
+        } catch(e) {
+            this.visualMergedGroupsCountry = [];
+        }
+
         // Import External Sales Excel Button
         const btnImportExt = document.getElementById('btnImportExternalSales');
         const inputImportExt = document.getElementById('inputImportExternalSales');
@@ -4454,7 +4460,7 @@ const IncomeStatementModule = {
             items: items
         });
         
-        this.saveData(); // Save the new group
+        localStorage.setItem('is_visual_merged_groups_country', JSON.stringify(this.visualMergedGroupsCountry));
         
         Utils.showToast(`Grupo visual "${name}" creado.`, 'success');
         this.renderConsolidatedSalesTable();
@@ -4468,7 +4474,7 @@ const IncomeStatementModule = {
         if (!confirm('¿Deshacer este grupo visual?')) return;
         
         this.visualMergedGroupsCountry.splice(groupId, 1);
-        this.saveData(); // Save the removal
+        localStorage.setItem('is_visual_merged_groups_country', JSON.stringify(this.visualMergedGroupsCountry));
         
         Utils.showToast('Grupo visual desagrupado.', 'success');
         this.renderConsolidatedSalesTable();
