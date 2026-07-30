@@ -611,38 +611,68 @@ const IncomeStatementModule = {
         const tbody = document.getElementById('isConsolidatedSalesTable');
         if (!tbody) return;
 
-        const salesByCountry = this.getSalesByCountry();
+        const sales = this.getFilteredSales();
         const freightsByCountry = this.getFreightsByCountry();
         const externalSales = this.getFilteredExternalSales();
         const allAdExpenses = this.getFilteredAdExpenses();
 
         let countryList = [];
 
-        // 1. Process Dropi Countries
-        salesByCountry.forEach(row => {
-            const countryFreight = freightsByCountry[row.country]?.totalFreight || 0;
-            const id = `Dropi_${row.country}`;
+        const dropiOrdersCount = {};
+        sales.forEach(guide => {
+            const country = this.getCountryFromCity(guide.cities);
+            dropiOrdersCount[country] = (dropiOrdersCount[country] || 0) + 1;
+        });
+
+        // 1. Process Dropi Orders (Individually)
+        sales.forEach(guide => {
+            const country = this.getCountryFromCity(guide.cities);
+            const id = `Dropi_${guide.id}`;
+            const name = `Dropi Pedido #${guide.id} (${country})`;
+
+            const count = dropiOrdersCount[country] || 1;
+            const freightProportion = (freightsByCountry[country]?.totalFreight || 0) / count;
             
             let adSpend = 0;
+            let manualAdSpend = false;
+            let countryUnlinkedAdSpend = 0;
+
             allAdExpenses.forEach(exp => {
                 if (exp.product_name === id) {
                     adSpend += parseFloat(exp.amount_spent || 0);
-                } else if (!exp.product_name && exp.country === row.country) {
-                    adSpend += parseFloat(exp.amount_spent || 0);
+                    manualAdSpend = true;
+                } else if (!exp.product_name && exp.country === country) {
+                    countryUnlinkedAdSpend += parseFloat(exp.amount_spent || 0);
                 }
             });
+
+            if (!manualAdSpend) {
+                adSpend = countryUnlinkedAdSpend / count;
+            }
+
+            let totalCost = 0;
+            let unitsSold = 0;
+            if (guide.guide_items) {
+                guide.guide_items.forEach(item => {
+                    const qty = parseInt(item.quantity || 0);
+                    const rawCost = parseFloat(item.products?.cost || 0);
+                    const cost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
+                    totalCost += qty * cost;
+                    unitsSold += qty;
+                });
+            }
             
             countryList.push({
                 id: id,
-                name: `${row.country} (Dropi)`,
+                name: name,
                 isDropi: true,
-                country: row.country,
-                orderCount: row.orderCount,
-                unitsSold: row.unitsSold,
-                totalRevenue: row.totalRevenue,
-                totalCost: row.totalCost,
-                totalShipping: row.totalShipping,
-                freight: countryFreight,
+                country: country,
+                orderCount: 1,
+                unitsSold: unitsSold,
+                totalRevenue: parseFloat(guide.total_amount || 0),
+                totalCost: totalCost,
+                totalShipping: parseFloat(guide.shipping_cost || 0),
+                freight: freightProportion,
                 adSpend: adSpend
             });
         });
@@ -4470,20 +4500,15 @@ const IncomeStatementModule = {
         
         itemIds.forEach(itemId => {
             if (itemId.startsWith('Dropi_')) {
-                const country = itemId.replace('Dropi_', '');
-                const countryOrders = this.guides.filter(g => 
-                    g.country === country && 
-                    g.status !== 'CANCELLED' && 
-                    g.status !== 'ANULADO'
-                );
-                // Attach source
-                countryOrders.forEach(o => {
+                const guideId = itemId.replace('Dropi_', '');
+                const order = this.guides.find(g => String(g.id) === String(guideId));
+                if (order && order.status !== 'CANCELLED' && order.status !== 'ANULADO') {
                     allOrders.push({
-                        ...o,
+                        ...order,
                         __source: 'Dropi',
-                        __sourceName: `Dropi (${country})`
+                        __sourceName: `Dropi (${this.getCountryFromCity(order.cities)})`
                     });
-                });
+                }
             } else if (itemId.startsWith('Ext_')) {
                 const extId = itemId.replace('Ext_', '');
                 const extSale = this.externalSales.find(s => s.id === extId);
