@@ -1118,6 +1118,33 @@ const IncomeStatementModule = {
 
         const expenses = this.getFilteredOperationalExpenses();
 
+        // Update KPIs
+        let totalSum = 0;
+        let totalOrders = 0;
+        
+        // Sum expenses
+        expenses.forEach(exp => {
+            totalSum += parseFloat(exp.amount || 0);
+        });
+        
+        // Get total delivered orders for the current filter
+        const dropiSales = this.getFilteredSales();
+        const extSales = this.getFilteredExternalSales();
+        const extDelivered = extSales.reduce((sum, s) => sum + parseInt(s.delivered || 0), 0);
+        totalOrders = dropiSales.length + extDelivered;
+        
+        // Calculate indirect cost
+        const indirectCost = totalOrders > 0 ? (totalSum / totalOrders) : 0;
+        
+        // Update DOM
+        const elSum = document.getElementById('opExpensesTotalSum');
+        const elOrders = document.getElementById('opExpensesTotalOrders');
+        const elIndirect = document.getElementById('opExpensesIndirectCost');
+        
+        if (elSum) elSum.textContent = this.formatCurrency(totalSum);
+        if (elOrders) elOrders.textContent = totalOrders;
+        if (elIndirect) elIndirect.textContent = this.formatCurrency(indirectCost);
+
         if (expenses.length === 0) {
             tbody.innerHTML = `
                 <tr>
