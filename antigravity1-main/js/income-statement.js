@@ -678,6 +678,7 @@ const IncomeStatementModule = {
                 country: country,
                 orderCount: 1,
                 unitsSold: unitsSold,
+                totalRevenue: parseFloat(guide.total_amount || 0),
                 totalCost: totalCost,
                 totalShipping: parseFloat(guide.shipping_cost || 0),
                 returnShipping: 0,
@@ -4572,8 +4573,12 @@ const IncomeStatementModule = {
                 orderCount++;
                 const rev = parseFloat(o.total_amount || 0);
                 const ship = parseFloat(o.shipping_cost || 0);
-                const items = o.products || o.items || [];
-                const cost = items.reduce((s, item) => s + (ProductsModule.getRealCost(item) * (item.quantity || 1)), 0);
+                const items = o.guide_items || [];
+                const cost = items.reduce((s, item) => {
+                    const rawCost = parseFloat(item.products?.cost || 0);
+                    const itemCost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
+                    return s + (itemCost * (item.quantity || 1));
+                }, 0);
                 
                 totalRev += rev;
                 totalCost += cost;
