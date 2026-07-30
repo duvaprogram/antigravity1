@@ -656,14 +656,8 @@ const IncomeStatementModule = {
                 if (exp.product_name === id) {
                     adSpend += parseFloat(exp.amount_spent || 0);
                     manualAdSpend = true;
-                } else if (!exp.product_name && exp.country === country) {
-                    countryUnlinkedAdSpend += parseFloat(exp.amount_spent || 0);
                 }
             });
-
-            if (!manualAdSpend) {
-                adSpend = countryUnlinkedAdSpend / count;
-            }
 
             let totalCost = 0;
             let unitsSold = 0;
