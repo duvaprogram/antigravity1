@@ -694,7 +694,7 @@ const IncomeStatementModule = {
             
             let adSpend = 0;
             allAdExpenses.forEach(exp => {
-                if (exp.product_name === id) {
+                if (exp.product_name === id || (s.description && exp.product_name === s.description)) {
                     adSpend += parseFloat(exp.amount_spent || 0);
                 }
             });
@@ -4454,6 +4454,8 @@ const IncomeStatementModule = {
             items: items
         });
         
+        this.saveData(); // Save the new group
+        
         Utils.showToast(`Grupo visual "${name}" creado.`, 'success');
         this.renderConsolidatedSalesTable();
         
@@ -4466,6 +4468,8 @@ const IncomeStatementModule = {
         if (!confirm('¿Deshacer este grupo visual?')) return;
         
         this.visualMergedGroupsCountry.splice(groupId, 1);
+        this.saveData(); // Save the removal
+        
         Utils.showToast('Grupo visual desagrupado.', 'success');
         this.renderConsolidatedSalesTable();
         this.updateSelectedUnifiedCountriesCount();
