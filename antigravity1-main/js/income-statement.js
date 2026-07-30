@@ -628,8 +628,17 @@ const IncomeStatementModule = {
         sales.forEach(guide => {
             const country = this.getCountryFromCity(guide.cities);
             const id = `Dropi_${guide.id}`;
-            const name = `Dropi Pedido #${guide.id} (${country})`;
-
+            
+            let productNames = [];
+            if (guide.guide_items && guide.guide_items.length > 0) {
+                productNames = guide.guide_items.map(item => item.products?.name || 'Producto Desconocido');
+            } else {
+                productNames = ['Producto Desconocido'];
+            }
+            // Eliminar duplicados si el pedido tiene múltiples del mismo producto
+            productNames = [...new Set(productNames)];
+            
+            const name = `${productNames.join(', ')} (${country})`;
             const count = dropiOrdersCount[country] || 1;
             const freightProportion = (freightsByCountry[country]?.totalFreight || 0) / count;
             
