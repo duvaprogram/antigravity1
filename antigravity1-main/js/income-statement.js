@@ -678,9 +678,9 @@ const IncomeStatementModule = {
                 country: country,
                 orderCount: 1,
                 unitsSold: unitsSold,
-                totalRevenue: parseFloat(guide.total_amount || 0),
                 totalCost: totalCost,
                 totalShipping: parseFloat(guide.shipping_cost || 0),
+                returnShipping: 0,
                 freight: freightProportion,
                 adSpend: adSpend
             });
@@ -707,7 +707,8 @@ const IncomeStatementModule = {
                 unitsSold: parseInt(s.delivered || 0) + parseInt(s.returned || 0),
                 totalRevenue: parseFloat(s.revenue || 0),
                 totalCost: parseFloat(s.product_cost || 0),
-                totalShipping: parseFloat(s.shipping_cost || 0) + parseFloat(s.return_shipping_cost || 0),
+                totalShipping: parseFloat(s.shipping_cost || 0),
+                returnShipping: parseFloat(s.return_shipping_cost || 0),
                 freight: 0,
                 adSpend: adSpend,
                 extId: s.id
@@ -719,7 +720,7 @@ const IncomeStatementModule = {
             const mergedItem = {
                 id: `Group_${index}`,
                 name: group.name, 
-                orderCount: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0, freight: 0, adSpend: 0,
+                orderCount: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0, returnShipping: 0, freight: 0, adSpend: 0,
                 isVisualGroup: true,
                 groupId: index
             };
@@ -740,6 +741,7 @@ const IncomeStatementModule = {
                     mergedItem.totalRevenue += c.totalRevenue;
                     mergedItem.totalCost += c.totalCost;
                     mergedItem.totalShipping += c.totalShipping;
+                    mergedItem.returnShipping += c.returnShipping;
                     mergedItem.freight += c.freight;
                     mergedItem.adSpend += c.adSpend;
                     foundAny = true;
@@ -759,7 +761,7 @@ const IncomeStatementModule = {
         if (countryList.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+<td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         No hay datos en el período seleccionado.
                     </td>
                 </tr>`;
@@ -767,7 +769,7 @@ const IncomeStatementModule = {
         }
 
         const totalRow = {
-            orderCount: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0, totalFreight: 0, totalAdSpend: 0
+            orderCount: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0, totalReturnShipping: 0, totalFreight: 0, totalAdSpend: 0
         };
 
         tbody.innerHTML = countryList.map(row => {
@@ -776,13 +778,15 @@ const IncomeStatementModule = {
             totalRow.totalRevenue += row.totalRevenue;
             totalRow.totalCost += row.totalCost;
             totalRow.totalShipping += row.totalShipping;
+            totalRow.totalReturnShipping += row.returnShipping;
             totalRow.totalFreight += row.freight;
             totalRow.totalAdSpend += row.adSpend;
             
-            const grossProfit = row.totalRevenue - row.totalCost - row.totalShipping - row.freight - row.adSpend;
+            const grossProfit = row.totalRevenue - row.totalCost - row.totalShipping - row.returnShipping - row.freight - row.adSpend;
             const margin = row.totalRevenue > 0 ? ((grossProfit / row.totalRevenue) * 100).toFixed(1) : '0.0';
             const costPct = row.totalRevenue > 0 ? ((row.totalCost / row.totalRevenue) * 100).toFixed(1) : '0.0';
             const shippingPct = row.totalRevenue > 0 ? ((row.totalShipping / row.totalRevenue) * 100).toFixed(1) : '0.0';
+            const returnShippingPct = row.totalRevenue > 0 ? ((row.returnShipping / row.totalRevenue) * 100).toFixed(1) : '0.0';
             const adPct = row.totalRevenue > 0 ? ((row.adSpend / row.totalRevenue) * 100).toFixed(1) : '0.0';
 
             const escapedId = row.id.replace(/"/g, '&quot;');
@@ -842,6 +846,14 @@ const IncomeStatementModule = {
                         <div>${this.formatCurrency(row.totalShipping + row.freight)}</div>
                         <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${shippingPct}%</div>
                     </td>
+                    <td style="text-align: right; color: var(--danger);">
+                        <div>${this.formatCurrency(row.returnShipping)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${returnShippingPct}%</div>
+                    </td>
+                    <td style="text-align: right; color: var(--danger);">
+                        <div>${this.formatCurrency(row.adSpend)}</div>
+                        <div style="font-size: 0.72rem; opacity: 0.8; font-weight: 500;">${adPct}%</div>
+                    </td>
                     <td style="text-align: right; font-weight: 600; color: ${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
                         ${this.formatCurrency(grossProfit)}
                     </td>
@@ -853,32 +865,6 @@ const IncomeStatementModule = {
                     </td>
                 </tr>`;
         }).join('');
-
-        // Total row
-        const totalGross = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalFreight - totalRow.totalAdSpend;
-        const totalMargin = totalRow.totalRevenue > 0 ? ((totalGross / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
-        const totalCostPct = totalRow.totalRevenue > 0 ? ((totalRow.totalCost / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
-        const totalShippingPct = totalRow.totalRevenue > 0 ? (((totalRow.totalShipping + totalRow.totalFreight) / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
-
-        tbody.innerHTML += `
-            <tr class="is-total-row">
-                <td colspan="2"><strong>TOTAL</strong></td>
-                <td style="text-align: right; font-weight: 700;">${totalRow.orderCount}</td>
-                <td style="text-align: right; font-weight: 700;">${totalRow.unitsSold}</td>
-                <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.totalRevenue)}</td>
-                <td style="text-align: right; font-weight: 700; color: var(--danger);">
-                    <div>${this.formatCurrency(totalRow.totalCost)}</div>
-                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalCostPct}%</div>
-                </td>
-                <td style="text-align: right; font-weight: 700; color: var(--danger);">
-                    <div>${this.formatCurrency(totalRow.totalShipping + totalRow.totalFreight)}</div>
-                    <div style="font-size: 0.72rem; opacity: 0.9;">${totalShippingPct}%</div>
-                </td>
-                <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
-                <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
-                <td></td>
-            </tr>`;
-    },
 
     renderAdExpensesTable() {
         const tbody = document.getElementById('isAdExpensesTable');
