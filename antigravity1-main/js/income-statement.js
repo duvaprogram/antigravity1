@@ -866,6 +866,27 @@ const IncomeStatementModule = {
                 </tr>`;
         }).join('');
 
+        // 3. Add Totals Row
+        const totalGrossProfit = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalReturnShipping - totalRow.totalFreight - totalRow.totalAdSpend;
+        const totalMargin = totalRow.totalRevenue > 0 ? ((totalGrossProfit / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
+
+        tbody.innerHTML += `
+            <tr class="is-total-row">
+                <td></td>
+                <td style="font-weight: 600;">TOTAL GENERAL</td>
+                <td style="text-align: right; font-weight: 600;">${totalRow.orderCount}</td>
+                <td style="text-align: right; font-weight: 600;">${totalRow.unitsSold}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.totalRevenue)}</td>
+                <td style="text-align: right; font-weight: 600; color: var(--danger);">${this.formatCurrency(totalRow.totalCost)}</td>
+                <td style="text-align: right; font-weight: 600; color: var(--danger);">${this.formatCurrency(totalRow.totalShipping + totalRow.totalFreight)}</td>
+                <td style="text-align: right; font-weight: 600; color: var(--danger);">${this.formatCurrency(totalRow.totalReturnShipping)}</td>
+                <td style="text-align: right; font-weight: 600; color: var(--danger);">${this.formatCurrency(totalRow.totalAdSpend)}</td>
+                <td style="text-align: right; font-weight: 700; color: ${totalGrossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGrossProfit)}</td>
+                <td style="text-align: center; font-weight: 700;">${totalMargin}%</td>
+                <td></td>
+            </tr>`;
+    },
+
     renderAdExpensesTable() {
         const tbody = document.getElementById('isAdExpensesTable');
         // Comenzar con TODOS los gastos para que los filtros locales puedan sobrescribir los globales
