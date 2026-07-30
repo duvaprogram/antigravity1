@@ -4558,13 +4558,11 @@ const IncomeStatementModule = {
         
         const tbody = document.getElementById('productOrdersDetailTable');
         const titleEl = document.getElementById('productOrdersDetailTitle');
-        const countEl = document.getElementById('productOrdersDetailCount');
-        const statsEl = document.getElementById('productOrdersDetailStats');
+        const statsEl = document.getElementById('productOrdersDetailSummary');
         
-        if (!tbody || !titleEl || !countEl) return;
+        if (!tbody || !titleEl || !statsEl) return;
         
-        titleEl.textContent = `Desglose: ${title.replace(/Dropi_|Ext_/, '')}`;
-        countEl.textContent = `${allOrders.length} registros`;
+        titleEl.textContent = `Desglose: ${title.replace(/Dropi_|Ext_/, '')} (${allOrders.length} registros)`;
         
         let totalRev = 0;
         let totalCost = 0;
