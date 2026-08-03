@@ -2108,9 +2108,26 @@ const CampaignsModule = {
         }
     },
 
-    // Open Quick Sale Modal directly from any table row
-    openQuickSaleModal(prefillAdId = '') {
-        const ad = this.campaignAds.find(a => String(a.adId) === String(prefillAdId));
+    // Universal notification helper
+    notify(msg, type = 'info') {
+        if (window.Utils && typeof window.Utils.showToast === 'function') {
+            window.Utils.showToast(msg, type);
+        } else if (window.Utils && typeof window.Utils.showNotification === 'function') {
+            window.Utils.showNotification(msg, type);
+        } else {
+            alert(msg);
+        }
+    },
+
+    // Open Quick Sale Modal directly (for create or edit)
+    openQuickSaleModal(prefillAdId = '', editSaleId = null) {
+        let existingSale = null;
+        if (editSaleId) {
+            existingSale = this.campaignSales.find(s => String(s.id) === String(editSaleId));
+        }
+
+        const initialAdId = existingSale ? existingSale.adId : prefillAdId;
+        const matchedAd = this.campaignAds.find(a => String(a.adId) === String(initialAdId));
 
         let modal = document.getElementById('modalQuickSale');
         if (!modal) {
@@ -2125,73 +2142,72 @@ const CampaignsModule = {
         }
 
         const today = new Date().toISOString().split('T')[0];
+        const isEditing = !!existingSale;
 
         modal.innerHTML = `
             <div class="modal-content" style="max-width: 550px;">
                 <div class="modal-header">
-                    <h2>⚡ Registro Rápido de Venta</h2>
+                    <h2>${isEditing ? '✏️ Editar Registro de Venta' : '⚡ Registro Rápido de Venta'}</h2>
                     <button class="modal-close" onclick="CampaignsModule.closeModalId('modalQuickSale')">&times;</button>
                 </div>
                 <div class="modal-body" style="padding: 1.5rem 0;">
-                    <form id="modalQuickSaleForm" onsubmit="CampaignsModule.handleModalQuickSaleSubmit(event)">
-                        ${ad ? `
-                            <div class="selected-ad-info-box" style="margin-bottom: 1.25rem;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <span class="ad-id-badge">🆔 ${ad.adId}</span>
-                                        <div style="font-weight: 700; color: var(--text-primary); margin-top: 4px;">${ad.adName}</div>
-                                        <div style="font-size: 0.75rem; color: var(--text-muted);">${ad.campaignName}</div>
-                                    </div>
-                                    <div style="text-align: right;">
-                                        <div style="font-size: 0.75rem; color: var(--text-muted);">Gasto Anuncio</div>
-                                        <div style="font-family: monospace; font-weight: 700; color: #f43f5e;">$${this.formatCurrency(ad.spent)}</div>
-                                    </div>
+                    <form id="modalQuickSaleForm" onsubmit="CampaignsModule.handleModalQuickSaleSubmit(event, '${editSaleId || ''}')">
+                        <div id="modalSelectedAdBox" class="selected-ad-info-box" style="margin-bottom: 1.25rem; ${matchedAd ? '' : 'display: none;'}">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <span class="ad-id-badge" id="modalAdBadge">🆔 ${matchedAd ? matchedAd.adId : ''}</span>
+                                    <div id="modalAdName" style="font-weight: 700; color: var(--text-primary); margin-top: 4px;">${matchedAd ? matchedAd.adName : ''}</div>
+                                    <div id="modalAdCampaign" style="font-size: 0.75rem; color: var(--text-muted);">${matchedAd ? matchedAd.campaignName : ''}</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-size: 0.75rem; color: var(--text-muted);">Gasto Anuncio</div>
+                                    <div id="modalAdSpent" style="font-family: monospace; font-weight: 700; color: #f43f5e;">${matchedAd ? '$' + this.formatCurrency(matchedAd.spent) : '$0'}</div>
                                 </div>
                             </div>
-                        ` : ''}
+                        </div>
 
                         <div class="form-group" style="margin-bottom: 1rem;">
                             <label for="modalSaleAdId">ID del Anuncio *</label>
-                            <input type="text" id="modalSaleAdId" class="form-control" value="${prefillAdId}" placeholder="Pega el ID del Anuncio..." required style="font-family: monospace; font-weight: 600;">
+                            <input type="text" id="modalSaleAdId" class="form-control" value="${initialAdId || ''}" placeholder="Pega o escribe el ID del Anuncio..." required style="font-family: monospace; font-weight: 600;" oninput="CampaignsModule.handleModalAdIdInput(this.value)">
                         </div>
 
                         <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                             <div class="form-group">
                                 <label for="modalSalePrice">Precio de Venta ($) *</label>
-                                <input type="number" id="modalSalePrice" class="form-control" placeholder="Ej: 150000" required step="any" min="1" autofocus style="font-size: 1.1rem; font-weight: 700; font-family: monospace;">
+                                <input type="number" id="modalSalePrice" class="form-control" value="${existingSale ? existingSale.price : ''}" placeholder="Ej: 150000" required step="any" min="1" autofocus style="font-size: 1.1rem; font-weight: 700; font-family: monospace;">
                             </div>
                             <div class="form-group">
                                 <label for="modalSaleQuantity">Cantidad</label>
-                                <input type="number" id="modalSaleQuantity" class="form-control" value="1" min="1" required style="font-weight: 700; text-align: center;">
+                                <input type="number" id="modalSaleQuantity" class="form-control" value="${existingSale ? existingSale.quantity : 1}" min="1" required style="font-weight: 700; text-align: center;">
                             </div>
                         </div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                             <div class="form-group">
                                 <label for="modalSaleOrderNumber">N° Guía / Pedido (Opcional)</label>
-                                <input type="text" id="modalSaleOrderNumber" class="form-control" placeholder="Ej: GUIA-98231">
+                                <input type="text" id="modalSaleOrderNumber" class="form-control" value="${existingSale ? (existingSale.orderNumber || '') : ''}" placeholder="Ej: GUIA-98231">
                             </div>
                             <div class="form-group">
                                 <label for="modalSaleCustomer">Nombre Cliente (Opcional)</label>
-                                <input type="text" id="modalSaleCustomer" class="form-control" placeholder="Nombre del cliente">
+                                <input type="text" id="modalSaleCustomer" class="form-control" value="${existingSale ? (existingSale.customerName || '') : ''}" placeholder="Nombre del cliente">
                             </div>
                         </div>
 
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
                             <div class="form-group">
                                 <label for="modalSaleCity">Ciudad / País</label>
-                                <input type="text" id="modalSaleCity" class="form-control" placeholder="Ej: Bogotá / Caracas">
+                                <input type="text" id="modalSaleCity" class="form-control" value="${existingSale ? (existingSale.city || '') : ''}" placeholder="Ej: Bogotá / Caracas">
                             </div>
                             <div class="form-group">
                                 <label for="modalSaleDate">Fecha de Venta *</label>
-                                <input type="date" id="modalSaleDate" class="form-control" value="${today}" required>
+                                <input type="date" id="modalSaleDate" class="form-control" value="${existingSale ? (existingSale.date || today) : today}" required>
                             </div>
                         </div>
 
                         <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
                             <button type="button" class="btn btn-secondary" onclick="CampaignsModule.closeModalId('modalQuickSale')">Cancelar</button>
                             <button type="submit" class="btn btn-success" style="font-weight: 700; padding: 0.6rem 1.5rem;">
-                                💾 Registrar Venta
+                                ${isEditing ? '💾 Guardar Cambios' : '💾 Registrar Venta'}
                             </button>
                         </div>
                     </form>
@@ -2208,8 +2224,32 @@ const CampaignsModule = {
         }, 150);
     },
 
-    // Handle modal quick sale submit
-    async handleModalQuickSaleSubmit(e) {
+    // Open Edit Sale Modal shorthand
+    openEditSaleModal(saleId) {
+        this.openQuickSaleModal('', saleId);
+    },
+
+    // Live update ad info box in modal
+    handleModalAdIdInput(adId) {
+        const infoBox = document.getElementById('modalSelectedAdBox');
+        if (!infoBox) return;
+
+        const trimmed = (adId || '').trim();
+        const matched = this.campaignAds.find(a => String(a.adId) === trimmed);
+
+        if (matched) {
+            document.getElementById('modalAdBadge').textContent = `🆔 ${matched.adId}`;
+            document.getElementById('modalAdName').textContent = matched.adName;
+            document.getElementById('modalAdCampaign').textContent = matched.campaignName;
+            document.getElementById('modalAdSpent').textContent = `$${this.formatCurrency(matched.spent)}`;
+            infoBox.style.display = 'block';
+        } else {
+            infoBox.style.display = 'none';
+        }
+    },
+
+    // Handle modal quick sale submit (both new and edit)
+    async handleModalQuickSaleSubmit(e, editSaleId = '') {
         e.preventDefault();
         const adId = document.getElementById('modalSaleAdId').value.trim();
         const price = parseFloat(document.getElementById('modalSalePrice').value) || 0;
@@ -2220,11 +2260,11 @@ const CampaignsModule = {
         const date = document.getElementById('modalSaleDate').value;
 
         if (!adId || price <= 0) {
-            Utils.showNotification('Por favor ingresa un ID de anuncio y un precio válido', 'error');
+            this.notify('Por favor ingresa un ID de anuncio y un precio válido', 'error');
             return;
         }
 
-        await this.saveNewSaleRecord({
+        const salePayload = {
             adId,
             price,
             quantity,
@@ -2232,7 +2272,13 @@ const CampaignsModule = {
             customerName,
             city,
             date
-        });
+        };
+
+        if (editSaleId) {
+            await this.updateSaleRecord(editSaleId, salePayload);
+        } else {
+            await this.saveNewSaleRecord(salePayload);
+        }
 
         this.closeModalId('modalQuickSale');
     },
@@ -2258,7 +2304,7 @@ const CampaignsModule = {
         const notes = notesInput ? notesInput.value.trim() : '';
 
         if (!adId || price <= 0) {
-            Utils.showNotification('Por favor ingrese el ID del Anuncio y el Precio de la Venta', 'error');
+            this.notify('Por favor ingrese el ID del Anuncio y el Precio de la Venta', 'error');
             return;
         }
 
@@ -2314,7 +2360,48 @@ const CampaignsModule = {
         this.renderAll();
 
         const totalRevenue = saleRecord.price * saleRecord.quantity;
-        Utils.showNotification(`✅ ¡Venta de $${this.formatCurrency(totalRevenue)} registrada para el anuncio ${saleRecord.adId}!`, 'success');
+        this.notify(`✅ ¡Venta de $${this.formatCurrency(totalRevenue)} registrada para el anuncio ${saleRecord.adId}!`, 'success');
+    },
+
+    // Core helper to update existing sale record
+    async updateSaleRecord(saleId, saleData) {
+        const index = this.campaignSales.findIndex(s => String(s.id) === String(saleId));
+        if (index === -1) {
+            this.notify('No se encontró la venta para actualizar', 'error');
+            return;
+        }
+
+        const matchedAd = this.campaignAds.find(a => String(a.adId) === String(saleData.adId));
+        const updatedSale = {
+            ...this.campaignSales[index],
+            adId: saleData.adId,
+            adName: matchedAd ? matchedAd.adName : (saleData.adName || this.campaignSales[index].adName),
+            campaignCode: matchedAd ? matchedAd.campaignCode : this.campaignSales[index].campaignCode,
+            campaignName: matchedAd ? matchedAd.campaignName : this.campaignSales[index].campaignName,
+            product: matchedAd ? matchedAd.product : this.campaignSales[index].product,
+            price: Number(saleData.price) || 0,
+            quantity: Number(saleData.quantity) || 1,
+            orderNumber: saleData.orderNumber || '',
+            customerName: saleData.customerName || '',
+            city: saleData.city || (matchedAd ? matchedAd.country : this.campaignSales[index].city),
+            date: saleData.date || this.campaignSales[index].date,
+            notes: saleData.notes || this.campaignSales[index].notes || '',
+            updatedAt: new Date().toISOString()
+        };
+
+        this.campaignSales[index] = updatedSale;
+
+        // Save to Database and localStorage
+        if (window.Database && window.Database.saveCampaignSale) {
+            try { await window.Database.saveCampaignSale(updatedSale); } catch(e){}
+        }
+        localStorage.setItem('campaignSalesData', JSON.stringify(this.campaignSales));
+
+        this.calculateAdMetrics();
+        this.renderAll();
+
+        const totalRevenue = updatedSale.price * updatedSale.quantity;
+        this.notify(`✅ ¡Venta actualizada correctamente! ($${this.formatCurrency(totalRevenue)})`, 'success');
     },
 
     // Delete a sale record
@@ -2332,7 +2419,7 @@ const CampaignsModule = {
 
             this.calculateAdMetrics();
             this.renderAll();
-            Utils.showNotification('Registro de venta eliminado', 'info');
+            this.notify('Registro de venta eliminado', 'info');
         }
     },
 
@@ -2418,7 +2505,13 @@ const CampaignsModule = {
                         ${sale.customerName ? `<div style="font-size: 0.75rem; color: var(--text-muted);">${sale.customerName}</div>` : ''}
                     </td>
                     <td style="font-size: 0.85rem; color: var(--text-secondary);">${sale.city || '-'}</td>
-                    <td>
+                    <td style="text-align: center; white-space: nowrap;">
+                        <button type="button" class="btn btn-icon btn-sm btn-primary-light" onclick="CampaignsModule.openEditSaleModal('${sale.id}')" title="Editar venta" style="margin-right: 4px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                        </button>
                         <button type="button" class="btn btn-icon btn-sm btn-danger-light" onclick="CampaignsModule.deleteSale('${sale.id}')" title="Eliminar venta">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>

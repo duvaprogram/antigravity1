@@ -63,7 +63,13 @@ const Utils = {
 
     // Show toast notification
     showToast(message, type = 'info') {
-        const container = document.getElementById('toastContainer');
+        let container = document.getElementById('toastContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+        }
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
 
@@ -75,23 +81,28 @@ const Utils = {
         };
 
         toast.innerHTML = `
-            <span class="toast-icon">${icons[type]}</span>
+            <span class="toast-icon">${icons[type] || 'ℹ'}</span>
             <span class="toast-message">${message}</span>
             <button class="toast-close">&times;</button>
         `;
 
         container.appendChild(toast);
 
-        // Auto remove after 4 seconds
+        // Auto remove after 4.5 seconds
         setTimeout(() => {
             toast.style.animation = 'slideIn 0.3s ease reverse';
             setTimeout(() => toast.remove(), 300);
-        }, 4000);
+        }, 4500);
 
         // Manual close
         toast.querySelector('.toast-close').addEventListener('click', () => {
             toast.remove();
         });
+    },
+
+    // Alias for showToast
+    showNotification(message, type = 'info') {
+        return this.showToast(message, type);
     },
 
     // Open modal
