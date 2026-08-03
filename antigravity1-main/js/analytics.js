@@ -162,6 +162,9 @@ const AnalyticsModule = {
             productSearch.value = '';
         }
 
+        // Clear month tag active states
+        document.querySelectorAll('#section-analytics .month-tag').forEach(el => el.classList.remove('active'));
+
         this.refreshData();
     },
 
@@ -191,6 +194,28 @@ const AnalyticsModule = {
 
         this.currentFilters.dateFrom = fromDate.toISOString().split('T')[0];
         this.currentFilters.dateTo = now.toISOString().split('T')[0];
+
+        document.querySelectorAll('#section-analytics .month-tag').forEach(el => el.classList.remove('active'));
+
+        this.refreshData();
+    },
+
+    setMonthFilter(monthIndex, btn) {
+        const now = new Date();
+        const year = now.getFullYear();
+        const mStr = String(monthIndex + 1).padStart(2, '0');
+        const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+        const from = `${year}-${mStr}-01`;
+        const to = `${year}-${mStr}-${String(lastDay).padStart(2, '0')}`;
+
+        document.getElementById('analyticsDateFrom').value = from;
+        document.getElementById('analyticsDateTo').value = to;
+
+        this.currentFilters.dateFrom = from;
+        this.currentFilters.dateTo = to;
+
+        document.querySelectorAll('#section-analytics .month-tag').forEach(el => el.classList.remove('active'));
+        if (btn) btn.classList.add('active');
 
         this.refreshData();
     },
@@ -829,6 +854,241 @@ const AnalyticsModule = {
                     <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary, #6366f1);">${formatUsd(totalFlete)}</div>
                 </div>
             `;
+        }
+    },
+
+    // ========================================
+    // EXPORT TO EXCEL
+    // ========================================
+    async exportToExcel() {
+        if (typeof XLSX === 'undefined') {
+            Utils.showToast('La librería XLSX no está disponible', 'error');
+            return;
+        }
+
+        try {
+            Utils.showToast('Generando reporte Excel...', 'info');
+
+            const guides = this.filteredGuides || [];
+            if (guides.length === 0) {
+                Utils.showToast('No hay guías para exportar con los filtros actuales', 'warning');
+                return;
+            }
+
+            // Build product cost map
+            const productCostMap = {};
+            for (const p of this.allProducts) {
+                productCostMap[p.id] = (parseFloat(p.cost) || 0) * this.COST_FACTOR;
+            }
+
+            // 1. SHEET: DETALLE DE GUÍAS
+            const guidesHeaders = [
+                'Nº Guía',
+                'Fecha',
+                'Cliente',
+                'Teléfono',
+                'Ciudad',
+                'Dirección',
+                'Estado',
+                'Total Venta ($)',
+                'Pago Bolívares (Bs)',
+                'Costo Flete ($)',
+                'Costo Mercancía ($)',
+                'Ganancia Neta ($)',
+                'Productos / Detalle',
+                'Observaciones'
+            ];
+
+            const guidesRows = [];
+            const sortedGuides = [...guides].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            for (const guide of sortedGuides) {
+                const isDevol = this.isDevolucion(guide);
+                const isCanc = this.isCancelado(guide);
+                const isExcluded = isDevol || isCanc;
+
+                const totalUsdVal = isExcluded ? 0 : (parseFloat(guide.totalAmount || guide.amountUsd || 0) || 0);
+                const bsVal = isExcluded ? 0 : (parseFloat(guide.paymentBs || 0) || 0);
+                const shippingCost = isCanc ? 0 : (parseFloat(guide.shippingCost || 0) || 0);
+
+                let itemsSummary = '';
+                let guideProductCost = 0;
+                try {
+                    const items = await Database.getGuideItems(guide.id);
+                    if (items && items.length > 0) {
+                        itemsSummary = items.map(it => `${it.quantity || 1}x ${it.productName || 'Producto'}`).join(' | ');
+                        if (!isExcluded) {
+                            for (const it of items) {
+                                const uCost = productCostMap[it.productId] || 0;
+                                guideProductCost += uCost * (it.quantity || 1);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Error al obtener ítems de guía', guide.id, e);
+                }
+
+                const netProfit = totalUsdVal - guideProductCost - shippingCost;
+
+                guidesRows.push([
+                    guide.guideNumber || '',
+                    guide.createdAt ? new Date(guide.createdAt).toLocaleDateString('es-ES') : '',
+                    guide.clientName || 'N/A',
+                    guide.clientPhone || guide.phone || '',
+                    guide.city || '',
+                    guide.address || guide.clientAddress || '',
+                    guide.status || '',
+                    totalUsdVal,
+                    bsVal,
+                    shippingCost,
+                    guideProductCost,
+                    netProfit,
+                    itemsSummary,
+                    guide.observations || guide.notes || ''
+                ]);
+            }
+
+            const wsGuides = XLSX.utils.aoa_to_sheet([guidesHeaders, ...guidesRows]);
+            wsGuides['!cols'] = [
+                { wch: 14 },
+                { wch: 12 },
+                { wch: 24 },
+                { wch: 15 },
+                { wch: 14 },
+                { wch: 28 },
+                { wch: 14 },
+                { wch: 15 },
+                { wch: 20 },
+                { wch: 15 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 35 },
+                { wch: 30 }
+            ];
+
+            // 2. SHEET: RESUMEN Y KPIS
+            const effectiveGuides = sortedGuides.filter(g => !this.isExcludedFromSales(g));
+            const devolucionGuides = sortedGuides.filter(g => this.isDevolucion(g));
+            const cancelledGuides = sortedGuides.filter(g => this.isCancelado(g));
+            const deliveredGuides = sortedGuides.filter(g => g.status === 'Entregado');
+            const paidGuides = sortedGuides.filter(g => g.status === 'Pagado');
+
+            const totalDollars = effectiveGuides.reduce((sum, g) => sum + (parseFloat(g.totalAmount || g.amountUsd || 0) || 0), 0);
+            const totalBs = effectiveGuides.reduce((sum, g) => sum + (parseFloat(g.paymentBs || 0) || 0), 0);
+            const totalFletes = sortedGuides.filter(g => !this.isCancelado(g)).reduce((sum, g) => sum + (parseFloat(g.shippingCost || 0) || 0), 0);
+
+            let totalCogs = 0;
+            for (const g of effectiveGuides) {
+                try {
+                    const items = await Database.getGuideItems(g.id);
+                    for (const it of items) {
+                        const uCost = productCostMap[it.productId] || 0;
+                        totalCogs += uCost * (it.quantity || 1);
+                    }
+                } catch (e) {}
+            }
+
+            const netProfitTotal = totalDollars - totalCogs - totalFletes;
+            const marginPct = totalDollars > 0 ? (netProfitTotal / totalDollars) * 100 : 0;
+
+            const kpiAoa = [
+                ['REPORTE DE ANÁLISIS DE DATOS'],
+                ['Generado el:', new Date().toLocaleString('es-ES')],
+                ['Período Desde:', this.currentFilters.dateFrom || 'Inicio'],
+                ['Período Hasta:', this.currentFilters.dateTo || 'Hoy'],
+                ['Filtro Ciudad:', this.currentFilters.city || 'Todas'],
+                ['Filtro Estado:', this.currentFilters.status || 'Todos'],
+                [''],
+                ['MÉTRICA / INDICADOR', 'VALOR'],
+                ['Total Guías Registradas', guides.length],
+                ['Guías Efectivas (Cobradas)', effectiveGuides.length],
+                ['Guías Entregadas', deliveredGuides.length],
+                ['Guías Pagadas', paidGuides.length],
+                ['Guías en Devolución', devolucionGuides.length],
+                ['Guías Canceladas', cancelledGuides.length],
+                ['Ventas Totales Efectivas ($ USD)', totalDollars],
+                ['Pagos Totales en Bolívares (Bs)', totalBs],
+                ['Costo Total de Fletes / Envíos ($ USD)', totalFletes],
+                ['Costo de Mercancía Vendida ($ USD)', totalCogs],
+                ['Utilidad Neta Estimada ($ USD)', netProfitTotal],
+                ['Margen de Rentabilidad (%)', `${marginPct.toFixed(2)}%`]
+            ];
+
+            const wsKpi = XLSX.utils.aoa_to_sheet(kpiAoa);
+            wsKpi['!cols'] = [
+                { wch: 38 },
+                { wch: 25 }
+            ];
+
+            // 3. SHEET: PRODUCTOS MÁS VENDIDOS
+            const productSales = {};
+            for (const guide of effectiveGuides) {
+                try {
+                    const items = await Database.getGuideItems(guide.id);
+                    for (const item of items) {
+                        const productName = item.productName || 'Producto';
+                        const productId = item.productId;
+                        const unitCost = productCostMap[productId] || 0;
+
+                        if (!productSales[productId]) {
+                            productSales[productId] = {
+                                name: productName,
+                                quantity: 0,
+                                revenue: 0,
+                                cost: 0,
+                                guideCount: 0
+                            };
+                        }
+                        productSales[productId].quantity += (item.quantity || 1);
+                        productSales[productId].revenue += item.subtotal || ((item.quantity || 1) * (item.unitPrice || 0));
+                        productSales[productId].cost += unitCost * (item.quantity || 1);
+                        productSales[productId].guideCount++;
+                    }
+                } catch (e) {}
+            }
+
+            const sortedProducts = Object.values(productSales).sort((a, b) => b.quantity - a.quantity);
+            const prodHeaders = ['#', 'Producto', 'Nº de Guías', 'Unidades Vendidas', 'Ingresos Totales ($)', 'Costo Total ($)', 'Ganancia ($)', 'Margen (%)'];
+            const prodRows = sortedProducts.map((p, idx) => {
+                const profit = p.revenue - p.cost;
+                const margin = p.revenue > 0 ? ((profit / p.revenue) * 100).toFixed(1) + '%' : '0%';
+                return [
+                    idx + 1,
+                    p.name,
+                    p.guideCount,
+                    p.quantity,
+                    p.revenue,
+                    p.cost,
+                    profit,
+                    margin
+                ];
+            });
+
+            const wsProd = XLSX.utils.aoa_to_sheet([prodHeaders, ...prodRows]);
+            wsProd['!cols'] = [
+                { wch: 6 },
+                { wch: 32 },
+                { wch: 12 },
+                { wch: 18 },
+                { wch: 20 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 12 }
+            ];
+
+            // Build workbook
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, wsGuides, 'Detalle de Guías');
+            XLSX.utils.book_append_sheet(wb, wsKpi, 'Resumen General');
+            XLSX.utils.book_append_sheet(wb, wsProd, 'Productos');
+
+            const dateStr = (this.currentFilters.dateFrom || 'inicio') + '_a_' + (this.currentFilters.dateTo || 'hoy');
+            XLSX.writeFile(wb, `reporte_analisis_datos_${dateStr}.xlsx`);
+            Utils.showToast('Reporte de Análisis descargado en Excel', 'success');
+
+        } catch (error) {
+            console.error('Error al exportar análisis a Excel:', error);
+            Utils.showToast('Error al generar archivo Excel', 'error');
         }
     }
 };

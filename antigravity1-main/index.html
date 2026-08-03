@@ -56,7 +56,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.21</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.22</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -857,14 +857,26 @@
                         </svg>
                         Análisis de Datos
                     </h2>
-                    <button class="btn btn-primary" onclick="AnalyticsModule.refreshData()">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <polyline points="1 4 1 10 7 10"></polyline>
-                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                        </svg>
-                        Actualizar
-                    </button>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="btn btn-success" onclick="AnalyticsModule.exportToExcel()" style="display: flex; align-items: center; gap: 0.5rem; background: #10b981; color: white; border: none; font-weight: 500;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="8" y1="13" x2="16" y2="13"></line>
+                                <line x1="8" y1="17" x2="16" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                            Descargar Reporte Excel
+                        </button>
+                        <button class="btn btn-primary" onclick="AnalyticsModule.refreshData()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="1 4 1 10 7 10"></polyline>
+                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                            </svg>
+                            Actualizar
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Filters Panel -->
@@ -951,6 +963,20 @@
                                 </svg>
                                 Limpiar Filtros
                             </button>
+                        </div>
+                        <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(0, this)">Enero</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(1, this)">Febrero</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(2, this)">Marzo</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(3, this)">Abril</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(4, this)">Mayo</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(5, this)">Junio</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(6, this)">Julio</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(7, this)">Agosto</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(8, this)">Septiembre</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(9, this)">Octubre</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(10, this)">Noviembre</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="AnalyticsModule.setMonthFilter(11, this)">Diciembre</button>
                         </div>
                     </div>
                 </div>
@@ -1303,9 +1329,20 @@
 
                 <!-- Detailed Table -->
                 <div class="card" style="margin-top: 1.5rem;">
-                    <div class="card-header">
-                        <h3>Detalle de Guías Filtradas</h3>
-                        <span id="analyticsRecordCount" style="font-size: 0.875rem; color: var(--text-muted);"></span>
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                        <div>
+                            <h3 style="margin: 0;">Detalle de Guías Filtradas</h3>
+                            <span id="analyticsRecordCount" style="font-size: 0.875rem; color: var(--text-muted);"></span>
+                        </div>
+                        <button class="btn btn-sm btn-secondary" onclick="AnalyticsModule.exportToExcel()" style="display: flex; align-items: center; gap: 0.4rem;" title="Exportar detalle a Excel">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="8" y1="13" x2="16" y2="13"></line>
+                                <line x1="8" y1="17" x2="16" y2="17"></line>
+                            </svg>
+                            Exportar Excel
+                        </button>
                     </div>
                     <div class="card-body" style="padding: 0;">
                         <div class="table-container"
@@ -3061,15 +3098,17 @@
                         </svg>
                         Estado de Resultados
                     </h2>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-secondary" onclick="IncomeStatementModule.exportToCSV()">
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="btn btn-success" onclick="IncomeStatementModule.exportToExcel()" style="display: flex; align-items: center; gap: 0.5rem; background: #10b981; color: white; border: none; font-weight: 500;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="8" y1="13" x2="16" y2="13"></line>
+                                <line x1="8" y1="17" x2="16" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
                             </svg>
-                            Exportar
+                            Descargar Reporte Excel
                         </button>
                         <button class="btn btn-primary" onclick="IncomeStatementModule.render()">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -3131,18 +3170,18 @@
                                 onclick="IncomeStatementModule.setQuickFilter('all')">Todo</button>
                         </div>
                         <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(0, this)">Ene</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(1, this)">Feb</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(2, this)">Mar</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(3, this)">Abr</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(4, this)">May</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(5, this)">Jun</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(6, this)">Jul</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(7, this)">Ago</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(8, this)">Sep</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(9, this)">Oct</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(10, this)">Nov</button>
-                            <button class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(11, this)">Dic</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(0, this)">Enero</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(1, this)">Febrero</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(2, this)">Marzo</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(3, this)">Abril</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(4, this)">Mayo</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(5, this)">Junio</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(6, this)">Julio</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(7, this)">Agosto</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(8, this)">Septiembre</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(9, this)">Octubre</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(10, this)">Noviembre</button>
+                            <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(11, this)">Diciembre</button>
                         </div>
                     </div>
                 </div>

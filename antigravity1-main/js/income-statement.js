@@ -3978,102 +3978,459 @@ const IncomeStatementModule = {
     // ========================================
     setQuickFilter(period) {
         const now = new Date();
+        const year = now.getFullYear();
         let from, to;
 
         switch (period) {
             case 'today':
-                from = to = now.toISOString().split('T')[0];
+                from = to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 break;
             case 'week':
                 const dayOfWeek = now.getDay();
-                from = new Date(now);
-                from.setDate(now.getDate() - dayOfWeek);
-                to = new Date(now);
-                from = from.toISOString().split('T')[0];
-                to = to.toISOString().split('T')[0];
+                const fromD = new Date(now);
+                fromD.setDate(now.getDate() - dayOfWeek);
+                from = `${fromD.getFullYear()}-${String(fromD.getMonth() + 1).padStart(2, '0')}-${String(fromD.getDate()).padStart(2, '0')}`;
+                to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 break;
             case 'month':
-                from = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-                to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+                const mStr = String(now.getMonth() + 1).padStart(2, '0');
+                const lastDay = new Date(year, now.getMonth() + 1, 0).getDate();
+                from = `${year}-${mStr}-01`;
+                to = `${year}-${mStr}-${String(lastDay).padStart(2, '0')}`;
                 break;
             case 'quarter':
                 const quarter = Math.floor(now.getMonth() / 3);
-                from = new Date(now.getFullYear(), quarter * 3, 1).toISOString().split('T')[0];
-                to = new Date(now.getFullYear(), quarter * 3 + 3, 0).toISOString().split('T')[0];
+                const qStartMonth = String(quarter * 3 + 1).padStart(2, '0');
+                const qEndMonth = quarter * 3 + 3;
+                const qLastDay = new Date(year, qEndMonth, 0).getDate();
+                from = `${year}-${qStartMonth}-01`;
+                to = `${year}-${String(qEndMonth).padStart(2, '0')}-${String(qLastDay).padStart(2, '0')}`;
                 break;
             case 'semester':
                 const semester = Math.floor(now.getMonth() / 6);
-                from = new Date(now.getFullYear(), semester * 6, 1).toISOString().split('T')[0];
-                to = new Date(now.getFullYear(), semester * 6 + 6, 0).toISOString().split('T')[0];
+                const sStartMonth = String(semester * 6 + 1).padStart(2, '0');
+                const sEndMonth = semester * 6 + 6;
+                const sLastDay = new Date(year, sEndMonth, 0).getDate();
+                from = `${year}-${sStartMonth}-01`;
+                to = `${year}-${String(sEndMonth).padStart(2, '0')}-${String(sLastDay).padStart(2, '0')}`;
                 break;
             case 'year':
-                from = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
-                to = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
+                from = `${year}-01-01`;
+                to = `${year}-12-31`;
                 break;
             case 'all':
                 from = '2020-01-01';
-                to = now.toISOString().split('T')[0];
+                to = `${year}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
                 break;
         }
 
         document.getElementById('isDateFrom').value = from;
         document.getElementById('isDateTo').value = to;
-        document.querySelectorAll('.month-tag').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('#section-income-statement .month-tag').forEach(el => el.classList.remove('active'));
         this.applyFilters();
     },
 
     setMonthFilter(monthIndex, btn) {
         const now = new Date();
         const year = now.getFullYear();
-        const from = new Date(year, monthIndex, 1).toISOString().split('T')[0];
-        const to = new Date(year, monthIndex + 1, 0).toISOString().split('T')[0];
+        const mStr = String(monthIndex + 1).padStart(2, '0');
+        const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+        const from = `${year}-${mStr}-01`;
+        const to = `${year}-${mStr}-${String(lastDay).padStart(2, '0')}`;
 
         document.getElementById('isDateFrom').value = from;
         document.getElementById('isDateTo').value = to;
 
-        document.querySelectorAll('.month-tag').forEach(el => el.classList.remove('active'));
+        document.querySelectorAll('#section-income-statement .month-tag').forEach(el => el.classList.remove('active'));
         if (btn) btn.classList.add('active');
 
         this.applyFilters();
     },
 
     // ========================================
-    // EXPORT
+    // EXPORT TO EXCEL
     // ========================================
+    exportToExcel() {
+        if (typeof XLSX === 'undefined') {
+            Utils.showToast('La librería XLSX no está disponible', 'error');
+            return;
+        }
+
+        try {
+            Utils.showToast('Generando reporte Excel del Estado de Resultados...', 'info');
+
+            const salesData = this.getSalesByCountry();
+            const adExpData = this.getAdExpensesByCountry();
+            const opExpData = this.getOpExpensesByCountry();
+            const freightData = this.getFreightsByCountry();
+            const extSalesSummary = this.getExternalSalesSummary();
+
+            const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0) + extSalesSummary.totalRevenue;
+            const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0) + extSalesSummary.totalCost;
+            const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping + extSalesSummary.totalReturnShipping;
+            const totalFreights = Object.values(freightData).reduce((s, f) => s + f.totalFreight, 0);
+            const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
+            const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
+
+            const grossProfit = totalRevenue - totalCOGS - totalShipping - totalFreights;
+            const netProfit = grossProfit - totalAdSpend - totalOpExp;
+            const grossMarginPct = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
+            const netMarginPct = totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0;
+            const roas = totalAdSpend > 0 ? (totalRevenue / totalAdSpend).toFixed(2) + 'x' : 'N/A';
+            const totalOrdersDelivered = salesData.reduce((s, c) => s + c.orderCount, 0) + extSalesSummary.totalDelivered;
+            const totalUnitsSold = salesData.reduce((s, c) => s + c.unitsSold, 0) + extSalesSummary.totalUnits;
+
+            // 1. SHEET: P&L ESTADO DE RESULTADOS
+            const plAoa = [
+                ['ESTADO DE RESULTADOS (P&L CONSOLIDADO)'],
+                ['Generado el:', new Date().toLocaleString('es-ES')],
+                ['Período Desde:', this.filters.dateFrom || 'Inicio'],
+                ['Período Hasta:', this.filters.dateTo || 'Hoy'],
+                ['País Filtrado:', this.filters.country || 'Todos los Países'],
+                [''],
+                ['CONCEPTO FINANCIERO', 'MONTO ($ USD)', '% SOBRE VENTAS'],
+                ['1. VENTAS NETAS (INGRESOS TOTALES)', totalRevenue, '100.00%'],
+                ['   - Costo de Mercancía Vendida (COGS)', -totalCOGS, totalRevenue > 0 ? ((totalCOGS / totalRevenue) * 100).toFixed(2) + '%' : '0%'],
+                ['   - Costo de Envíos Locales', -totalShipping, totalRevenue > 0 ? ((totalShipping / totalRevenue) * 100).toFixed(2) + '%' : '0%'],
+                ['   - Costo de Fletes Internacionales', -totalFreights, totalRevenue > 0 ? ((totalFreights / totalRevenue) * 100).toFixed(2) + '%' : '0%'],
+                ['2. UTILIDAD BRUTA', grossProfit, `${grossMarginPct.toFixed(2)}%`],
+                ['   - Gastos Publicitarios (Ads)', -totalAdSpend, totalRevenue > 0 ? ((totalAdSpend / totalRevenue) * 100).toFixed(2) + '%' : '0%'],
+                ['   - Gastos Operativos', -totalOpExp, totalRevenue > 0 ? ((totalOpExp / totalRevenue) * 100).toFixed(2) + '%' : '0%'],
+                ['3. UTILIDAD NETA FINAL', netProfit, `${netMarginPct.toFixed(2)}%`],
+                [''],
+                ['MÉTRICAS ADICIONALES', 'VALOR'],
+                ['Margen Bruto', `${grossMarginPct.toFixed(2)}%`],
+                ['Margen Neto', `${netMarginPct.toFixed(2)}%`],
+                ['Retorno Gasto Publicitario (ROAS)', roas],
+                ['Pedidos Entregados Totales', totalOrdersDelivered],
+                ['Unidades Vendidas Totales', totalUnitsSold]
+            ];
+
+            const wsPL = XLSX.utils.aoa_to_sheet(plAoa);
+            wsPL['!cols'] = [
+                { wch: 42 },
+                { wch: 20 },
+                { wch: 18 }
+            ];
+
+            // 2. SHEET: DESGLOSE POR PAÍS
+            const countryMap = {};
+            salesData.forEach(c => {
+                countryMap[c.country] = {
+                    country: c.country,
+                    orders: c.orderCount,
+                    units: c.unitsSold,
+                    revenue: c.totalRevenue,
+                    cost: c.totalCost,
+                    shipping: c.totalShipping,
+                    freight: freightData[c.country]?.totalFreight || 0,
+                    ads: 0,
+                    opExp: 0
+                };
+            });
+            adExpData.forEach(a => {
+                if (!countryMap[a.country]) {
+                    countryMap[a.country] = { country: a.country, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, ads: 0, opExp: 0 };
+                }
+                countryMap[a.country].ads += a.totalSpent;
+            });
+            opExpData.forEach(o => {
+                if (!countryMap[o.country]) {
+                    countryMap[o.country] = { country: o.country, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, ads: 0, opExp: 0 };
+                }
+                countryMap[o.country].opExp += o.total;
+            });
+
+            const countryHeaders = [
+                'País',
+                'Pedidos',
+                'Unidades',
+                'Ventas ($)',
+                'Costo Mercancía ($)',
+                'Costo Envíos ($)',
+                'Costo Fletes ($)',
+                'Utilidad Bruta ($)',
+                'Publicidad ($)',
+                'Gastos Operativos ($)',
+                'Utilidad Neta ($)',
+                'Margen Neto (%)'
+            ];
+            const countryRows = Object.values(countryMap).map(c => {
+                const gross = c.revenue - c.cost - c.shipping - c.freight;
+                const net = gross - c.ads - c.opExp;
+                const netMargin = c.revenue > 0 ? ((net / c.revenue) * 100).toFixed(1) + '%' : '0%';
+                return [
+                    c.country,
+                    c.orders,
+                    c.units,
+                    c.revenue,
+                    c.cost,
+                    c.shipping,
+                    c.freight,
+                    gross,
+                    c.ads,
+                    c.opExp,
+                    net,
+                    netMargin
+                ];
+            });
+
+            const wsCountry = XLSX.utils.aoa_to_sheet([countryHeaders, ...countryRows]);
+            wsCountry['!cols'] = [
+                { wch: 16 },
+                { wch: 10 },
+                { wch: 10 },
+                { wch: 16 },
+                { wch: 18 },
+                { wch: 16 },
+                { wch: 16 },
+                { wch: 18 },
+                { wch: 16 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 14 }
+            ];
+
+            // 3. SHEET: RENTABILIDAD POR PRODUCTO
+            const productMap = {};
+            const filteredGuides = this.guides || [];
+            filteredGuides.forEach(g => {
+                if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
+                if (this.filters.country && g.country !== this.filters.country) return;
+                const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
+                if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
+                if (this.filters.dateTo && gDate > this.filters.dateTo) return;
+
+                const isExcluded = this.isExcludedFromSales(g);
+                const items = g.guide_items || g.products || g.items || [];
+                const shippingPerItem = items.length > 0 ? (parseFloat(g.shipping_cost || 0) / items.length) : 0;
+                const totalRev = isExcluded ? 0 : parseFloat(g.amount_usd || g.total_amount || g.revenue || 0);
+                const totalItemsCost = items.reduce((s, item) => {
+                    const prod = item.products || item;
+                    const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
+                    return s + (unitCost * (item.quantity || 1));
+                }, 0);
+
+                items.forEach(item => {
+                    const prod = item.products || item;
+                    const rawName = prod.name || item.name || 'Producto Desconocido';
+                    const name = this.productMappings[rawName] || rawName;
+                    const qty = parseInt(item.quantity || 1);
+                    const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
+                    const realCost = isExcluded ? 0 : (unitCost * qty);
+                    const revProp = isExcluded ? 0 : (totalItemsCost > 0 ? (realCost / totalItemsCost) * totalRev : (totalRev / items.length));
+
+                    if (!productMap[name]) {
+                        productMap[name] = { name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: 0 };
+                    }
+                    if (!isExcluded) {
+                        productMap[name].orders += 1;
+                        productMap[name].units += qty;
+                        productMap[name].revenue += revProp;
+                        productMap[name].cost += realCost;
+                    }
+                    productMap[name].shipping += shippingPerItem;
+                });
+            });
+
+            // Add external sales to productMap
+            const extSales = this.getFilteredExternalSales();
+            extSales.forEach(s => {
+                const rawName = s.product_name || s.description || 'Venta Manual';
+                const name = this.productMappings[rawName] || rawName;
+                if (!productMap[name]) {
+                    productMap[name] = { name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: 0 };
+                }
+                productMap[name].orders += (parseInt(s.delivered || 0) + parseInt(s.returned || 0));
+                productMap[name].revenue += parseFloat(s.revenue || 0);
+                productMap[name].cost += parseFloat(s.product_cost || 0);
+                productMap[name].shipping += (parseFloat(s.shipping_cost || 0) + parseFloat(s.return_shipping_cost || 0));
+            });
+
+            // Add ad expenses per product
+            const adExpenses = this.getFilteredAdExpenses();
+            adExpenses.forEach(exp => {
+                const rawName = exp.product_name;
+                if (!rawName) return;
+                const name = this.productMappings[rawName] || rawName;
+                if (productMap[name]) {
+                    productMap[name].adSpend += parseFloat(exp.amount_spent || 0);
+                } else {
+                    productMap[name] = { name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: parseFloat(exp.amount_spent || 0) };
+                }
+            });
+
+            const sortedProductList = Object.values(productMap).sort((a, b) => b.revenue - a.revenue);
+            const prodHeaders = ['#', 'Producto / Referencia', 'Pedidos', 'Unidades', 'Ventas ($)', 'Costo Producto ($)', 'Envíos ($)', 'Publicidad ($)', 'Utilidad Bruta ($)', 'Utilidad Neta ($)', 'Margen Neto (%)'];
+            const prodRows = sortedProductList.map((p, idx) => {
+                const gross = p.revenue - p.cost - p.shipping;
+                const net = gross - p.adSpend;
+                const netMargin = p.revenue > 0 ? ((net / p.revenue) * 100).toFixed(1) + '%' : '0%';
+                return [
+                    idx + 1,
+                    p.name,
+                    p.orders,
+                    p.units,
+                    p.revenue,
+                    p.cost,
+                    p.shipping,
+                    p.adSpend,
+                    gross,
+                    net,
+                    netMargin
+                ];
+            });
+
+            const wsProducts = XLSX.utils.aoa_to_sheet([prodHeaders, ...prodRows]);
+            wsProducts['!cols'] = [
+                { wch: 6 },
+                { wch: 32 },
+                { wch: 10 },
+                { wch: 10 },
+                { wch: 16 },
+                { wch: 18 },
+                { wch: 16 },
+                { wch: 16 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 14 }
+            ];
+
+            // 4. SHEET: DETALLE DE PEDIDOS
+            const orderHeaders = [
+                'Fecha',
+                'Nº Guía / Pedido',
+                'Cliente',
+                'País',
+                'Ciudad',
+                'Estado',
+                '¿Devolución?',
+                'Venta ($)',
+                'Costo Producto ($)',
+                'Costo Envío ($)',
+                'Utilidad Estimada ($)',
+                'Productos'
+            ];
+
+            const orderRows = [];
+            filteredGuides.forEach(g => {
+                if (this.filters.country && g.country !== this.filters.country) return;
+                const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
+                if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
+                if (this.filters.dateTo && gDate > this.filters.dateTo) return;
+
+                const isDevol = this.isDevolucion(g);
+                const isCanc = this.isCancelado(g);
+                const isExcluded = isDevol || isCanc;
+
+                const totalRev = isExcluded ? 0 : parseFloat(g.amount_usd || g.total_amount || 0);
+                const shipping = isCanc ? 0 : parseFloat(g.shipping_cost || 0);
+
+                let prodCost = 0;
+                let prodSummary = '';
+                const items = g.guide_items || g.products || g.items || [];
+                if (items.length > 0) {
+                    prodSummary = items.map(it => `${it.quantity || 1}x ${(it.products?.name || it.name || 'Producto')}`).join(' | ');
+                    if (!isExcluded) {
+                        items.forEach(it => {
+                            const prod = it.products || it;
+                            const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
+                            prodCost += unitCost * (it.quantity || 1);
+                        });
+                    }
+                }
+
+                const profit = totalRev - prodCost - shipping;
+
+                orderRows.push([
+                    gDate,
+                    g.guide_number || g.guideNumber || '',
+                    g.client_name || g.clientName || 'N/A',
+                    g.country || this.getCountryFromCity(g.cities) || '',
+                    g.cities?.name || g.city || '',
+                    g.guide_statuses?.name || g.status || '',
+                    isDevol ? 'SÍ (Devolución)' : (isCanc ? 'SÍ (Cancelado)' : 'No'),
+                    totalRev,
+                    prodCost,
+                    shipping,
+                    profit,
+                    prodSummary
+                ]);
+            });
+
+            const wsOrders = XLSX.utils.aoa_to_sheet([orderHeaders, ...orderRows]);
+            wsOrders['!cols'] = [
+                { wch: 12 },
+                { wch: 15 },
+                { wch: 22 },
+                { wch: 14 },
+                { wch: 14 },
+                { wch: 14 },
+                { wch: 16 },
+                { wch: 14 },
+                { wch: 18 },
+                { wch: 16 },
+                { wch: 18 },
+                { wch: 35 }
+            ];
+
+            // 5. SHEET: GASTOS OPERATIVOS Y PUBLICIDAD
+            const expHeaders = ['Tipo de Gasto', 'Fecha', 'País', 'Campaña / Categoría / Producto', 'Descripción / Notas', 'Monto ($ USD)'];
+            const expRows = [];
+
+            adExpenses.forEach(a => {
+                expRows.push([
+                    'Publicidad (Ads)',
+                    a.date || '',
+                    a.country || '',
+                    a.product_name || a.campaign_name || 'General',
+                    a.notes || '',
+                    parseFloat(a.amount_spent || 0)
+                ]);
+            });
+
+            const opExpenses = this.getFilteredOpExpenses();
+            opExpenses.forEach(o => {
+                expRows.push([
+                    'Gasto Operativo',
+                    o.date || '',
+                    o.country || '',
+                    o.category || 'Operativo',
+                    o.description || '',
+                    parseFloat(o.amount || 0)
+                ]);
+            });
+
+            const wsExpenses = XLSX.utils.aoa_to_sheet([expHeaders, ...expRows]);
+            wsExpenses['!cols'] = [
+                { wch: 18 },
+                { wch: 12 },
+                { wch: 14 },
+                { wch: 30 },
+                { wch: 30 },
+                { wch: 16 }
+            ];
+
+            // Build workbook
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, wsPL, 'P&L Consolidado');
+            XLSX.utils.book_append_sheet(wb, wsCountry, 'Desglose por País');
+            XLSX.utils.book_append_sheet(wb, wsProducts, 'Rentabilidad Productos');
+            XLSX.utils.book_append_sheet(wb, wsOrders, 'Detalle de Pedidos');
+            XLSX.utils.book_append_sheet(wb, wsExpenses, 'Gastos y Publicidad');
+
+            const dateStr = (this.filters.dateFrom || 'inicio') + '_a_' + (this.filters.dateTo || 'hoy');
+            XLSX.writeFile(wb, `estado_resultados_${dateStr}.xlsx`);
+            Utils.showToast('Estado de Resultados descargado en Excel', 'success');
+
+        } catch (error) {
+            console.error('Error al exportar estado de resultados a Excel:', error);
+            Utils.showToast('Error al generar Excel del Estado de Resultados', 'error');
+        }
+    },
+
     exportToCSV() {
-        const salesData = this.getSalesByCountry();
-        const adExpData = this.getAdExpensesByCountry();
-        const opExpData = this.getOpExpensesByCountry();
-        const extSalesSummary = this.getExternalSalesSummary();
-
-        const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0) + extSalesSummary.totalRevenue;
-        const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0) + extSalesSummary.totalCost;
-        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping + extSalesSummary.totalReturnShipping;
-        const grossProfit = totalRevenue - totalCOGS - totalShipping;
-        const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
-        const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
-        const netProfit = grossProfit - totalAdSpend - totalOpExp;
-
-        let csv = 'Estado de Resultados\n';
-        csv += `Período,${this.filters.dateFrom || 'Inicio'},${this.filters.dateTo || 'Fin'}\n`;
-        csv += `País,${this.filters.country || 'Todos'}\n\n`;
-        csv += 'Concepto,Monto\n';
-        csv += `Ventas Netas,${totalRevenue.toFixed(2)}\n`;
-        csv += `Costo de Mercancía,${totalCOGS.toFixed(2)}\n`;
-        csv += `Costo de Fletes,${totalShipping.toFixed(2)}\n`;
-        csv += `Utilidad Bruta,${grossProfit.toFixed(2)}\n`;
-        csv += `Gastos Publicitarios,${totalAdSpend.toFixed(2)}\n`;
-        csv += `Gastos Operativos,${totalOpExp.toFixed(2)}\n`;
-        csv += `Utilidad Neta,${netProfit.toFixed(2)}\n`;
-
-        // Download
-        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `estado_resultados_${this.filters.dateFrom || 'all'}.csv`;
-        link.click();
-
-        Utils.showToast('Estado de resultados exportado', 'success');
+        this.exportToExcel();
     },
 
     // ========================================
