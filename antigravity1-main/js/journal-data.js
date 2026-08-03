@@ -289,6 +289,52 @@ const JournalSeedData = {
             createdAt: new Date('2024-01-01').toISOString()
         }
     ],
+    weeklyGoals: [
+        {
+            id: "wg_seed_1",
+            weekKey: "2026-08-W1",
+            title: "Facturar $3,500 en Dropi con producto ganador",
+            category: "💼 Ventas / Dropi",
+            priority: "high",
+            target: "Meta: 120 pedidos despachados / CPA < $4.00",
+            completed: false,
+            completedAt: null,
+            createdAt: "2026-08-01T10:00:00.000Z"
+        },
+        {
+            id: "wg_seed_2",
+            weekKey: "2026-08-W1",
+            title: "Testear 4 nuevos ángulos creativos en TikTok Ads y Meta Ads",
+            category: "🚀 Anuncios / Marketing",
+            priority: "high",
+            target: "Lanzar 2 CBO con 3 creativos cada una",
+            completed: false,
+            completedAt: null,
+            createdAt: "2026-08-01T10:00:00.000Z"
+        },
+        {
+            id: "wg_seed_3",
+            weekKey: "2026-08-W1",
+            title: "Revisar novedades logísticas y reducir tasa de devolución",
+            category: "📦 Logística / Fletes",
+            priority: "medium",
+            target: "Mantener porcentaje de devolución por debajo del 15%",
+            completed: true,
+            completedAt: "2026-08-03T12:00:00.000Z",
+            createdAt: "2026-08-01T10:00:00.000Z"
+        },
+        {
+            id: "wg_seed_4",
+            weekKey: "2026-08-W2",
+            title: "Escalar presupuesto publicitario un 25% en campañas con ROAS > 2.5",
+            category: "💼 Ventas / Dropi",
+            priority: "high",
+            target: "Meta: $4,500 facturados",
+            completed: false,
+            completedAt: null,
+            createdAt: "2026-08-01T10:00:00.000Z"
+        }
+    ],
     principles: {
         principles: [
             { id: "p1", text: "Soy un ser puro con buenos sentimientos sin presumir nada viviendo en la realidad buena.", area: "Personal" },

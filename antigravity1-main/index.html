@@ -3864,9 +3864,105 @@
 
                     <!-- Right Column: Goals Tracker -->
                     <div class="journal-col">
-                        <div class="journal-card glass-card">
+                        <!-- Objetivos Semanales con Calendario de Semanas -->
+                        <div class="journal-card glass-card" id="weeklyGoalsCard">
+                            <!-- Header with Month/Year Navigation and New Goal Button -->
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                                <div>
+                                    <h3 class="card-title" style="margin-bottom: 0; display: flex; align-items: center; gap: 0.5rem;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                        Objetivos Semanales
+                                    </h3>
+                                    <span style="font-size: 0.8rem; color: var(--text-muted);">Planifica y monitorea tus objetivos semana a semana</span>
+                                </div>
+                                <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                                    <div style="display: inline-flex; align-items: center; background: var(--surface-hover); border-radius: 6px; border: 1px solid var(--border); padding: 2px;">
+                                        <button type="button" class="btn btn-sm btn-icon" id="btnWeeklyPrevMonth" style="padding: 4px 8px; border: none; background: transparent; color: var(--text-primary);" title="Mes Anterior">◀</button>
+                                        <span id="weeklyMonthLabel" style="font-weight: 600; font-size: 0.85rem; padding: 0 6px; min-width: 110px; text-align: center;">Agosto 2026</span>
+                                        <button type="button" class="btn btn-sm btn-icon" id="btnWeeklyNextMonth" style="padding: 4px 8px; border: none; background: transparent; color: var(--text-primary);" title="Siguiente Mes">▶</button>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-secondary" id="btnWeeklyCurrentWeek" title="Ir a la semana actual" style="font-size: 0.78rem;">📅 Hoy</button>
+                                    <button type="button" class="btn btn-sm btn-primary" id="btnNewWeeklyGoal" style="font-size: 0.8rem;">+ Nuevo Objetivo</button>
+                                </div>
+                            </div>
+
+                            <!-- Weeks Selector Pills (Generated via JS) -->
+                            <div class="weekly-pills-container" id="weeklyPillsContainer">
+                                <!-- E.g. Semana 1 (03 Ago - 09 Ago), Semana 2, etc. -->
+                            </div>
+
+                            <!-- Selected Week Banner & Progress -->
+                            <div id="weeklyActiveInfo" style="background: var(--surface-hover); border-radius: 8px; padding: 0.85rem; margin-bottom: 1rem; border-left: 4px solid var(--primary); border: 1px solid var(--border); border-left-width: 4px;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                        <strong id="selectedWeekTitle" style="font-size: 0.92rem; color: var(--text-primary);">Semana 1: 03 de Agosto al 09 de Agosto</strong>
+                                        <span id="selectedWeekBadge" class="badge" style="background: rgba(99, 102, 241, 0.15); color: #818cf8; font-size: 0.72rem;">Semana Activa</span>
+                                    </div>
+                                    <div id="selectedWeekStats" style="font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);">
+                                        0 / 0 completados (0%)
+                                    </div>
+                                </div>
+                                <!-- Progress Bar -->
+                                <div style="background: rgba(255,255,255,0.08); border-radius: 999px; height: 8px; width: 100%; overflow: hidden;">
+                                    <div id="selectedWeekProgressBar" style="background: linear-gradient(90deg, #6366f1, #10b981); height: 100%; width: 0%; transition: width 0.4s ease;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Add / Edit Weekly Goal Form (Hidden by default) -->
+                            <div id="newWeeklyGoalFormContainer" style="display: none; margin-bottom: 1rem; padding: 1rem; background: var(--bg-primary); border-radius: 8px; border: 1px solid var(--border);">
+                                <form id="weeklyGoalForm">
+                                    <input type="hidden" id="weeklyGoalId">
+                                    <div class="form-group" style="margin-bottom: 0.75rem;">
+                                        <label style="font-size: 0.82rem; font-weight: 600;">Objetivo Semanal</label>
+                                        <input type="text" id="weeklyGoalTitle" required placeholder="Ej: Facturar $3,000 en Dropi, Probar 5 creativos, Escalar producto X...">
+                                    </div>
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;">
+                                        <div class="form-group" style="margin-bottom: 0;">
+                                            <label style="font-size: 0.78rem; font-weight: 600;">Semana</label>
+                                            <select id="weeklyGoalWeekSelect" style="width: 100%; padding: 0.45rem; border-radius: 6px; background: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border); font-size: 0.82rem;">
+                                                <!-- Populated dynamically -->
+                                            </select>
+                                        </div>
+                                        <div class="form-group" style="margin-bottom: 0;">
+                                            <label style="font-size: 0.78rem; font-weight: 600;">Categoría</label>
+                                            <select id="weeklyGoalCategory" style="width: 100%; padding: 0.45rem; border-radius: 6px; background: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border); font-size: 0.82rem;">
+                                                <option value="💼 Ventas / Dropi">💼 Ventas / Dropi</option>
+                                                <option value="🚀 Anuncios / Marketing">🚀 Anuncios / Marketing</option>
+                                                <option value="📦 Logística / Fletes">📦 Logística / Fletes</option>
+                                                <option value="💰 Finanzas">💰 Finanzas</option>
+                                                <option value="🏋️ Hábitos / Salud">🏋️ Hábitos / Salud</option>
+                                                <option value="👤 Personal">👤 Personal</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group" style="margin-bottom: 0;">
+                                            <label style="font-size: 0.78rem; font-weight: 600;">Prioridad</label>
+                                            <select id="weeklyGoalPriority" style="width: 100%; padding: 0.45rem; border-radius: 6px; background: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border); font-size: 0.82rem;">
+                                                <option value="high">🔥 Alta</option>
+                                                <option value="medium" selected>⚡ Media</option>
+                                                <option value="normal">🎯 Normal</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0.75rem;">
+                                        <label style="font-size: 0.78rem; font-weight: 600;">Meta Cuantitativa / Plan de Acción (Opcional)</label>
+                                        <input type="text" id="weeklyGoalTarget" placeholder="Ej: Meta: 80 pedidos entregados / Plan: Subir presupuesto a $30/día" style="width: 100%; padding: 0.45rem 0.6rem; border-radius: 6px; background: var(--surface-hover); color: var(--text-primary); border: 1px solid var(--border); font-size: 0.82rem;">
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                                        <button type="button" class="btn btn-sm btn-secondary" id="btnCancelWeeklyGoal">Cancelar</button>
+                                        <button type="submit" class="btn btn-sm btn-primary">Guardar Objetivo</button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Weekly Goals List -->
+                            <div id="weeklyGoalsList" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                                <!-- Populated dynamically via JS -->
+                            </div>
+                        </div>
+
+                        <div class="journal-card glass-card" style="margin-top: var(--space-lg);">
                             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                                <h3 class="card-title" style="margin-bottom: 0;">Mis Metas</h3>
+                                <h3 class="card-title" style="margin-bottom: 0;">Mis Metas Generales</h3>
                                 <button class="btn btn-sm btn-primary" id="btnNewGoal">+ Nueva Meta</button>
                             </div>
                             

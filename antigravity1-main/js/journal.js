@@ -5,13 +5,19 @@
 const JournalModule = {
     entries: [],
     goals: [],
+    weeklyGoals: [],
     principles: { principles: [], rules: [], actions: [], improvements: [] },
     currentMood: null,
     editingGoalId: null,
+    editingWeeklyGoalId: null,
+    currentWeeklyYear: new Date().getFullYear(),
+    currentWeeklyMonth: new Date().getMonth(), // 0-11
+    selectedWeekKey: null,
 
     async init() {
         await this.loadData();
         this.bindEvents();
+        this.renderWeeklyGoals();
     },
     
     restoreSeedData() {
@@ -20,9 +26,11 @@ const JournalModule = {
         if (typeof JournalSeedData !== 'undefined') {
             this.entries = [...JournalSeedData.entries];
             this.goals = [...JournalSeedData.goals];
+            this.weeklyGoals = [...(JournalSeedData.weeklyGoals || [])];
             this.principles = JSON.parse(JSON.stringify(JournalSeedData.principles));
             this.saveData();
             
+            this.renderWeeklyGoals();
             this.renderEntries();
             this.renderGoals();
             this.renderPrinciples();
@@ -36,12 +44,14 @@ const JournalModule = {
     async loadData() {
         const localEntries = JSON.parse(localStorage.getItem('journal_entries') || 'null');
         const localGoals = JSON.parse(localStorage.getItem('journal_goals') || 'null');
+        const localWeeklyGoals = JSON.parse(localStorage.getItem('journal_weekly_goals') || 'null');
         const localPrinciples = JSON.parse(localStorage.getItem('journal_principles') || 'null');
 
         if (!window.supabaseClient || !window.AuthModule || !window.AuthModule.currentUser) {
             console.error("Supabase or user not initialized, falling back to local storage");
             this.entries = localEntries || [];
             this.goals = localGoals || [];
+            this.weeklyGoals = localWeeklyGoals || [];
             this.principles = localPrinciples || { principles: [], rules: [], actions: [], improvements: [] };
             return;
         }
@@ -63,23 +73,27 @@ const JournalModule = {
                 // Load from DB
                 this.entries = data.entries || [];
                 this.goals = data.goals || [];
+                this.weeklyGoals = data.weekly_goals || data.weeklyGoals || localWeeklyGoals || [];
                 this.principles = data.principles || { principles: [], rules: [], actions: [], improvements: [] };
             } else {
                 // Try to migrate from localStorage if DB is empty
-                if (localEntries || localGoals || localPrinciples) {
+                if (localEntries || localGoals || localWeeklyGoals || localPrinciples) {
                     this.entries = localEntries || [];
                     this.goals = localGoals || [];
+                    this.weeklyGoals = localWeeklyGoals || [];
                     this.principles = localPrinciples || { principles: [], rules: [], actions: [], improvements: [] };
                     // Save to DB now
                     await this.saveData();
                 } else if (typeof JournalSeedData !== 'undefined') {
                     this.entries = [...JournalSeedData.entries];
                     this.goals = [...JournalSeedData.goals];
+                    this.weeklyGoals = [...(JournalSeedData.weeklyGoals || [])];
                     this.principles = JSON.parse(JSON.stringify(JournalSeedData.principles));
                     await this.saveData();
                 } else {
                     this.entries = [];
                     this.goals = [];
+                    this.weeklyGoals = [];
                     this.principles = { principles: [], rules: [], actions: [], improvements: [] };
                 }
             }
@@ -88,6 +102,7 @@ const JournalModule = {
             Utils.showToast('Error cargando el diario de la nube', 'error');
             this.entries = localEntries || [];
             this.goals = localGoals || [];
+            this.weeklyGoals = localWeeklyGoals || [];
             this.principles = localPrinciples || { principles: [], rules: [], actions: [], improvements: [] };
         }
     },
@@ -96,6 +111,7 @@ const JournalModule = {
         // Always save to localStorage as backup/offline caching
         localStorage.setItem('journal_entries', JSON.stringify(this.entries));
         localStorage.setItem('journal_goals', JSON.stringify(this.goals));
+        localStorage.setItem('journal_weekly_goals', JSON.stringify(this.weeklyGoals));
         localStorage.setItem('journal_principles', JSON.stringify(this.principles));
 
         if (!window.supabaseClient || !window.AuthModule || !window.AuthModule.currentUser) return;
@@ -109,18 +125,48 @@ const JournalModule = {
                     user_id: userId,
                     entries: this.entries,
                     goals: this.goals,
+                    weekly_goals: this.weeklyGoals,
                     principles: this.principles,
                     updated_at: new Date().toISOString()
                 }, { onConflict: 'user_id' });
 
-            if (error) throw error;
+            if (error) {
+                // If weekly_goals column does not exist in DB schema, fallback gracefully
+                if (error.message && (error.message.includes('weekly_goals') || error.code === '42703')) {
+                    await supabaseClient
+                        .from('user_journals')
+                        .upsert({
+                            user_id: userId,
+                            entries: this.entries,
+                            goals: this.goals,
+                            principles: this.principles,
+                            updated_at: new Date().toISOString()
+                        }, { onConflict: 'user_id' });
+                } else {
+                    throw error;
+                }
+            }
         } catch (err) {
             console.error('Error saving journal to DB', err);
-            Utils.showToast('Error guardando en la nube', 'error');
         }
     },
 
     bindEvents() {
+        // Weekly Goals Navigation & Form Events
+        const btnPrevMonth = document.getElementById('btnWeeklyPrevMonth');
+        const btnNextMonth = document.getElementById('btnWeeklyNextMonth');
+        const btnCurrentWeek = document.getElementById('btnWeeklyCurrentWeek');
+        const btnNewWeeklyGoal = document.getElementById('btnNewWeeklyGoal');
+        const btnCancelWeeklyGoal = document.getElementById('btnCancelWeeklyGoal');
+        const weeklyGoalForm = document.getElementById('weeklyGoalForm');
+
+        if (btnPrevMonth) btnPrevMonth.addEventListener('click', () => this.changeWeeklyMonth(-1));
+        if (btnNextMonth) btnNextMonth.addEventListener('click', () => this.changeWeeklyMonth(1));
+        if (btnCurrentWeek) btnCurrentWeek.addEventListener('click', () => this.goToCurrentWeek());
+        if (btnNewWeeklyGoal) btnNewWeeklyGoal.addEventListener('click', () => this.openNewWeeklyGoalForm());
+        if (btnCancelWeeklyGoal) btnCancelWeeklyGoal.addEventListener('click', () => this.closeWeeklyGoalForm());
+        if (weeklyGoalForm) weeklyGoalForm.addEventListener('submit', (e) => this.handleSaveWeeklyGoal(e));
+
         // Journal Entry Form
         const form = document.getElementById('journalEntryForm');
         if (form) {
@@ -171,9 +217,377 @@ const JournalModule = {
     },
 
     async render() {
+        this.renderWeeklyGoals();
         this.renderEntries();
         this.renderGoals();
         this.renderPrinciples();
+    },
+
+    // ========================================
+    // WEEKLY GOALS & CALENDAR METHODS
+    // ========================================
+    getWeeksForMonth(year, monthIndex) {
+        const monthNames = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+        const monthShortNames = [
+            'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun',
+            'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'
+        ];
+
+        const weeks = [];
+        const firstDayObj = new Date(year, monthIndex, 1);
+        const firstDayOfWeek = firstDayObj.getDay(); // 0: Sun, 1: Mon, 2: Tue... 6: Sat
+        
+        let week1StartDate = new Date(year, monthIndex, 1);
+        if (firstDayOfWeek === 6) { // Saturday
+            week1StartDate = new Date(year, monthIndex, 3); // Start on Monday
+        } else if (firstDayOfWeek === 0) { // Sunday
+            week1StartDate = new Date(year, monthIndex, 2); // Start on Monday
+        }
+
+        let currentMonday = new Date(week1StartDate);
+        const dOffset = (currentMonday.getDay() + 6) % 7; // Distance to Monday
+        currentMonday.setDate(currentMonday.getDate() - dOffset);
+
+        let weekIndex = 1;
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+        while (true) {
+            const sunday = new Date(currentMonday);
+            sunday.setDate(currentMonday.getDate() + 6);
+
+            if (currentMonday.getMonth() > monthIndex && currentMonday.getFullYear() >= year) {
+                break;
+            }
+            if (currentMonday.getFullYear() > year) {
+                break;
+            }
+
+            const startStr = `${String(currentMonday.getDate()).padStart(2, '0')} de ${monthNames[currentMonday.getMonth()]}`;
+            const endStr = `${String(sunday.getDate()).padStart(2, '0')} de ${monthNames[sunday.getMonth()]}`;
+            const shortStartStr = `${String(currentMonday.getDate()).padStart(2, '0')} ${monthShortNames[currentMonday.getMonth()]}`;
+            const shortEndStr = `${String(sunday.getDate()).padStart(2, '0')} ${monthShortNames[sunday.getMonth()]}`;
+
+            const key = `${year}-${String(monthIndex + 1).padStart(2, '0')}-W${weekIndex}`;
+
+            const startIso = `${currentMonday.getFullYear()}-${String(currentMonday.getMonth() + 1).padStart(2, '0')}-${String(currentMonday.getDate()).padStart(2, '0')}`;
+            const endIso = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
+            const isCurrent = todayStr >= startIso && todayStr <= endIso;
+
+            weeks.push({
+                weekNumber: weekIndex,
+                key: key,
+                title: `Semana ${weekIndex}: ${startStr} al ${endStr}`,
+                shortLabel: `Semana ${weekIndex} (${shortStartStr} - ${shortEndStr})`,
+                startDate: startIso,
+                endDate: endIso,
+                isCurrent: isCurrent
+            });
+
+            currentMonday.setDate(currentMonday.getDate() + 7);
+            weekIndex++;
+
+            if (weekIndex > 6 || (currentMonday.getMonth() !== monthIndex && currentMonday.getDate() > 7)) {
+                break;
+            }
+        }
+
+        return weeks;
+    },
+
+    renderWeeklyGoals() {
+        const monthNames = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+        ];
+
+        const monthLabel = document.getElementById('weeklyMonthLabel');
+        if (monthLabel) {
+            monthLabel.textContent = `${monthNames[this.currentWeeklyMonth]} ${this.currentWeeklyYear}`;
+        }
+
+        const weeks = this.getWeeksForMonth(this.currentWeeklyYear, this.currentWeeklyMonth);
+        if (weeks.length === 0) return;
+
+        const currentWeekInMonth = weeks.find(w => w.isCurrent);
+        if (!this.selectedWeekKey || !weeks.some(w => w.key === this.selectedWeekKey)) {
+            this.selectedWeekKey = currentWeekInMonth ? currentWeekInMonth.key : weeks[0].key;
+        }
+
+        const activeWeek = weeks.find(w => w.key === this.selectedWeekKey) || weeks[0];
+
+        // 1. Render Week Selector Pills
+        const pillsContainer = document.getElementById('weeklyPillsContainer');
+        if (pillsContainer) {
+            pillsContainer.innerHTML = weeks.map(w => {
+                const weekGoals = this.weeklyGoals.filter(g => g.weekKey === w.key);
+                const completedCount = weekGoals.filter(g => g.completed).length;
+                const totalCount = weekGoals.length;
+                
+                let badgeHtml = '';
+                if (totalCount === 0) {
+                    badgeHtml = `<span class="weekly-pill-badge empty">0</span>`;
+                } else if (completedCount === totalCount) {
+                    badgeHtml = `<span class="weekly-pill-badge completed">✓ ${completedCount}/${totalCount}</span>`;
+                } else {
+                    badgeHtml = `<span class="weekly-pill-badge in-progress">${completedCount}/${totalCount}</span>`;
+                }
+
+                const isActive = w.key === this.selectedWeekKey;
+                const todayBadge = w.isCurrent ? `<span style="font-size: 0.65rem; color: #818cf8; margin-left: 4px;">• Hoy</span>` : '';
+
+                return `
+                    <button type="button" class="weekly-pill ${isActive ? 'active' : ''}" onclick="JournalModule.selectWeek('${w.key}')">
+                        <div class="weekly-pill-title">
+                            <span>Semana ${w.weekNumber} ${todayBadge}</span>
+                            ${badgeHtml}
+                        </div>
+                        <div class="weekly-pill-dates">${w.shortLabel.split('(')[1].replace(')', '')}</div>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        // 2. Update Active Week Banner & Progress Bar
+        const titleEl = document.getElementById('selectedWeekTitle');
+        const badgeEl = document.getElementById('selectedWeekBadge');
+        const statsEl = document.getElementById('selectedWeekStats');
+        const barEl = document.getElementById('selectedWeekProgressBar');
+
+        const activeGoals = this.weeklyGoals.filter(g => g.weekKey === activeWeek.key);
+        const activeCompleted = activeGoals.filter(g => g.completed).length;
+        const activeTotal = activeGoals.length;
+        const pct = activeTotal > 0 ? Math.round((activeCompleted / activeTotal) * 100) : 0;
+
+        if (titleEl) titleEl.textContent = activeWeek.title;
+        if (badgeEl) {
+            badgeEl.textContent = activeWeek.isCurrent ? 'Semana Actual 🔥' : `Semana ${activeWeek.weekNumber}`;
+            badgeEl.style.background = activeWeek.isCurrent ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.08)';
+            badgeEl.style.color = activeWeek.isCurrent ? '#818cf8' : 'var(--text-secondary)';
+        }
+        if (statsEl) statsEl.textContent = `${activeCompleted} / ${activeTotal} completados (${pct}%)`;
+        if (barEl) barEl.style.width = `${pct}%`;
+
+        // 3. Update Week Selector in Form
+        const weekSelect = document.getElementById('weeklyGoalWeekSelect');
+        if (weekSelect) {
+            weekSelect.innerHTML = weeks.map(w => `
+                <option value="${w.key}" ${w.key === activeWeek.key ? 'selected' : ''}>
+                    ${w.title}
+                </option>
+            `).join('');
+        }
+
+        // 4. Render Objectives List for Selected Week
+        const listEl = document.getElementById('weeklyGoalsList');
+        if (listEl) {
+            if (activeGoals.length === 0) {
+                listEl.innerHTML = `
+                    <div style="text-align: center; color: var(--text-muted); padding: 1.75rem 1rem; background: var(--bg-primary); border-radius: 8px; border: 1px dashed var(--border);">
+                        <p style="margin-bottom: 0.75rem; font-size: 0.9rem;">No tienes objetivos registrados para la <strong>${activeWeek.title}</strong>.</p>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="JournalModule.openNewWeeklyGoalForm()">+ Agregar Objetivo a esta Semana</button>
+                    </div>
+                `;
+            } else {
+                const priorityWeight = { 'high': 3, 'medium': 2, 'normal': 1 };
+                const sorted = [...activeGoals].sort((a, b) => {
+                    if (a.completed !== b.completed) return a.completed ? 1 : -1;
+                    return (priorityWeight[b.priority || 'medium'] || 2) - (priorityWeight[a.priority || 'medium'] || 2);
+                });
+
+                listEl.innerHTML = sorted.map(g => {
+                    const priorityClass = g.priority || 'medium';
+                    const priorityLabel = g.priority === 'high' ? '🔥 Alta' : (g.priority === 'normal' ? '🎯 Normal' : '⚡ Media');
+                    
+                    return `
+                        <div class="weekly-goal-card ${g.completed ? 'completed' : ''}">
+                            <input type="checkbox" class="weekly-checkbox" ${g.completed ? 'checked' : ''} onchange="JournalModule.toggleWeeklyGoal('${g.id}')" title="${g.completed ? 'Marcar como pendiente' : 'Marcar como completado'}">
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 0.25rem;">
+                                    <span class="priority-pill ${priorityClass}">${priorityLabel}</span>
+                                    <span style="font-size: 0.72rem; color: var(--text-muted); background: var(--bg-primary); padding: 1px 6px; border-radius: 4px; border: 1px solid var(--border);">${Utils.escapeHtml(g.category || '💼 Ventas / Dropi')}</span>
+                                </div>
+                                <div class="weekly-goal-text" style="font-size: 0.9rem; font-weight: 500; color: var(--text-primary); margin-bottom: 0.2rem; line-height: 1.35;">
+                                    ${Utils.escapeHtml(g.title)}
+                                </div>
+                                ${g.target ? `
+                                    <div style="font-size: 0.78rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; margin-top: 2px;">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
+                                        ${Utils.escapeHtml(g.target)}
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div style="display: flex; gap: 0.25rem; align-items: center;">
+                                <button type="button" class="btn btn-sm btn-icon" style="color: var(--primary); padding: 4px;" onclick="JournalModule.editWeeklyGoal('${g.id}')" title="Editar objetivo">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-icon" style="color: var(--text-muted); padding: 4px;" onclick="JournalModule.moveWeeklyGoalToNextWeek('${g.id}')" title="Mover a la siguiente semana">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-icon" style="color: var(--danger); padding: 4px;" onclick="JournalModule.deleteWeeklyGoal('${g.id}')" title="Eliminar">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    },
+
+    changeWeeklyMonth(delta) {
+        let newMonth = this.currentWeeklyMonth + delta;
+        let newYear = this.currentWeeklyYear;
+        if (newMonth < 0) {
+            newMonth = 11;
+            newYear -= 1;
+        } else if (newMonth > 11) {
+            newMonth = 0;
+            newYear += 1;
+        }
+        this.currentWeeklyMonth = newMonth;
+        this.currentWeeklyYear = newYear;
+        this.selectedWeekKey = null;
+        this.renderWeeklyGoals();
+    },
+
+    goToCurrentWeek() {
+        const now = new Date();
+        this.currentWeeklyYear = now.getFullYear();
+        this.currentWeeklyMonth = now.getMonth();
+        const weeks = this.getWeeksForMonth(this.currentWeeklyYear, this.currentWeeklyMonth);
+        const current = weeks.find(w => w.isCurrent);
+        this.selectedWeekKey = current ? current.key : (weeks[0] ? weeks[0].key : null);
+        this.renderWeeklyGoals();
+    },
+
+    selectWeek(key) {
+        this.selectedWeekKey = key;
+        this.renderWeeklyGoals();
+    },
+
+    openNewWeeklyGoalForm() {
+        this.editingWeeklyGoalId = null;
+        const form = document.getElementById('weeklyGoalForm');
+        if (form) form.reset();
+        document.getElementById('weeklyGoalId').value = '';
+        if (this.selectedWeekKey) {
+            const selectEl = document.getElementById('weeklyGoalWeekSelect');
+            if (selectEl) selectEl.value = this.selectedWeekKey;
+        }
+        document.getElementById('newWeeklyGoalFormContainer').style.display = 'block';
+        document.getElementById('btnNewWeeklyGoal').style.display = 'none';
+        document.getElementById('weeklyGoalTitle').focus();
+    },
+
+    closeWeeklyGoalForm() {
+        document.getElementById('newWeeklyGoalFormContainer').style.display = 'none';
+        document.getElementById('btnNewWeeklyGoal').style.display = 'inline-flex';
+        const form = document.getElementById('weeklyGoalForm');
+        if (form) form.reset();
+        this.editingWeeklyGoalId = null;
+    },
+
+    handleSaveWeeklyGoal(e) {
+        e.preventDefault();
+        const title = document.getElementById('weeklyGoalTitle').value.trim();
+        const weekKey = document.getElementById('weeklyGoalWeekSelect').value;
+        const category = document.getElementById('weeklyGoalCategory').value;
+        const priority = document.getElementById('weeklyGoalPriority').value;
+        const target = document.getElementById('weeklyGoalTarget').value.trim();
+
+        if (!title) {
+            Utils.showToast('Por favor escribe el título del objetivo', 'warning');
+            return;
+        }
+
+        if (this.editingWeeklyGoalId) {
+            const goal = this.weeklyGoals.find(g => g.id === this.editingWeeklyGoalId);
+            if (goal) {
+                goal.title = title;
+                goal.weekKey = weekKey;
+                goal.category = category;
+                goal.priority = priority;
+                goal.target = target;
+            }
+            this.editingWeeklyGoalId = null;
+            Utils.showToast('Objetivo semanal actualizado', 'success');
+        } else {
+            const newGoal = {
+                id: 'wg_' + Date.now().toString(),
+                weekKey: weekKey,
+                title: title,
+                category: category,
+                priority: priority,
+                target: target,
+                completed: false,
+                completedAt: null,
+                createdAt: new Date().toISOString()
+            };
+            this.weeklyGoals.push(newGoal);
+            Utils.showToast('¡Objetivo semanal agregado con éxito!', 'success');
+        }
+
+        this.selectedWeekKey = weekKey;
+        this.saveData();
+        this.closeWeeklyGoalForm();
+        this.renderWeeklyGoals();
+    },
+
+    toggleWeeklyGoal(id) {
+        const goal = this.weeklyGoals.find(g => g.id === id);
+        if (goal) {
+            goal.completed = !goal.completed;
+            goal.completedAt = goal.completed ? new Date().toISOString() : null;
+            this.saveData();
+            this.renderWeeklyGoals();
+            if (goal.completed) {
+                Utils.showToast('¡Excelente! Objetivo semanal cumplido 🎉', 'success');
+            }
+        }
+    },
+
+    editWeeklyGoal(id) {
+        const goal = this.weeklyGoals.find(g => g.id === id);
+        if (!goal) return;
+
+        this.editingWeeklyGoalId = id;
+        document.getElementById('weeklyGoalId').value = goal.id;
+        document.getElementById('weeklyGoalTitle').value = goal.title;
+        document.getElementById('weeklyGoalWeekSelect').value = goal.weekKey;
+        document.getElementById('weeklyGoalCategory').value = goal.category || '💼 Ventas / Dropi';
+        document.getElementById('weeklyGoalPriority').value = goal.priority || 'medium';
+        document.getElementById('weeklyGoalTarget').value = goal.target || '';
+
+        document.getElementById('newWeeklyGoalFormContainer').style.display = 'block';
+        document.getElementById('btnNewWeeklyGoal').style.display = 'none';
+        document.getElementById('newWeeklyGoalFormContainer').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    },
+
+    deleteWeeklyGoal(id) {
+        if (!confirm('¿Estás seguro de eliminar este objetivo semanal?')) return;
+        this.weeklyGoals = this.weeklyGoals.filter(g => g.id !== id);
+        this.saveData();
+        this.renderWeeklyGoals();
+        Utils.showToast('Objetivo semanal eliminado', 'success');
+    },
+
+    moveWeeklyGoalToNextWeek(id) {
+        const goal = this.weeklyGoals.find(g => g.id === id);
+        if (!goal) return;
+
+        const parts = goal.weekKey.split('-W');
+        if (parts.length === 2) {
+            const nextWeekNum = parseInt(parts[1], 10) + 1;
+            goal.weekKey = `${parts[0]}-W${nextWeekNum}`;
+            this.selectedWeekKey = goal.weekKey;
+            this.saveData();
+            this.renderWeeklyGoals();
+            Utils.showToast(`Objetivo movido a la Semana ${nextWeekNum}`, 'success');
+        }
     },
 
     getMoodEmoji(mood) {
@@ -414,12 +828,49 @@ const JournalModule = {
         doc.text("Reporte de Diario y Metas", 105, y, null, null, "center");
         y += 15;
 
-        // --- 1. METAS ---
+        // --- 1. OBJETIVOS SEMANALES ---
+        if (this.weeklyGoals && this.weeklyGoals.length > 0) {
+            if (y > 270) { doc.addPage(); y = 20; }
+            doc.setFontSize(16);
+            doc.setFont("helvetica", "bold");
+            doc.text("Objetivos Semanales", 20, y);
+            y += 10;
+
+            const sortedWeekly = [...this.weeklyGoals].sort((a, b) => {
+                if (a.completed === b.completed) return (a.weekKey || '').localeCompare(b.weekKey || '');
+                return a.completed ? 1 : -1;
+            });
+
+            doc.setFontSize(12);
+            sortedWeekly.forEach((goal, index) => {
+                if (y > 270) { doc.addPage(); y = 20; }
+                const status = goal.completed ? "[Completado]" : "[Pendiente]";
+                const priority = goal.priority === 'high' ? 'Alta' : (goal.priority === 'normal' ? 'Normal' : 'Media');
+
+                doc.setFont("helvetica", "bold");
+                doc.text(`${index + 1}. ${goal.title} ${status}`, 20, y);
+                y += 7;
+
+                doc.setFont("helvetica", "normal");
+                doc.text(`Semana: ${goal.weekKey || 'N/A'} | Prioridad: ${priority} | Categoría: ${goal.category || 'General'}`, 25, y);
+                y += 7;
+
+                if (goal.target) {
+                    const splitTarget = doc.splitTextToSize(`Meta/Plan: ${goal.target}`, 160);
+                    doc.text(splitTarget, 25, y);
+                    y += (splitTarget.length * 7);
+                }
+                y += 5;
+            });
+            y += 5;
+        }
+
+        // --- 2. METAS GENERALES ---
         if (this.goals.length > 0) {
             if (y > 270) { doc.addPage(); y = 20; }
             doc.setFontSize(16);
             doc.setFont("helvetica", "bold");
-            doc.text("Mis Metas", 20, y);
+            doc.text("Mis Metas Generales", 20, y);
             y += 10;
 
             const sortedGoals = [...this.goals].sort((a, b) => {
@@ -451,7 +902,7 @@ const JournalModule = {
             y += 5;
         }
 
-        // --- 2. DIARIO ---
+        // --- 3. DIARIO ---
         if (this.entries.length > 0) {
             if (y > 270) { doc.addPage(); y = 20; }
             doc.setFontSize(16);
@@ -497,7 +948,7 @@ const JournalModule = {
             });
         }
 
-        // --- 3. PRINCIPIOS Y REGLAS ---
+        // --- 4. PRINCIPIOS Y REGLAS ---
         const principleCategories = [
             { key: 'principles', label: 'Principios y Valores' },
             { key: 'rules', label: 'Reglas de Vida' },
@@ -619,16 +1070,17 @@ const JournalModule = {
 
     // Export backup JSON file
     exportBackup() {
-        if (this.entries.length === 0 && this.goals.length === 0 && (!this.principles || Object.values(this.principles).every(arr => arr.length === 0))) {
+        if (this.entries.length === 0 && this.goals.length === 0 && (!this.weeklyGoals || this.weeklyGoals.length === 0) && (!this.principles || Object.values(this.principles).every(arr => arr.length === 0))) {
             Utils.showToast('No hay datos en el diario para exportar', 'warning');
             return;
         }
 
         const backupData = {
-            version: '1.0',
+            version: '1.1',
             exportedAt: new Date().toISOString(),
             entries: this.entries,
             goals: this.goals,
+            weekly_goals: this.weeklyGoals,
             principles: this.principles
         };
 
@@ -676,10 +1128,11 @@ const JournalModule = {
     // Copy all journal & goals data to clipboard as JSON text
     copyBackupToClipboard() {
         const backupData = {
-            version: '1.0',
+            version: '1.1',
             exportedAt: new Date().toISOString(),
             entries: this.entries,
             goals: this.goals,
+            weekly_goals: this.weeklyGoals,
             principles: this.principles
         };
 
@@ -734,6 +1187,7 @@ const JournalModule = {
 
         const newEntries = data.entries || [];
         const newGoals = data.goals || [];
+        const newWeeklyGoals = data.weekly_goals || data.weeklyGoals || [];
         const newPrinciples = data.principles || { principles: [], rules: [], actions: [], improvements: [] };
 
         // Merge entries by ID
@@ -750,6 +1204,13 @@ const JournalModule = {
             if (g.id) goalMap.set(g.id, g);
         });
         this.goals = Array.from(goalMap.values());
+
+        // Merge weekly goals by ID
+        const weeklyMap = new Map(this.weeklyGoals.map(wg => [wg.id, wg]));
+        newWeeklyGoals.forEach(wg => {
+            if (wg.id) weeklyMap.set(wg.id, wg);
+        });
+        this.weeklyGoals = Array.from(weeklyMap.values());
 
         // Merge principles
         if (newPrinciples && typeof newPrinciples === 'object') {
