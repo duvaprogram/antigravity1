@@ -1,4 +1,4 @@
-// Campaigns Module - Campaign Name Generator
+// Campaigns Module - Campaign Name Generator, Meta Ad IDs Import & Quick Sales Registration
 const CampaignsModule = {
     // Country codes mapping
     countries: {
@@ -19,6 +19,21 @@ const CampaignsModule = {
     // Store generated campaigns
     generatedCampaigns: [],
 
+    // Store imported ads with IDs and metrics
+    campaignAds: [],
+
+    // Store quick sales registered by Ad ID
+    campaignSales: [],
+
+    // Store campaign performance data (consolidated)
+    performanceData: [],
+
+    // Store pending report data
+    pendingReportData: null,
+
+    // Current active tab ('generator', 'ads-performance', 'quick-sales', 'sales-history')
+    activeTab: 'generator',
+
     // Track if already initialized
     initialized: false,
 
@@ -33,7 +48,6 @@ const CampaignsModule = {
 
     // Initialize the module
     async init() {
-        // Prevent multiple initializations
         if (this.initialized) {
             return;
         }
@@ -41,11 +55,150 @@ const CampaignsModule = {
 
         await this.loadProducts();
         this.loadUsedCodes();
-        this.loadPerformanceData();
+        await this.loadAllDataFromDb();
         this.bindEvents();
         this.setDefaultDate();
-        this.loadSavedCampaigns();
+        this.renderAll();
+    },
+
+    // Load all data from Supabase / localStorage
+    async loadAllDataFromDb() {
+        try {
+            // 1. Load Campaigns
+            if (window.Database && window.Database.getCampaigns) {
+                try {
+                    const dbCampaigns = await window.Database.getCampaigns();
+                    if (dbCampaigns && dbCampaigns.length > 0) {
+                        this.generatedCampaigns = dbCampaigns;
+                    } else {
+                        const saved = localStorage.getItem('generatedCampaigns');
+                        this.generatedCampaigns = saved ? JSON.parse(saved) : [];
+                    }
+                } catch (e) {
+                    const saved = localStorage.getItem('generatedCampaigns');
+                    this.generatedCampaigns = saved ? JSON.parse(saved) : [];
+                }
+            } else {
+                const saved = localStorage.getItem('generatedCampaigns');
+                this.generatedCampaigns = saved ? JSON.parse(saved) : [];
+            }
+
+            // Rebuild used codes
+            this.generatedCampaigns.forEach(c => {
+                if (c.code) this.usedCodes.add(c.code);
+                if (c.adSetCodes) c.adSetCodes.forEach(code => this.usedCodes.add(code));
+                if (c.adCodes) c.adCodes.forEach(code => this.usedCodes.add(code));
+            });
+
+            // 2. Load Campaign Ads
+            if (window.Database && window.Database.getCampaignAds) {
+                try {
+                    const dbAds = await window.Database.getCampaignAds();
+                    if (dbAds && dbAds.length > 0) {
+                        this.campaignAds = dbAds;
+                    } else {
+                        const savedAds = localStorage.getItem('campaignAdsData');
+                        this.campaignAds = savedAds ? JSON.parse(savedAds) : [];
+                    }
+                } catch (e) {
+                    const savedAds = localStorage.getItem('campaignAdsData');
+                    this.campaignAds = savedAds ? JSON.parse(savedAds) : [];
+                }
+            } else {
+                const savedAds = localStorage.getItem('campaignAdsData');
+                this.campaignAds = savedAds ? JSON.parse(savedAds) : [];
+            }
+
+            // 3. Load Campaign Sales
+            if (window.Database && window.Database.getCampaignSales) {
+                try {
+                    const dbSales = await window.Database.getCampaignSales();
+                    if (dbSales && dbSales.length > 0) {
+                        this.campaignSales = dbSales;
+                    } else {
+                        const savedSales = localStorage.getItem('campaignSalesData');
+                        this.campaignSales = savedSales ? JSON.parse(savedSales) : [];
+                    }
+                } catch (e) {
+                    const savedSales = localStorage.getItem('campaignSalesData');
+                    this.campaignSales = savedSales ? JSON.parse(savedSales) : [];
+                }
+            } else {
+                const savedSales = localStorage.getItem('campaignSalesData');
+                this.campaignSales = savedSales ? JSON.parse(savedSales) : [];
+            }
+
+            // 4. Load Campaign Performance
+            this.loadPerformanceData();
+
+            this.calculateAdMetrics();
+            this.renderAll();
+        } catch (error) {
+            console.error('Error loading campaigns data from DB:', error);
+        }
+    },
+
+    // Render all sub-sections
+    renderAll() {
+        this.renderHistory();
+        this.renderAdsTable();
         this.renderPerformanceTable();
+        this.renderSalesHistoryTable();
+        this.renderSalesKPIs();
+    },
+
+    // Switch between tabs
+    switchTab(tabId) {
+        this.activeTab = tabId;
+
+        // Update tab buttons
+        const tabBtns = {
+            'generator': 'tabBtnCampaignGenerator',
+            'ads-performance': 'tabBtnCampaignAds',
+            'quick-sales': 'tabBtnCampaignSales',
+            'sales-history': 'tabBtnCampaignHistory'
+        };
+
+        Object.keys(tabBtns).forEach(key => {
+            const btn = document.getElementById(tabBtns[key]);
+            if (btn) {
+                if (key === tabId) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            }
+        });
+
+        // Update tab panes
+        const panes = {
+            'generator': 'tabContentCampaignGenerator',
+            'ads-performance': 'tabContentCampaignAds',
+            'quick-sales': 'tabContentCampaignSales',
+            'sales-history': 'tabContentCampaignHistory'
+        };
+
+        Object.keys(panes).forEach(key => {
+            const pane = document.getElementById(panes[key]);
+            if (pane) {
+                if (key === tabId) {
+                    pane.style.display = 'block';
+                } else {
+                    pane.style.display = 'none';
+                }
+            }
+        });
+
+        // Re-render data for the active tab
+        if (tabId === 'ads-performance') {
+            this.renderAdsTable();
+            this.renderPerformanceTable();
+        } else if (tabId === 'quick-sales') {
+            this.renderSalesKPIs();
+        } else if (tabId === 'sales-history') {
+            this.renderSalesHistoryTable();
+            this.renderSalesKPIs();
+        }
     },
 
     // Load used codes from localStorage
@@ -72,18 +225,13 @@ const CampaignsModule = {
         const maxAttempts = 1000;
 
         do {
-            // Generate 2 random letters
             const letter1 = this.codeLetters[Math.floor(Math.random() * this.codeLetters.length)];
             const letter2 = this.codeLetters[Math.floor(Math.random() * this.codeLetters.length)];
-
-            // Generate 2 random numbers (00-99)
             const numbers = String(Math.floor(Math.random() * 100)).padStart(2, '0');
-
             code = `${letter1}${letter2}${numbers}`;
             attempts++;
         } while (this.usedCodes.has(code) && attempts < maxAttempts);
 
-        // If we couldn't find a unique code, add timestamp suffix
         if (this.usedCodes.has(code)) {
             code = code + String(Date.now()).slice(-2);
         }
@@ -93,7 +241,7 @@ const CampaignsModule = {
         return code;
     },
 
-    // Generate ad codes based on campaign code (no dashes, unique)
+    // Generate ad codes based on campaign code
     generateAdCodes(campaignCode, numAds) {
         const adCodes = [];
         for (let i = 1; i <= numAds; i++) {
@@ -105,7 +253,7 @@ const CampaignsModule = {
         return adCodes;
     },
 
-    // Generate ad set codes based on campaign code (no dashes, unique)
+    // Generate ad set codes based on campaign code
     generateAdSetCodes(campaignCode, numAdSets) {
         const adSetCodes = [];
         for (let i = 1; i <= numAdSets; i++) {
@@ -120,20 +268,14 @@ const CampaignsModule = {
     // Load products from database
     async loadProducts() {
         try {
-            this.products = await Database.getProducts();
-            // this.populateProductSelect(); // No longer needed
+            if (window.Database && window.Database.getProducts) {
+                this.products = await Database.getProducts();
+            }
         } catch (error) {
             console.error('Error loading products:', error);
             this.products = [];
         }
     },
-
-    // Populate the product select dropdown - DEPRECATED (Replaced by autocomplete)
-    populateProductSelect() {
-        // No-op
-    },
-
-
 
     // Generate the campaign name
     generateCampaignName() {
@@ -157,7 +299,7 @@ const CampaignsModule = {
         // Format: PAIS-TIPO-OBJETIVO-FECHA-PRODUCTO-CODIGO
         const campaignName = `${country}-${type}-${objective}-${formattedDate}-${formattedProduct}-${campaignCode}`;
 
-        // Generate ad and ad set codes (no dashes, unique)
+        // Generate ad and ad set codes
         const adSetCodes = this.generateAdSetCodes(campaignCode, adSets);
         const adCodes = this.generateAdCodes(campaignCode, ads);
 
@@ -179,7 +321,7 @@ const CampaignsModule = {
         // Show result
         this.showResult(campaignName, campaignCode, adSets, ads, adSetCodes, adCodes);
 
-        // Reset form for next entry (keep country, type and date)
+        // Reset form inputs
         document.getElementById('campaignProduct').value = '';
         document.getElementById('campaignProductSearch').value = '';
         document.getElementById('campaignAdSets').value = '';
@@ -187,11 +329,10 @@ const CampaignsModule = {
         this.updatePreview();
     },
 
-    // Bind form events
+    // Bind form and input events
     bindEvents() {
         const form = document.getElementById('campaignForm');
         if (form) {
-            // Remove existing listeners to prevent duplicates
             form.removeEventListener('submit', this.handleFormSubmit);
             this.handleFormSubmit = (e) => {
                 e.preventDefault();
@@ -200,22 +341,31 @@ const CampaignsModule = {
             form.addEventListener('submit', this.handleFormSubmit);
         }
 
+        // Quick Sales Form
+        const quickSalesForm = document.getElementById('quickSaleForm');
+        if (quickSalesForm) {
+            quickSalesForm.removeEventListener('submit', this.handleQuickSaleFormSubmit);
+            this.handleQuickSaleFormSubmit = (e) => {
+                e.preventDefault();
+                this.registerQuickSale();
+            };
+            quickSalesForm.addEventListener('submit', this.handleQuickSaleFormSubmit);
+        }
+
         // Real-time preview interactions
         const inputs = ['campaignCountry', 'campaignType', 'campaignObjective', 'campaignDate', 'campaignProduct', 'campaignAdSets', 'campaignAds'];
         inputs.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
-                // Remove existing listeners
                 el.removeEventListener('input', this.updatePreviewHandler);
                 el.removeEventListener('change', this.updatePreviewHandler);
-
                 this.updatePreviewHandler = () => this.updatePreview();
                 el.addEventListener('input', this.updatePreviewHandler);
                 el.addEventListener('change', this.updatePreviewHandler);
             }
         });
 
-        // Product Autocomplete
+        // Product Autocomplete for Campaign Generator
         const productSearchInput = document.getElementById('campaignProductSearch');
         if (productSearchInput) {
             productSearchInput.addEventListener('input', Utils.debounce(() => {
@@ -233,10 +383,39 @@ const CampaignsModule = {
             });
         }
 
-        // Close autocomplete when clicking outside
+        // Ad ID Autocomplete for Quick Sales
+        const quickSaleAdIdInput = document.getElementById('quickSaleAdId');
+        if (quickSaleAdIdInput) {
+            quickSaleAdIdInput.addEventListener('input', Utils.debounce(() => {
+                this.searchAdsForQuickSale(quickSaleAdIdInput.value);
+            }, 150));
+
+            quickSaleAdIdInput.addEventListener('focus', () => {
+                this.searchAdsForQuickSale(quickSaleAdIdInput.value);
+            });
+        }
+
+        // Ads Table Search Input
+        const searchAdsInput = document.getElementById('searchAdsInput');
+        if (searchAdsInput) {
+            searchAdsInput.addEventListener('input', Utils.debounce(() => {
+                this.renderAdsTable(searchAdsInput.value);
+            }, 200));
+        }
+
+        // Sales History Search Input
+        const searchSalesInput = document.getElementById('searchSalesInput');
+        if (searchSalesInput) {
+            searchSalesInput.addEventListener('input', Utils.debounce(() => {
+                this.renderSalesHistoryTable(searchSalesInput.value);
+            }, 200));
+        }
+
+        // Close autocompletes when clicking outside
         document.addEventListener('click', (e) => {
-            if (!e.target.closest('.autocomplete-container')) {
-                document.querySelectorAll('.autocomplete-suggestions').forEach(el => {
+            if (!e.target.closest('.autocomplete-container') && !e.target.closest('#quickSaleAdIdContainer')) {
+                document.querySelectorAll('.autocomplete-suggestions, .ad-search-dropdown').forEach(el => {
+                    el.style.display = 'none';
                     el.classList.remove('active');
                 });
             }
@@ -246,6 +425,7 @@ const CampaignsModule = {
     // Handle keyboard navigation in autocomplete
     handleAutocompleteKeyboard(e, suggestionsId) {
         const suggestions = document.getElementById(suggestionsId);
+        if (!suggestions) return;
         const items = suggestions.querySelectorAll('.autocomplete-item:not(.disabled)');
         const activeItem = suggestions.querySelector('.autocomplete-item.active');
         let currentIndex = Array.from(items).indexOf(activeItem);
@@ -284,6 +464,7 @@ const CampaignsModule = {
     // Search products for autocomplete
     searchProducts(query) {
         const suggestionsEl = document.getElementById('campaignProductSuggestions');
+        if (!suggestionsEl) return;
 
         if (query.length < 1) {
             suggestionsEl.classList.remove('active');
@@ -291,7 +472,6 @@ const CampaignsModule = {
         }
 
         const queryLower = query.toLowerCase();
-        // Filter active products
         const activeProducts = this.products.filter(p => p.active !== false);
 
         const filtered = activeProducts.filter(product =>
@@ -300,18 +480,17 @@ const CampaignsModule = {
         ).slice(0, 10);
 
         if (filtered.length === 0) {
-            suggestionsEl.innerHTML = '<div class="autocomplete-no-results">No se encontraron productos</div>';
+            suggestionsEl.innerHTML = '<div class="autocomplete-no-results" style="padding: 0.5rem; color: var(--text-muted);">No se encontraron productos</div>';
         } else {
             suggestionsEl.innerHTML = filtered.map(product => `
                 <div class="autocomplete-item" data-id="${product.id}" data-name="${product.name}" data-sku="${product.sku || ''}">
-                    <div class="item-main">${this.highlightMatch(product.name, query)}</div>
+                    <div class="item-main" style="font-weight: 600;">${this.highlightMatch(product.name, query)}</div>
                     <div class="item-secondary">
-                        ${product.sku ? `<span style="color: var(--text-muted);">SKU: ${product.sku}</span>` : ''}
+                        ${product.sku ? `<span style="color: var(--text-muted); font-size: 0.75rem;">SKU: ${product.sku}</span>` : ''}
                     </div>
                 </div>
             `).join('');
 
-            // Add click handlers
             suggestionsEl.querySelectorAll('.autocomplete-item').forEach(item => {
                 item.addEventListener('click', () => {
                     this.selectProduct(item.dataset.id, item.dataset.name, item.dataset.sku);
@@ -324,9 +503,12 @@ const CampaignsModule = {
 
     // Select a product from autocomplete
     selectProduct(productId, productName, productSku) {
-        document.getElementById('campaignProduct').value = productName; // Store name or concatenated text? Storing name for now, will format later
-        document.getElementById('campaignProductSearch').value = productName;
-        document.getElementById('campaignProductSuggestions').classList.remove('active');
+        const prodInput = document.getElementById('campaignProduct');
+        const prodSearch = document.getElementById('campaignProductSearch');
+        if (prodInput) prodInput.value = productName;
+        if (prodSearch) prodSearch.value = productName;
+        const sugg = document.getElementById('campaignProductSuggestions');
+        if (sugg) sugg.classList.remove('active');
         this.updatePreview();
     },
 
@@ -334,7 +516,7 @@ const CampaignsModule = {
     highlightMatch(text, query) {
         if (!query) return text;
         const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-        return text.replace(regex, '<span class="autocomplete-highlight">$1</span>');
+        return text.replace(regex, '<span class="autocomplete-highlight" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; font-weight: 700;">$1</span>');
     },
 
     // Set default date to today
@@ -344,6 +526,10 @@ const CampaignsModule = {
             const today = new Date();
             dateInput.value = today.toISOString().split('T')[0];
             this.updatePreview();
+        }
+        const quickSaleDateInput = document.getElementById('quickSaleDate');
+        if (quickSaleDateInput && !quickSaleDateInput.value) {
+            quickSaleDateInput.value = new Date().toISOString().split('T')[0];
         }
     },
 
@@ -362,7 +548,7 @@ const CampaignsModule = {
         const type = document.getElementById('campaignType')?.value || '';
         const objective = document.getElementById('campaignObjective')?.value || '';
         const date = document.getElementById('campaignDate')?.value || '';
-        const product = document.getElementById('campaignProduct')?.value || ''; // Value from hidden input (name)
+        const product = document.getElementById('campaignProduct')?.value || '';
         const adSets = document.getElementById('campaignAdSets')?.value || '';
         const ads = document.getElementById('campaignAds')?.value || '';
 
@@ -375,7 +561,6 @@ const CampaignsModule = {
         if (country && type && objective && date && product.trim()) {
             const formattedDate = this.formatDate(date);
             const formattedProduct = product.toUpperCase().trim().replace(/\s+/g, '-');
-            // Format example: ECU-ABO-COMPRAS-06-FEB-2026-PRODUCTO-XY01
             const campaignName = `${country}-${type}-${objective}-${formattedDate}-${formattedProduct}-XY01`;
 
             previewTextEl.innerHTML = `
@@ -387,7 +572,6 @@ const CampaignsModule = {
             previewEl.style.display = 'block';
             previewEl.classList.add('preview-active');
 
-            // Show ad info if provided
             if (adInfoEl) {
                 if (adSets || ads) {
                     const adSetsNum = parseInt(adSets) || 0;
@@ -419,7 +603,6 @@ const CampaignsModule = {
         }
     },
 
-
     // Show the generated result
     showResult(campaignName, campaignCode, adSets, ads, adSetCodes, adCodes) {
         const resultEl = document.getElementById('campaignResult');
@@ -441,7 +624,6 @@ const CampaignsModule = {
                 <div style="font-family: monospace; font-size: 1.1rem; color: var(--text-secondary);">${campaignName}</div>
             `;
 
-            // Show ad info in result
             if (resultAdInfoEl) {
                 if (adSets > 0 || ads > 0) {
                     resultAdInfoEl.innerHTML = `
@@ -465,7 +647,6 @@ const CampaignsModule = {
                 }
             }
 
-            // Show codes list
             if (resultCodesEl) {
                 let codesHtml = '';
 
@@ -481,8 +662,6 @@ const CampaignsModule = {
                                           style="font-family: monospace; padding: 0.5rem 0.75rem; background: var(--primary-light); 
                                                  color: var(--primary); border-radius: var(--radius-sm); cursor: pointer; 
                                                  font-size: 0.95rem; font-weight: 600; transition: all 0.2s;"
-                                          onmouseover="this.style.background='var(--primary)'; this.style.color='white';"
-                                          onmouseout="this.style.background='var(--primary-light)'; this.style.color='var(--primary)';"
                                           title="Clic para copiar">
                                         ${code}
                                     </span>
@@ -504,8 +683,6 @@ const CampaignsModule = {
                                           style="font-family: monospace; padding: 0.5rem 0.75rem; background: rgba(139, 92, 246, 0.1); 
                                                  color: #8b5cf6; border-radius: var(--radius-sm); cursor: pointer; 
                                                  font-size: 0.95rem; font-weight: 600; transition: all 0.2s;"
-                                          onmouseover="this.style.background='#8b5cf6'; this.style.color='white';"
-                                          onmouseout="this.style.background='rgba(139, 92, 246, 0.1)'; this.style.color='#8b5cf6';"
                                           title="Clic para copiar">
                                         ${code}
                                     </span>
@@ -520,11 +697,6 @@ const CampaignsModule = {
 
             resultEl.style.display = 'block';
             resultEl.classList.add('result-active');
-
-            // Animate entrance
-            resultEl.style.animation = 'none';
-            resultEl.offsetHeight; // Trigger reflow
-            resultEl.style.animation = 'slideIn 0.3s ease-out';
         }
 
         Utils.showNotification(`¡Campaña generada! Código: ${campaignCode}`, 'success');
@@ -532,11 +704,12 @@ const CampaignsModule = {
 
     // Copy single code to clipboard
     copyCode(code) {
-        navigator.clipboard.writeText(code).then(() => {
+        if (!code) return;
+        navigator.clipboard.writeText(String(code)).then(() => {
             Utils.showNotification(`Código ${code} copiado`, 'success');
         }).catch(err => {
             const textArea = document.createElement('textarea');
-            textArea.value = code;
+            textArea.value = String(code);
             document.body.appendChild(textArea);
             textArea.select();
             document.execCommand('copy');
@@ -545,39 +718,25 @@ const CampaignsModule = {
         });
     },
 
-    // Copy to clipboard (campaign name)
+    // Copy campaign name
     copyToClipboard() {
         const resultTextEl = document.getElementById('campaignResultText');
         if (resultTextEl) {
-            // Get just the campaign name (the monospace div)
             const campaignNameEl = resultTextEl.querySelector('div:last-child');
             const campaignName = campaignNameEl?.textContent || '';
-
-            navigator.clipboard.writeText(campaignName.trim()).then(() => {
-                Utils.showNotification('¡Nombre copiado al portapapeles!', 'success');
-            }).catch(err => {
-                const textArea = document.createElement('textarea');
-                textArea.value = campaignName.trim();
-                document.body.appendChild(textArea);
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
-                Utils.showNotification('¡Nombre copiado al portapapeles!', 'success');
-            });
+            this.copyCode(campaignName.trim());
         }
     },
 
     // Copy all codes for a campaign
     copyAllCodes(campaignId) {
-        const campaign = this.generatedCampaigns.find(c => c.id === campaignId);
+        const campaign = this.generatedCampaigns.find(c => String(c.id) === String(campaignId));
         if (!campaign) return;
 
         let allCodes = `CAMPAÑA: ${campaign.code}\nNombre: ${campaign.name}\n`;
-
         if (campaign.adSetCodes && campaign.adSetCodes.length > 0) {
             allCodes += `\nCONJUNTOS DE ANUNCIOS (${campaign.adSetCodes.length}):\n${campaign.adSetCodes.join('\n')}`;
         }
-
         if (campaign.adCodes && campaign.adCodes.length > 0) {
             allCodes += `\n\nANUNCIOS (${campaign.adCodes.length}):\n${campaign.adCodes.join('\n')}`;
         }
@@ -585,13 +744,7 @@ const CampaignsModule = {
         navigator.clipboard.writeText(allCodes).then(() => {
             Utils.showNotification('¡Todos los códigos copiados!', 'success');
         }).catch(err => {
-            const textArea = document.createElement('textarea');
-            textArea.value = allCodes;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            Utils.showNotification('¡Todos los códigos copiados!', 'success');
+            this.copyCode(allCodes);
         });
     },
 
@@ -604,10 +757,8 @@ const CampaignsModule = {
         };
 
         this.generatedCampaigns.unshift(campaign);
-
-        // Keep only last 100 campaigns
-        if (this.generatedCampaigns.length > 100) {
-            this.generatedCampaigns = this.generatedCampaigns.slice(0, 100);
+        if (this.generatedCampaigns.length > 150) {
+            this.generatedCampaigns = this.generatedCampaigns.slice(0, 150);
         }
 
         this.saveCampaigns();
@@ -620,40 +771,6 @@ const CampaignsModule = {
     // Save campaigns to localStorage
     saveCampaigns() {
         localStorage.setItem('generatedCampaigns', JSON.stringify(this.generatedCampaigns));
-    },
-
-    // Load saved campaigns
-    async loadSavedCampaigns() {
-        if (window.Database && window.Database.getCampaigns) {
-            try {
-                const dbCampaigns = await window.Database.getCampaigns();
-                if (dbCampaigns && dbCampaigns.length > 0) {
-                    this.generatedCampaigns = dbCampaigns;
-                    this.saveCampaigns();
-                    // Rebuild used codes from database campaigns
-                    this.generatedCampaigns.forEach(c => {
-                        if (c.code) this.usedCodes.add(c.code);
-                        if (c.adSetCodes) c.adSetCodes.forEach(code => this.usedCodes.add(code));
-                        if (c.adCodes) c.adCodes.forEach(code => this.usedCodes.add(code));
-                    });
-                    this.saveUsedCodes();
-                    this.renderHistory();
-                    return;
-                }
-            } catch (e) {
-                console.warn('Could not load campaigns from DB, fallback to localStorage:', e);
-            }
-        }
-        const saved = localStorage.getItem('generatedCampaigns');
-        if (saved) {
-            try {
-                this.generatedCampaigns = JSON.parse(saved);
-                this.renderHistory();
-            } catch (e) {
-                console.error('Error loading campaigns:', e);
-                this.generatedCampaigns = [];
-            }
-        }
     },
 
     // Render history table
@@ -671,14 +788,12 @@ const CampaignsModule = {
             return;
         }
 
-        tbody.innerHTML = this.generatedCampaigns.slice(0, 30).map(campaign => {
-            const date = new Date(campaign.createdAt);
+        tbody.innerHTML = this.generatedCampaigns.slice(0, 40).map(campaign => {
+            const date = new Date(campaign.createdAt || Date.now());
             const formattedDate = date.toLocaleDateString('es-ES', {
                 day: '2-digit',
                 month: 'short',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
+                year: 'numeric'
             });
 
             const adSetsDisplay = campaign.adSets > 0 ? campaign.adSets : '-';
@@ -697,10 +812,12 @@ const CampaignsModule = {
                             ${codeDisplay}
                         </span>
                     </td>
-                    <td style="font-family: monospace; font-size: 0.8rem; max-width: 190px; overflow: hidden; text-overflow: ellipsis;">${campaign.name}</td>
-                    <td>${this.countries[campaign.country] || campaign.country}</td>
-                    <td><span class="badge badge-${campaign.type === 'ABO' ? 'primary' : 'secondary'}">${campaign.type}</span></td>
-                    <td style="font-size: 0.85rem;">${campaign.date}</td>
+                    <td style="font-family: monospace; font-size: 0.8rem; max-width: 190px; overflow: hidden; text-overflow: ellipsis;" title="${campaign.name}">
+                        ${campaign.name}
+                    </td>
+                    <td>${this.countries[campaign.country] || campaign.country || '-'}</td>
+                    <td><span class="badge badge-${campaign.type === 'ABO' ? 'primary' : 'secondary'}">${campaign.type || 'ABO'}</span></td>
+                    <td style="font-size: 0.85rem;">${campaign.date || '-'}</td>
                     <td style="text-align: center; font-weight: 600;">${adSetsDisplay}</td>
                     <td style="text-align: center; font-weight: 600;">${adsDisplay}</td>
                     <td>
@@ -761,7 +878,28 @@ const CampaignsModule = {
         }
     },
 
-    // View campaign details in a modal/popup
+    // Delete campaign
+    deleteCampaign(campaignId) {
+        if (!confirm('¿Está seguro de eliminar esta campaña?')) return;
+        const index = this.generatedCampaigns.findIndex(c => String(c.id) === String(campaignId));
+        if (index > -1) {
+            const campaign = this.generatedCampaigns[index];
+            if (campaign.code) this.usedCodes.delete(campaign.code);
+            if (campaign.adSetCodes) campaign.adSetCodes.forEach(c => this.usedCodes.delete(c));
+            if (campaign.adCodes) campaign.adCodes.forEach(c => this.usedCodes.delete(c));
+            this.saveUsedCodes();
+
+            this.generatedCampaigns.splice(index, 1);
+            this.saveCampaigns();
+            if (window.Database && window.Database.deleteCampaign) {
+                try { window.Database.deleteCampaign(campaignId); } catch(e){}
+            }
+            this.renderHistory();
+            Utils.showNotification('Campaña eliminada', 'info');
+        }
+    },
+
+    // View campaign details modal
     viewCampaignDetails(campaignId) {
         const campaign = this.generatedCampaigns.find(c => String(c.id) === String(campaignId));
         if (!campaign) return;
@@ -828,44 +966,6 @@ const CampaignsModule = {
             `;
         }
 
-        if (campaign.adCodes && campaign.adCodes.length > 0) {
-            detailsHtml += `
-                <div style="margin-bottom: 1rem; padding: 1rem; background: var(--surface-hover); border-radius: var(--radius-md); border-left: 4px solid #8b5cf6;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                        <div style="font-weight: 600; color: #8b5cf6;">
-                            📢 Anuncios (${campaign.adCodes.length})
-                        </div>
-                        <button class="btn btn-sm btn-secondary" onclick="CampaignsModule.openAdDetailsModal('${campaign.id}')" style="font-size: 0.75rem;">
-                            ✏️ Editar Post IDs y Compras
-                        </button>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                        ${(campaign.adDetails || []).map(ad => `
-                            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-primary); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-                                <span onclick="CampaignsModule.copyCode('${ad.code}')" 
-                                      style="font-family: monospace; color: #8b5cf6; cursor: pointer; font-weight: 700;"
-                                      title="Clic para copiar código de anuncio">
-                                    ${ad.code}
-                                </span>
-                                <div style="display: flex; gap: 0.75rem; align-items: center; font-size: 0.85rem;">
-                                    ${ad.postId ? `
-                                        <span onclick="CampaignsModule.copyCode('${ad.postId}')" 
-                                              style="font-family: monospace; background: rgba(99, 102, 241, 0.1); color: var(--primary); padding: 0.2rem 0.5rem; border-radius: 4px; cursor: pointer;"
-                                              title="Clic para copiar Post ID">
-                                            🆔 ${ad.postId}
-                                        </span>
-                                    ` : `<span style="color: var(--text-muted); font-size: 0.75rem;">Sin Post ID</span>`}
-                                    <span style="font-weight: 700; color: ${ad.purchases > 0 ? '#10b981' : 'var(--text-muted)'};">
-                                        🛒 ${ad.purchases || 0} compras
-                                    </span>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-
         detailsHtml += `
                 <div style="margin-top: 1.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center;">
                     <button class="btn btn-secondary" onclick="CampaignsModule.openEditCampaignModal('${campaign.id}')">
@@ -882,7 +982,6 @@ const CampaignsModule = {
             </div>
         `;
 
-        // Create or update modal
         let modal = document.getElementById('campaignDetailsModal');
         if (!modal) {
             modal = document.createElement('div');
@@ -891,7 +990,6 @@ const CampaignsModule = {
             modal.innerHTML = `<div class="modal-content" style="max-width: 580px;"></div>`;
             document.body.appendChild(modal);
 
-            // Close on backdrop click
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
                     this.closeDetailsModal();
@@ -922,7 +1020,7 @@ const CampaignsModule = {
         }
     },
 
-    // Ensure adDetails array exists for a campaign
+    // Ensure adDetails array exists
     ensureAdDetails(campaign) {
         if (!campaign.adDetails) campaign.adDetails = [];
         const existingMap = new Map(campaign.adDetails.map(a => [a.code, a]));
@@ -1036,7 +1134,7 @@ const CampaignsModule = {
         document.body.style.overflow = 'hidden';
     },
 
-    // Helper to format date for input[type="date"]
+    // Parse date format
     parseDateInputFormat(dateStr) {
         if (!dateStr) return '';
         if (dateStr.includes('-')) {
@@ -1096,8 +1194,8 @@ const CampaignsModule = {
         }
 
         this.ensureAdDetails(campaign);
-
         this.saveCampaigns();
+
         if (window.Database && window.Database.saveCampaign) {
             try { window.Database.saveCampaign(campaign); } catch(e){}
         }
@@ -1188,7 +1286,7 @@ const CampaignsModule = {
                             <thead>
                                 <tr>
                                     <th>Código Anuncio</th>
-                                    <th>Post ID (Facebook / IG)</th>
+                                    <th>Post ID / Identificador</th>
                                     <th style="width: 130px; text-align: center;">Compras</th>
                                     <th style="width: 140px; text-align: right;">Gasto (USD/COP)</th>
                                 </tr>
@@ -1214,7 +1312,7 @@ const CampaignsModule = {
         document.body.style.overflow = 'hidden';
     },
 
-    // Save ad details, Post IDs and purchases from modal
+    // Save ad details from modal
     saveAdDetailsFromModal() {
         if (!this.currentEditingCampaignId) return;
         const campaign = this.generatedCampaigns.find(c => String(c.id) === String(this.currentEditingCampaignId));
@@ -1251,26 +1349,6 @@ const CampaignsModule = {
             totalSpent += val;
         });
 
-        // Sync performanceData
-        this.loadPerformanceData();
-        let perfItem = this.performanceData.find(p => p.code === campaign.code);
-        if (perfItem) {
-            perfItem.purchases = totalPurchases;
-            if (totalSpent > 0) perfItem.spent = totalSpent;
-            if (perfItem.spent && perfItem.purchases) {
-                perfItem.costPerPurchase = perfItem.spent / perfItem.purchases;
-            }
-        } else {
-            this.performanceData.push({
-                code: campaign.code,
-                originalName: campaign.name,
-                spent: totalSpent,
-                purchases: totalPurchases,
-                costPerPurchase: totalSpent && totalPurchases ? (totalSpent / totalPurchases) : 0
-            });
-        }
-        this.savePerformanceData();
-
         this.saveCampaigns();
         if (window.Database && window.Database.saveCampaign) {
             try { window.Database.saveCampaign(campaign); } catch(e){}
@@ -1278,280 +1356,12 @@ const CampaignsModule = {
 
         this.closeModalId('modalEditAdDetails');
         this.renderHistory();
-        this.renderPerformanceTable();
         Utils.showNotification('¡Post IDs y compras guardados exitosamente!', 'success');
     },
 
-    // Edit performance item directly from performance table
-    editPerformanceItem(code) {
-        const campaign = this.generatedCampaigns.find(c => c.code === code);
-        if (campaign) {
-            this.openAdDetailsModal(campaign.id);
-            return;
-        }
-
-        const item = this.performanceData.find(p => p.code === code);
-        if (!item) return;
-
-        const newPurchasesStr = prompt(`Editar compras para ${code}:`, item.purchases || 0);
-        if (newPurchasesStr === null) return;
-        const newPurchases = parseInt(newPurchasesStr) || 0;
-
-        const newSpentStr = prompt(`Editar gasto total para ${code}:`, item.spent || 0);
-        if (newSpentStr === null) return;
-        const newSpent = parseFloat(newSpentStr) || 0;
-
-        item.purchases = newPurchases;
-        item.spent = newSpent;
-        if (newSpent && newPurchases) {
-            item.costPerPurchase = newSpent / newPurchases;
-        }
-
-        this.savePerformanceData();
-        this.renderPerformanceTable();
-        Utils.showNotification('Rendimiento actualizado', 'success');
-    },
-
-    // Copy a campaign from history
-    copyCampaign(campaignName) {
-        navigator.clipboard.writeText(campaignName).then(() => {
-            Utils.showNotification('¡Copiado al portapapeles!', 'success');
-        }).catch(err => {
-            const textArea = document.createElement('textarea');
-            textArea.value = campaignName;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            Utils.showNotification('¡Copiado al portapapeles!', 'success');
-        });
-    },
-
-    // Delete a campaign from history
-    deleteCampaign(campaignId) {
-        if (!confirm('¿Está seguro de eliminar esta campaña?')) return;
-        const index = this.generatedCampaigns.findIndex(c => String(c.id) === String(campaignId));
-        if (index > -1) {
-            const campaign = this.generatedCampaigns[index];
-
-            // Remove codes from used codes
-            if (campaign.code) this.usedCodes.delete(campaign.code);
-            if (campaign.adSetCodes) campaign.adSetCodes.forEach(c => this.usedCodes.delete(c));
-            if (campaign.adCodes) campaign.adCodes.forEach(c => this.usedCodes.delete(c));
-            this.saveUsedCodes();
-
-            this.generatedCampaigns.splice(index, 1);
-            this.saveCampaigns();
-            this.renderHistory();
-            Utils.showNotification('Campaña eliminada', 'info');
-        }
-    },
-
-    // Clear history
-    clearHistory() {
-        if (confirm('¿Está seguro de que desea limpiar todo el historial de campañas? Los códigos serán liberados para reutilización.')) {
-            // Clear all used codes
-            this.usedCodes.clear();
-            this.saveUsedCodes();
-
-            this.generatedCampaigns = [];
-            this.saveCampaigns();
-            this.renderHistory();
-            document.getElementById('campaignResult').style.display = 'none';
-            Utils.showNotification('Historial limpiado', 'info');
-        }
-    },
-
-    // Export backup JSON file
-    exportBackup() {
-        if (this.generatedCampaigns.length === 0 && (!this.performanceData || this.performanceData.length === 0)) {
-            Utils.showNotification('No hay datos de campañas para exportar', 'warning');
-            return;
-        }
-
-        const backupData = {
-            version: '1.0',
-            exportedAt: new Date().toISOString(),
-            generatedCampaigns: this.generatedCampaigns,
-            usedCodes: Array.from(this.usedCodes),
-            performanceData: this.performanceData || []
-        };
-
-        const jsonStr = JSON.stringify(backupData, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        const dateStr = new Date().toISOString().split('T')[0];
-        a.href = url;
-        a.download = `campanas_backup_${dateStr}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        Utils.showNotification('¡Copia de seguridad exportada en archivo JSON!', 'success');
-    },
-
-    // Trigger file picker for import
-    triggerImportBackup() {
-        const input = document.getElementById('campaignBackupInput');
-        if (input) input.click();
-    },
-
-    // Import backup file
-    importBackupFile(inputEl) {
-        const file = inputEl.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const data = JSON.parse(e.target.result);
-                this.applyBackupData(data);
-                inputEl.value = '';
-                Utils.showNotification('¡Copia de seguridad importada con éxito!', 'success');
-            } catch (err) {
-                console.error('Error al importar backup:', err);
-                Utils.showNotification('El archivo no tiene un formato de backup JSON válido', 'error');
-            }
-        };
-        reader.readAsText(file);
-    },
-
-    // Copy all campaign data to clipboard as JSON text
-    copyBackupToClipboard() {
-        const backupData = {
-            version: '1.0',
-            exportedAt: new Date().toISOString(),
-            generatedCampaigns: this.generatedCampaigns,
-            usedCodes: Array.from(this.usedCodes),
-            performanceData: this.performanceData || []
-        };
-
-        const jsonStr = JSON.stringify(backupData);
-        navigator.clipboard.writeText(jsonStr).then(() => {
-            Utils.showNotification('¡Datos copiados al portapapeles! Ahora abre tu otro navegador y haz clic en "Pegar / Cargar"', 'success');
-        }).catch(() => {
-            const textArea = document.createElement('textarea');
-            textArea.value = jsonStr;
-            document.body.appendChild(textArea);
-            textArea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textArea);
-            Utils.showNotification('¡Datos copiados al portapapeles! Haz clic en "Pegar / Cargar" en el otro navegador', 'success');
-        });
-    },
-
-    // Show paste modal
-    pasteBackupModal() {
-        const textEl = document.getElementById('campaignBackupText');
-        if (textEl) textEl.value = '';
-        Utils.openModal('modalCampaignBackup');
-    },
-
-    // Process pasted JSON backup
-    processPasteBackup() {
-        const textEl = document.getElementById('campaignBackupText');
-        const content = textEl ? textEl.value.trim() : '';
-
-        if (!content) {
-            Utils.showNotification('Por favor pega el contenido de la copia de seguridad', 'warning');
-            return;
-        }
-
-        try {
-            const data = JSON.parse(content);
-            this.applyBackupData(data);
-            Utils.closeModal('modalCampaignBackup');
-            if (textEl) textEl.value = '';
-            Utils.showNotification('¡Campañas y rendimiento restaurados exitosamente!', 'success');
-        } catch (err) {
-            console.error('Error procesando texto de backup:', err);
-            Utils.showNotification('El texto pegado no es un JSON de backup válido', 'error');
-        }
-    },
-
-    // Apply backup data
-    applyBackupData(data) {
-        if (!data || (typeof data !== 'object')) {
-            throw new Error('Formato inválido');
-        }
-
-        let campaigns = [];
-        let codes = [];
-        let performance = [];
-
-        if (Array.isArray(data)) {
-            campaigns = data;
-        } else {
-            campaigns = data.generatedCampaigns || [];
-            codes = data.usedCodes || [];
-            performance = data.performanceData || [];
-        }
-
-        const existingIds = new Set(this.generatedCampaigns.map(c => c.id));
-        const existingCodes = new Set(this.generatedCampaigns.map(c => c.code));
-
-        campaigns.forEach(c => {
-            if (!existingIds.has(c.id) && !existingCodes.has(c.code)) {
-                this.generatedCampaigns.push(c);
-            }
-        });
-
-        this.generatedCampaigns.sort((a, b) => (b.id || 0) - (a.id || 0));
-
-        this.generatedCampaigns.forEach(c => {
-            if (c.code) this.usedCodes.add(c.code);
-            if (c.adSetCodes) c.adSetCodes.forEach(code => this.usedCodes.add(code));
-            if (c.adCodes) c.adCodes.forEach(code => this.usedCodes.add(code));
-        });
-        codes.forEach(code => this.usedCodes.add(code));
-
-        if (performance && performance.length > 0) {
-            const perfMap = new Map((this.performanceData || []).map(p => [p.code, p]));
-            performance.forEach(p => {
-                if (p.code) perfMap.set(p.code, p);
-            });
-            this.performanceData = Array.from(perfMap.values());
-            this.savePerformanceData();
-        }
-
-        this.saveCampaigns();
-        this.saveUsedCodes();
-
-        if (window.Database && window.Database.saveCampaign) {
-            this.generatedCampaigns.forEach(c => {
-                try { window.Database.saveCampaign(c); } catch (e) {}
-            });
-        }
-
-        this.renderHistory();
-        this.renderPerformanceTable();
-    },
-
-    // Reset form
-    resetForm() {
-        document.getElementById('campaignForm').reset();
-        this.setDefaultDate();
-        document.getElementById('campaignResult').style.display = 'none';
-        this.updatePreview();
-    },
-
-    // Refresh products list
-    async refreshProducts() {
-        await this.loadProducts();
-        Utils.showNotification('Lista de productos actualizada', 'success');
-    },
-
     // ============================================
-    // REPORT UPLOAD FUNCTIONALITY
+    // REPORT UPLOAD & ADS PARSING (WITH AD IDS)
     // ============================================
-
-    // Store pending report data
-    pendingReportData: null,
-
-    // Store campaign performance data
-    performanceData: [],
 
     // Handle report file upload
     handleReportUpload(input) {
@@ -1559,42 +1369,36 @@ const CampaignsModule = {
         if (!file) return;
 
         const statusEl = document.getElementById('reportUploadStatus');
-        const previewEl = document.getElementById('reportPreview');
-
-        // Show loading status
         if (statusEl) {
             statusEl.style.display = 'block';
             statusEl.innerHTML = `
                 <div style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; background: var(--primary-light); border-radius: var(--radius-md);">
                     <div class="spinner-small"></div>
-                    <span>Procesando archivo: <strong>${file.name}</strong></span>
+                    <span>Procesando archivo Excel: <strong>${file.name}</strong></span>
                 </div>
             `;
         }
 
         const reader = new FileReader();
-
         reader.onload = (e) => {
             try {
+                if (typeof XLSX === 'undefined') {
+                    throw new Error('La librería XLSX no está cargada en la página.');
+                }
+
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-
-                // Get first sheet
                 const sheetName = workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
-
-                // Convert to JSON
                 const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
                 if (jsonData.length < 2) {
                     throw new Error('El archivo no contiene datos suficientes');
                 }
 
-                // Process the data
                 this.processReportData(jsonData, file.name);
-
             } catch (error) {
-                console.error('Error processing file:', error);
+                console.error('Error processing Excel file:', error);
                 if (statusEl) {
                     statusEl.innerHTML = `
                         <div style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; background: rgba(239, 68, 68, 0.1); border-radius: var(--radius-md); color: #ef4444;">
@@ -1603,7 +1407,7 @@ const CampaignsModule = {
                                 <line x1="15" y1="9" x2="9" y2="15"></line>
                                 <line x1="9" y1="9" x2="15" y2="15"></line>
                             </svg>
-                            <span>Error al procesar el archivo: ${error.message}</span>
+                            <span>Error al procesar archivo: ${error.message}</span>
                         </div>
                     `;
                 }
@@ -1611,214 +1415,230 @@ const CampaignsModule = {
         };
 
         reader.readAsArrayBuffer(file);
-
-        // Clear input for future uploads
         input.value = '';
     },
 
-    // Process report data and show preview
-    processReportData(jsonData, fileName) {
-        const headers = jsonData[0];
-        const rows = jsonData.slice(1).filter(row => row.length > 0 && row[0]);
-
-        // Map columns - try to identify them automatically
-        const columnMap = this.identifyColumns(headers);
-
-        if (columnMap.campaignName === null) {
-            throw new Error('No se encontró la columna de nombre de campaña');
-        }
-
-        // Process each row and extract campaign codes
-        const processedData = rows.map(row => {
-            const campaignName = row[columnMap.campaignName] || '';
-            const code = this.extractCampaignCode(campaignName);
-
-            return {
-                originalName: campaignName,
-                code: code,
-                spent: this.parseNumber(row[columnMap.spent]),
-                purchases: this.parseNumber(row[columnMap.purchases]),
-                cpc: this.parseNumber(row[columnMap.cpc]),
-                cpm: this.parseNumber(row[columnMap.cpm]),
-                costPerPurchase: this.parseNumber(row[columnMap.costPerPurchase]),
-                startDate: row[columnMap.startDate] || '',
-                endDate: row[columnMap.endDate] || '',
-                matched: false
-            };
-        });
-
-        // Check which codes match existing campaigns
-        processedData.forEach(item => {
-            if (item.code) {
-                const matchedCampaign = this.generatedCampaigns.find(c => c.code === item.code);
-                item.matched = !!matchedCampaign;
-                if (matchedCampaign) {
-                    item.campaignId = matchedCampaign.id;
-                }
-            }
-        });
-
-        // Store pending data
-        this.pendingReportData = processedData;
-
-        // Show preview
-        this.showReportPreview(headers, processedData);
-    },
-
-    // Identify columns in the report
+    // Identify columns with Meta Ads column name matching
     identifyColumns(headers) {
         const map = {
+            adId: null,
+            adName: null,
+            adSetName: null,
             campaignName: null,
             spent: null,
-            purchases: null,
-            cpc: null,
-            cpm: null,
-            costPerPurchase: null,
+            impressions: null,
+            reach: null,
+            conversations: null,
+            currency: null,
             startDate: null,
             endDate: null
         };
 
-        console.log('Headers found:', headers);
-
         headers.forEach((header, index) => {
-            const h = (header || '').toString().toLowerCase().trim();
+            if (header === null || header === undefined) return;
+            const h = header.toString().toLowerCase().trim();
 
-            // Campaign name detection - expanded patterns
+            // 1. Identificador del anuncio (Meta Ad ID)
+            if (map.adId === null) {
+                if (h.includes('identificador del anuncio') || h.includes('identificador de anuncio') || 
+                    h.includes('id del anuncio') || h.includes('id de anuncio') || 
+                    h === 'ad id' || h === 'ad_id' || h === 'identificador' || h === 'ad identifier') {
+                    map.adId = index;
+                }
+            }
+
+            // 2. Nombre del anuncio
+            if (map.adName === null) {
+                if ((h.includes('nombre') && (h.includes('anuncio') || h.includes('ad'))) && !h.includes('conjunto')) {
+                    map.adName = index;
+                } else if (h === 'ad name' || h === 'nombre del anuncio') {
+                    map.adName = index;
+                }
+            }
+
+            // 3. Nombre del conjunto de anuncios
+            if (map.adSetName === null) {
+                if (h.includes('conjunto') || h.includes('ad set') || h.includes('adset')) {
+                    map.adSetName = index;
+                }
+            }
+
+            // 4. Nombre de la campaña
             if (map.campaignName === null) {
-                if (h.includes('nombre') && (h.includes('campaña') || h.includes('campana'))) {
-                    map.campaignName = index;
-                } else if (h === 'nombre de la campaña' || h === 'nombre de la campana') {
-                    map.campaignName = index;
-                } else if (h.includes('campaign name') || h === 'campaign') {
-                    map.campaignName = index;
-                } else if (h === 'nombre' || h === 'name' || h === 'campaña' || h === 'campana') {
-                    map.campaignName = index;
-                } else if (h.includes('ad name') || h.includes('nombre del anuncio')) {
+                if ((h.includes('campaña') || h.includes('campana') || h.includes('campaign')) && !h.includes('conjunto') && !h.includes('anuncio')) {
                     map.campaignName = index;
                 }
             }
 
-            // Spent/Amount detection
-            if (h.includes('importe gastado') || h.includes('amount spent') || h.includes('spent') ||
-                h.includes('gastado') || h.includes('gasto') || h.includes('monto')) {
-                map.spent = index;
+            // 5. Gasto
+            if (map.spent === null) {
+                if (h.includes('importe gastado') || h.includes('amount spent') || h.includes('spent') ||
+                    h.includes('gastado') || h.includes('gasto') || h.includes('monto')) {
+                    map.spent = index;
+                }
             }
 
-            // Purchases/Results detection
-            if (h === 'compras' || h === 'purchases' || h === 'conversiones' ||
-                h === 'resultados' || h === 'results' || h.includes('purchase')) {
-                map.purchases = index;
+            // 6. Impresiones
+            if (map.impressions === null) {
+                if (h.includes('impresiones') || h.includes('impressions')) {
+                    map.impressions = index;
+                }
             }
 
-            // CPC detection
-            if (h.includes('cpc') || h.includes('coste por clic') || h.includes('cost per click') ||
-                h.includes('costo por clic')) {
-                map.cpc = index;
+            // 7. Alcance
+            if (map.reach === null) {
+                if (h.includes('alcance') || h.includes('reach')) {
+                    map.reach = index;
+                }
             }
 
-            // CPM detection
-            if (h.includes('cpm') || h.includes('coste por 1000') || h.includes('costo por 1000') ||
-                h.includes('cost per 1,000') || h.includes('cost per 1000')) {
-                map.cpm = index;
+            // 8. Conversaciones / Compras / Resultados
+            if (map.conversations === null) {
+                if (h.includes('conversaciones') || h.includes('mensajes') || h.includes('compras') || 
+                    h.includes('purchases') || h.includes('resultados') || h.includes('results') || h.includes('conversiones')) {
+                    map.conversations = index;
+                }
             }
 
-            // Cost per purchase detection
-            if (h.includes('coste por compra') || h.includes('cost per purchase') ||
-                h.includes('costo por compra') || h.includes('coste por resultado') ||
-                h.includes('cost per result') || h.includes('costo por resultado')) {
-                map.costPerPurchase = index;
+            // 9. Divisa
+            if (map.currency === null) {
+                if (h.includes('divisa') || h.includes('currency') || h.includes('moneda')) {
+                    map.currency = index;
+                }
             }
 
-            // Date detection
-            if (h.includes('inicio') || h.includes('start') || h.includes('fecha inicio')) {
+            // 10. Fechas
+            if (map.startDate === null && (h.includes('inicio') || h.includes('start'))) {
                 map.startDate = index;
             }
-            if (h.includes('fin') || h.includes('end') || h.includes('fecha fin')) {
+            if (map.endDate === null && (h.includes('fin') || h.includes('end'))) {
                 map.endDate = index;
             }
         });
 
-        // If campaign name not found, use first column as fallback
-        if (map.campaignName === null && headers.length > 0) {
-            console.log('Campaign name column not detected, using first column as fallback');
-            map.campaignName = 0;
-        }
+        // Fallbacks
+        if (map.campaignName === null && headers.length > 0) map.campaignName = 0;
+        if (map.adName === null && headers.length > 2) map.adName = 2;
 
-        console.log('Column mapping:', map);
         return map;
     },
 
-    // Extract campaign code from campaign name (last 4 characters that match pattern)
-    extractCampaignCode(campaignName) {
-        if (!campaignName) return null;
+    // Process report data from Excel
+    processReportData(jsonData, fileName) {
+        const headers = jsonData[0];
+        const rows = jsonData.slice(1).filter(row => row && row.length > 0);
 
-        const name = campaignName.toString().trim();
+        const columnMap = this.identifyColumns(headers);
 
-        // Try to find a code pattern at the end (2 letters + 2 numbers)
-        const codePattern = /([A-Z]{2}\d{2})$/i;
-        const match = name.match(codePattern);
+        const parsedAds = [];
+        const campaignsMap = new Map();
 
-        if (match) {
-            return match[1].toUpperCase();
-        }
+        rows.forEach((row, rowIndex) => {
+            const rawCampaignName = (row[columnMap.campaignName] || '').toString().trim();
+            const rawAdName = (columnMap.adName !== null ? (row[columnMap.adName] || '') : '').toString().trim();
+            const rawAdSet = (columnMap.adSetName !== null ? (row[columnMap.adSetName] || '') : '').toString().trim();
+            const rawAdId = (columnMap.adId !== null ? (row[columnMap.adId] || '') : '').toString().trim();
 
-        // Try to find anywhere in the name
-        const anywherePattern = /\b([A-Z]{2}\d{2})\b/gi;
-        const matches = [...name.matchAll(anywherePattern)];
+            // Skip total or summary row (empty campaign name or marked as Total)
+            if (!rawCampaignName && !rawAdName && !rawAdId) return;
+            if (rawCampaignName.toLowerCase().includes('total') || rawCampaignName.toLowerCase() === 'resultados') return;
 
-        if (matches.length > 0) {
-            // Return the last match
-            return matches[matches.length - 1][1].toUpperCase();
-        }
+            const spent = this.parseNumber(row[columnMap.spent]);
+            const impressions = this.parseNumber(row[columnMap.impressions]);
+            const reach = this.parseNumber(row[columnMap.reach]);
+            const conversations = this.parseNumber(row[columnMap.conversations]);
+            const currency = (columnMap.currency !== null && row[columnMap.currency]) ? row[columnMap.currency].toString().trim() : 'COP';
+            const startDate = columnMap.startDate !== null ? (row[columnMap.startDate] || '') : '';
+            const endDate = columnMap.endDate !== null ? (row[columnMap.endDate] || '') : '';
 
-        // Last resort: get last 4 characters if they look like a code
-        const lastFour = name.slice(-4);
-        if (/^[A-Z]{2}\d{2}$/i.test(lastFour)) {
-            return lastFour.toUpperCase();
-        }
+            // Extract campaign code from name
+            const code = this.extractCampaignCode(rawCampaignName) || this.extractCampaignCode(rawAdName) || '';
 
-        return null;
+            // Guess product and country
+            let country = '';
+            let product = '';
+            if (rawCampaignName.includes('-')) {
+                const parts = rawCampaignName.split('-');
+                if (parts[0] && ['ECU', 'VEN', 'COL'].includes(parts[0].toUpperCase())) {
+                    country = parts[0].toUpperCase();
+                }
+                if (parts.length >= 6) {
+                    product = parts.slice(4, parts.length - 1).join('-');
+                }
+            }
+
+            const adEntry = {
+                id: rawAdId ? `ad_${rawAdId}` : `ad_${Date.now()}_${rowIndex}`,
+                adId: rawAdId || (rawAdName ? `ad_${rawAdName}` : `ad_${Date.now()}_${rowIndex}`),
+                adName: rawAdName || rawCampaignName,
+                adSetName: rawAdSet,
+                campaignName: rawCampaignName,
+                campaignCode: code,
+                country: country,
+                product: product,
+                spent: spent,
+                impressions: impressions,
+                reach: reach,
+                conversations: conversations,
+                currency: currency,
+                startDate: startDate,
+                endDate: endDate,
+                matched: false
+            };
+
+            // Check match with existing campaigns
+            if (code) {
+                const matchedCampaign = this.generatedCampaigns.find(c => c.code === code);
+                adEntry.matched = !!matchedCampaign;
+                if (matchedCampaign) {
+                    adEntry.campaignId = matchedCampaign.id;
+                    if (!adEntry.product && matchedCampaign.product) adEntry.product = matchedCampaign.product;
+                    if (!adEntry.country && matchedCampaign.country) adEntry.country = matchedCampaign.country;
+                }
+            }
+
+            parsedAds.push(adEntry);
+
+            // Consolidate Campaign metrics
+            const campKey = code || rawCampaignName;
+            if (!campaignsMap.has(campKey)) {
+                campaignsMap.set(campKey, {
+                    code: code,
+                    originalName: rawCampaignName,
+                    spent: 0,
+                    purchases: 0,
+                    impressions: 0,
+                    reach: 0,
+                    startDate: startDate,
+                    endDate: endDate,
+                    matched: adEntry.matched
+                });
+            }
+            const cMetric = campaignsMap.get(campKey);
+            cMetric.spent += spent;
+            cMetric.purchases += conversations;
+            cMetric.impressions += impressions;
+            cMetric.reach += reach;
+        });
+
+        const consolidatedCampaigns = Array.from(campaignsMap.values()).map(c => ({
+            ...c,
+            costPerPurchase: c.purchases > 0 ? (c.spent / c.purchases) : 0,
+            cpc: c.reach > 0 ? (c.spent / c.reach) : 0,
+            cpm: c.impressions > 0 ? ((c.spent / c.impressions) * 1000) : 0
+        }));
+
+        this.pendingReportData = {
+            ads: parsedAds,
+            campaigns: consolidatedCampaigns,
+            fileName: fileName
+        };
+
+        this.showReportPreview(this.pendingReportData);
     },
 
-    // Parse number from various formats
-    parseNumber(value) {
-        if (value === null || value === undefined || value === '') return 0;
-
-        // If already a number
-        if (typeof value === 'number') return value;
-
-        // Remove currency symbols, spaces, and handle comma as decimal separator
-        let str = value.toString()
-            .replace(/[^\d.,\-]/g, '')
-            .trim();
-
-        // Handle European format (1.234,56 -> 1234.56)
-        if (str.includes(',') && str.includes('.')) {
-            if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
-                // European: 1.234,56
-                str = str.replace(/\./g, '').replace(',', '.');
-            } else {
-                // US: 1,234.56
-                str = str.replace(/,/g, '');
-            }
-        } else if (str.includes(',')) {
-            // Could be European decimal or US thousands
-            const parts = str.split(',');
-            if (parts.length === 2 && parts[1].length <= 2) {
-                // Likely European decimal
-                str = str.replace(',', '.');
-            } else {
-                // Likely US thousands
-                str = str.replace(/,/g, '');
-            }
-        }
-
-        const num = parseFloat(str);
-        return isNaN(num) ? 0 : num;
-    },
-
-    // Show report preview
-    showReportPreview(headers, data) {
+    // Show preview modal/box
+    showReportPreview(pendingData) {
         const statusEl = document.getElementById('reportUploadStatus');
         const previewEl = document.getElementById('reportPreview');
         const headEl = document.getElementById('reportPreviewHead');
@@ -1826,145 +1646,149 @@ const CampaignsModule = {
 
         if (!previewEl || !headEl || !bodyEl) return;
 
-        const matchedCount = data.filter(d => d.matched).length;
-        const totalCount = data.length;
+        const ads = pendingData.ads || [];
+        const totalSpent = ads.reduce((acc, a) => acc + (a.spent || 0), 0);
+        const totalMsg = ads.reduce((acc, a) => acc + (a.conversations || 0), 0);
 
-        // Update status
         if (statusEl) {
             statusEl.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 0.5rem; padding: 1rem; background: ${matchedCount > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)'}; border-radius: var(--radius-md); color: ${matchedCount > 0 ? '#10b981' : '#f59e0b'};">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        ${matchedCount > 0 ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>' : '<circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line>'}
-                    </svg>
-                    <span><strong>${matchedCount}</strong> de <strong>${totalCount}</strong> campañas coinciden con códigos existentes</span>
+                <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding: 1rem; background: rgba(16, 185, 129, 0.1); border-radius: var(--radius-md); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.25);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                        <span>Se detectaron <strong>${ads.length} anuncios</strong> con sus identificadores de Meta.</span>
+                    </div>
+                    <div style="font-size: 0.9rem; font-weight: 700; font-family: monospace;">
+                        Gasto Total: $${this.formatCurrency(totalSpent)} | Mensajes/Resultados: ${totalMsg}
+                    </div>
                 </div>
             `;
             statusEl.style.display = 'block';
         }
 
-        // Build preview table header
         headEl.innerHTML = `
             <tr>
-                <th style="width: 80px;">Estado</th>
-                <th style="width: 80px;">Código</th>
-                <th>Nombre Campaña</th>
-                <th style="text-align: right;">Gastado</th>
-                <th style="text-align: center;">Compras</th>
-                <th style="text-align: right;">CPC</th>
-                <th style="text-align: right;">CPM</th>
-                <th style="text-align: right;">C/Compra</th>
+                <th style="width: 140px;">ID del Anuncio</th>
+                <th>Nombre Anuncio</th>
+                <th>Conjunto</th>
+                <th>Campaña</th>
+                <th style="text-align: right;">Gasto (COP)</th>
+                <th style="text-align: center;">Mensajes/Resultados</th>
+                <th>Fechas</th>
             </tr>
         `;
 
-        // Build preview table body
-        bodyEl.innerHTML = data.map(item => `
-            <tr style="${item.matched ? '' : 'opacity: 0.6;'}">
+        bodyEl.innerHTML = ads.map(ad => `
+            <tr>
                 <td>
-                    ${item.matched ?
-                `<span style="color: #10b981; font-weight: 600;">✓ Match</span>` :
-                `<span style="color: #f59e0b;">Sin match</span>`}
+                    <span class="ad-id-badge" onclick="CampaignsModule.copyCode('${ad.adId}')" title="Clic para copiar ID">
+                        🆔 ${ad.adId || 'Sin ID'}
+                    </span>
                 </td>
-                <td>
-                    ${item.code ?
-                `<span style="background: ${item.matched ? 'linear-gradient(135deg, var(--primary), #8b5cf6)' : 'var(--surface-hover)'}; 
-                                color: ${item.matched ? 'white' : 'var(--text-muted)'}; 
-                                padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-weight: 600; font-family: monospace;">
-                            ${item.code}
-                        </span>` :
-                '<span style="color: var(--text-muted);">-</span>'}
+                <td style="font-weight: 600; font-size: 0.85rem; max-width: 150px; overflow: hidden; text-overflow: ellipsis;" title="${ad.adName}">
+                    ${ad.adName}
                 </td>
-                <td style="font-size: 0.8rem; max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${item.originalName}">
-                    ${item.originalName}
+                <td style="font-size: 0.8rem; color: var(--text-muted);">${ad.adSetName || '-'}</td>
+                <td style="font-size: 0.8rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis;" title="${ad.campaignName}">
+                    ${ad.campaignCode ? `<span style="background: var(--primary-light); color: var(--primary); padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: monospace; margin-right: 4px;">${ad.campaignCode}</span>` : ''}
+                    ${ad.campaignName}
                 </td>
-                <td style="text-align: right; font-family: monospace;">$${this.formatCurrency(item.spent)}</td>
-                <td style="text-align: center; font-weight: 600;">${item.purchases || '-'}</td>
-                <td style="text-align: right; font-family: monospace;">${item.cpc ? '$' + this.formatCurrency(item.cpc) : '-'}</td>
-                <td style="text-align: right; font-family: monospace;">${item.cpm ? '$' + this.formatCurrency(item.cpm) : '-'}</td>
-                <td style="text-align: right; font-family: monospace;">${item.costPerPurchase ? '$' + this.formatCurrency(item.costPerPurchase) : '-'}</td>
+                <td style="text-align: right; font-family: monospace; font-weight: 700; color: #f43f5e;">
+                    $${this.formatCurrency(ad.spent)}
+                </td>
+                <td style="text-align: center; font-weight: 700; color: #10b981;">
+                    ${ad.conversations || '-'}
+                </td>
+                <td style="font-size: 0.75rem; color: var(--text-muted);">
+                    ${ad.startDate || ''} - ${ad.endDate || ''}
+                </td>
             </tr>
         `).join('');
 
         previewEl.style.display = 'block';
     },
 
-    // Format currency
-    formatCurrency(value) {
-        if (!value && value !== 0) return '0';
-        return new Intl.NumberFormat('es-CO', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 2
-        }).format(value);
-    },
-
-    // Confirm and save report upload
-    confirmReportUpload() {
-        if (!this.pendingReportData || this.pendingReportData.length === 0) {
+    // Confirm report upload and save to DB
+    async confirmReportUpload() {
+        if (!this.pendingReportData || !this.pendingReportData.ads || this.pendingReportData.ads.length === 0) {
             Utils.showNotification('No hay datos para procesar', 'error');
             return;
         }
 
-        // Filter only matched data
-        const matchedData = this.pendingReportData.filter(d => d.matched);
+        const newAds = this.pendingReportData.ads;
+        const newCampaigns = this.pendingReportData.campaigns;
 
-        if (matchedData.length === 0) {
-            Utils.showNotification('No hay campañas que coincidan. Los códigos deben estar al final del nombre de la campaña.', 'warning');
-            return;
-        }
+        // 1. Merge Ads into this.campaignAds
+        const adsMap = new Map(this.campaignAds.map(a => [String(a.adId || a.id), a]));
+        newAds.forEach(ad => {
+            const key = String(ad.adId || ad.id);
+            adsMap.set(key, ad);
+        });
+        this.campaignAds = Array.from(adsMap.values());
 
-        // Load existing performance data
-        this.loadPerformanceData();
+        // 2. Merge Campaign Performance
+        const perfMap = new Map(this.performanceData.map(p => [p.code || p.originalName, p]));
+        newCampaigns.forEach(c => {
+            const key = c.code || c.originalName;
+            perfMap.set(key, c);
+        });
+        this.performanceData = Array.from(perfMap.values());
 
-        // Add or update performance data
-        matchedData.forEach(item => {
-            const existingIndex = this.performanceData.findIndex(p => p.code === item.code);
-
-            const performanceEntry = {
-                code: item.code,
-                campaignId: item.campaignId,
-                originalName: item.originalName,
-                spent: item.spent,
-                purchases: item.purchases,
-                cpc: item.cpc,
-                cpm: item.cpm,
-                costPerPurchase: item.costPerPurchase,
-                startDate: item.startDate,
-                endDate: item.endDate,
-                updatedAt: new Date().toISOString()
-            };
-
-            if (existingIndex > -1) {
-                // Update existing
-                this.performanceData[existingIndex] = performanceEntry;
-            } else {
-                // Add new
-                this.performanceData.push(performanceEntry);
+        // 3. Auto-create campaigns in generatedCampaigns if not already existing
+        newCampaigns.forEach(c => {
+            if (c.code && !this.generatedCampaigns.some(g => g.code === c.code)) {
+                this.generatedCampaigns.push({
+                    id: Date.now() + Math.floor(Math.random() * 1000),
+                    name: c.originalName,
+                    code: c.code,
+                    country: c.originalName.startsWith('VEN') ? 'VEN' : (c.originalName.startsWith('ECU') ? 'ECU' : 'COL'),
+                    type: c.originalName.includes('CBO') ? 'CBO' : 'ABO',
+                    objective: c.originalName.includes('COMPRAS') ? 'COMPRAS' : 'MENSAJES',
+                    date: c.startDate || new Date().toISOString().split('T')[0],
+                    product: c.originalName,
+                    adSets: 0,
+                    ads: 0,
+                    createdAt: new Date().toISOString()
+                });
             }
         });
 
-        // Save performance data
+        // 4. Save to Database & localStorage
+        this.saveCampaigns();
         this.savePerformanceData();
 
-        // Clear pending data and hide preview
+        if (window.Database) {
+            if (window.Database.saveCampaignAds) {
+                try { await window.Database.saveCampaignAds(this.campaignAds); } catch(e){}
+            }
+            if (window.Database.saveCampaign) {
+                this.generatedCampaigns.forEach(c => {
+                    try { window.Database.saveCampaign(c); } catch(e){}
+                });
+            }
+        }
+        localStorage.setItem('campaignAdsData', JSON.stringify(this.campaignAds));
+
+        // 5. Clean up preview & recalculate
         this.cancelReportUpload();
+        this.calculateAdMetrics();
+        this.renderAll();
 
-        // Render performance table
-        this.renderPerformanceTable();
-
-        Utils.showNotification(`¡${matchedData.length} campaña(s) actualizadas con datos de rendimiento!`, 'success');
+        Utils.showNotification(`¡${newAds.length} anuncio(s) importados con éxito con sus IDs y métricas!`, 'success');
     },
 
     // Cancel report upload
     cancelReportUpload() {
         this.pendingReportData = null;
-
         const statusEl = document.getElementById('reportUploadStatus');
         const previewEl = document.getElementById('reportPreview');
-
         if (statusEl) statusEl.style.display = 'none';
         if (previewEl) previewEl.style.display = 'none';
     },
 
-    // Load performance data from localStorage
+    // Load performance data
     loadPerformanceData() {
         const saved = localStorage.getItem('campaignPerformanceData');
         if (saved) {
@@ -1976,22 +1800,172 @@ const CampaignsModule = {
         }
     },
 
-    // Save performance data to localStorage
+    // Save performance data
     savePerformanceData() {
         localStorage.setItem('campaignPerformanceData', JSON.stringify(this.performanceData));
     },
 
-    // Render performance table
+    // Extract campaign code from name
+    extractCampaignCode(campaignName) {
+        if (!campaignName) return null;
+        const name = campaignName.toString().trim();
+
+        // 1. Look at the end of the name for 2 letters + 2 numbers (e.g., HN20)
+        const codePattern = /([A-Z]{2}\d{2})$/i;
+        const match = name.match(codePattern);
+        if (match) return match[1].toUpperCase();
+
+        // 2. Look anywhere for code
+        const anywherePattern = /\b([A-Z]{2}\d{2})\b/gi;
+        const matches = [...name.matchAll(anywherePattern)];
+        if (matches.length > 0) return matches[matches.length - 1][1].toUpperCase();
+
+        // 3. Fallback: last 4 chars
+        const lastFour = name.slice(-4);
+        if (/^[A-Z]{2}\d{2}$/i.test(lastFour)) return lastFour.toUpperCase();
+
+        return null;
+    },
+
+    // Parse numeric values safely
+    parseNumber(value) {
+        if (value === null || value === undefined || value === '') return 0;
+        if (typeof value === 'number') return value;
+
+        let str = value.toString().replace(/[^\d.,\-]/g, '').trim();
+        if (str.includes(',') && str.includes('.')) {
+            if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+                str = str.replace(/\./g, '').replace(',', '.');
+            } else {
+                str = str.replace(/,/g, '');
+            }
+        } else if (str.includes(',')) {
+            const parts = str.split(',');
+            if (parts.length === 2 && parts[1].length <= 2) {
+                str = str.replace(',', '.');
+            } else {
+                str = str.replace(/,/g, '');
+            }
+        }
+
+        const num = parseFloat(str);
+        return isNaN(num) ? 0 : num;
+    },
+
+    // Format currency string
+    formatCurrency(value) {
+        if (!value && value !== 0) return '0';
+        return new Intl.NumberFormat('es-CO', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2
+        }).format(value);
+    },
+
+    // ============================================
+    // ADS PERFORMANCE TABLE & METRICS CALCULATION
+    // ============================================
+
+    // Calculate ROAS, CPA, and sales counts per Ad
+    calculateAdMetrics() {
+        this.campaignAds.forEach(ad => {
+            const adSales = this.campaignSales.filter(s => String(s.adId) === String(ad.adId) || (ad.adName && s.adName === ad.adName));
+            const salesCount = adSales.reduce((acc, s) => acc + (Number(s.quantity) || 1), 0);
+            const salesRevenue = adSales.reduce((acc, s) => acc + ((Number(s.price) || 0) * (Number(s.quantity) || 1)), 0);
+
+            ad.salesCount = salesCount;
+            ad.salesRevenue = salesRevenue;
+            ad.roas = (ad.spent > 0) ? (salesRevenue / ad.spent) : (salesRevenue > 0 ? 99 : 0);
+            ad.cpa = (salesCount > 0) ? (ad.spent / salesCount) : (ad.spent > 0 ? ad.spent : 0);
+            ad.profit = salesRevenue - ad.spent;
+        });
+    },
+
+    // Render Ads Performance Table
+    renderAdsTable(filterQuery = '') {
+        const tbody = document.getElementById('adsPerformanceTableBody');
+        if (!tbody) return;
+
+        this.calculateAdMetrics();
+
+        let ads = [...this.campaignAds];
+        if (filterQuery) {
+            const q = filterQuery.toLowerCase().trim();
+            ads = ads.filter(a =>
+                (a.adId && a.adId.toLowerCase().includes(q)) ||
+                (a.adName && a.adName.toLowerCase().includes(q)) ||
+                (a.campaignName && a.campaignName.toLowerCase().includes(q)) ||
+                (a.campaignCode && a.campaignCode.toLowerCase().includes(q)) ||
+                (a.product && a.product.toLowerCase().includes(q))
+            );
+        }
+
+        if (ads.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
+                        ${filterQuery ? 'No se encontraron anuncios que coincidan con la búsqueda.' : 'No hay anuncios importados aún. Sube un archivo Excel para ver el desglose por ID de anuncio.'}
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = ads.map(ad => {
+            const roasColor = ad.roas >= 2.0 ? '#10b981' : (ad.roas >= 1.0 ? '#f59e0b' : (ad.salesRevenue > 0 ? '#f43f5e' : 'var(--text-muted)'));
+            const roasDisplay = ad.roas > 0 ? `${ad.roas.toFixed(2)}x` : '-';
+            const cpaDisplay = ad.salesCount > 0 ? `$${this.formatCurrency(ad.cpa)}` : '-';
+
+            return `
+                <tr>
+                    <td>
+                        <span class="ad-id-badge" onclick="CampaignsModule.copyCode('${ad.adId}')" title="Clic para copiar ID">
+                            🆔 ${ad.adId || 'Sin ID'}
+                        </span>
+                    </td>
+                    <td style="font-weight: 600; font-size: 0.85rem; max-width: 140px; overflow: hidden; text-overflow: ellipsis;" title="${ad.adName}">
+                        ${ad.adName}
+                    </td>
+                    <td style="font-size: 0.8rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis;" title="${ad.campaignName}">
+                        ${ad.campaignCode ? `<span style="background: linear-gradient(135deg, var(--primary), #8b5cf6); color: white; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-family: monospace; font-size: 0.75rem; margin-right: 4px;">${ad.campaignCode}</span>` : ''}
+                        ${ad.campaignName}
+                    </td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 700; color: #f43f5e;">
+                        $${this.formatCurrency(ad.spent)}
+                    </td>
+                    <td style="text-align: center; font-weight: 600; color: var(--text-secondary);">
+                        ${ad.conversations || '-'}
+                    </td>
+                    <td style="text-align: center; font-weight: 700; color: ${ad.salesCount > 0 ? '#10b981' : 'var(--text-muted)'};">
+                        ${ad.salesCount > 0 ? `🛒 ${ad.salesCount} uds` : '-'}
+                    </td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 700; color: ${ad.salesRevenue > 0 ? '#10b981' : 'var(--text-muted)'};">
+                        ${ad.salesRevenue > 0 ? '$' + this.formatCurrency(ad.salesRevenue) : '-'}
+                    </td>
+                    <td style="text-align: center; font-weight: 700; color: ${roasColor}; font-family: monospace;">
+                        ${roasDisplay}
+                    </td>
+                    <td style="text-align: right; font-family: monospace; font-size: 0.85rem; color: var(--text-secondary);">
+                        ${cpaDisplay}
+                    </td>
+                    <td>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="CampaignsModule.openQuickSaleModal('${ad.adId}')" style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; padding: 4px 8px;" title="Registrar venta para este anuncio">
+                            <span>⚡</span> Venta
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    // Render consolidated campaign performance table
     renderPerformanceTable() {
         const tbody = document.getElementById('campaignPerformanceTable');
         if (!tbody) return;
 
-        this.loadPerformanceData();
-
         if (this.performanceData.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         No hay datos de rendimiento. Sube un reporte para ver el rendimiento.
                     </td>
                 </tr>
@@ -1999,7 +1973,6 @@ const CampaignsModule = {
             return;
         }
 
-        // Calculate totals
         const totals = this.performanceData.reduce((acc, item) => {
             acc.spent += item.spent || 0;
             acc.purchases += item.purchases || 0;
@@ -2059,14 +2032,676 @@ const CampaignsModule = {
         `;
     },
 
+    // ============================================
+    // QUICK SALES REGISTRATION SYSTEM
+    // ============================================
+
+    // Search ads for autocomplete in Quick Sale
+    searchAdsForQuickSale(query) {
+        const dropdown = document.getElementById('quickSaleAdSuggestions');
+        if (!dropdown) return;
+
+        if (!query || query.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        const q = query.toLowerCase().trim();
+        const matches = this.campaignAds.filter(a =>
+            (a.adId && a.adId.toLowerCase().includes(q)) ||
+            (a.adName && a.adName.toLowerCase().includes(q)) ||
+            (a.campaignName && a.campaignName.toLowerCase().includes(q)) ||
+            (a.campaignCode && a.campaignCode.toLowerCase().includes(q)) ||
+            (a.product && a.product.toLowerCase().includes(q))
+        ).slice(0, 8);
+
+        if (matches.length === 0) {
+            dropdown.innerHTML = '<div style="padding: 0.75rem; color: var(--text-muted); font-size: 0.85rem;">No se encontraron anuncios para "' + query + '"</div>';
+            dropdown.style.display = 'block';
+            return;
+        }
+
+        dropdown.innerHTML = matches.map(ad => `
+            <div class="ad-search-item" onclick="CampaignsModule.selectAdForQuickSale('${ad.adId}')">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px;">
+                    <span style="font-family: monospace; font-weight: 700; color: #8b5cf6;">🆔 ${ad.adId}</span>
+                    <span style="font-size: 0.75rem; color: #f43f5e; font-family: monospace;">Gasto: $${this.formatCurrency(ad.spent)}</span>
+                </div>
+                <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">${ad.adName}</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    ${ad.campaignCode ? `[${ad.campaignCode}] ` : ''}${ad.campaignName}
+                </div>
+            </div>
+        `).join('');
+
+        dropdown.style.display = 'block';
+    },
+
+    // Select an ad from autocomplete
+    selectAdForQuickSale(adId) {
+        const ad = this.campaignAds.find(a => String(a.adId) === String(adId));
+        const inputAdId = document.getElementById('quickSaleAdId');
+        const infoBox = document.getElementById('quickSaleSelectedAdInfo');
+        const dropdown = document.getElementById('quickSaleAdSuggestions');
+
+        if (inputAdId) inputAdId.value = adId;
+        if (dropdown) dropdown.style.display = 'none';
+
+        if (infoBox && ad) {
+            infoBox.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 700; color: var(--primary); font-size: 0.95rem;">
+                            📢 ${ad.adName} ${ad.campaignCode ? `(${ad.campaignCode})` : ''}
+                        </div>
+                        <div style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px;">
+                            Campaña: ${ad.campaignName}
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block;">Gasto Publicitario</span>
+                        <span style="font-weight: 700; color: #f43f5e; font-family: monospace;">$${this.formatCurrency(ad.spent)}</span>
+                    </div>
+                </div>
+            `;
+            infoBox.style.display = 'block';
+        }
+    },
+
+    // Open Quick Sale Modal directly from any table row
+    openQuickSaleModal(prefillAdId = '') {
+        const ad = this.campaignAds.find(a => String(a.adId) === String(prefillAdId));
+
+        let modal = document.getElementById('modalQuickSale');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalQuickSale';
+            modal.className = 'modal';
+            document.body.appendChild(modal);
+
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) this.closeModalId('modalQuickSale');
+            });
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 550px;">
+                <div class="modal-header">
+                    <h2>⚡ Registro Rápido de Venta</h2>
+                    <button class="modal-close" onclick="CampaignsModule.closeModalId('modalQuickSale')">&times;</button>
+                </div>
+                <div class="modal-body" style="padding: 1.5rem 0;">
+                    <form id="modalQuickSaleForm" onsubmit="CampaignsModule.handleModalQuickSaleSubmit(event)">
+                        ${ad ? `
+                            <div class="selected-ad-info-box" style="margin-bottom: 1.25rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <span class="ad-id-badge">🆔 ${ad.adId}</span>
+                                        <div style="font-weight: 700; color: var(--text-primary); margin-top: 4px;">${ad.adName}</div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">${ad.campaignName}</div>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">Gasto Anuncio</div>
+                                        <div style="font-family: monospace; font-weight: 700; color: #f43f5e;">$${this.formatCurrency(ad.spent)}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        <div class="form-group" style="margin-bottom: 1rem;">
+                            <label for="modalSaleAdId">ID del Anuncio *</label>
+                            <input type="text" id="modalSaleAdId" class="form-control" value="${prefillAdId}" placeholder="Pega el ID del Anuncio..." required style="font-family: monospace; font-weight: 600;">
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div class="form-group">
+                                <label for="modalSalePrice">Precio de Venta ($) *</label>
+                                <input type="number" id="modalSalePrice" class="form-control" placeholder="Ej: 150000" required step="any" min="1" autofocus style="font-size: 1.1rem; font-weight: 700; font-family: monospace;">
+                            </div>
+                            <div class="form-group">
+                                <label for="modalSaleQuantity">Cantidad</label>
+                                <input type="number" id="modalSaleQuantity" class="form-control" value="1" min="1" required style="font-weight: 700; text-align: center;">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                            <div class="form-group">
+                                <label for="modalSaleOrderNumber">N° Guía / Pedido (Opcional)</label>
+                                <input type="text" id="modalSaleOrderNumber" class="form-control" placeholder="Ej: GUIA-98231">
+                            </div>
+                            <div class="form-group">
+                                <label for="modalSaleCustomer">Nombre Cliente (Opcional)</label>
+                                <input type="text" id="modalSaleCustomer" class="form-control" placeholder="Nombre del cliente">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+                            <div class="form-group">
+                                <label for="modalSaleCity">Ciudad / País</label>
+                                <input type="text" id="modalSaleCity" class="form-control" placeholder="Ej: Bogotá / Caracas">
+                            </div>
+                            <div class="form-group">
+                                <label for="modalSaleDate">Fecha de Venta *</label>
+                                <input type="date" id="modalSaleDate" class="form-control" value="${today}" required>
+                            </div>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+                            <button type="button" class="btn btn-secondary" onclick="CampaignsModule.closeModalId('modalQuickSale')">Cancelar</button>
+                            <button type="submit" class="btn btn-success" style="font-weight: 700; padding: 0.6rem 1.5rem;">
+                                💾 Registrar Venta
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        setTimeout(() => {
+            const priceInput = document.getElementById('modalSalePrice');
+            if (priceInput) priceInput.focus();
+        }, 150);
+    },
+
+    // Handle modal quick sale submit
+    async handleModalQuickSaleSubmit(e) {
+        e.preventDefault();
+        const adId = document.getElementById('modalSaleAdId').value.trim();
+        const price = parseFloat(document.getElementById('modalSalePrice').value) || 0;
+        const quantity = parseInt(document.getElementById('modalSaleQuantity').value) || 1;
+        const orderNumber = document.getElementById('modalSaleOrderNumber').value.trim();
+        const customerName = document.getElementById('modalSaleCustomer').value.trim();
+        const city = document.getElementById('modalSaleCity').value.trim();
+        const date = document.getElementById('modalSaleDate').value;
+
+        if (!adId || price <= 0) {
+            Utils.showNotification('Por favor ingresa un ID de anuncio y un precio válido', 'error');
+            return;
+        }
+
+        await this.saveNewSaleRecord({
+            adId,
+            price,
+            quantity,
+            orderNumber,
+            customerName,
+            city,
+            date
+        });
+
+        this.closeModalId('modalQuickSale');
+    },
+
+    // Register sale from the main quick sales tab form
+    async registerQuickSale() {
+        const adIdInput = document.getElementById('quickSaleAdId');
+        const priceInput = document.getElementById('quickSalePrice');
+        const qtyInput = document.getElementById('quickSaleQuantity');
+        const orderInput = document.getElementById('quickSaleOrderNumber');
+        const customerInput = document.getElementById('quickSaleCustomerName');
+        const cityInput = document.getElementById('quickSaleCity');
+        const dateInput = document.getElementById('quickSaleDate');
+        const notesInput = document.getElementById('quickSaleNotes');
+
+        const adId = adIdInput ? adIdInput.value.trim() : '';
+        const price = priceInput ? (parseFloat(priceInput.value) || 0) : 0;
+        const quantity = qtyInput ? (parseInt(qtyInput.value) || 1) : 1;
+        const orderNumber = orderInput ? orderInput.value.trim() : '';
+        const customerName = customerInput ? customerInput.value.trim() : '';
+        const city = cityInput ? cityInput.value.trim() : '';
+        const date = dateInput ? dateInput.value : new Date().toISOString().split('T')[0];
+        const notes = notesInput ? notesInput.value.trim() : '';
+
+        if (!adId || price <= 0) {
+            Utils.showNotification('Por favor ingrese el ID del Anuncio y el Precio de la Venta', 'error');
+            return;
+        }
+
+        await this.saveNewSaleRecord({
+            adId,
+            price,
+            quantity,
+            orderNumber,
+            customerName,
+            city,
+            date,
+            notes
+        });
+
+        // Reset form
+        if (priceInput) priceInput.value = '';
+        if (orderInput) orderInput.value = '';
+        if (customerInput) customerInput.value = '';
+        if (notesInput) notesInput.value = '';
+        if (qtyInput) qtyInput.value = '1';
+    },
+
+    // Core helper to persist new sale record
+    async saveNewSaleRecord(saleData) {
+        const matchedAd = this.campaignAds.find(a => String(a.adId) === String(saleData.adId));
+
+        const saleRecord = {
+            id: `sale_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+            adId: saleData.adId,
+            adName: matchedAd ? matchedAd.adName : (saleData.adName || 'Anuncio ' + saleData.adId),
+            campaignCode: matchedAd ? matchedAd.campaignCode : '',
+            campaignName: matchedAd ? matchedAd.campaignName : '',
+            product: matchedAd ? matchedAd.product : '',
+            price: Number(saleData.price) || 0,
+            quantity: Number(saleData.quantity) || 1,
+            orderNumber: saleData.orderNumber || '',
+            customerName: saleData.customerName || '',
+            city: saleData.city || (matchedAd ? matchedAd.country : ''),
+            date: saleData.date || new Date().toISOString().split('T')[0],
+            notes: saleData.notes || '',
+            createdAt: new Date().toISOString()
+        };
+
+        this.campaignSales.unshift(saleRecord);
+
+        // Save to Database and localStorage
+        if (window.Database && window.Database.saveCampaignSale) {
+            try { await window.Database.saveCampaignSale(saleRecord); } catch(e){}
+        }
+        localStorage.setItem('campaignSalesData', JSON.stringify(this.campaignSales));
+
+        this.calculateAdMetrics();
+        this.renderAll();
+
+        const totalRevenue = saleRecord.price * saleRecord.quantity;
+        Utils.showNotification(`✅ ¡Venta de $${this.formatCurrency(totalRevenue)} registrada para el anuncio ${saleRecord.adId}!`, 'success');
+    },
+
+    // Delete a sale record
+    async deleteSale(saleId) {
+        if (!confirm('¿Está seguro de eliminar este registro de venta?')) return;
+
+        const index = this.campaignSales.findIndex(s => String(s.id) === String(saleId));
+        if (index > -1) {
+            this.campaignSales.splice(index, 1);
+
+            if (window.Database && window.Database.deleteCampaignSale) {
+                try { await window.Database.deleteCampaignSale(saleId); } catch(e){}
+            }
+            localStorage.setItem('campaignSalesData', JSON.stringify(this.campaignSales));
+
+            this.calculateAdMetrics();
+            this.renderAll();
+            Utils.showNotification('Registro de venta eliminado', 'info');
+        }
+    },
+
+    // Render Sales KPIs Cards
+    renderSalesKPIs() {
+        const kpiSpentEl = document.getElementById('kpiTotalAdSpent');
+        const kpiRevenueEl = document.getElementById('kpiTotalSalesRevenue');
+        const kpiRoasEl = document.getElementById('kpiGlobalRoas');
+        const kpiCpaEl = document.getElementById('kpiGlobalCpa');
+
+        const totalSpent = this.campaignAds.reduce((acc, a) => acc + (Number(a.spent) || 0), 0);
+        const totalSalesCount = this.campaignSales.reduce((acc, s) => acc + (Number(s.quantity) || 1), 0);
+        const totalSalesRevenue = this.campaignSales.reduce((acc, s) => acc + ((Number(s.price) || 0) * (Number(s.quantity) || 1)), 0);
+
+        const globalRoas = totalSpent > 0 ? (totalSalesRevenue / totalSpent) : (totalSalesRevenue > 0 ? 99 : 0);
+        const globalCpa = totalSalesCount > 0 ? (totalSpent / totalSalesCount) : 0;
+
+        if (kpiSpentEl) kpiSpentEl.textContent = `$${this.formatCurrency(totalSpent)}`;
+        if (kpiRevenueEl) kpiRevenueEl.textContent = `$${this.formatCurrency(totalSalesRevenue)} (${totalSalesCount} uds)`;
+        if (kpiRoasEl) kpiRoasEl.textContent = globalRoas > 0 ? `${globalRoas.toFixed(2)}x` : '-';
+        if (kpiCpaEl) kpiCpaEl.textContent = globalCpa > 0 ? `$${this.formatCurrency(globalCpa)}` : '-';
+    },
+
+    // Render Sales History Table
+    renderSalesHistoryTable(filterQuery = '') {
+        const tbody = document.getElementById('campaignSalesHistoryBody');
+        if (!tbody) return;
+
+        let sales = [...this.campaignSales];
+        if (filterQuery) {
+            const q = filterQuery.toLowerCase().trim();
+            sales = sales.filter(s =>
+                (s.adId && s.adId.toLowerCase().includes(q)) ||
+                (s.adName && s.adName.toLowerCase().includes(q)) ||
+                (s.campaignName && s.campaignName.toLowerCase().includes(q)) ||
+                (s.orderNumber && s.orderNumber.toLowerCase().includes(q)) ||
+                (s.customerName && s.customerName.toLowerCase().includes(q)) ||
+                (s.city && s.city.toLowerCase().includes(q)) ||
+                (s.date && s.date.includes(q))
+            );
+        }
+
+        if (sales.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
+                        ${filterQuery ? 'No se encontraron ventas para esta búsqueda.' : 'No hay ventas registradas todavía. Usa el formulario de Registro Rápido para ingresar ventas.'}
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = sales.map(sale => {
+            const total = (Number(sale.price) || 0) * (Number(sale.quantity) || 1);
+
+            return `
+                <tr>
+                    <td style="font-size: 0.85rem; font-weight: 600;">${sale.date || '-'}</td>
+                    <td>
+                        <span class="ad-id-badge" onclick="CampaignsModule.copyCode('${sale.adId}')" title="Clic para copiar ID">
+                            🆔 ${sale.adId}
+                        </span>
+                    </td>
+                    <td style="font-size: 0.85rem; font-weight: 600; max-width: 140px; overflow: hidden; text-overflow: ellipsis;" title="${sale.adName}">
+                        ${sale.adName || '-'}
+                    </td>
+                    <td style="font-size: 0.8rem; max-width: 160px; overflow: hidden; text-overflow: ellipsis;" title="${sale.campaignName}">
+                        ${sale.campaignCode ? `<span style="background: var(--primary-light); color: var(--primary); padding: 2px 5px; border-radius: 4px; font-weight: 700; font-family: monospace; font-size: 0.75rem;">${sale.campaignCode}</span> ` : ''}
+                        ${sale.campaignName || '-'}
+                    </td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 700; color: #10b981;">
+                        $${this.formatCurrency(sale.price)}
+                    </td>
+                    <td style="text-align: center; font-weight: 700;">
+                        ${sale.quantity || 1}
+                    </td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 700; color: #10b981;">
+                        $${this.formatCurrency(total)}
+                    </td>
+                    <td style="font-size: 0.85rem;">
+                        ${sale.orderNumber ? `<span style="font-family: monospace; background: var(--surface-hover); padding: 2px 6px; border-radius: 4px;">${sale.orderNumber}</span>` : '-'}
+                        ${sale.customerName ? `<div style="font-size: 0.75rem; color: var(--text-muted);">${sale.customerName}</div>` : ''}
+                    </td>
+                    <td style="font-size: 0.85rem; color: var(--text-secondary);">${sale.city || '-'}</td>
+                    <td>
+                        <button type="button" class="btn btn-icon btn-sm btn-danger-light" onclick="CampaignsModule.deleteSale('${sale.id}')" title="Eliminar venta">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    // Export Sales History to CSV
+    exportSalesToCsv() {
+        if (this.campaignSales.length === 0) {
+            Utils.showNotification('No hay ventas para exportar', 'warning');
+            return;
+        }
+
+        const headers = ['ID Registro', 'Fecha', 'ID Anuncio', 'Nombre Anuncio', 'Código Campaña', 'Nombre Campaña', 'Precio Unitario', 'Cantidad', 'Total Venta', 'N° Guía/Pedido', 'Cliente', 'Ciudad', 'Notas'];
+        const rows = this.campaignSales.map(s => [
+            s.id,
+            s.date,
+            s.adId,
+            `"${(s.adName || '').replace(/"/g, '""')}"`,
+            s.campaignCode || '',
+            `"${(s.campaignName || '').replace(/"/g, '""')}"`,
+            s.price,
+            s.quantity,
+            (s.price * s.quantity),
+            `"${(s.orderNumber || '').replace(/"/g, '""')}"`,
+            `"${(s.customerName || '').replace(/"/g, '""')}"`,
+            `"${(s.city || '').replace(/"/g, '""')}"`,
+            `"${(s.notes || '').replace(/"/g, '""')}"`
+        ]);
+
+        const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.href = url;
+        a.download = `ventas_por_anuncio_${dateStr}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        Utils.showNotification('¡Archivo CSV de ventas descargado con éxito!', 'success');
+    },
+
+    // Edit performance item directly
+    editPerformanceItem(code) {
+        const campaign = this.generatedCampaigns.find(c => c.code === code);
+        if (campaign) {
+            this.openAdDetailsModal(campaign.id);
+            return;
+        }
+
+        const item = this.performanceData.find(p => p.code === code);
+        if (!item) return;
+
+        const newPurchasesStr = prompt(`Editar compras para ${code}:`, item.purchases || 0);
+        if (newPurchasesStr === null) return;
+        const newPurchases = parseInt(newPurchasesStr) || 0;
+
+        const newSpentStr = prompt(`Editar gasto total para ${code}:`, item.spent || 0);
+        if (newSpentStr === null) return;
+        const newSpent = parseFloat(newSpentStr) || 0;
+
+        item.purchases = newPurchases;
+        item.spent = newSpent;
+        if (newSpent && newPurchases) {
+            item.costPerPurchase = newSpent / newPurchases;
+        }
+
+        this.savePerformanceData();
+        this.renderPerformanceTable();
+        Utils.showNotification('Rendimiento actualizado', 'success');
+    },
+
     // Clear performance data
     clearPerformanceData() {
-        if (confirm('¿Está seguro de que desea limpiar todos los datos de rendimiento?')) {
+        if (confirm('¿Está seguro de que desea limpiar todos los datos de rendimiento de campañas?')) {
             this.performanceData = [];
             this.savePerformanceData();
             this.renderPerformanceTable();
             Utils.showNotification('Datos de rendimiento eliminados', 'info');
         }
+    },
+
+    // Clear ads data
+    clearAdsData() {
+        if (confirm('¿Está seguro de que desea eliminar todos los anuncios importados?')) {
+            this.campaignAds = [];
+            localStorage.setItem('campaignAdsData', JSON.stringify([]));
+            this.renderAdsTable();
+            this.renderSalesKPIs();
+            Utils.showNotification('Anuncios importados eliminados', 'info');
+        }
+    },
+
+    // Clear history
+    clearHistory() {
+        if (confirm('¿Está seguro de que desea limpiar todo el historial de campañas? Los códigos serán liberados para reutilización.')) {
+            this.usedCodes.clear();
+            this.saveUsedCodes();
+            this.generatedCampaigns = [];
+            this.saveCampaigns();
+            this.renderHistory();
+            document.getElementById('campaignResult').style.display = 'none';
+            Utils.showNotification('Historial limpiado', 'info');
+        }
+    },
+
+    // Export backup JSON file
+    exportBackup() {
+        const backupData = {
+            version: '2.0',
+            exportedAt: new Date().toISOString(),
+            generatedCampaigns: this.generatedCampaigns,
+            campaignAds: this.campaignAds,
+            campaignSales: this.campaignSales,
+            usedCodes: Array.from(this.usedCodes),
+            performanceData: this.performanceData || []
+        };
+
+        const jsonStr = JSON.stringify(backupData, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.href = url;
+        a.download = `campanas_anuncios_ventas_backup_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        Utils.showNotification('¡Copia de seguridad exportada en archivo JSON!', 'success');
+    },
+
+    // Trigger file picker for import
+    triggerImportBackup() {
+        const input = document.getElementById('campaignBackupInput');
+        if (input) input.click();
+    },
+
+    // Import backup file
+    importBackupFile(inputEl) {
+        const file = inputEl.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = JSON.parse(e.target.result);
+                this.applyBackupData(data);
+                inputEl.value = '';
+                Utils.showNotification('¡Copia de seguridad importada con éxito!', 'success');
+            } catch (err) {
+                console.error('Error al importar backup:', err);
+                Utils.showNotification('El archivo no tiene un formato de backup JSON válido', 'error');
+            }
+        };
+        reader.readAsText(file);
+    },
+
+    // Copy all campaign data to clipboard as JSON text
+    copyBackupToClipboard() {
+        const backupData = {
+            version: '2.0',
+            exportedAt: new Date().toISOString(),
+            generatedCampaigns: this.generatedCampaigns,
+            campaignAds: this.campaignAds,
+            campaignSales: this.campaignSales,
+            usedCodes: Array.from(this.usedCodes),
+            performanceData: this.performanceData || []
+        };
+
+        const jsonStr = JSON.stringify(backupData);
+        navigator.clipboard.writeText(jsonStr).then(() => {
+            Utils.showNotification('¡Datos de campañas, anuncios y ventas copiados al portapapeles!', 'success');
+        }).catch(() => {
+            const textArea = document.createElement('textarea');
+            textArea.value = jsonStr;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            Utils.showNotification('¡Datos copiados al portapapeles! Haz clic en "Pegar / Cargar" en el otro navegador', 'success');
+        });
+    },
+
+    // Show paste modal
+    pasteBackupModal() {
+        const textEl = document.getElementById('campaignBackupText');
+        if (textEl) textEl.value = '';
+        Utils.openModal('modalCampaignBackup');
+    },
+
+    // Process pasted JSON backup
+    processPasteBackup() {
+        const textEl = document.getElementById('campaignBackupText');
+        const content = textEl ? textEl.value.trim() : '';
+
+        if (!content) {
+            Utils.showNotification('Por favor pega el contenido de la copia de seguridad', 'warning');
+            return;
+        }
+
+        try {
+            const data = JSON.parse(content);
+            this.applyBackupData(data);
+            Utils.closeModal('modalCampaignBackup');
+            if (textEl) textEl.value = '';
+            Utils.showNotification('¡Campañas, anuncios y ventas restaurados exitosamente!', 'success');
+        } catch (err) {
+            console.error('Error procesando texto de backup:', err);
+            Utils.showNotification('El texto pegado no es un JSON de backup válido', 'error');
+        }
+    },
+
+    // Apply backup data
+    applyBackupData(data) {
+        if (!data || (typeof data !== 'object')) {
+            throw new Error('Formato inválido');
+        }
+
+        let campaigns = data.generatedCampaigns || (Array.isArray(data) ? data : []);
+        let ads = data.campaignAds || [];
+        let sales = data.campaignSales || [];
+        let codes = data.usedCodes || [];
+        let performance = data.performanceData || [];
+
+        const existingIds = new Set(this.generatedCampaigns.map(c => c.id));
+        campaigns.forEach(c => {
+            if (!existingIds.has(c.id)) {
+                this.generatedCampaigns.push(c);
+            }
+        });
+
+        if (ads.length > 0) {
+            const adsMap = new Map(this.campaignAds.map(a => [String(a.adId || a.id), a]));
+            ads.forEach(a => adsMap.set(String(a.adId || a.id), a));
+            this.campaignAds = Array.from(adsMap.values());
+            localStorage.setItem('campaignAdsData', JSON.stringify(this.campaignAds));
+        }
+
+        if (sales.length > 0) {
+            const salesMap = new Map(this.campaignSales.map(s => [s.id, s]));
+            sales.forEach(s => salesMap.set(s.id, s));
+            this.campaignSales = Array.from(salesMap.values());
+            localStorage.setItem('campaignSalesData', JSON.stringify(this.campaignSales));
+        }
+
+        if (performance.length > 0) {
+            const perfMap = new Map(this.performanceData.map(p => [p.code, p]));
+            performance.forEach(p => {
+                if (p.code) perfMap.set(p.code, p);
+            });
+            this.performanceData = Array.from(perfMap.values());
+            this.savePerformanceData();
+        }
+
+        codes.forEach(code => this.usedCodes.add(code));
+
+        this.saveCampaigns();
+        this.saveUsedCodes();
+
+        if (window.Database) {
+            if (window.Database.saveCampaignAds) {
+                try { window.Database.saveCampaignAds(this.campaignAds); } catch(e){}
+            }
+            if (window.Database.saveCampaign) {
+                this.generatedCampaigns.forEach(c => {
+                    try { window.Database.saveCampaign(c); } catch(e){}
+                });
+            }
+        }
+
+        this.calculateAdMetrics();
+        this.renderAll();
     }
 };
 

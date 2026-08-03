@@ -1577,6 +1577,171 @@ const Database = {
         } catch (error) {
             console.warn('Supabase deleteCampaign fallback:', error);
         }
+    },
+
+    // ========================================
+    // CAMPAIGN ADS (ANUNCIOS IMPORTADOS CON IDS)
+    // ========================================
+    async getCampaignAds() {
+        try {
+            if (supabaseClient) {
+                const { data, error } = await supabaseClient
+                    .from('campaign_ads')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (!error && data && data.length > 0) {
+                    return data.map(a => ({
+                        id: a.id,
+                        adId: a.ad_id,
+                        adName: a.ad_name,
+                        adSetName: a.ad_set_name,
+                        campaignName: a.campaign_name,
+                        campaignCode: a.campaign_code,
+                        country: a.country,
+                        product: a.product,
+                        spent: Number(a.spent) || 0,
+                        currency: a.currency || 'COP',
+                        impressions: Number(a.impressions) || 0,
+                        reach: Number(a.reach) || 0,
+                        conversations: Number(a.conversations) || 0,
+                        startDate: a.start_date,
+                        endDate: a.end_date,
+                        createdAt: a.created_at,
+                        updatedAt: a.updated_at
+                    }));
+                }
+            }
+        } catch (error) {
+            console.warn('Supabase getCampaignAds fallback to localStorage:', error);
+        }
+        const saved = localStorage.getItem('campaignAdsData');
+        return saved ? JSON.parse(saved) : [];
+    },
+
+    async saveCampaignAds(ads) {
+        if (!Array.isArray(ads) || ads.length === 0) return;
+        try {
+            if (supabaseClient) {
+                const rows = ads.map(a => ({
+                    id: a.id || (a.adId ? `ad_${a.adId}` : `ad_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`),
+                    ad_id: String(a.adId || ''),
+                    ad_name: a.adName || '',
+                    ad_set_name: a.adSetName || '',
+                    campaign_name: a.campaignName || '',
+                    campaign_code: a.campaignCode || '',
+                    country: a.country || '',
+                    product: a.product || '',
+                    spent: Number(a.spent) || 0,
+                    currency: a.currency || 'COP',
+                    impressions: Number(a.impressions) || 0,
+                    reach: Number(a.reach) || 0,
+                    conversations: Number(a.conversations) || 0,
+                    start_date: a.startDate || null,
+                    end_date: a.endDate || null,
+                    updated_at: new Date().toISOString()
+                }));
+
+                await supabaseClient
+                    .from('campaign_ads')
+                    .upsert(rows, { onConflict: 'id' });
+            }
+        } catch (error) {
+            console.warn('Supabase saveCampaignAds fallback:', error);
+        }
+        localStorage.setItem('campaignAdsData', JSON.stringify(ads));
+    },
+
+    async deleteCampaignAd(id) {
+        try {
+            if (supabaseClient) {
+                await supabaseClient
+                    .from('campaign_ads')
+                    .delete()
+                    .eq('id', id);
+            }
+        } catch (error) {
+            console.warn('Supabase deleteCampaignAd fallback:', error);
+        }
+    },
+
+    // ========================================
+    // CAMPAIGN SALES (REGISTRO RÁPIDO DE VENTAS POR ANUNCIO)
+    // ========================================
+    async getCampaignSales() {
+        try {
+            if (supabaseClient) {
+                const { data, error } = await supabaseClient
+                    .from('campaign_sales')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (!error && data && data.length > 0) {
+                    return data.map(s => ({
+                        id: s.id,
+                        adId: s.ad_id,
+                        adName: s.ad_name,
+                        campaignCode: s.campaign_code,
+                        campaignName: s.campaign_name,
+                        product: s.product,
+                        price: Number(s.price) || 0,
+                        quantity: Number(s.quantity) || 1,
+                        customerName: s.customer_name || '',
+                        orderNumber: s.order_number || '',
+                        city: s.city || '',
+                        date: s.sale_date,
+                        notes: s.notes || '',
+                        createdAt: s.created_at,
+                        updatedAt: s.updated_at
+                    }));
+                }
+            }
+        } catch (error) {
+            console.warn('Supabase getCampaignSales fallback to localStorage:', error);
+        }
+        const saved = localStorage.getItem('campaignSalesData');
+        return saved ? JSON.parse(saved) : [];
+    },
+
+    async saveCampaignSale(sale) {
+        try {
+            if (supabaseClient) {
+                await supabaseClient
+                    .from('campaign_sales')
+                    .upsert({
+                        id: sale.id,
+                        ad_id: String(sale.adId || ''),
+                        ad_name: sale.adName || '',
+                        campaign_code: sale.campaignCode || '',
+                        campaign_name: sale.campaignName || '',
+                        product: sale.product || '',
+                        price: Number(sale.price) || 0,
+                        quantity: Number(sale.quantity) || 1,
+                        customer_name: sale.customerName || '',
+                        order_number: sale.orderNumber || '',
+                        city: sale.city || '',
+                        sale_date: sale.date || new Date().toISOString().split('T')[0],
+                        notes: sale.notes || '',
+                        created_at: sale.createdAt || new Date().toISOString(),
+                        updated_at: new Date().toISOString()
+                    });
+            }
+        } catch (error) {
+            console.warn('Supabase saveCampaignSale fallback:', error);
+        }
+    },
+
+    async deleteCampaignSale(id) {
+        try {
+            if (supabaseClient) {
+                await supabaseClient
+                    .from('campaign_sales')
+                    .delete()
+                    .eq('id', id);
+            }
+        } catch (error) {
+            console.warn('Supabase deleteCampaignSale fallback:', error);
+        }
     }
 };
 
