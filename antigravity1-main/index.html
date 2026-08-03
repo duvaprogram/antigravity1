@@ -56,7 +56,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.19</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.20</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -1309,15 +1309,16 @@
                     </div>
                     <div class="card-body" style="padding: 0;">
                         <div class="table-container"
-                            style="border: none; border-radius: 0; max-height: 400px; overflow-y: auto;">
+                            style="border: none; border-radius: 0; max-height: 450px; overflow-y: auto;">
                             <table class="table">
-                                <thead style="position: sticky; top: 0; background: var(--surface-hover);">
+                                <thead style="position: sticky; top: 0; background: var(--surface-hover); z-index: 2;">
                                     <tr>
                                         <th>Nº Guía</th>
                                         <th>Fecha</th>
                                         <th>Cliente</th>
                                         <th>Ciudad</th>
-                                        <th>Total</th>
+                                        <th>Total ($)</th>
+                                        <th>Pago en Bolívares</th>
                                         <th>Flete</th>
                                         <th>Estado</th>
                                     </tr>
@@ -1325,7 +1326,14 @@
                                 <tbody id="analyticsGuidesTable">
                                     <!-- Dynamic content -->
                                 </tbody>
+                                <tfoot id="analyticsGuidesTableFoot" style="position: sticky; bottom: 0; background: var(--surface); border-top: 2px solid var(--border-color, rgba(255,255,255,0.1)); font-weight: 600; z-index: 2;">
+                                    <!-- Dynamic totals footer -->
+                                </tfoot>
                             </table>
+                        </div>
+                        <!-- Summary cards below the table -->
+                        <div id="analyticsTableSummaryCards" style="padding: 1rem 1.25rem; background: var(--surface-hover, rgba(255,255,255,0.03)); border-top: 1px solid var(--border-color, rgba(255,255,255,0.08)); display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">
+                            <!-- Dynamic summary cards -->
                         </div>
                     </div>
                 </div>

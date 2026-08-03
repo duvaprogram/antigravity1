@@ -667,69 +667,169 @@ const AnalyticsModule = {
         }
 
         const tbody = document.getElementById('analyticsGuidesTable');
+        const tfoot = document.getElementById('analyticsGuidesTableFoot');
+        const summaryCards = document.getElementById('analyticsTableSummaryCards');
         const recordCount = document.getElementById('analyticsRecordCount');
 
         if (recordCount) recordCount.textContent = `${guides.length} registros`;
 
+        const formatBs = (num) => {
+            return (num || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Bs';
+        };
+
+        const formatUsd = (num) => {
+            return '$' + (num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
         if (guides.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                    <td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">
                         No se encontraron guías con los filtros aplicados
                     </td>
                 </tr>
             `;
+            if (tfoot) tfoot.innerHTML = '';
+            if (summaryCards) summaryCards.innerHTML = '';
             return;
         }
 
         // Sort by date (newest first)
         const sortedGuides = [...guides].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        const cityFilter = this.currentFilters.city;
-        const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
+        const effectiveGuides = sortedGuides.filter(g => !this.isExcludedFromSales(g));
+        const devolucionGuides = sortedGuides.filter(g => this.isDevolucion(g));
+        const cancelledGuides = sortedGuides.filter(g => this.isCancelado(g));
+
+        // Totals: only effective guides sum revenue and Bs payments
+        const totalDollars = effectiveGuides.reduce((sum, g) => {
+            const val = parseFloat(g.totalAmount || g.amountUsd || 0);
+            return sum + (isNaN(val) ? 0 : val);
+        }, 0);
+
+        const totalBs = effectiveGuides.reduce((sum, g) => {
+            const val = parseFloat(g.paymentBs || 0);
+            return sum + (isNaN(val) ? 0 : val);
+        }, 0);
+
+        const bsGuidesCount = effectiveGuides.filter(g => g.paymentBs && parseFloat(g.paymentBs) > 0).length;
+
+        // Flete is charged for all dispatched guides (effective + devolucion), excluded only if cancelado
+        const totalFlete = sortedGuides.filter(g => !this.isCancelado(g)).reduce((sum, g) => {
+            const val = parseFloat(g.shippingCost || 0);
+            return sum + (isNaN(val) ? 0 : val);
+        }, 0);
 
         tbody.innerHTML = sortedGuides.map(guide => {
             const statusClass = Utils.getStatusClass(guide.status);
             const cityClass = (guide.city || '').toLowerCase();
             const isDevol = this.isDevolucion(guide);
             const isCanc = this.isCancelado(guide);
+            const isExcluded = isDevol || isCanc;
 
-            // Determine payment info based on country/city filter
-            let paymentInfo;
-            if (isDevol || isCanc) {
+            const totalUsdVal = parseFloat(guide.totalAmount || guide.amountUsd || 0);
+            const bsVal = parseFloat(guide.paymentBs || 0);
+            const hasBs = !isNaN(bsVal) && bsVal > 0;
+
+            // Total ($) column
+            let totalUsdCol;
+            if (isExcluded) {
                 const label = isDevol ? 'Devuelto' : 'Cancelado';
-                const originalVal = parseFloat(guide.amountUsd || guide.totalAmount || 0);
-                paymentInfo = `<span style="text-decoration: line-through; opacity: 0.5; color: var(--text-muted); font-size: 0.85em;">$${originalVal.toFixed(2)}</span> <span style="font-size: 0.78em; color: #f97316; font-weight: 600;">($0 ${label})</span>`;
-            } else if (isEcuador || guide.city === 'Quito' || guide.city === 'Guayaquil') {
-                paymentInfo = `<span style="color: var(--success); font-weight: 600;">$${(parseFloat(guide.totalAmount) || 0).toFixed(2)}</span>`;
-            } else if (guide.amountUsd) {
-                paymentInfo = `<span style="color: var(--success); font-weight: 600;">$${parseFloat(guide.amountUsd).toFixed(2)}</span>`;
+                totalUsdCol = `
+                    <div style="text-decoration: line-through; opacity: 0.5; color: var(--text-muted); font-size: 0.85em;">${formatUsd(totalUsdVal)}</div>
+                    <div style="font-size: 0.72rem; color: #f97316; font-weight: 600;">$0.00 (${label})</div>
+                `;
             } else {
-                paymentInfo = `<span style="color: var(--success); font-weight: 600;">${Utils.formatCurrency(guide.totalAmount)}</span>`;
+                totalUsdCol = `<span style="color: var(--success); font-weight: 600;">${formatUsd(totalUsdVal)}</span>`;
             }
 
-            // Shipping cost in separate column
+            // Pago en Bolívares column
+            let pagoBsCol;
+            if (isExcluded) {
+                if (hasBs) {
+                    const label = isDevol ? 'Devuelto' : 'Cancelado';
+                    pagoBsCol = `
+                        <div style="text-decoration: line-through; opacity: 0.5; color: var(--text-muted); font-size: 0.85em;">${formatBs(bsVal)}</div>
+                        <div style="font-size: 0.72rem; color: #f97316; font-weight: 600;">0.00 Bs (${label})</div>
+                    `;
+                } else {
+                    pagoBsCol = `<span style="color: var(--text-muted);">-</span>`;
+                }
+            } else if (hasBs) {
+                pagoBsCol = `<span class="badge" style="background: rgba(167, 139, 250, 0.15); color: #a78bfa; font-weight: 600; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(167, 139, 250, 0.3); font-size: 0.85rem;">${formatBs(bsVal)}</span>`;
+            } else {
+                pagoBsCol = `<span style="color: var(--text-muted);">-</span>`;
+            }
+
+            // Shipping cost column
             let shippingCost = '-';
             if (guide.shippingCost && parseFloat(guide.shippingCost) > 0) {
-                if (isEcuador || guide.city === 'Quito' || guide.city === 'Guayaquil') {
-                    shippingCost = `<span style="color: var(--primary);">$${parseFloat(guide.shippingCost).toFixed(2)}</span>`;
-                } else {
-                    shippingCost = `<span style="color: var(--primary);">${Utils.formatCurrency(guide.shippingCost)}</span>`;
-                }
+                shippingCost = `<span style="color: var(--primary); font-weight: 500;">${formatUsd(parseFloat(guide.shippingCost))}</span>`;
             }
 
+            const rowStyle = isDevol ? 'background: rgba(249, 115, 22, 0.04);' : (isCanc ? 'opacity: 0.6;' : '');
+
             return `
-                <tr onclick="App.navigateTo('guides'); GuidesModule.viewGuide('${guide.id}')" style="cursor: pointer;" title="Ver detalles de la guía">
+                <tr onclick="App.navigateTo('guides'); GuidesModule.viewGuide('${guide.id}')" style="cursor: pointer; ${rowStyle}" title="Ver detalles de la guía">
                     <td><strong style="color: var(--primary);">${guide.guideNumber}</strong></td>
                     <td>${Utils.formatDate(guide.createdAt)}</td>
                     <td>${Utils.escapeHtml(guide.clientName || 'N/A')}</td>
-                    <td><span class="city-badge ${cityClass}">${guide.city}</span></td>
-                    <td>${paymentInfo}</td>
+                    <td><span class="city-badge ${cityClass}">${guide.city || 'N/A'}</span></td>
+                    <td>${totalUsdCol}</td>
+                    <td>${pagoBsCol}</td>
                     <td>${shippingCost}</td>
                     <td><span class="status-badge ${statusClass}">${guide.status}</span></td>
                 </tr>
             `;
         }).join('');
+
+        // Update table footer totals
+        if (tfoot) {
+            tfoot.innerHTML = `
+                <tr style="border-top: 2px solid var(--border-color, rgba(255,255,255,0.1)); font-weight: 700; background: var(--surface-hover, rgba(255,255,255,0.06));">
+                    <td colspan="4" style="padding: 0.85rem 0.6rem;">
+                        <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                            TOTALES (${effectiveGuides.length} cobradas / ${guides.length} guías)
+                        </div>
+                        ${devolucionGuides.length > 0 ? `<div style="font-size: 0.72rem; color: #f97316; font-weight: normal; margin-top: 3px;">⚠️ ${devolucionGuides.length} pedido(s) en Devolución no suman a los cobros</div>` : ''}
+                    </td>
+                    <td style="padding: 0.85rem 0.6rem; color: var(--success); font-size: 1rem; font-weight: 700;">
+                        ${formatUsd(totalDollars)}
+                    </td>
+                    <td style="padding: 0.85rem 0.6rem; color: #a78bfa; font-size: 1rem; font-weight: 700;">
+                        ${totalBs > 0 ? formatBs(totalBs) : '-'}
+                    </td>
+                    <td style="padding: 0.85rem 0.6rem; color: var(--primary); font-size: 1rem; font-weight: 700;">
+                        ${formatUsd(totalFlete)}
+                    </td>
+                    <td></td>
+                </tr>
+            `;
+        }
+
+        // Update summary cards container below table
+        if (summaryCards) {
+            summaryCards.innerHTML = `
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Guías</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">${guides.length} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(${effectiveGuides.length} efectivas)</span></div>
+                    ${devolucionGuides.length > 0 ? `<div style="font-size: 0.7rem; color: #f97316; margin-top: 2px;">${devolucionGuides.length} en devolución</div>` : ''}
+                </div>
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Dólares ($)</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--success, #10b981);">${formatUsd(totalDollars)}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Bolívares (Bs)</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: #a78bfa;">${formatBs(totalBs)}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">${bsGuidesCount} pedido(s) pagados en Bs</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Fletes ($)</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary, #6366f1);">${formatUsd(totalFlete)}</div>
+                </div>
+            `;
+        }
     }
 };
 
