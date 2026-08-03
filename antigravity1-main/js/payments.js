@@ -71,7 +71,7 @@ const PaymentsModule = {
             .select(`
                 *,
                 payment_guides (
-                    guides ( id, guide_number, total_amount, payment_bs, amount_usd, observations, city_id, created_at, clients ( full_name ), cities ( name ) )
+                    guides ( id, guide_number, total_amount, shipping_cost, payment_bs, amount_usd, observations, status_id, guide_statuses ( name ), city_id, created_at, clients ( full_name ), cities ( name ) )
                 )
             `)
             .order('created_at', { ascending: false });
@@ -330,23 +330,36 @@ const PaymentsModule = {
 
         let guides = payment.payment_guides?.map(pg => pg.guides).filter(Boolean) || [];
 
+        // Helper to check if a guide is in return or cancelled status
+        const isReturnOrCancel = (g) => {
+            const st = (g.status || g.status_name || g.guide_statuses?.name || '').toLowerCase().trim();
+            return st.includes('devol') || st.includes('cancel');
+        };
+
         try {
             if (window.Database && typeof window.Database.getGuides === 'function') {
                 const allDbGuides = await window.Database.getGuides();
                 if (allDbGuides && allDbGuides.length > 0) {
                     guides = guides.map(g => {
                         const full = allDbGuides.find(dbG => dbG.id === g.id || dbG.guideNumber === g.guide_number);
+                        const statusName = full?.status || g.guide_statuses?.name || g.status_name || g.status || '';
                         if (full) {
                             return {
                                 ...g,
+                                status: statusName,
+                                statusColor: full.statusColor,
                                 payment_bs: (g.payment_bs !== undefined && g.payment_bs !== null && g.payment_bs !== '') ? g.payment_bs : full.paymentBs,
                                 amount_usd: (g.amount_usd !== undefined && g.amount_usd !== null) ? g.amount_usd : full.amountUsd,
                                 total_amount: g.total_amount ?? full.totalAmount,
+                                shipping_cost: g.shipping_cost ?? full.shippingCost,
                                 clients: g.clients || { full_name: full.clientName },
                                 observations: g.observations ?? full.observations
                             };
                         }
-                        return g;
+                        return {
+                            ...g,
+                            status: statusName
+                        };
                     });
                 }
             }
@@ -354,11 +367,17 @@ const PaymentsModule = {
             console.warn('Error enriching payment guides:', e);
         }
 
-        const totalDollars = guides.reduce((sum, g) => sum + (parseFloat(g.total_amount || g.amount_usd || 0) || 0), 0);
-        const totalBs = guides.reduce((sum, g) => {
+        // Separate effective guides (paid) from return/cancelled guides
+        const effectiveGuides = guides.filter(g => !isReturnOrCancel(g));
+        const devolucionGuides = guides.filter(g => isReturnOrCancel(g));
+
+        // Totals only sum effective guides (returns do NOT sum payments)
+        const totalDollars = effectiveGuides.reduce((sum, g) => sum + (parseFloat(g.total_amount || g.amount_usd || 0) || 0), 0);
+        const totalBs = effectiveGuides.reduce((sum, g) => {
             const val = parseFloat(g.payment_bs || g.paymentBs || 0);
             return sum + (isNaN(val) ? 0 : val);
         }, 0);
+        const totalFlete = guides.reduce((sum, g) => sum + (parseFloat(g.shipping_cost || g.shippingCost || 0) || 0), 0);
 
         const formatBs = (num) => {
             return num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Bs';
@@ -381,9 +400,35 @@ const PaymentsModule = {
                     </thead>
                     <tbody>
                         ${guides.map(g => {
+                            const isDevol = isReturnOrCancel(g);
                             const bsVal = parseFloat(g.payment_bs || g.paymentBs || 0);
                             const hasBs = !isNaN(bsVal) && bsVal > 0;
                             const totalUsd = parseFloat(g.total_amount || g.amount_usd || 0);
+
+                            if (isDevol) {
+                                return `
+                                <tr style="background: rgba(249, 115, 22, 0.06);">
+                                    <td style="padding: 0.75rem 0.6rem;"><strong>${g.guide_number}</strong></td>
+                                    <td style="padding: 0.75rem 0.6rem;">
+                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                            <span>${Utils.escapeHtml(g.clients?.full_name || 'N/A')}</span>
+                                            <span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #f97316; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(249, 115, 22, 0.3);">Devolución</span>
+                                        </div>
+                                    </td>
+                                    <td style="padding: 0.75rem 0.6rem; text-align: right;">
+                                        <div style="text-decoration: line-through; opacity: 0.5; color: var(--text-muted); font-size: 0.85rem;">${formatUsd(totalUsd)}</div>
+                                        <div style="font-size: 0.72rem; color: #f97316; font-weight: 600;">$0.00 (No suma)</div>
+                                    </td>
+                                    <td style="padding: 0.75rem 0.6rem; text-align: right;">
+                                        ${hasBs 
+                                            ? `<div style="text-decoration: line-through; opacity: 0.5; color: var(--text-muted); font-size: 0.85rem;">${formatBs(bsVal)}</div><div style="font-size: 0.72rem; color: #f97316; font-weight: 600;">0.00 Bs (No suma)</div>`
+                                            : `<span style="color: var(--text-muted);">-</span>`
+                                        }
+                                    </td>
+                                </tr>
+                                `;
+                            }
+
                             return `
                             <tr>
                                 <td style="padding: 0.75rem 0.6rem;"><strong>${g.guide_number}</strong></td>
@@ -401,18 +446,22 @@ const PaymentsModule = {
                     </tbody>
                     <tfoot>
                         <tr style="border-top: 2px solid var(--border); font-weight: 700; background: var(--surface-hover, rgba(255,255,255,0.06));">
-                            <td colspan="2" style="padding: 0.85rem 0.6rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px;">TOTALES (${guides.length} guías)</td>
-                            <td style="padding: 0.85rem 0.6rem; text-align: right; color: var(--success); font-size: 0.95rem;">${formatUsd(totalDollars)}</td>
-                            <td style="padding: 0.85rem 0.6rem; text-align: right; color: #a78bfa; font-size: 0.95rem;">${totalBs > 0 ? formatBs(totalBs) : '-'}</td>
+                            <td colspan="2" style="padding: 0.85rem 0.6rem;">
+                                <div style="text-transform: uppercase; font-size: 0.82rem; letter-spacing: 0.5px;">TOTALES (${effectiveGuides.length} cobradas / ${guides.length} guías)</div>
+                                ${devolucionGuides.length > 0 ? `<div style="font-size: 0.72rem; color: #f97316; font-weight: normal; margin-top: 3px;">⚠️ ${devolucionGuides.length} pedido(s) en Devolución no suman a los cobros</div>` : ''}
+                            </td>
+                            <td style="padding: 0.85rem 0.6rem; text-align: right; color: var(--success); font-size: 1rem;">${formatUsd(totalDollars)}</td>
+                            <td style="padding: 0.85rem 0.6rem; text-align: right; color: #a78bfa; font-size: 1rem;">${totalBs > 0 ? formatBs(totalBs) : '-'}</td>
                         </tr>
                     </tfoot>
                 </table>
             </div>
 
-            <div style="margin-top: 1.25rem; padding: 1rem 1.25rem; background: var(--surface-hover, rgba(255,255,255,0.03)); border-radius: var(--radius-md); border: 1px solid var(--border); display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">
+            <div style="margin-top: 1.25rem; padding: 1rem 1.25rem; background: var(--surface-hover, rgba(255,255,255,0.03)); border-radius: var(--radius-md); border: 1px solid var(--border); display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
                 <div>
                     <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Guías</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">${guides.length}</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">${guides.length} <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">(${effectiveGuides.length} cobradas)</span></div>
+                    ${devolucionGuides.length > 0 ? `<div style="font-size: 0.7rem; color: #f97316; margin-top: 2px;">${devolucionGuides.length} en devolución</div>` : ''}
                 </div>
                 <div>
                     <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Dólares ($)</div>
@@ -421,6 +470,10 @@ const PaymentsModule = {
                 <div>
                     <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Bolívares (Bs)</div>
                     <div style="font-size: 1.25rem; font-weight: 700; color: #a78bfa;">${formatBs(totalBs)}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Flete ($)</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--info, #38bdf8);">${formatUsd(totalFlete)}</div>
                 </div>
             </div>
         `;
