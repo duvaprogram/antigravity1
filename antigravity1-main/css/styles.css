@@ -3747,3 +3747,45 @@ form {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
+
+.global-sync-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 6px 14px;
+    border-radius: var(--radius-md);
+    background: rgba(99, 102, 241, 0.12);
+    color: #818cf8;
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.global-sync-btn:hover {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+    box-shadow: 0 0 14px rgba(99, 102, 241, 0.4);
+    transform: translateY(-1px);
+}
+
+.global-sync-btn-sidebar {
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    font-weight: 600;
+    font-size: 0.82rem;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.global-sync-btn-sidebar:hover {
+    background: #10b981;
+    color: #ffffff;
+    border-color: #10b981;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.4);
+    transform: translateY(-1px);
+}

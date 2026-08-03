@@ -56,7 +56,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.10</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.11</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -245,6 +245,12 @@
                         </div>
                     </div>
                 </div>
+                <button class="btn btn-sm global-sync-btn-sidebar btn-full" onclick="App.syncAllOnline()" style="margin-bottom: 0.5rem; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0.55rem;" title="Sincronizar toda la información online con Supabase">
+                    <svg class="sync-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                    </svg>
+                    Sincronizar Online
+                </button>
                 <button class="btn btn-secondary btn-full" onclick="AuthModule.logout()" style="margin-bottom: 0.5rem;">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -279,6 +285,12 @@
                 </button>
                 <h1 id="pageTitle">Dashboard</h1>
                 <div class="header-actions">
+                    <button class="btn btn-sm global-sync-btn" id="globalSyncBtn" onclick="App.syncAllOnline()" title="Sincronizar toda la aplicación online con Supabase en tiempo real">
+                        <svg class="sync-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                        </svg>
+                        <span>Sincronizar Online</span>
+                    </button>
                     <button class="btn btn-icon theme-toggle" id="themeToggle" title="Cambiar tema">
                         <!-- Sun Icon (for dark mode) -->
                         <svg class="icon-sun" width="20" height="20" viewBox="0 0 24 24" fill="none"

@@ -420,6 +420,58 @@ const App = {
             month: 'short'
         });
         document.getElementById('currentTime').textContent = `${dateString} · ${timeString}`;
+    },
+
+    async syncAllOnline(options = { showToast: true }) {
+        const syncBtns = document.querySelectorAll('.global-sync-btn .sync-icon, .global-sync-btn-sidebar .sync-icon');
+        syncBtns.forEach(icon => icon.classList.add('spin-icon'));
+        
+        try {
+            console.log('🔄 Sincronizando toda la aplicación online con Supabase...');
+            
+            // 1. Re-init database cache (cities, statuses, categories, pages)
+            if (window.Database && typeof Database.init === 'function') {
+                await Database.init();
+            }
+
+            // 2. Sync Journal and Goals from Supabase
+            if (window.JournalModule) {
+                if (typeof JournalModule.downloadCloudToLocal === 'function') {
+                    await JournalModule.downloadCloudToLocal(false);
+                } else if (typeof JournalModule.loadData === 'function') {
+                    await JournalModule.loadData();
+                }
+            }
+
+            // 3. Sync Income Statement & Finance if available
+            if (window.IncomeStatementModule && typeof IncomeStatementModule.loadData === 'function') {
+                await IncomeStatementModule.loadData();
+            }
+            if (window.FinanceModule && typeof FinanceModule.loadData === 'function') {
+                await FinanceModule.loadData();
+            }
+
+            // 4. Update Dashboard stats
+            await this.updateDashboard();
+
+            // 5. Re-render active section
+            await this.renderSection(this.currentSection);
+
+            if (options.showToast) {
+                Utils.showToast('✅ ¡Toda la información ha sido sincronizada online con Supabase!', 'success');
+            }
+            return true;
+        } catch (error) {
+            console.error('❌ Error en sincronización global:', error);
+            if (options.showToast) {
+                Utils.showToast('Error sincronizando con la nube: ' + (error.message || error), 'error');
+            }
+            return false;
+        } finally {
+            setTimeout(() => {
+                syncBtns.forEach(icon => icon.classList.remove('spin-icon'));
+            }, 600);
+        }
     }
 };
 
