@@ -178,7 +178,7 @@ const IncomeStatementModule = {
 
     async loadAllData() {
         try {
-            // Load guides with items
+            // Load guides with items (all dispatched guides for accurate freight & sales attribution)
             const { data: guides, error: guidesError } = await supabaseClient
                 .from('guides')
                 .select(`
@@ -186,8 +186,7 @@ const IncomeStatementModule = {
                     cities!guides_city_id_fkey(name, country),
                     guide_statuses!guides_status_id_fkey(name),
                     guide_items(*, products!guide_items_product_id_fkey(name, cost, price, sku))
-                `)
-                .in('status_id', await this.getDeliveredStatusIds());
+                `);
 
             if (guidesError) throw guidesError;
             this.guides = guides || [];
@@ -207,7 +206,6 @@ const IncomeStatementModule = {
                 .select('*')
                 .order('expense_date', { ascending: false });
 
-            if (opError) throw opError;
             if (opError) throw opError;
             this.operationalExpenses = opExpenses || [];
 
@@ -250,6 +248,24 @@ const IncomeStatementModule = {
         } catch (error) {
             console.error('Error loading data:', error);
         }
+    },
+
+    isDevolucion(g) {
+        if (!g) return false;
+        const st = (g.status || g.status_name || g.guide_statuses?.name || '').toLowerCase().trim();
+        const obs = (g.observations || '').toLowerCase();
+        return st.includes('devol') || st.includes('devuelt') || obs.includes('devolución') || obs.includes('devolucion') || obs.includes('devuelto');
+    },
+
+    isCancelado(g) {
+        if (!g) return false;
+        const st = (g.status || g.status_name || g.guide_statuses?.name || '').toLowerCase().trim();
+        const obs = (g.observations || '').toLowerCase();
+        return st.includes('cancel') || st.includes('anulad') || obs.includes('cancelad') || obs.includes('anulad');
+    },
+
+    isExcludedFromSales(g) {
+        return this.isDevolucion(g) || this.isCancelado(g);
     },
 
     async getDeliveredStatusIds() {
@@ -305,6 +321,8 @@ const IncomeStatementModule = {
         const byCountry = {};
 
         sales.forEach(guide => {
+            if (this.isCancelado(guide)) return;
+
             const country = this.getCountryFromCity(guide.cities);
             if (!byCountry[country]) {
                 byCountry[country] = {
@@ -317,18 +335,25 @@ const IncomeStatementModule = {
                 };
             }
 
-            byCountry[country].totalRevenue += parseFloat(guide.total_amount || 0);
-            byCountry[country].totalShipping += parseFloat(guide.shipping_cost || 0);
-            byCountry[country].orderCount++;
+            const isExcluded = this.isExcludedFromSales(guide);
 
-            if (guide.guide_items) {
-                guide.guide_items.forEach(item => {
-                    const qty = parseInt(item.quantity || 0);
-                    const rawCost = parseFloat(item.products?.cost || 0);
-                    const cost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
-                    byCountry[country].totalCost += qty * cost;
-                    byCountry[country].unitsSold += qty;
-                });
+            // Flete se genera siempre que el pedido fue despachado (incluyendo Devolución)
+            byCountry[country].totalShipping += parseFloat(guide.shipping_cost || 0);
+
+            if (!isExcluded) {
+                // Solo pedidos entregados/efectivos suman ventas y costo de producto
+                byCountry[country].totalRevenue += parseFloat(guide.amount_usd || guide.total_amount || 0);
+                byCountry[country].orderCount++;
+
+                if (guide.guide_items) {
+                    guide.guide_items.forEach(item => {
+                        const qty = parseInt(item.quantity || 0);
+                        const rawCost = parseFloat(item.products?.cost || 0);
+                        const cost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
+                        byCountry[country].totalCost += qty * cost;
+                        byCountry[country].unitsSold += qty;
+                    });
+                }
             }
         });
 
@@ -626,14 +651,19 @@ const IncomeStatementModule = {
 
         const dropiOrdersCount = {};
         sales.forEach(guide => {
+            if (this.isCancelado(guide)) return;
             const country = this.getCountryFromCity(guide.cities);
             dropiOrdersCount[country] = (dropiOrdersCount[country] || 0) + 1;
         });
 
         // 1. Process Dropi Orders (Individually)
         sales.forEach(guide => {
+            if (this.isCancelado(guide)) return;
+
             const country = this.getCountryFromCity(guide.cities);
             const id = `Dropi_${guide.id}`;
+            const isExcluded = this.isExcludedFromSales(guide);
+            const isDevol = this.isDevolucion(guide);
             
             let productNames = [];
             if (guide.guide_items && guide.guide_items.length > 0) {
@@ -644,7 +674,7 @@ const IncomeStatementModule = {
             // Eliminar duplicados si el pedido tiene múltiples del mismo producto
             productNames = [...new Set(productNames)];
             
-            const name = `${productNames.join(', ')} (${country})`;
+            const name = `${productNames.join(', ')} (${country})${isDevol ? ' [Devolución]' : ''}`;
             const count = dropiOrdersCount[country] || 1;
             const freightProportion = (freightsByCountry[country]?.totalFreight || 0) / count;
             
@@ -661,7 +691,7 @@ const IncomeStatementModule = {
 
             let totalCost = 0;
             let unitsSold = 0;
-            if (guide.guide_items) {
+            if (!isExcluded && guide.guide_items) {
                 guide.guide_items.forEach(item => {
                     const qty = parseInt(item.quantity || 0);
                     const rawCost = parseFloat(item.products?.cost || 0);
@@ -677,10 +707,10 @@ const IncomeStatementModule = {
                 isDropi: true,
                 country: country,
                 orderCount: 1,
-                totalDelivered: 1,
-                totalReturned: 0,
+                totalDelivered: isExcluded ? 0 : 1,
+                totalReturned: isDevol ? 1 : 0,
                 unitsSold: unitsSold,
-                totalRevenue: parseFloat(guide.total_amount || 0),
+                totalRevenue: isExcluded ? 0 : parseFloat(guide.amount_usd || guide.total_amount || 0),
                 totalCost: totalCost,
                 totalShipping: parseFloat(guide.shipping_cost || 0),
                 returnShipping: 0,
@@ -2305,33 +2335,42 @@ const IncomeStatementModule = {
         // 1. Process Guides (Orders)
         const filteredGuides = this.guides || [];
         filteredGuides.forEach(g => {
-            if (g.status === 'CANCELLED' || g.status === 'ANULADO') return;
+            if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
             if (this.filters.country && g.country !== this.filters.country) return;
             const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
             if (this.filters.dateTo && gDate > this.filters.dateTo) return;
 
-            const items = g.products || g.items || [];
+            const isExcluded = this.isExcludedFromSales(g);
+            const items = g.guide_items || g.products || g.items || [];
             const shippingPerItem = items.length > 0 ? (parseFloat(g.shipping_cost || 0) / items.length) : 0;
-            const totalRev = parseFloat(g.total_amount || g.revenue || 0);
-            const totalItemsCost = items.reduce((s, item) => s + (ProductsModule.getRealCost(item) * (item.quantity || 1)), 0);
+            const totalRev = isExcluded ? 0 : parseFloat(g.amount_usd || g.total_amount || g.revenue || 0);
+            const totalItemsCost = items.reduce((s, item) => {
+                const prod = item.products || item;
+                const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
+                return s + (unitCost * (item.quantity || 1));
+            }, 0);
 
             items.forEach(item => {
-                const rawName = item.name || 'Producto Desconocido';
+                const prod = item.products || item;
+                const rawName = prod.name || item.name || 'Producto Desconocido';
                 const name = this.productMappings[rawName] || rawName;
                 const qty = parseInt(item.quantity || 1);
-                const realCost = ProductsModule.getRealCost(item) * qty;
-                const revProp = totalItemsCost > 0 ? (realCost / totalItemsCost) * totalRev : (totalRev / items.length);
+                const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
+                const realCost = isExcluded ? 0 : (unitCost * qty);
+                const revProp = isExcluded ? 0 : (totalItemsCost > 0 ? (realCost / totalItemsCost) * totalRev : (totalRev / items.length));
 
                 if (!productMap[name]) {
                     productMap[name] = {
                         name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0
                     };
                 }
-                productMap[name].orders += 1;
-                productMap[name].units += qty;
-                productMap[name].revenue += revProp;
-                productMap[name].cost += realCost;
+                if (!isExcluded) {
+                    productMap[name].orders += 1;
+                    productMap[name].units += qty;
+                    productMap[name].revenue += revProp;
+                    productMap[name].cost += realCost;
+                }
                 productMap[name].shipping += shippingPerItem;
             });
         });
@@ -4107,18 +4146,26 @@ const IncomeStatementModule = {
         if (!tableBody || !tableHead) return;
 
         // Calculate summary
-        let totalRevenue = 0, totalCost = 0, totalShipping = 0, totalUnits = 0;
+        let totalRevenue = 0, totalCost = 0, totalShipping = 0, totalUnits = 0, effectiveOrders = 0, returnedOrders = 0;
         sales.forEach(g => {
-            totalRevenue += parseFloat(g.total_amount || 0);
+            if (this.isCancelado(g)) return;
+            const isExcluded = this.isExcludedFromSales(g);
             totalShipping += parseFloat(g.shipping_cost || 0);
-            if (g.guide_items) {
-                g.guide_items.forEach(item => {
-                    const qty = parseInt(item.quantity || 0);
-                    const rawCost = parseFloat(item.products?.cost || 0);
-                    const cost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
-                    totalCost += qty * cost;
-                    totalUnits += qty;
-                });
+
+            if (!isExcluded) {
+                effectiveOrders++;
+                totalRevenue += parseFloat(g.amount_usd || g.total_amount || 0);
+                if (g.guide_items) {
+                    g.guide_items.forEach(item => {
+                        const qty = parseInt(item.quantity || 0);
+                        const rawCost = parseFloat(item.products?.cost || 0);
+                        const cost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
+                        totalCost += qty * cost;
+                        totalUnits += qty;
+                    });
+                }
+            } else {
+                returnedOrders++;
             }
         });
 
@@ -4131,11 +4178,11 @@ const IncomeStatementModule = {
             summaryEl.innerHTML = `
                 <div class="orders-detail-summary-grid">
                     <div class="orders-summary-item">
-                        <span class="orders-summary-label">Pedidos</span>
-                        <span class="orders-summary-value">${sales.length}</span>
+                        <span class="orders-summary-label">Pedidos Entregados</span>
+                        <span class="orders-summary-value">${effectiveOrders}${returnedOrders > 0 ? ` <small style="font-size:0.75rem; color: #f97316; font-weight: 500;">(+${returnedOrders} dev)</small>` : ''}</span>
                     </div>
                     <div class="orders-summary-item">
-                        <span class="orders-summary-label">Unidades</span>
+                        <span class="orders-summary-label">Unidades Vendidas</span>
                         <span class="orders-summary-value">${totalUnits}</span>
                     </div>
                     <div class="orders-summary-item">
@@ -4147,7 +4194,7 @@ const IncomeStatementModule = {
                         <span class="orders-summary-value" style="color: var(--danger);">${this.formatCurrency(totalCost)}</span>
                     </div>
                     <div class="orders-summary-item">
-                        <span class="orders-summary-label">Envíos</span>
+                        <span class="orders-summary-label">Envíos (Total)</span>
                         <span class="orders-summary-value" style="color: var(--danger);">${this.formatCurrency(totalShipping)}</span>
                     </div>
                     <div class="orders-summary-item">
@@ -4189,8 +4236,10 @@ const IncomeStatementModule = {
             `;
             tableBody.innerHTML = sales.map((guide, idx) => {
                 const city = guide.cities?.name || '-';
-                const status = guide.guide_statuses?.name || '-';
-                const revenue = parseFloat(guide.total_amount || 0);
+                const status = guide.guide_statuses?.name || guide.status || '-';
+                const isExcluded = this.isExcludedFromSales(guide);
+                const isDevol = this.isDevolucion(guide);
+                const revenue = isExcluded ? 0 : parseFloat(guide.amount_usd || guide.total_amount || 0);
                 const shipping = parseFloat(guide.shipping_cost || 0);
                 let cost = 0, units = 0;
                 const products = [];
@@ -4199,8 +4248,10 @@ const IncomeStatementModule = {
                         const qty = parseInt(item.quantity || 0);
                         const rawCost = parseFloat(item.products?.cost || 0);
                         const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
-                        cost += qty * unitCost;
-                        units += qty;
+                        if (!isExcluded) {
+                            cost += qty * unitCost;
+                            units += qty;
+                        }
                         
                         const rawName = item.products?.name || 'Producto Desconocido';
                         const mappedName = this.productMappings[rawName] || rawName;
@@ -4209,24 +4260,35 @@ const IncomeStatementModule = {
                 }
                 const profit = revenue - cost - shipping;
                 const dateStr = guide.created_at ? this.formatDate(guide.created_at.split('T')[0]) : '-';
-                const statusClass = status === 'Pagado' ? 'color: var(--success);' : 'color: var(--primary);';
+                
+                let statusBadge = `<div style="font-size: 0.75rem; font-weight: 500;">${status}</div>`;
+                if (isDevol) {
+                    statusBadge = `<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #f97316; font-size: 0.72rem; font-weight: 600; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(249, 115, 22, 0.3);">Devolución (Sin cobro)</span>`;
+                } else if (status === 'Pagado') {
+                    statusBadge = `<div style="color: var(--success); font-size: 0.75rem; font-weight: 500;">${status}</div>`;
+                }
+
+                const rowBg = isDevol ? 'background: rgba(249, 115, 22, 0.05);' : '';
+                const revDisplay = isExcluded 
+                    ? `<span style="text-decoration: line-through; opacity: 0.6; font-size: 0.78rem;">${this.formatCurrency(guide.total_amount || 0)}</span> <div style="font-size: 0.72rem; color: #f97316; font-weight: 600;">$0.00</div>` 
+                    : `${this.formatCurrency(revenue)}`;
 
                 return `
-                    <tr>
+                    <tr style="${rowBg}">
                         <td style="font-weight: 600; color: var(--text-muted); font-size: 0.8rem;">${idx + 1}</td>
                         <td>
                             <div style="font-weight: 600; font-size: 0.85rem;">${guide.customer_name || guide.guide_number || '-'}</div>
                             <div style="font-size: 0.75rem; color: var(--text-muted);">${city}</div>
                         </td>
                         <td style="font-size: 0.8rem; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${products.join(', ')}">${products.join(', ') || '-'}</td>
-                        <td style="text-align: center;">${units}</td>
-                        <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(revenue)}</td>
+                        <td style="text-align: center;">${isExcluded ? `<span style="text-decoration: line-through; opacity: 0.6;">${guide.guide_items?.reduce((s,i)=>s+parseInt(i.quantity||0),0)||0}</span> <span style="font-size: 0.72rem; color: #f97316;">(0)</span>` : units}</td>
+                        <td style="text-align: right; font-weight: 600; color: var(--success);">${revDisplay}</td>
                         <td style="text-align: right; color: var(--danger);">${this.formatCurrency(cost)}</td>
                         <td style="text-align: right; color: var(--danger);">${this.formatCurrency(shipping)}</td>
                         <td style="text-align: right; font-weight: 600; color: ${profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(profit)}</td>
                         <td style="font-size: 0.8rem;">
                             <div>${dateStr}</div>
-                            <div style="${statusClass} font-size: 0.75rem; font-weight: 500;">${status}</div>
+                            ${statusBadge}
                         </td>
                     </tr>`;
             }).join('');
@@ -4248,7 +4310,9 @@ const IncomeStatementModule = {
 
             const groupedMap = {};
             sales.forEach(guide => {
-                const revenue = parseFloat(guide.total_amount || 0);
+                if (this.isCancelado(guide)) return;
+                const isExcluded = this.isExcludedFromSales(guide);
+                const revenue = isExcluded ? 0 : parseFloat(guide.amount_usd || guide.total_amount || 0);
                 const shipping = parseFloat(guide.shipping_cost || 0);
                 
                 let totalItemsCost = 0;
@@ -4263,21 +4327,23 @@ const IncomeStatementModule = {
                     const qty = parseInt(item.quantity || 0);
                     const rawCost = parseFloat(item.products?.cost || 0);
                     const cost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
-                    const realCost = qty * cost;
+                    const realCost = isExcluded ? 0 : (qty * cost);
                     
                     const rawName = item.products?.name || 'Producto Desconocido';
                     const mappedName = this.productMappings[rawName] || rawName;
 
                     const shippingProp = items.length > 0 ? (shipping / items.length) : 0;
-                    const revProp = totalItemsCost > 0 ? (realCost / totalItemsCost) * revenue : (revenue / items.length);
+                    const revProp = isExcluded ? 0 : (totalItemsCost > 0 ? (realCost / totalItemsCost) * revenue : (revenue / items.length));
 
                     if (!groupedMap[mappedName]) {
                         groupedMap[mappedName] = { name: mappedName, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0 };
                     }
-                    groupedMap[mappedName].orders += 1;
-                    groupedMap[mappedName].units += qty;
-                    groupedMap[mappedName].revenue += revProp;
-                    groupedMap[mappedName].cost += realCost;
+                    if (!isExcluded) {
+                        groupedMap[mappedName].orders += 1;
+                        groupedMap[mappedName].units += qty;
+                        groupedMap[mappedName].revenue += revProp;
+                        groupedMap[mappedName].cost += realCost;
+                    }
                     groupedMap[mappedName].shipping += shippingProp;
                 });
             });
@@ -4617,33 +4683,42 @@ const IncomeStatementModule = {
         let html = '';
         allOrders.forEach(o => {
             if (o.__source === 'Dropi') {
-                orderCount++;
-                const rev = parseFloat(o.total_amount || 0);
+                const isExcluded = this.isExcludedFromSales(o);
+                const isDevol = this.isDevolucion(o);
+                const rev = isExcluded ? 0 : parseFloat(o.amount_usd || o.total_amount || 0);
                 const ship = parseFloat(o.shipping_cost || 0);
                 const items = o.guide_items || [];
-                const cost = items.reduce((s, item) => {
+                const cost = isExcluded ? 0 : items.reduce((s, item) => {
                     const rawCost = parseFloat(item.products?.cost || 0);
                     const itemCost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
                     return s + (itemCost * (item.quantity || 1));
                 }, 0);
                 
-                totalRev += rev;
-                totalCost += cost;
+                if (!isExcluded) {
+                    orderCount++;
+                    totalRev += rev;
+                    totalCost += cost;
+                }
                 totalShip += ship;
                 
                 const date = o.created_at ? o.created_at.split('T')[0] : (o.date || '');
+                const statusBadge = isDevol 
+                    ? '<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #f97316;">Devolución</span>' 
+                    : `<span class="badge ${o.status === 'DELIVERED' || o.guide_statuses?.name === 'Pagado' ? 'bg-success' : 'bg-secondary'}">${o.guide_statuses?.name || o.status}</span>`;
+                const revText = isExcluded 
+                    ? `<span style="text-decoration: line-through; opacity: 0.6;">${this.formatCurrency(o.total_amount || 0)}</span> <span style="color: #f97316; font-size: 0.75rem;">$0.00</span>` 
+                    : this.formatCurrency(rev);
+
                 html += `
-                    <tr>
+                    <tr style="${isDevol ? 'background: rgba(249, 115, 22, 0.05);' : ''}">
                         <td style="font-size: 0.8rem; color: var(--text-muted);">${date}</td>
                         <td>
                             <div style="font-weight: 500;">${o.id || o.guide_number || 'N/A'}</div>
                             <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">Dropi</span>
                         </td>
                         <td>${o.client_name || o.customer_name || 'Desconocido'}</td>
-                        <td>
-                            <span class="badge ${o.status === 'DELIVERED' ? 'bg-success' : 'bg-secondary'}">${o.status}</span>
-                        </td>
-                        <td style="text-align: right; color: var(--success); font-weight: 600;">${this.formatCurrency(rev)}</td>
+                        <td>${statusBadge}</td>
+                        <td style="text-align: right; color: var(--success); font-weight: 600;">${revText}</td>
                         <td style="text-align: right;">${this.formatCurrency(cost)}</td>
                         <td style="text-align: right;">${this.formatCurrency(ship)}</td>
                     </tr>`;
@@ -4727,16 +4802,19 @@ const IncomeStatementModule = {
         // 1. From Dropi API Guides
         const filteredGuides = this.guides || [];
         filteredGuides.forEach(g => {
-            if (g.status === 'CANCELLED' || g.status === 'ANULADO') return;
+            if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
             if (this.filters.country && g.country !== this.filters.country) return;
             const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
             if (this.filters.dateTo && gDate > this.filters.dateTo) return;
             
-            const items = g.products || g.items || [];
+            const isExcluded = this.isExcludedFromSales(g);
+            const isDevol = this.isDevolucion(g);
+            const items = g.guide_items || g.products || g.items || [];
             let includedItems = [];
             items.forEach(item => {
-                const rawName = item.name || 'Producto Desconocido';
+                const prod = item.products || item;
+                const rawName = prod.name || item.name || 'Producto Desconocido';
                 const mappedName = this.productMappings[rawName] || rawName;
                 if (targetProductNames.includes(mappedName)) {
                     includedItems.push(item);
@@ -4745,26 +4823,35 @@ const IncomeStatementModule = {
             
             if (includedItems.length > 0) {
                 const shippingPerItem = items.length > 0 ? (parseFloat(g.shipping_cost || 0) / items.length) : 0;
-                const totalGuideRev = parseFloat(g.total_amount || g.revenue || 0);
-                const totalItemsCost = items.reduce((s, it) => s + (ProductsModule.getRealCost(it) * (it.quantity || 1)), 0);
+                const totalGuideRev = isExcluded ? 0 : parseFloat(g.amount_usd || g.total_amount || g.revenue || 0);
+                const totalItemsCost = items.reduce((s, it) => {
+                    const prod = it.products || it;
+                    const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
+                    return s + (unitCost * (it.quantity || 1));
+                }, 0);
                 
                 includedItems.forEach(item => {
+                    const prod = item.products || item;
+                    const rawName = prod.name || item.name || 'Producto Desconocido';
                     const qty = parseInt(item.quantity || 1);
-                    const realCost = ProductsModule.getRealCost(item) * qty;
-                    const revProp = totalItemsCost > 0 ? (realCost / totalItemsCost) * totalGuideRev : (totalGuideRev / items.length);
+                    const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
+                    const realCost = isExcluded ? 0 : (unitCost * qty);
+                    const revProp = isExcluded ? 0 : (totalItemsCost > 0 ? (realCost / totalItemsCost) * totalGuideRev : (totalGuideRev / items.length));
                     
-                    totalQty += qty;
-                    totalRev += revProp;
-                    totalCost += realCost;
+                    if (!isExcluded) {
+                        totalQty += qty;
+                        totalRev += revProp;
+                        totalCost += realCost;
+                    }
                     totalShip += shippingPerItem;
                     
                     matchingOrders.push({
                         date: gDate,
-                        origin: 'Guía Dropi',
+                        origin: isDevol ? 'Dropi (Devolución)' : 'Guía Dropi',
                         location: `${g.country || ''} - ${this.getCountryFromCity(g.cities) || g.cities || ''}`,
-                        status: g.status || '',
-                        originalName: item.name,
-                        qty: qty,
+                        status: g.guide_statuses?.name || g.status || '',
+                        originalName: rawName,
+                        qty: isExcluded ? 0 : qty,
                         revenue: revProp,
                         cost: realCost,
                         shipping: shippingPerItem
