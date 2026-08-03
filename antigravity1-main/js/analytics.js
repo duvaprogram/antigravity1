@@ -261,35 +261,60 @@ const AnalyticsModule = {
         return filtered;
     },
 
+    isDevolucion(g) {
+        const st = (g.status || g.status_name || '').toLowerCase().trim();
+        return st.includes('devol');
+    },
+
+    isCancelado(g) {
+        const st = (g.status || g.status_name || '').toLowerCase().trim();
+        return st.includes('cancel');
+    },
+
+    isExcludedFromSales(g) {
+        return this.isDevolucion(g) || this.isCancelado(g);
+    },
+
     updateSummaryStats() {
         const guides = this.filteredGuides;
 
         // Total guides
-        document.getElementById('analyticsTotal').textContent = guides.length;
+        const totalEl = document.getElementById('analyticsTotal');
+        if (totalEl) totalEl.textContent = guides.length;
 
         // Delivered
         const delivered = guides.filter(g => g.status === 'Entregado').length;
-        document.getElementById('analyticsDelivered').textContent = delivered;
+        const delEl = document.getElementById('analyticsDelivered');
+        if (delEl) delEl.textContent = delivered;
 
         // Paid
         const paid = guides.filter(g => g.status === 'Pagado').length;
-        document.getElementById('analyticsPaid').textContent = paid;
+        const paidEl = document.getElementById('analyticsPaid');
+        if (paidEl) paidEl.textContent = paid;
 
         // Cancelled
-        const cancelled = guides.filter(g => g.status === 'Cancelado').length;
-        document.getElementById('analyticsCancelled').textContent = cancelled;
+        const cancelled = guides.filter(g => this.isCancelado(g)).length;
+        const cancEl = document.getElementById('analyticsCancelled');
+        if (cancEl) cancEl.textContent = cancelled;
 
-        // Total USD (from Caracas guides with amountUsd)
+        // Devolución
+        const devoluciones = guides.filter(g => this.isDevolucion(g)).length;
+        const devolEl = document.getElementById('analyticsDevolucion');
+        if (devolEl) devolEl.textContent = devoluciones;
+
+        // Total USD (from Caracas guides with amountUsd - EXCLUDE Devolución and Cancelado)
         const totalUsd = guides
-            .filter(g => g.amountUsd && g.status !== 'Cancelado')
+            .filter(g => g.amountUsd && !this.isExcludedFromSales(g))
             .reduce((sum, g) => sum + (parseFloat(g.amountUsd) || 0), 0);
-        document.getElementById('analyticsTotalUsd').textContent = `$${totalUsd.toFixed(2)}`;
+        const usdEl = document.getElementById('analyticsTotalUsd');
+        if (usdEl) usdEl.textContent = `$${totalUsd.toFixed(2)}`;
 
-        // Total Bs
+        // Total Bs (EXCLUDE Devolución and Cancelado)
         const totalBs = guides
-            .filter(g => g.paymentBs && g.status !== 'Cancelado')
+            .filter(g => g.paymentBs && !this.isExcludedFromSales(g))
             .reduce((sum, g) => sum + (parseFloat(g.paymentBs) || 0), 0);
-        document.getElementById('analyticsTotalBs').textContent = `${totalBs.toFixed(2)} Bs`;
+        const bsEl = document.getElementById('analyticsTotalBs');
+        if (bsEl) bsEl.textContent = `${totalBs.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs`;
     },
 
     updateCityChart() {
@@ -301,13 +326,19 @@ const AnalyticsModule = {
 
         const maxCount = Math.max(quitoCount, guayaquilCount, caracasCount, 1);
 
-        document.getElementById('analyticsQuitoCount').textContent = quitoCount;
-        document.getElementById('analyticsGuayaquilCount').textContent = guayaquilCount;
-        document.getElementById('analyticsCaracasCount').textContent = caracasCount;
+        const qCountEl = document.getElementById('analyticsQuitoCount');
+        const gCountEl = document.getElementById('analyticsGuayaquilCount');
+        const cCountEl = document.getElementById('analyticsCaracasCount');
+        if (qCountEl) qCountEl.textContent = quitoCount;
+        if (gCountEl) gCountEl.textContent = guayaquilCount;
+        if (cCountEl) cCountEl.textContent = caracasCount;
 
-        document.getElementById('analyticsQuitoBar').style.width = `${(quitoCount / maxCount) * 100}%`;
-        document.getElementById('analyticsGuayaquilBar').style.width = `${(guayaquilCount / maxCount) * 100}%`;
-        document.getElementById('analyticsCaracasBar').style.width = `${(caracasCount / maxCount) * 100}%`;
+        const qBarEl = document.getElementById('analyticsQuitoBar');
+        const gBarEl = document.getElementById('analyticsGuayaquilBar');
+        const cBarEl = document.getElementById('analyticsCaracasBar');
+        if (qBarEl) qBarEl.style.width = `${(quitoCount / maxCount) * 100}%`;
+        if (gBarEl) gBarEl.style.width = `${(guayaquilCount / maxCount) * 100}%`;
+        if (cBarEl) cBarEl.style.width = `${(caracasCount / maxCount) * 100}%`;
     },
 
     updateStatusChart() {
@@ -318,22 +349,27 @@ const AnalyticsModule = {
             'En ruta': guides.filter(g => g.status === 'En ruta').length,
             'Entregado': guides.filter(g => g.status === 'Entregado').length,
             'Pagado': guides.filter(g => g.status === 'Pagado').length,
-            'Cancelado': guides.filter(g => g.status === 'Cancelado').length
+            'Novedad': guides.filter(g => g.status === 'Novedad').length,
+            'Cancelado': guides.filter(g => this.isCancelado(g)).length,
+            'Devolución': guides.filter(g => this.isDevolucion(g)).length
         };
 
         const maxCount = Math.max(...Object.values(statusCounts), 1);
 
-        document.getElementById('analyticsPendienteCount').textContent = statusCounts['Pendiente'];
-        document.getElementById('analyticsEnRutaCount').textContent = statusCounts['En ruta'];
-        document.getElementById('analyticsEntregadoCount').textContent = statusCounts['Entregado'];
-        document.getElementById('analyticsPagadoCount').textContent = statusCounts['Pagado'];
-        document.getElementById('analyticsCanceladoCount').textContent = statusCounts['Cancelado'];
+        const setBar = (id, barId, count) => {
+            const countEl = document.getElementById(id);
+            const barEl = document.getElementById(barId);
+            if (countEl) countEl.textContent = count;
+            if (barEl) barEl.style.width = `${(count / maxCount) * 100}%`;
+        };
 
-        document.getElementById('analyticsPendienteBar').style.width = `${(statusCounts['Pendiente'] / maxCount) * 100}%`;
-        document.getElementById('analyticsEnRutaBar').style.width = `${(statusCounts['En ruta'] / maxCount) * 100}%`;
-        document.getElementById('analyticsEntregadoBar').style.width = `${(statusCounts['Entregado'] / maxCount) * 100}%`;
-        document.getElementById('analyticsPagadoBar').style.width = `${(statusCounts['Pagado'] / maxCount) * 100}%`;
-        document.getElementById('analyticsCanceladoBar').style.width = `${(statusCounts['Cancelado'] / maxCount) * 100}%`;
+        setBar('analyticsPendienteCount', 'analyticsPendienteBar', statusCounts['Pendiente']);
+        setBar('analyticsEnRutaCount', 'analyticsEnRutaBar', statusCounts['En ruta']);
+        setBar('analyticsEntregadoCount', 'analyticsEntregadoBar', statusCounts['Entregado']);
+        setBar('analyticsPagadoCount', 'analyticsPagadoBar', statusCounts['Pagado']);
+        setBar('analyticsNovedadCount', 'analyticsNovedadBar', statusCounts['Novedad']);
+        setBar('analyticsCanceladoCount', 'analyticsCanceladoBar', statusCounts['Cancelado']);
+        setBar('analyticsDevolucionCount', 'analyticsDevolucionBar', statusCounts['Devolución']);
     },
 
     updateCurrencyStats() {
@@ -341,39 +377,41 @@ const AnalyticsModule = {
         const cityFilter = this.currentFilters.city;
         const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
 
-        // Guides with USD payment
-        const usdGuides = guides.filter(g => g.amountUsd && parseFloat(g.amountUsd) > 0 && g.status !== 'Cancelado');
+        // Guides with USD payment (only effective non-cancelled, non-devolucion)
+        const usdGuides = guides.filter(g => g.amountUsd && parseFloat(g.amountUsd) > 0 && !this.isExcludedFromSales(g));
         const usdCount = usdGuides.length;
         const usdAmount = usdGuides.reduce((sum, g) => sum + (parseFloat(g.amountUsd) || 0), 0);
 
-        document.getElementById('analyticsUsdCount').textContent = usdCount;
-        document.getElementById('analyticsUsdAmount').textContent = `$${usdAmount.toFixed(2)}`;
+        const usdCountEl = document.getElementById('analyticsUsdCount');
+        const usdAmountEl = document.getElementById('analyticsUsdAmount');
+        if (usdCountEl) usdCountEl.textContent = usdCount;
+        if (usdAmountEl) usdAmountEl.textContent = `$${usdAmount.toFixed(2)}`;
 
         // Show/hide currency sections based on country
         const bsCurrencyCard = document.getElementById('analyticsBsCurrencyCard');
         const usdCurrencyCard = document.getElementById('analyticsUsdCurrencyCard');
 
         if (isEcuador) {
-            // Ecuador only uses USD - hide Bs section
             if (bsCurrencyCard) bsCurrencyCard.style.display = 'none';
             if (usdCurrencyCard) usdCurrencyCard.style.display = 'block';
         } else {
-            // Show both for Venezuela (Caracas) or All
             if (bsCurrencyCard) bsCurrencyCard.style.display = 'block';
             if (usdCurrencyCard) usdCurrencyCard.style.display = 'block';
         }
 
-        // Guides with Bs payment
-        const bsGuides = guides.filter(g => g.paymentBs && parseFloat(g.paymentBs) > 0 && g.status !== 'Cancelado');
+        // Guides with Bs payment (only effective non-cancelled, non-devolucion)
+        const bsGuides = guides.filter(g => g.paymentBs && parseFloat(g.paymentBs) > 0 && !this.isExcludedFromSales(g));
         const bsCount = bsGuides.length;
         const bsAmount = bsGuides.reduce((sum, g) => sum + (parseFloat(g.paymentBs) || 0), 0);
 
-        document.getElementById('analyticsBsCount').textContent = bsCount;
-        document.getElementById('analyticsBsAmount').textContent = `${bsAmount.toFixed(2)} Bs`;
+        const bsCountEl = document.getElementById('analyticsBsCount');
+        const bsAmountEl = document.getElementById('analyticsBsAmount');
+        if (bsCountEl) bsCountEl.textContent = bsCount;
+        if (bsAmountEl) bsAmountEl.textContent = `${bsAmount.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs`;
     },
 
     async updateGuideValueStats() {
-        let guides = this.filteredGuides.filter(g => g.status !== 'Cancelado');
+        let guides = this.filteredGuides;
         const cityFilter = this.currentFilters.city;
         const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
         const productFilter = this.currentFilters.productId;
@@ -391,11 +429,15 @@ const AnalyticsModule = {
             guides = guidesWithProduct;
         }
 
-        // Calculate total value of guides (totalAmount)
-        const totalGuideValue = guides.reduce((sum, g) => sum + (parseFloat(g.totalAmount) || 0), 0);
+        // Realized/Effective sales guides (Devolución and Cancelado do NOT sum sales)
+        const effectiveSalesGuides = guides.filter(g => !this.isExcludedFromSales(g));
 
-        // Calculate total shipping costs (shippingCost)
-        const totalShippingValue = guides.reduce((sum, g) => sum + (parseFloat(g.shippingCost) || 0), 0);
+        // Calculate total value of guides (totalAmount) - Only effective sales
+        const totalGuideValue = effectiveSalesGuides.reduce((sum, g) => sum + (parseFloat(g.totalAmount) || 0), 0);
+
+        // Calculate total shipping costs (shippingCost) - Shipped guides generate shipping cost even if returned!
+        const shippingGuides = guides.filter(g => !this.isCancelado(g));
+        const totalShippingValue = shippingGuides.reduce((sum, g) => sum + (parseFloat(g.shippingCost) || 0), 0);
 
         // Update display elements
         const totalValueElement = document.getElementById('analyticsTotalGuideValue');
@@ -418,12 +460,8 @@ const AnalyticsModule = {
         }
 
         // Update summary stats currency display
-        const totalUsdElement = document.getElementById('analyticsTotalUsd');
-        const totalBsElement = document.getElementById('analyticsTotalBs');
         const totalBsCard = document.getElementById('analyticsTotalBsCard');
-
         if (isEcuador) {
-            // For Ecuador, hide Bs total
             if (totalBsCard) totalBsCard.style.display = 'none';
         } else {
             if (totalBsCard) totalBsCard.style.display = 'flex';
@@ -431,7 +469,7 @@ const AnalyticsModule = {
     },
 
     async updateCostStats() {
-        let guides = this.filteredGuides.filter(g => g.status !== 'Cancelado');
+        let guides = this.filteredGuides;
         const cityFilter = this.currentFilters.city;
         const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
         const productFilter = this.currentFilters.productId;
@@ -442,27 +480,30 @@ const AnalyticsModule = {
             productCostMap[p.id] = (parseFloat(p.cost) || 0) * this.COST_FACTOR;
         }
 
+        // Effective sales guides (Devolución and Cancelado do NOT sum sales revenue / sold product cost)
+        const effectiveSalesGuides = guides.filter(g => !this.isExcludedFromSales(g));
+
         // If product filter is active, filter guides that contain that product
+        let salesGuidesToProcess = effectiveSalesGuides;
         if (productFilter) {
             const guidesWithProduct = [];
-            for (const guide of guides) {
+            for (const guide of effectiveSalesGuides) {
                 const items = await Database.getGuideItems(guide.id);
                 const hasProduct = items.some(item => item.productId === productFilter);
                 if (hasProduct) {
                     guidesWithProduct.push(guide);
                 }
             }
-            guides = guidesWithProduct;
+            salesGuidesToProcess = guidesWithProduct;
         }
 
-        // Calculate total product cost from guide items
+        // Calculate total product cost & revenue from effective sales
         let totalProductCost = 0;
         let totalRevenue = 0;
 
-        for (const guide of guides) {
+        for (const guide of salesGuidesToProcess) {
             const items = await Database.getGuideItems(guide.id);
             for (const item of items) {
-                // If product filter is active, only count that product
                 if (productFilter && item.productId !== productFilter) {
                     continue;
                 }
@@ -472,8 +513,9 @@ const AnalyticsModule = {
             }
         }
 
-        // Total shipping
-        const totalShipping = guides.reduce((sum, g) => sum + (parseFloat(g.shippingCost) || 0), 0);
+        // Total shipping (includes all dispatched guides, including devoluciones)
+        const shippingGuides = guides.filter(g => !this.isCancelado(g));
+        const totalShipping = shippingGuides.reduce((sum, g) => sum + (parseFloat(g.shippingCost) || 0), 0);
 
         // Net profit = Revenue - Product Cost - Shipping
         const netProfit = totalRevenue - totalProductCost - totalShipping;
@@ -513,8 +555,8 @@ const AnalyticsModule = {
     },
 
     async updateTopProducts() {
-        // Filter out cancelled guides for product stats
-        const guides = this.filteredGuides.filter(g => g.status !== 'Cancelado');
+        // Exclude cancelled and returned guides for product sales ranking
+        const guides = this.filteredGuides.filter(g => !this.isExcludedFromSales(g));
         const productSales = {};
         const productFilter = this.currentFilters.productId;
 
@@ -538,7 +580,6 @@ const AnalyticsModule = {
         for (const guide of guides) {
             const items = await Database.getGuideItems(guide.id);
             for (const item of items) {
-                // If product filter is active, only count that product
                 if (productFilter && item.productId !== productFilter) {
                     continue;
                 }
@@ -628,7 +669,7 @@ const AnalyticsModule = {
         const tbody = document.getElementById('analyticsGuidesTable');
         const recordCount = document.getElementById('analyticsRecordCount');
 
-        recordCount.textContent = `${guides.length} registros`;
+        if (recordCount) recordCount.textContent = `${guides.length} registros`;
 
         if (guides.length === 0) {
             tbody.innerHTML = `
@@ -649,17 +690,22 @@ const AnalyticsModule = {
 
         tbody.innerHTML = sortedGuides.map(guide => {
             const statusClass = Utils.getStatusClass(guide.status);
-            const cityClass = guide.city.toLowerCase();
+            const cityClass = (guide.city || '').toLowerCase();
+            const isDevol = this.isDevolucion(guide);
+            const isCanc = this.isCancelado(guide);
 
             // Determine payment info based on country/city filter
             let paymentInfo;
-            if (isEcuador || guide.city === 'Quito' || guide.city === 'Guayaquil') {
-                // Ecuador uses dollars
-                paymentInfo = `<span style="color: var(--success);">$${(guide.totalAmount || 0).toFixed(2)}</span>`;
+            if (isDevol || isCanc) {
+                const label = isDevol ? 'Devuelto' : 'Cancelado';
+                const originalVal = parseFloat(guide.amountUsd || guide.totalAmount || 0);
+                paymentInfo = `<span style="text-decoration: line-through; opacity: 0.5; color: var(--text-muted); font-size: 0.85em;">$${originalVal.toFixed(2)}</span> <span style="font-size: 0.78em; color: #f97316; font-weight: 600;">($0 ${label})</span>`;
+            } else if (isEcuador || guide.city === 'Quito' || guide.city === 'Guayaquil') {
+                paymentInfo = `<span style="color: var(--success); font-weight: 600;">$${(parseFloat(guide.totalAmount) || 0).toFixed(2)}</span>`;
             } else if (guide.amountUsd) {
-                paymentInfo = `<span style="color: var(--success);">$${guide.amountUsd}</span>`;
+                paymentInfo = `<span style="color: var(--success); font-weight: 600;">$${parseFloat(guide.amountUsd).toFixed(2)}</span>`;
             } else {
-                paymentInfo = Utils.formatCurrency(guide.totalAmount);
+                paymentInfo = `<span style="color: var(--success); font-weight: 600;">${Utils.formatCurrency(guide.totalAmount)}</span>`;
             }
 
             // Shipping cost in separate column
@@ -676,7 +722,7 @@ const AnalyticsModule = {
                 <tr onclick="App.navigateTo('guides'); GuidesModule.viewGuide('${guide.id}')" style="cursor: pointer;" title="Ver detalles de la guía">
                     <td><strong style="color: var(--primary);">${guide.guideNumber}</strong></td>
                     <td>${Utils.formatDate(guide.createdAt)}</td>
-                    <td>${guide.clientName || 'N/A'}</td>
+                    <td>${Utils.escapeHtml(guide.clientName || 'N/A')}</td>
                     <td><span class="city-badge ${cityClass}">${guide.city}</span></td>
                     <td>${paymentInfo}</td>
                     <td>${shippingCost}</td>

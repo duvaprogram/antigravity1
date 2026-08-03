@@ -56,7 +56,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.18</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.19</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -913,6 +913,8 @@
                                     <option value="En ruta">En ruta</option>
                                     <option value="Entregado">Entregado</option>
                                     <option value="Pagado">Pagado</option>
+                                    <option value="Novedad">Novedad</option>
+                                    <option value="Devolución">Devolución</option>
                                     <option value="Cancelado">Cancelado</option>
                                 </select>
                             </div>
@@ -1006,6 +1008,19 @@
                         <div class="stat-info">
                             <span class="stat-value" id="analyticsCancelled">0</span>
                             <span class="stat-label">Canceladas</span>
+                        </div>
+                    </div>
+                    <div class="stat-card analytics-stat">
+                        <div class="stat-icon" style="background: rgba(249, 115, 22, 0.1); color: #f97316;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <polyline points="9 14 4 9 9 4"></polyline>
+                                <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="analyticsDevolucion">0</span>
+                            <span class="stat-label">Devoluciones</span>
                         </div>
                     </div>
                     <div class="stat-card analytics-stat">
@@ -1194,6 +1209,28 @@
                                     </div>
                                     <span class="status-count" style="width: 40px; text-align: right; font-weight: 600;"
                                         id="analyticsPagadoCount">0</span>
+                                </div>
+                                <div class="status-bar"
+                                    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                    <span style="width: 80px; font-size: 0.875rem; font-weight: 500;">Novedad</span>
+                                    <div class="bar-container" style="flex: 1;">
+                                        <div class="bar" id="analyticsNovedadBar"
+                                            style="width: 0%; background: linear-gradient(135deg, #ec4899, #db2777);">
+                                        </div>
+                                    </div>
+                                    <span class="status-count" style="width: 40px; text-align: right; font-weight: 600;"
+                                        id="analyticsNovedadCount">0</span>
+                                </div>
+                                <div class="status-bar"
+                                    style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+                                    <span style="width: 80px; font-size: 0.875rem; font-weight: 500;">Devolución</span>
+                                    <div class="bar-container" style="flex: 1;">
+                                        <div class="bar" id="analyticsDevolucionBar"
+                                            style="width: 0%; background: linear-gradient(135deg, #f97316, #ea580c);">
+                                        </div>
+                                    </div>
+                                    <span class="status-count" style="width: 40px; text-align: right; font-weight: 600;"
+                                        id="analyticsDevolucionCount">0</span>
                                 </div>
                                 <div class="status-bar" style="display: flex; align-items: center; gap: 1rem;">
                                     <span style="width: 80px; font-size: 0.875rem; font-weight: 500;">Cancelado</span>
