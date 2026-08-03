@@ -71,7 +71,7 @@ const PaymentsModule = {
             .select(`
                 *,
                 payment_guides (
-                    guides ( id, guide_number, total_amount, city_id, created_at, clients ( full_name ), cities ( name ) )
+                    guides ( id, guide_number, total_amount, payment_bs, amount_usd, observations, city_id, created_at, clients ( full_name ), cities ( name ) )
                 )
             `)
             .order('created_at', { ascending: false });
@@ -234,7 +234,7 @@ const PaymentsModule = {
                 guide_items ( products ( name ) )
             `)
             .order('created_at', { ascending: false })
-            .limit(500); // Last 500 should be plenty for recent associations
+            .limit(500);
 
         if (error) throw error;
         this.availableGuides = data || [];
@@ -252,6 +252,8 @@ const PaymentsModule = {
         tbody.innerHTML = guidesToRender.map(guide => {
             const isChecked = this.selectedGuideIds.has(guide.id) ? 'checked' : '';
             const date = new Date(guide.created_at).toLocaleDateString();
+            const bsVal = parseFloat(guide.payment_bs || guide.paymentBs || 0);
+            const hasBs = !isNaN(bsVal) && bsVal > 0;
             return `
                 <tr>
                     <td>
@@ -261,12 +263,13 @@ const PaymentsModule = {
                     <td>${date}</td>
                     <td><span class="city-badge ${guide.city_name?.toLowerCase()}">${guide.city_name}</span></td>
                     <td>${Utils.escapeHtml(guide.client_name || '')}</td>
-                    <td>$${parseFloat(guide.total_amount || 0).toFixed(2)}</td>
+                    <td>
+                        <div>$${parseFloat(guide.total_amount || 0).toFixed(2)}</div>
+                        ${hasBs ? `<small style="color: #a78bfa; font-weight: 600; display: block;">${bsVal.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs</small>` : ''}
+                    </td>
                 </tr>
             `;
         }).join('');
-
-        // Update check-all state logic if needed
     },
 
     toggleGuideSelection(checkbox) {
@@ -297,22 +300,163 @@ const PaymentsModule = {
                 const guideNo = (g.guide_number || '').toLowerCase();
                 const client = (g.client_name || '').toLowerCase();
                 const productsStr = (g.guide_items || []).map(i => i.products?.name || '').join(' ').toLowerCase();
-
                 if (!guideNo.includes(searchVal) && !client.includes(searchVal) && !productsStr.includes(searchVal)) {
                     matches = false;
                 }
             }
-            if (cityVal && g.city_name !== cityVal) matches = false;
-
-            if (dateStartVal || dateEndVal) {
-                const guideDate = new Date(g.created_at).toISOString().split('T')[0];
-                if (dateStartVal && guideDate < dateStartVal) matches = false;
-                if (dateEndVal && guideDate > dateEndVal) matches = false;
+            if (cityVal && g.city_name !== cityVal) {
+                matches = false;
+            }
+            if (dateStartVal) {
+                const guideDate = new Date(g.created_at);
+                const startDate = new Date(dateStartVal);
+                if (guideDate < startDate) matches = false;
+            }
+            if (dateEndVal) {
+                const guideDate = new Date(g.created_at);
+                const endDate = new Date(dateEndVal);
+                endDate.setHours(23, 59, 59, 999);
+                if (guideDate > endDate) matches = false;
             }
             return matches;
         });
 
         this.renderModalGuides(filtered);
+    },
+
+    async viewPayment(paymentId) {
+        const payment = this.payments.find(p => p.id === paymentId);
+        if (!payment) return;
+
+        let guides = payment.payment_guides?.map(pg => pg.guides).filter(Boolean) || [];
+
+        try {
+            if (window.Database && typeof window.Database.getGuides === 'function') {
+                const allDbGuides = await window.Database.getGuides();
+                if (allDbGuides && allDbGuides.length > 0) {
+                    guides = guides.map(g => {
+                        const full = allDbGuides.find(dbG => dbG.id === g.id || dbG.guideNumber === g.guide_number);
+                        if (full) {
+                            return {
+                                ...g,
+                                payment_bs: (g.payment_bs !== undefined && g.payment_bs !== null && g.payment_bs !== '') ? g.payment_bs : full.paymentBs,
+                                amount_usd: (g.amount_usd !== undefined && g.amount_usd !== null) ? g.amount_usd : full.amountUsd,
+                                total_amount: g.total_amount ?? full.totalAmount,
+                                clients: g.clients || { full_name: full.clientName },
+                                observations: g.observations ?? full.observations
+                            };
+                        }
+                        return g;
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('Error enriching payment guides:', e);
+        }
+
+        const totalDollars = guides.reduce((sum, g) => sum + (parseFloat(g.total_amount || g.amount_usd || 0) || 0), 0);
+        const totalBs = guides.reduce((sum, g) => {
+            const val = parseFloat(g.payment_bs || g.paymentBs || 0);
+            return sum + (isNaN(val) ? 0 : val);
+        }, 0);
+
+        const formatBs = (num) => {
+            return num.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Bs';
+        };
+
+        const formatUsd = (num) => {
+            return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        let guidesHtml = guides.length === 0 ? '<p class="text-muted" style="padding: 1rem 0;">No hay guías asociadas a este pago.</p>' : `
+            <div style="overflow-x: auto; margin-top: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                <table class="table" style="margin: 0; width: 100%; font-size: 0.9rem;">
+                    <thead>
+                        <tr style="background: var(--surface-hover, rgba(255,255,255,0.04));">
+                            <th style="padding: 0.75rem 0.6rem;">Nº Guía</th>
+                            <th style="padding: 0.75rem 0.6rem;">Cliente</th>
+                            <th style="padding: 0.75rem 0.6rem; text-align: right;">Total ($)</th>
+                            <th style="padding: 0.75rem 0.6rem; text-align: right;">Pago en Bolívares</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${guides.map(g => {
+                            const bsVal = parseFloat(g.payment_bs || g.paymentBs || 0);
+                            const hasBs = !isNaN(bsVal) && bsVal > 0;
+                            const totalUsd = parseFloat(g.total_amount || g.amount_usd || 0);
+                            return `
+                            <tr>
+                                <td style="padding: 0.75rem 0.6rem;"><strong>${g.guide_number}</strong></td>
+                                <td style="padding: 0.75rem 0.6rem;">${Utils.escapeHtml(g.clients?.full_name || 'N/A')}</td>
+                                <td style="padding: 0.75rem 0.6rem; text-align: right; font-weight: 600; color: var(--success);">${formatUsd(totalUsd)}</td>
+                                <td style="padding: 0.75rem 0.6rem; text-align: right;">
+                                    ${hasBs 
+                                        ? `<span class="badge" style="background: rgba(167, 139, 250, 0.15); color: #a78bfa; font-weight: 600; padding: 3px 8px; border-radius: 6px; border: 1px solid rgba(167, 139, 250, 0.3);">${formatBs(bsVal)}</span>`
+                                        : `<span style="color: var(--text-muted);">-</span>`
+                                    }
+                                </td>
+                            </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                    <tfoot>
+                        <tr style="border-top: 2px solid var(--border); font-weight: 700; background: var(--surface-hover, rgba(255,255,255,0.06));">
+                            <td colspan="2" style="padding: 0.85rem 0.6rem; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 0.5px;">TOTALES (${guides.length} guías)</td>
+                            <td style="padding: 0.85rem 0.6rem; text-align: right; color: var(--success); font-size: 0.95rem;">${formatUsd(totalDollars)}</td>
+                            <td style="padding: 0.85rem 0.6rem; text-align: right; color: #a78bfa; font-size: 0.95rem;">${totalBs > 0 ? formatBs(totalBs) : '-'}</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div style="margin-top: 1.25rem; padding: 1rem 1.25rem; background: var(--surface-hover, rgba(255,255,255,0.03)); border-radius: var(--radius-md); border: 1px solid var(--border); display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem;">
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Guías</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">${guides.length}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Dólares ($)</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--success, #10b981);">${formatUsd(totalDollars)}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Total Bolívares (Bs)</div>
+                    <div style="font-size: 1.25rem; font-weight: 700; color: #a78bfa;">${formatBs(totalBs)}</div>
+                </div>
+            </div>
+        `;
+
+        let modalEl = document.getElementById('dynamicDetailModal');
+        if (!modalEl) {
+            modalEl = document.createElement('div');
+            modalEl.className = 'modal';
+            modalEl.id = 'dynamicDetailModal';
+            document.body.appendChild(modalEl);
+        }
+
+        modalEl.innerHTML = `
+            <div class="modal-content" style="max-width: 700px;">
+                <div class="modal-header">
+                    <h2>Detalles de Pago: ${payment.code}</h2>
+                    <button class="modal-close" onclick="document.getElementById('dynamicDetailModal').classList.remove('active'); document.body.style.overflow='';">&times;</button>
+                </div>
+                <div class="card-body">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+                        <p style="margin: 0;"><strong>Origen:</strong> ${payment.origin || 'N/A'}</p>
+                        <p style="margin: 0;"><strong>Monto:</strong> ${(payment.currency === 'COP' ? 'COP $' : '$')}${parseFloat(payment.amount).toFixed(2)}</p>
+                        <p style="margin: 0;"><strong>Fecha:</strong> ${new Date(payment.created_at).toLocaleString()}</p>
+                    </div>
+                    <p style="margin-bottom: 1.25rem;"><strong>Notas:</strong> ${Utils.escapeHtml(payment.notes || 'Ninguna')}</p>
+                    
+                    <h3 style="margin-top: 1rem; font-size: 1.1rem; display: flex; align-items: center; justify-content: space-between;">
+                        <span>Guías Vinculadas (${guides.length})</span>
+                    </h3>
+                    ${guidesHtml}
+                </div>
+            </div>
+        `;
+
+        modalEl.classList.add('active');
+        document.body.style.overflow = 'hidden';
     },
 
     generatePaymentCode(origin) {
@@ -416,68 +560,6 @@ const PaymentsModule = {
         } finally {
             App.showLoading(false);
         }
-    },
-
-    async viewPayment(paymentId) {
-        // Find payment data
-        const payment = this.payments.find(p => p.id === paymentId);
-        if (!payment) return;
-
-        const guides = payment.payment_guides?.map(pg => pg.guides) || [];
-
-        let guidesHtml = guides.length === 0 ? '<p>No hay guías asociadas a este pago.</p>' : `
-            <table class="table" style="margin-top: 1rem;">
-                <thead>
-                    <tr><th>Nº Guía</th><th>Cliente</th><th>Total</th></tr>
-                </thead>
-                <tbody>
-                    ${guides.map(g => `
-                        <tr>
-                            <td><strong>${g.guide_number}</strong></td>
-                            <td>${Utils.escapeHtml(g.clients?.full_name || '')}</td>
-                            <td>$${parseFloat(g.total_amount || 0).toFixed(2)}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-
-        // Show in generic alert or custom modal mechanism that doesn't exist?
-        // It's better to reuse ConfirmationModule's detail modal idea or custom HTML.
-        // Let's show an alert or a little toast, wait, we can just inject into a generic modal if it existed.
-        // We can just create a simple detail modal dynamically or use a prompt.
-
-        // Better: create dynamic modal
-        let modalEl = document.getElementById('dynamicDetailModal');
-        if (!modalEl) {
-            modalEl = document.createElement('div');
-            modalEl.className = 'modal';
-            modalEl.id = 'dynamicDetailModal';
-            document.body.appendChild(modalEl);
-        }
-
-        modalEl.innerHTML = `
-            <div class="modal-content" style="max-width: 600px;">
-                <div class="modal-header">
-                    <h2>Detalles de Pago: ${payment.code}</h2>
-                    <button class="modal-close" onclick="document.getElementById('dynamicDetailModal').classList.remove('active'); document.body.style.overflow='';">&times;</button>
-                </div>
-                <div class="card-body">
-                    <p><strong>Origen:</strong> ${payment.origin}</p>
-                    <p><strong>Monto:</strong> ${(payment.currency === 'COP' ? 'COP $' : '$')}${parseFloat(payment.amount).toFixed(2)}</p>
-                    <p><strong>Fecha:</strong> ${new Date(payment.created_at).toLocaleString()}</p>
-                    <p><strong>Notas:</strong> ${Utils.escapeHtml(payment.notes || 'Ninguna')}</p>
-                    
-                    <h3 style="margin-top: 1rem;">Guías (Total: ${guides.length})</h3>
-                    ${guidesHtml}
-                </div>
-            </div>
-        `;
-
-        modalEl.classList.add('active');
-        document.body.style.overflow = 'hidden';
-    },
-
     async deletePayment(id) {
         if (!confirm('¿Está seguro de eliminar este pago? Esta acción no se puede deshacer.')) return;
 
