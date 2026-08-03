@@ -241,9 +241,106 @@ const JournalModule = {
     },
 
     async syncCloudNow() {
-        this.updateSyncStatus('syncing', 'Sincronizando con Supabase...');
-        await this.saveData();
-        Utils.showToast('Sincronización con Supabase ejecutada', 'info');
+        await this.uploadLocalToCloud(true);
+    },
+
+    async uploadLocalToCloud(interactive = true) {
+        // Ensure state contains latest local storage items if present
+        const localEntries = JSON.parse(localStorage.getItem('journal_entries') || 'null');
+        const localGoals = JSON.parse(localStorage.getItem('journal_goals') || 'null');
+        const localWeeklyGoals = JSON.parse(localStorage.getItem('journal_weekly_goals') || 'null');
+        const localPrinciples = JSON.parse(localStorage.getItem('journal_principles') || 'null');
+
+        if (localEntries && localEntries.length >= this.entries.length) this.entries = localEntries;
+        if (localGoals && localGoals.length >= this.goals.length) this.goals = localGoals;
+        if (localWeeklyGoals && localWeeklyGoals.length >= this.weeklyGoals.length) this.weeklyGoals = localWeeklyGoals;
+        if (localPrinciples && Object.keys(localPrinciples).length > 0) this.principles = localPrinciples;
+
+        this.updateSyncStatus('syncing', 'Subiendo versión local a Supabase...');
+
+        try {
+            await this.saveData();
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+            this.updateSyncStatus('success', `Sincronizado (${timeStr})`);
+            
+            if (interactive) {
+                Utils.showToast('¡Versión local subida y sincronizada en Supabase con éxito! ☁️🚀', 'success');
+            }
+            return true;
+        } catch (err) {
+            console.error('Error subiendo versión local:', err);
+            this.updateSyncStatus('warning', 'Error al subir a Supabase');
+            if (interactive) {
+                Utils.showToast('Hubo un error al subir a Supabase. Revisa la consola o conexión.', 'error');
+            }
+            return false;
+        }
+    },
+
+    async downloadCloudToLocal(interactive = true) {
+        if (!window.supabaseClient || !window.AuthModule || !window.AuthModule.currentUser) {
+            Utils.showToast('No hay sesión activa para descargar de Supabase', 'warning');
+            return false;
+        }
+
+        const userId = window.AuthModule.currentUser.id;
+        this.updateSyncStatus('syncing', 'Descargando datos de Supabase...');
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('user_journals')
+                .select('*')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (error) throw error;
+
+            if (data) {
+                this.entries = data.entries || [];
+                this.goals = data.goals || [];
+                this.weeklyGoals = data.weekly_goals || data.weeklyGoals || data.principles?._weekly_goals || [];
+                this.principles = data.principles || { principles: [], rules: [], actions: [], improvements: [] };
+                
+                if (this.principles && this.principles._weekly_goals) {
+                    delete this.principles._weekly_goals;
+                }
+
+                // Cache in localStorage
+                localStorage.setItem('journal_entries', JSON.stringify(this.entries));
+                localStorage.setItem('journal_goals', JSON.stringify(this.goals));
+                localStorage.setItem('journal_weekly_goals', JSON.stringify(this.weeklyGoals));
+                localStorage.setItem('journal_principles', JSON.stringify(this.principles));
+
+                // Re-render UI
+                this.renderWeeklyGoals();
+                this.renderEntries();
+                this.renderGoals();
+                this.renderPrinciples();
+
+                const now = new Date();
+                const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+                this.updateSyncStatus('success', `Sincronizado (${timeStr})`);
+
+                if (interactive) {
+                    Utils.showToast('¡Datos descargados y sincronizados desde Supabase! 📥☁️', 'success');
+                }
+                return true;
+            } else {
+                if (interactive) {
+                    Utils.showToast('No se encontró registro previo en la nube para este usuario. Subiendo datos actuales...', 'info');
+                }
+                await this.saveData();
+                return true;
+            }
+        } catch (err) {
+            console.error('Error descargando de Supabase:', err);
+            this.updateSyncStatus('warning', 'Error descargando de Supabase');
+            if (interactive) {
+                Utils.showToast('Error al consultar datos en Supabase', 'error');
+            }
+            return false;
+        }
     },
 
     bindEvents() {

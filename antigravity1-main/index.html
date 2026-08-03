@@ -3782,11 +3782,21 @@
                         <p class="journal-subtitle" style="margin-top: 0.25rem;">Un espacio para reflexionar, planificar y crecer.</p>
                     </div>
                     <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
-                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="JournalModule.syncCloudNow()" title="Forzar sincronización inmediata con Supabase">
+                        <button type="button" class="btn btn-sm btn-success" onclick="JournalModule.uploadLocalToCloud()" title="Subir y guardar inmediatamente mi última versión local a Supabase (Resuelve problemas de caché)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
                             </svg>
-                            Sincronizar Nube
+                            Subir Local a Nube
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="JournalModule.downloadCloudToLocal()" title="Descargar y sincronizar con la versión guardada en Supabase">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="7 10 12 15 17 10"></polyline>
+                                <line x1="12" y1="15" x2="12" y2="3"></line>
+                            </svg>
+                            Descargar de Nube
                         </button>
                         <button type="button" class="btn btn-sm btn-secondary" onclick="JournalModule.exportBackup()" title="Descargar archivo JSON con todo el diario y metas">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3888,6 +3898,10 @@
                                     <span style="font-size: 0.8rem; color: var(--text-muted);">Planifica y monitorea tus objetivos semana a semana</span>
                                 </div>
                                 <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                                    <button type="button" class="btn btn-sm btn-outline-success" onclick="JournalModule.uploadLocalToCloud()" title="Subir y forzar sincronización de mi versión local a Supabase" style="font-size: 0.78rem;">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                        Sincronizar Local
+                                    </button>
                                     <div style="display: inline-flex; align-items: center; background: var(--surface-hover); border-radius: 6px; border: 1px solid var(--border); padding: 2px;">
                                         <button type="button" class="btn btn-sm btn-icon" id="btnWeeklyPrevMonth" style="padding: 4px 8px; border: none; background: transparent; color: var(--text-primary);" title="Mes Anterior">◀</button>
                                         <span id="weeklyMonthLabel" style="font-weight: 600; font-size: 0.85rem; padding: 0 6px; min-width: 110px; text-align: center;">Agosto 2026</span>
