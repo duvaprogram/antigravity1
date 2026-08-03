@@ -129,7 +129,7 @@ const CampaignsModule = {
             }
 
             // 4. Load Campaign Performance
-            this.loadPerformanceData();
+            await this.loadPerformanceData();
 
             this.calculateAdMetrics();
             this.renderAll();
@@ -768,9 +768,14 @@ const CampaignsModule = {
         this.renderHistory();
     },
 
-    // Save campaigns to localStorage
-    saveCampaigns() {
+    // Save campaigns to localStorage and Supabase
+    async saveCampaigns() {
         localStorage.setItem('generatedCampaigns', JSON.stringify(this.generatedCampaigns));
+        if (window.Database && window.Database.saveCampaign) {
+            for (const c of this.generatedCampaigns) {
+                try { await window.Database.saveCampaign(c); } catch(e){}
+            }
+        }
     },
 
     // Render history table
@@ -1756,17 +1761,17 @@ const CampaignsModule = {
         });
 
         // 4. Save to Database & localStorage
-        this.saveCampaigns();
-        this.savePerformanceData();
+        await this.saveCampaigns();
+        await this.savePerformanceData();
 
         if (window.Database) {
             if (window.Database.saveCampaignAds) {
                 try { await window.Database.saveCampaignAds(this.campaignAds); } catch(e){}
             }
             if (window.Database.saveCampaign) {
-                this.generatedCampaigns.forEach(c => {
-                    try { window.Database.saveCampaign(c); } catch(e){}
-                });
+                for (const c of this.generatedCampaigns) {
+                    try { await window.Database.saveCampaign(c); } catch(e){}
+                }
             }
         }
         localStorage.setItem('campaignAdsData', JSON.stringify(this.campaignAds));
@@ -1789,7 +1794,18 @@ const CampaignsModule = {
     },
 
     // Load performance data
-    loadPerformanceData() {
+    async loadPerformanceData() {
+        if (window.Database && window.Database.getCampaignPerformance) {
+            try {
+                const dbPerf = await window.Database.getCampaignPerformance();
+                if (dbPerf && dbPerf.length > 0) {
+                    this.performanceData = dbPerf;
+                    return;
+                }
+            } catch (e) {
+                console.warn('Error cargando reportes de campañas desde Supabase:', e);
+            }
+        }
         const saved = localStorage.getItem('campaignPerformanceData');
         if (saved) {
             try {
@@ -1797,11 +1813,20 @@ const CampaignsModule = {
             } catch (e) {
                 this.performanceData = [];
             }
+        } else {
+            this.performanceData = [];
         }
     },
 
     // Save performance data
-    savePerformanceData() {
+    async savePerformanceData() {
+        if (window.Database && window.Database.saveCampaignPerformance) {
+            try {
+                await window.Database.saveCampaignPerformance(this.performanceData);
+            } catch (e) {
+                console.warn('Error guardando reportes de campañas en Supabase:', e);
+            }
+        }
         localStorage.setItem('campaignPerformanceData', JSON.stringify(this.performanceData));
     },
 
@@ -2594,20 +2619,29 @@ const CampaignsModule = {
     },
 
     // Clear performance data
-    clearPerformanceData() {
+    async clearPerformanceData() {
         if (confirm('¿Está seguro de que desea limpiar todos los datos de rendimiento de campañas?')) {
             this.performanceData = [];
-            this.savePerformanceData();
+            await this.savePerformanceData();
+            if (window.Database && window.Database.deleteCampaignPerformance) {
+                try { await window.Database.deleteCampaignPerformance(); } catch(e){}
+            }
             this.renderPerformanceTable();
             Utils.showNotification('Datos de rendimiento eliminados', 'info');
         }
     },
 
     // Clear ads data
-    clearAdsData() {
+    async clearAdsData() {
         if (confirm('¿Está seguro de que desea eliminar todos los anuncios importados?')) {
+            const oldAds = [...this.campaignAds];
             this.campaignAds = [];
             localStorage.setItem('campaignAdsData', JSON.stringify([]));
+            if (window.Database && window.Database.deleteCampaignAd) {
+                for (const a of oldAds) {
+                    try { await window.Database.deleteCampaignAd(a.id); } catch(e){}
+                }
+            }
             this.renderAdsTable();
             this.renderSalesKPIs();
             Utils.showNotification('Anuncios importados eliminados', 'info');

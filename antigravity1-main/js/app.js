@@ -227,7 +227,11 @@ const App = {
                 await UsersModule.render();
                 break;
             case 'campaigns':
-                CampaignsModule.init();
+                if (!CampaignsModule.initialized) {
+                    await CampaignsModule.init();
+                } else {
+                    await CampaignsModule.loadAllDataFromDb();
+                }
                 break;
             case 'income-statement':
                 await IncomeStatementModule.render();
@@ -451,10 +455,15 @@ const App = {
                 await FinanceModule.loadData();
             }
 
-            // 4. Update Dashboard stats
+            // 4. Sync Campaigns & Ads & Sales & Reports from Supabase
+            if (window.CampaignsModule && typeof CampaignsModule.loadAllDataFromDb === 'function') {
+                await CampaignsModule.loadAllDataFromDb();
+            }
+
+            // 5. Update Dashboard stats
             await this.updateDashboard();
 
-            // 5. Re-render active section
+            // 6. Re-render active section
             await this.renderSection(this.currentSection);
 
             if (options.showToast) {

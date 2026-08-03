@@ -1529,6 +1529,8 @@ const Database = {
                         ads: c.ads,
                         adSetCodes: c.ad_set_codes,
                         adCodes: c.ad_codes,
+                        adDetails: c.ad_details || [],
+                        active: c.active !== false,
                         createdAt: c.created_at
                     }));
                 }
@@ -1558,6 +1560,8 @@ const Database = {
                         ads: campaign.ads,
                         ad_set_codes: campaign.adSetCodes,
                         ad_codes: campaign.adCodes,
+                        ad_details: campaign.adDetails || [],
+                        active: campaign.active !== false,
                         created_at: campaign.createdAt
                     });
             }
@@ -1742,6 +1746,89 @@ const Database = {
         } catch (error) {
             console.warn('Supabase deleteCampaignSale fallback:', error);
         }
+    },
+
+    // ========================================
+    // CAMPAIGN PERFORMANCE (REPORTES IMPORTADOS DE EXCEL/CSV)
+    // ========================================
+    async getCampaignPerformance() {
+        try {
+            if (supabaseClient) {
+                const { data, error } = await supabaseClient
+                    .from('campaign_performance')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (!error && data && data.length > 0) {
+                    return data.map(p => ({
+                        id: p.id,
+                        code: p.code,
+                        campaignName: p.campaign_name,
+                        product: p.product,
+                        country: p.country,
+                        cost: Number(p.cost) || 0,
+                        impressions: Number(p.impressions) || 0,
+                        reach: Number(p.reach) || 0,
+                        conversations: Number(p.conversations) || 0,
+                        purchases: Number(p.purchases) || 0,
+                        purchaseValue: Number(p.purchase_value) || 0,
+                        startDate: p.start_date,
+                        endDate: p.end_date,
+                        createdAt: p.created_at,
+                        updatedAt: p.updated_at
+                    }));
+                }
+            }
+        } catch (error) {
+            console.warn('Supabase getCampaignPerformance fallback to localStorage:', error);
+        }
+        const saved = localStorage.getItem('campaignPerformanceData');
+        return saved ? JSON.parse(saved) : [];
+    },
+
+    async saveCampaignPerformance(performanceList) {
+        if (!Array.isArray(performanceList)) return;
+        try {
+            if (supabaseClient && performanceList.length > 0) {
+                const rows = performanceList.map(p => ({
+                    id: p.id || (p.code ? `perf_${p.code}` : `perf_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`),
+                    code: p.code || '',
+                    campaign_name: p.campaignName || '',
+                    product: p.product || '',
+                    country: p.country || '',
+                    cost: Number(p.cost) || 0,
+                    impressions: Number(p.impressions) || 0,
+                    reach: Number(p.reach) || 0,
+                    conversations: Number(p.conversations) || 0,
+                    purchases: Number(p.purchases) || 0,
+                    purchase_value: Number(p.purchaseValue) || 0,
+                    start_date: p.startDate || null,
+                    end_date: p.endDate || null,
+                    updated_at: new Date().toISOString()
+                }));
+
+                await supabaseClient
+                    .from('campaign_performance')
+                    .upsert(rows, { onConflict: 'id' });
+            }
+        } catch (error) {
+            console.warn('Supabase saveCampaignPerformance fallback:', error);
+        }
+        localStorage.setItem('campaignPerformanceData', JSON.stringify(performanceList));
+    },
+
+    async deleteCampaignPerformance() {
+        try {
+            if (supabaseClient) {
+                await supabaseClient
+                    .from('campaign_performance')
+                    .delete()
+                    .neq('id', '___non_existent___');
+            }
+        } catch (error) {
+            console.warn('Supabase deleteCampaignPerformance fallback:', error);
+        }
+        localStorage.removeItem('campaignPerformanceData');
     }
 };
 
