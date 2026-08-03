@@ -560,6 +560,8 @@ const PaymentsModule = {
         } finally {
             App.showLoading(false);
         }
+    },
+
     async deletePayment(id) {
         if (!confirm('¿Está seguro de eliminar este pago? Esta acción no se puede deshacer.')) return;
 
