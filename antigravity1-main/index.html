@@ -3772,10 +3772,22 @@
             <section class="content-section" id="section-journal">
                 <div class="journal-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
                     <div>
-                        <h2>Mi Diario y Metas</h2>
-                        <p class="journal-subtitle">Un espacio para reflexionar, planificar y crecer.</p>
+                        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                            <h2 style="margin: 0;">Mi Diario y Metas</h2>
+                            <div id="journalSyncBadge" class="sync-badge sync-warning" title="Estado de sincronización en tiempo real">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                                <span>Cargando estado...</span>
+                            </div>
+                        </div>
+                        <p class="journal-subtitle" style="margin-top: 0.25rem;">Un espacio para reflexionar, planificar y crecer.</p>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+                        <button type="button" class="btn btn-sm btn-outline-primary" onclick="JournalModule.syncCloudNow()" title="Forzar sincronización inmediata con Supabase">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                            </svg>
+                            Sincronizar Nube
+                        </button>
                         <button type="button" class="btn btn-sm btn-secondary" onclick="JournalModule.exportBackup()" title="Descargar archivo JSON con todo el diario y metas">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>

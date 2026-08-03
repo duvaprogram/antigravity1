@@ -14,6 +14,22 @@ const JournalModule = {
     currentWeeklyMonth: new Date().getMonth(), // 0-11
     selectedWeekKey: null,
 
+    updateSyncStatus(status, text) {
+        const badge = document.getElementById('journalSyncBadge');
+        if (!badge) return;
+        
+        badge.className = `sync-badge sync-${status}`;
+        let icon = '';
+        if (status === 'success') {
+            icon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        } else if (status === 'syncing') {
+            icon = '<svg class="spin-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>';
+        } else {
+            icon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
+        }
+        badge.innerHTML = `${icon} <span>${text}</span>`;
+    },
+
     async init() {
         await this.loadData();
         this.bindEvents();
@@ -48,24 +64,26 @@ const JournalModule = {
         const localPrinciples = JSON.parse(localStorage.getItem('journal_principles') || 'null');
 
         if (!window.supabaseClient || !window.AuthModule || !window.AuthModule.currentUser) {
-            console.error("Supabase or user not initialized, falling back to local storage");
             this.entries = localEntries || [];
             this.goals = localGoals || [];
             this.weeklyGoals = localWeeklyGoals || [];
             this.principles = localPrinciples || { principles: [], rules: [], actions: [], improvements: [] };
+            this.updateSyncStatus('warning', 'Guardado Local (Modo sin conexión)');
             return;
         }
 
         const userId = window.AuthModule.currentUser.id;
+        this.updateSyncStatus('syncing', 'Cargando de Supabase...');
 
         try {
             const { data, error } = await supabaseClient
                 .from('user_journals')
                 .select('*')
                 .eq('user_id', userId)
-                .single();
+                .maybeSingle();
 
-            if (error && error.code !== 'PGRST116') {
+            if (error) {
+                console.warn('Advertencia consultando user_journals en Supabase:', error);
                 throw error;
             }
 
@@ -73,16 +91,29 @@ const JournalModule = {
                 // Load from DB
                 this.entries = data.entries || [];
                 this.goals = data.goals || [];
-                this.weeklyGoals = data.weekly_goals || data.weeklyGoals || localWeeklyGoals || [];
+                // Extract weekly goals from direct column, camelCase, principles backup, or local cache
+                this.weeklyGoals = data.weekly_goals || data.weeklyGoals || data.principles?._weekly_goals || localWeeklyGoals || [];
                 this.principles = data.principles || { principles: [], rules: [], actions: [], improvements: [] };
+                
+                // Clean internal backup property in memory
+                if (this.principles && this.principles._weekly_goals) {
+                    delete this.principles._weekly_goals;
+                }
+
+                // Update local storage cache
+                localStorage.setItem('journal_entries', JSON.stringify(this.entries));
+                localStorage.setItem('journal_goals', JSON.stringify(this.goals));
+                localStorage.setItem('journal_weekly_goals', JSON.stringify(this.weeklyGoals));
+                localStorage.setItem('journal_principles', JSON.stringify(this.principles));
+
+                this.updateSyncStatus('success', 'Sincronizado con Supabase');
             } else {
-                // Try to migrate from localStorage if DB is empty
+                // Try to migrate from localStorage or SeedData if DB is empty for this user
                 if (localEntries || localGoals || localWeeklyGoals || localPrinciples) {
                     this.entries = localEntries || [];
                     this.goals = localGoals || [];
                     this.weeklyGoals = localWeeklyGoals || [];
                     this.principles = localPrinciples || { principles: [], rules: [], actions: [], improvements: [] };
-                    // Save to DB now
                     await this.saveData();
                 } else if (typeof JournalSeedData !== 'undefined') {
                     this.entries = [...JournalSeedData.entries];
@@ -96,14 +127,15 @@ const JournalModule = {
                     this.weeklyGoals = [];
                     this.principles = { principles: [], rules: [], actions: [], improvements: [] };
                 }
+                this.updateSyncStatus('success', 'Sincronizado con Supabase');
             }
         } catch (err) {
-            console.error('Error loading journal from DB', err);
-            Utils.showToast('Error cargando el diario de la nube', 'error');
+            console.error('Error loading journal from DB, using local fallback:', err);
             this.entries = localEntries || [];
             this.goals = localGoals || [];
             this.weeklyGoals = localWeeklyGoals || [];
             this.principles = localPrinciples || { principles: [], rules: [], actions: [], improvements: [] };
+            this.updateSyncStatus('warning', 'Guardado Local (Verifique tabla Supabase)');
         }
     },
 
@@ -114,41 +146,104 @@ const JournalModule = {
         localStorage.setItem('journal_weekly_goals', JSON.stringify(this.weeklyGoals));
         localStorage.setItem('journal_principles', JSON.stringify(this.principles));
 
-        if (!window.supabaseClient || !window.AuthModule || !window.AuthModule.currentUser) return;
+        if (!window.supabaseClient || !window.AuthModule || !window.AuthModule.currentUser) {
+            this.updateSyncStatus('warning', 'Guardado Local (Sin sesión activa)');
+            return;
+        }
         
         const userId = window.AuthModule.currentUser.id;
+        this.updateSyncStatus('syncing', 'Guardando en Supabase...');
 
         try {
-            const { error } = await supabaseClient
-                .from('user_journals')
-                .upsert({
-                    user_id: userId,
-                    entries: this.entries,
-                    goals: this.goals,
-                    weekly_goals: this.weeklyGoals,
-                    principles: this.principles,
-                    updated_at: new Date().toISOString()
-                }, { onConflict: 'user_id' });
+            // Dual persistence: embed _weekly_goals in principles as backup for older schemas
+            const principlesToSave = {
+                ...this.principles,
+                _weekly_goals: this.weeklyGoals
+            };
 
-            if (error) {
-                // If weekly_goals column does not exist in DB schema, fallback gracefully
-                if (error.message && (error.message.includes('weekly_goals') || error.code === '42703')) {
-                    await supabaseClient
+            // Check if record exists for this user
+            const { data: existing, error: checkError } = await supabaseClient
+                .from('user_journals')
+                .select('id')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            let saveError = null;
+
+            if (existing && existing.id) {
+                // Update existing record
+                const { error: updateErr } = await supabaseClient
+                    .from('user_journals')
+                    .update({
+                        entries: this.entries,
+                        goals: this.goals,
+                        weekly_goals: this.weeklyGoals,
+                        principles: principlesToSave,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id);
+
+                if (updateErr && (updateErr.message?.includes('weekly_goals') || updateErr.code === '42703')) {
+                    // Retry update without weekly_goals column
+                    const { error: fallbackErr } = await supabaseClient
                         .from('user_journals')
-                        .upsert({
+                        .update({
+                            entries: this.entries,
+                            goals: this.goals,
+                            principles: principlesToSave,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', existing.id);
+                    saveError = fallbackErr;
+                } else {
+                    saveError = updateErr;
+                }
+            } else {
+                // Insert new record
+                const { error: insertErr } = await supabaseClient
+                    .from('user_journals')
+                    .insert([{
+                        user_id: userId,
+                        entries: this.entries,
+                        goals: this.goals,
+                        weekly_goals: this.weeklyGoals,
+                        principles: principlesToSave,
+                        updated_at: new Date().toISOString()
+                    }]);
+
+                if (insertErr && (insertErr.message?.includes('weekly_goals') || insertErr.code === '42703')) {
+                    // Retry insert without weekly_goals column
+                    const { error: fallbackErr } = await supabaseClient
+                        .from('user_journals')
+                        .insert([{
                             user_id: userId,
                             entries: this.entries,
                             goals: this.goals,
-                            principles: this.principles,
+                            principles: principlesToSave,
                             updated_at: new Date().toISOString()
-                        }, { onConflict: 'user_id' });
+                        }]);
+                    saveError = fallbackErr;
                 } else {
-                    throw error;
+                    saveError = insertErr;
                 }
             }
+
+            if (saveError) {
+                console.error('Error guardando diario en Supabase:', saveError);
+                this.updateSyncStatus('warning', 'Guardado Local (Error al sincronizar Supabase)');
+            } else {
+                this.updateSyncStatus('success', 'Sincronizado con Supabase');
+            }
         } catch (err) {
-            console.error('Error saving journal to DB', err);
+            console.error('Error general guardando diario en Supabase:', err);
+            this.updateSyncStatus('warning', 'Guardado Local (Error de red Supabase)');
         }
+    },
+
+    async syncCloudNow() {
+        this.updateSyncStatus('syncing', 'Sincronizando con Supabase...');
+        await this.saveData();
+        Utils.showToast('Sincronización con Supabase ejecutada', 'info');
     },
 
     bindEvents() {
