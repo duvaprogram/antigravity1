@@ -61,80 +61,183 @@ const CampaignsModule = {
         this.renderAll();
     },
 
-    // Load all data from Supabase / localStorage
+    // Load all data from Supabase / localStorage with Smart Bidirectional Cloud Sync
     async loadAllDataFromDb() {
         try {
-            // 1. Load Campaigns
-            if (window.Database && window.Database.getCampaigns) {
-                try {
-                    const dbCampaigns = await window.Database.getCampaigns();
-                    if (dbCampaigns && dbCampaigns.length > 0) {
-                        this.generatedCampaigns = dbCampaigns;
-                    } else {
-                        const saved = localStorage.getItem('generatedCampaigns');
-                        this.generatedCampaigns = saved ? JSON.parse(saved) : [];
-                    }
-                } catch (e) {
-                    const saved = localStorage.getItem('generatedCampaigns');
-                    this.generatedCampaigns = saved ? JSON.parse(saved) : [];
+            console.log('🔄 Iniciando sincronización inteligente de Campañas con Supabase...');
+            
+            // 1. Fetch cloud data from dedicated tables
+            let cloudCampaigns = [];
+            let cloudAds = [];
+            let cloudSales = [];
+            let cloudPerf = [];
+
+            if (window.Database) {
+                if (typeof window.Database.getCampaigns === 'function') {
+                    try { cloudCampaigns = await window.Database.getCampaigns(true); } catch(e) {}
                 }
-            } else {
-                const saved = localStorage.getItem('generatedCampaigns');
-                this.generatedCampaigns = saved ? JSON.parse(saved) : [];
+                if (typeof window.Database.getCampaignAds === 'function') {
+                    try { cloudAds = await window.Database.getCampaignAds(true); } catch(e) {}
+                }
+                if (typeof window.Database.getCampaignSales === 'function') {
+                    try { cloudSales = await window.Database.getCampaignSales(true); } catch(e) {}
+                }
+                if (typeof window.Database.getCampaignPerformance === 'function') {
+                    try { cloudPerf = await window.Database.getCampaignPerformance(true); } catch(e) {}
+                }
+
+                // Check universal cloud snapshot fallback if tables were empty
+                if (typeof window.Database.getCampaignsSnapshotFromCloud === 'function') {
+                    try {
+                        const snapshot = await window.Database.getCampaignsSnapshotFromCloud();
+                        if (snapshot) {
+                            if (cloudCampaigns.length === 0 && Array.isArray(snapshot.campaigns) && snapshot.campaigns.length > 0) {
+                                cloudCampaigns = snapshot.campaigns;
+                            }
+                            if (cloudAds.length === 0 && Array.isArray(snapshot.ads) && snapshot.ads.length > 0) {
+                                cloudAds = snapshot.ads;
+                            }
+                            if (cloudSales.length === 0 && Array.isArray(snapshot.sales) && snapshot.sales.length > 0) {
+                                cloudSales = snapshot.sales;
+                            }
+                            if (cloudPerf.length === 0 && Array.isArray(snapshot.performance) && snapshot.performance.length > 0) {
+                                cloudPerf = snapshot.performance;
+                            }
+                        }
+                    } catch(e) {}
+                }
             }
 
+            // 2. Load LocalStorage Data
+            let localCampaigns = [];
+            let localAds = [];
+            let localSales = [];
+            let localPerf = [];
+            try { localCampaigns = JSON.parse(localStorage.getItem('generatedCampaigns')) || []; } catch(e) {}
+            try { localAds = JSON.parse(localStorage.getItem('campaignAdsData')) || []; } catch(e) {}
+            try { localSales = JSON.parse(localStorage.getItem('campaignSalesData')) || []; } catch(e) {}
+            try { localPerf = JSON.parse(localStorage.getItem('campaignPerformanceData')) || []; } catch(e) {}
+
+            // 3. Smart Merge & Deduplication
+            // (a) Campaigns Merge
+            const campaignsMap = new Map();
+            cloudCampaigns.forEach(c => {
+                if (c && (c.id || c.code)) campaignsMap.set(String(c.id || c.code), c);
+            });
+            localCampaigns.forEach(c => {
+                if (c && (c.id || c.code)) {
+                    const k = String(c.id || c.code);
+                    if (!campaignsMap.has(k)) {
+                        campaignsMap.set(k, c);
+                    } else {
+                        campaignsMap.set(k, { ...c, ...campaignsMap.get(k) });
+                    }
+                }
+            });
+            this.generatedCampaigns = Array.from(campaignsMap.values());
+
             // Rebuild used codes
+            this.usedCodes.clear();
             this.generatedCampaigns.forEach(c => {
                 if (c.code) this.usedCodes.add(c.code);
                 if (c.adSetCodes) c.adSetCodes.forEach(code => this.usedCodes.add(code));
                 if (c.adCodes) c.adCodes.forEach(code => this.usedCodes.add(code));
             });
 
-            // 2. Load Campaign Ads
-            if (window.Database && window.Database.getCampaignAds) {
-                try {
-                    const dbAds = await window.Database.getCampaignAds();
-                    if (dbAds && dbAds.length > 0) {
-                        this.campaignAds = dbAds;
+            // (b) Ads Merge
+            const adsMap = new Map();
+            cloudAds.forEach(a => {
+                if (a && (a.adId || a.id)) adsMap.set(String(a.adId || a.id), a);
+            });
+            localAds.forEach(a => {
+                if (a && (a.adId || a.id)) {
+                    const k = String(a.adId || a.id);
+                    if (!adsMap.has(k)) {
+                        adsMap.set(k, a);
                     } else {
-                        const savedAds = localStorage.getItem('campaignAdsData');
-                        this.campaignAds = savedAds ? JSON.parse(savedAds) : [];
+                        adsMap.set(k, { ...a, ...adsMap.get(k) });
                     }
-                } catch (e) {
-                    const savedAds = localStorage.getItem('campaignAdsData');
-                    this.campaignAds = savedAds ? JSON.parse(savedAds) : [];
                 }
-            } else {
-                const savedAds = localStorage.getItem('campaignAdsData');
-                this.campaignAds = savedAds ? JSON.parse(savedAds) : [];
+            });
+            this.campaignAds = Array.from(adsMap.values());
+
+            // (c) Sales Merge
+            const salesMap = new Map();
+            cloudSales.forEach(s => {
+                if (s && s.id) salesMap.set(String(s.id), s);
+            });
+            localSales.forEach(s => {
+                if (s && s.id) {
+                    const k = String(s.id);
+                    if (!salesMap.has(k)) {
+                        salesMap.set(k, s);
+                    } else {
+                        salesMap.set(k, { ...s, ...salesMap.get(k) });
+                    }
+                }
+            });
+            this.campaignSales = Array.from(salesMap.values());
+
+            // (d) Performance Reports Merge
+            const perfMap = new Map();
+            cloudPerf.forEach(p => {
+                if (p && (p.code || p.id || p.campaignName)) perfMap.set(String(p.code || p.id || p.campaignName), p);
+            });
+            localPerf.forEach(p => {
+                if (p && (p.code || p.id || p.campaignName)) {
+                    const k = String(p.code || p.id || p.campaignName);
+                    if (!perfMap.has(k)) {
+                        perfMap.set(k, p);
+                    } else {
+                        perfMap.set(k, { ...p, ...perfMap.get(k) });
+                    }
+                }
+            });
+            this.performanceData = Array.from(perfMap.values());
+
+            // 4. Update LocalStorage with the consolidated dataset
+            localStorage.setItem('generatedCampaigns', JSON.stringify(this.generatedCampaigns));
+            localStorage.setItem('campaignAdsData', JSON.stringify(this.campaignAds));
+            localStorage.setItem('campaignSalesData', JSON.stringify(this.campaignSales));
+            localStorage.setItem('campaignPerformanceData', JSON.stringify(this.performanceData));
+
+            // 5. BIDIRECTIONAL PUSH: If we have data, push consolidated to Supabase cloud
+            if (window.Database) {
+                if (this.campaignAds.length > 0 && typeof window.Database.saveCampaignAds === 'function') {
+                    await window.Database.saveCampaignAds(this.campaignAds);
+                }
+                if (this.performanceData.length > 0 && typeof window.Database.saveCampaignPerformance === 'function') {
+                    await window.Database.saveCampaignPerformance(this.performanceData);
+                }
+                if (this.generatedCampaigns.length > 0 && typeof window.Database.saveCampaigns === 'function') {
+                    await window.Database.saveCampaigns(this.generatedCampaigns);
+                }
+                if (this.campaignSales.length > 0 && typeof window.Database.saveCampaignSale === 'function') {
+                    for (const s of this.campaignSales) {
+                        try { await window.Database.saveCampaignSale(s); } catch(e) {}
+                    }
+                }
+                if (typeof window.Database.syncCampaignsSnapshotToCloud === 'function') {
+                    await window.Database.syncCampaignsSnapshotToCloud({
+                        campaigns: this.generatedCampaigns,
+                        ads: this.campaignAds,
+                        sales: this.campaignSales,
+                        performance: this.performanceData
+                    });
+                }
             }
 
-            // 3. Load Campaign Sales
-            if (window.Database && window.Database.getCampaignSales) {
-                try {
-                    const dbSales = await window.Database.getCampaignSales();
-                    if (dbSales && dbSales.length > 0) {
-                        this.campaignSales = dbSales;
-                    } else {
-                        const savedSales = localStorage.getItem('campaignSalesData');
-                        this.campaignSales = savedSales ? JSON.parse(savedSales) : [];
-                    }
-                } catch (e) {
-                    const savedSales = localStorage.getItem('campaignSalesData');
-                    this.campaignSales = savedSales ? JSON.parse(savedSales) : [];
-                }
-            } else {
-                const savedSales = localStorage.getItem('campaignSalesData');
-                this.campaignSales = savedSales ? JSON.parse(savedSales) : [];
-            }
-
-            // 4. Load Campaign Performance
-            await this.loadPerformanceData();
-
+            // 6. Recalculate metrics & render UI
             this.calculateAdMetrics();
             this.renderAll();
+            console.log('✅ Campañas sincronizadas bidireccionalmente:', {
+                campaigns: this.generatedCampaigns.length,
+                ads: this.campaignAds.length,
+                sales: this.campaignSales.length,
+                performance: this.performanceData.length
+            });
         } catch (error) {
-            console.error('Error loading campaigns data from DB:', error);
+            console.error('❌ Error en sincronización de campañas con DB:', error);
         }
     },
 
@@ -761,19 +864,30 @@ const CampaignsModule = {
             this.generatedCampaigns = this.generatedCampaigns.slice(0, 150);
         }
 
-        this.saveCampaigns();
-        if (window.Database && window.Database.saveCampaign) {
-            try { await window.Database.saveCampaign(campaign); } catch(e){}
-        }
+        await this.saveCampaigns();
         this.renderHistory();
     },
 
     // Save campaigns to localStorage and Supabase
     async saveCampaigns() {
         localStorage.setItem('generatedCampaigns', JSON.stringify(this.generatedCampaigns));
-        if (window.Database && window.Database.saveCampaign) {
-            for (const c of this.generatedCampaigns) {
-                try { await window.Database.saveCampaign(c); } catch(e){}
+        if (window.Database) {
+            if (typeof window.Database.saveCampaigns === 'function') {
+                try { await window.Database.saveCampaigns(this.generatedCampaigns); } catch(e){}
+            } else if (typeof window.Database.saveCampaign === 'function') {
+                for (const c of this.generatedCampaigns) {
+                    try { await window.Database.saveCampaign(c); } catch(e){}
+                }
+            }
+            if (typeof window.Database.syncCampaignsSnapshotToCloud === 'function') {
+                try {
+                    await window.Database.syncCampaignsSnapshotToCloud({
+                        campaigns: this.generatedCampaigns,
+                        ads: this.campaignAds,
+                        sales: this.campaignSales,
+                        performance: this.performanceData
+                    });
+                } catch(e){}
             }
         }
     },
@@ -1765,13 +1879,18 @@ const CampaignsModule = {
         await this.savePerformanceData();
 
         if (window.Database) {
-            if (window.Database.saveCampaignAds) {
+            if (typeof window.Database.saveCampaignAds === 'function') {
                 try { await window.Database.saveCampaignAds(this.campaignAds); } catch(e){}
             }
-            if (window.Database.saveCampaign) {
-                for (const c of this.generatedCampaigns) {
-                    try { await window.Database.saveCampaign(c); } catch(e){}
-                }
+            if (typeof window.Database.syncCampaignsSnapshotToCloud === 'function') {
+                try {
+                    await window.Database.syncCampaignsSnapshotToCloud({
+                        campaigns: this.generatedCampaigns,
+                        ads: this.campaignAds,
+                        sales: this.campaignSales,
+                        performance: this.performanceData
+                    });
+                } catch(e){}
             }
         }
         localStorage.setItem('campaignAdsData', JSON.stringify(this.campaignAds));
@@ -1781,7 +1900,7 @@ const CampaignsModule = {
         this.calculateAdMetrics();
         this.renderAll();
 
-        Utils.showNotification(`¡${newAds.length} anuncio(s) importados con éxito con sus IDs y métricas!`, 'success');
+        Utils.showNotification(`¡${newAds.length} anuncio(s) importados y sincronizados online con éxito!`, 'success');
     },
 
     // Cancel report upload
@@ -1826,6 +1945,16 @@ const CampaignsModule = {
             } catch (e) {
                 console.warn('Error guardando reportes de campañas en Supabase:', e);
             }
+        }
+        if (window.Database && typeof window.Database.syncCampaignsSnapshotToCloud === 'function') {
+            try {
+                await window.Database.syncCampaignsSnapshotToCloud({
+                    campaigns: this.generatedCampaigns,
+                    ads: this.campaignAds,
+                    sales: this.campaignSales,
+                    performance: this.performanceData
+                });
+            } catch (e) {}
         }
         localStorage.setItem('campaignPerformanceData', JSON.stringify(this.performanceData));
     },
@@ -2379,6 +2508,16 @@ const CampaignsModule = {
         if (window.Database && window.Database.saveCampaignSale) {
             try { await window.Database.saveCampaignSale(saleRecord); } catch(e){}
         }
+        if (window.Database && typeof window.Database.syncCampaignsSnapshotToCloud === 'function') {
+            try {
+                await window.Database.syncCampaignsSnapshotToCloud({
+                    campaigns: this.generatedCampaigns,
+                    ads: this.campaignAds,
+                    sales: this.campaignSales,
+                    performance: this.performanceData
+                });
+            } catch(e){}
+        }
         localStorage.setItem('campaignSalesData', JSON.stringify(this.campaignSales));
 
         this.calculateAdMetrics();
@@ -2420,6 +2559,16 @@ const CampaignsModule = {
         if (window.Database && window.Database.saveCampaignSale) {
             try { await window.Database.saveCampaignSale(updatedSale); } catch(e){}
         }
+        if (window.Database && typeof window.Database.syncCampaignsSnapshotToCloud === 'function') {
+            try {
+                await window.Database.syncCampaignsSnapshotToCloud({
+                    campaigns: this.generatedCampaigns,
+                    ads: this.campaignAds,
+                    sales: this.campaignSales,
+                    performance: this.performanceData
+                });
+            } catch(e){}
+        }
         localStorage.setItem('campaignSalesData', JSON.stringify(this.campaignSales));
 
         this.calculateAdMetrics();
@@ -2439,6 +2588,16 @@ const CampaignsModule = {
 
             if (window.Database && window.Database.deleteCampaignSale) {
                 try { await window.Database.deleteCampaignSale(saleId); } catch(e){}
+            }
+            if (window.Database && typeof window.Database.syncCampaignsSnapshotToCloud === 'function') {
+                try {
+                    await window.Database.syncCampaignsSnapshotToCloud({
+                        campaigns: this.generatedCampaigns,
+                        ads: this.campaignAds,
+                        sales: this.campaignSales,
+                        performance: this.performanceData
+                    });
+                } catch(e){}
             }
             localStorage.setItem('campaignSalesData', JSON.stringify(this.campaignSales));
 

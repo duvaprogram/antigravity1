@@ -1505,9 +1505,24 @@ const Database = {
     },
 
     // ========================================
-    // CAMPAIGNS
+    // CAMPAIGNS & PERFORMANCE (HYBRID CLOUD PERSISTENCE)
     // ========================================
-    async getCampaigns() {
+
+    // Helper: Safely format date string for DB
+    _formatDateStr(val) {
+        if (!val) return null;
+        const s = String(val).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        if (s.includes('T')) return s.split('T')[0];
+        const dm = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+        if (dm) return `${dm[3]}-${dm[2].padStart(2, '0')}-${dm[1].padStart(2, '0')}`;
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+        return s;
+    },
+
+    // 1. CAMPAIGNS
+    async getCampaigns(onlyFromCloud = false) {
         try {
             if (supabaseClient) {
                 const { data, error } = await supabaseClient
@@ -1515,8 +1530,8 @@ const Database = {
                     .select('*')
                     .order('created_at', { ascending: false });
 
-                if (!error && data && data.length > 0) {
-                    return data.map(c => ({
+                if (!error && Array.isArray(data)) {
+                    const mapped = data.map(c => ({
                         id: c.id,
                         name: c.name,
                         code: c.code,
@@ -1533,41 +1548,85 @@ const Database = {
                         active: c.active !== false,
                         createdAt: c.created_at
                     }));
+                    if (mapped.length > 0 || onlyFromCloud) {
+                        return mapped;
+                    }
+                } else if (error) {
+                    console.warn('⚠️ Supabase getCampaigns error:', error.message || error);
                 }
             }
         } catch (error) {
-            console.warn('Supabase getCampaigns fallback to localStorage:', error);
+            console.warn('⚠️ Supabase getCampaigns fallback:', error);
         }
+        if (onlyFromCloud) return [];
         const saved = localStorage.getItem('generatedCampaigns');
         return saved ? JSON.parse(saved) : [];
     },
 
     async saveCampaign(campaign) {
+        if (!campaign) return;
         try {
             if (supabaseClient) {
-                await supabaseClient
+                const { error } = await supabaseClient
                     .from('campaigns')
                     .upsert({
-                        id: campaign.id,
-                        name: campaign.name,
-                        code: campaign.code,
-                        country: campaign.country,
-                        type: campaign.type,
-                        objective: campaign.objective,
-                        date: campaign.date,
-                        product: campaign.product,
-                        ad_sets: campaign.adSets,
-                        ads: campaign.ads,
-                        ad_set_codes: campaign.adSetCodes,
-                        ad_codes: campaign.adCodes,
+                        id: String(campaign.id),
+                        name: campaign.name || '',
+                        code: campaign.code || '',
+                        country: campaign.country || '',
+                        type: campaign.type || '',
+                        objective: campaign.objective || '',
+                        date: this._formatDateStr(campaign.date) || campaign.date || '',
+                        product: campaign.product || '',
+                        ad_sets: campaign.adSets || 0,
+                        ads: campaign.ads || 0,
+                        ad_set_codes: campaign.adSetCodes || [],
+                        ad_codes: campaign.adCodes || [],
                         ad_details: campaign.adDetails || [],
                         active: campaign.active !== false,
-                        created_at: campaign.createdAt
+                        created_at: campaign.createdAt || new Date().toISOString()
                     });
+                if (error) {
+                    console.warn('⚠️ Supabase saveCampaign warning:', error.message || error);
+                }
             }
         } catch (error) {
-            console.warn('Supabase saveCampaign fallback:', error);
+            console.warn('⚠️ Supabase saveCampaign exception:', error);
         }
+    },
+
+    async saveCampaigns(campaignsList) {
+        if (!Array.isArray(campaignsList) || campaignsList.length === 0) return;
+        try {
+            if (supabaseClient) {
+                const rows = campaignsList.map(c => ({
+                    id: String(c.id),
+                    name: c.name || '',
+                    code: c.code || '',
+                    country: c.country || '',
+                    type: c.type || '',
+                    objective: c.objective || '',
+                    date: this._formatDateStr(c.date) || c.date || '',
+                    product: c.product || '',
+                    ad_sets: c.adSets || 0,
+                    ads: c.ads || 0,
+                    ad_set_codes: c.adSetCodes || [],
+                    ad_codes: c.adCodes || [],
+                    ad_details: c.adDetails || [],
+                    active: c.active !== false,
+                    created_at: c.createdAt || new Date().toISOString()
+                }));
+                const { error } = await supabaseClient
+                    .from('campaigns')
+                    .upsert(rows, { onConflict: 'id' });
+                if (error) {
+                    console.warn('⚠️ Supabase saveCampaigns warning:', error.message || error);
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Supabase saveCampaigns exception:', error);
+        }
+        localStorage.setItem('generatedCampaigns', JSON.stringify(campaignsList));
     },
 
     async deleteCampaign(id) {
@@ -1576,17 +1635,15 @@ const Database = {
                 await supabaseClient
                     .from('campaigns')
                     .delete()
-                    .eq('id', id);
+                    .eq('id', String(id));
             }
         } catch (error) {
-            console.warn('Supabase deleteCampaign fallback:', error);
+            console.warn('⚠️ Supabase deleteCampaign fallback:', error);
         }
     },
 
-    // ========================================
-    // CAMPAIGN ADS (ANUNCIOS IMPORTADOS CON IDS)
-    // ========================================
-    async getCampaignAds() {
+    // 2. CAMPAIGN ADS (ANUNCIOS IMPORTADOS CON IDS DE META)
+    async getCampaignAds(onlyFromCloud = false) {
         try {
             if (supabaseClient) {
                 const { data, error } = await supabaseClient
@@ -1594,8 +1651,8 @@ const Database = {
                     .select('*')
                     .order('created_at', { ascending: false });
 
-                if (!error && data && data.length > 0) {
-                    return data.map(a => ({
+                if (!error && Array.isArray(data)) {
+                    const mapped = data.map(a => ({
                         id: a.id,
                         adId: a.ad_id,
                         adName: a.ad_name,
@@ -1614,11 +1671,17 @@ const Database = {
                         createdAt: a.created_at,
                         updatedAt: a.updated_at
                     }));
+                    if (mapped.length > 0 || onlyFromCloud) {
+                        return mapped;
+                    }
+                } else if (error) {
+                    console.warn('⚠️ Supabase getCampaignAds error:', error.message || error);
                 }
             }
         } catch (error) {
-            console.warn('Supabase getCampaignAds fallback to localStorage:', error);
+            console.warn('⚠️ Supabase getCampaignAds fallback:', error);
         }
+        if (onlyFromCloud) return [];
         const saved = localStorage.getItem('campaignAdsData');
         return saved ? JSON.parse(saved) : [];
     },
@@ -1641,17 +1704,23 @@ const Database = {
                     impressions: Number(a.impressions) || 0,
                     reach: Number(a.reach) || 0,
                     conversations: Number(a.conversations) || 0,
-                    start_date: a.startDate || null,
-                    end_date: a.endDate || null,
+                    start_date: this._formatDateStr(a.startDate) || a.startDate || null,
+                    end_date: this._formatDateStr(a.endDate) || a.endDate || null,
                     updated_at: new Date().toISOString()
                 }));
 
-                await supabaseClient
+                const { data, error } = await supabaseClient
                     .from('campaign_ads')
                     .upsert(rows, { onConflict: 'id' });
+
+                if (error) {
+                    console.error('❌ Error guardando campaign_ads en Supabase:', error.message || error);
+                } else {
+                    console.log('✅ campaign_ads sincronizados con Supabase:', rows.length);
+                }
             }
         } catch (error) {
-            console.warn('Supabase saveCampaignAds fallback:', error);
+            console.warn('⚠️ Supabase saveCampaignAds exception:', error);
         }
         localStorage.setItem('campaignAdsData', JSON.stringify(ads));
     },
@@ -1662,17 +1731,15 @@ const Database = {
                 await supabaseClient
                     .from('campaign_ads')
                     .delete()
-                    .eq('id', id);
+                    .eq('id', String(id));
             }
         } catch (error) {
-            console.warn('Supabase deleteCampaignAd fallback:', error);
+            console.warn('⚠️ Supabase deleteCampaignAd fallback:', error);
         }
     },
 
-    // ========================================
-    // CAMPAIGN SALES (REGISTRO RÁPIDO DE VENTAS POR ANUNCIO)
-    // ========================================
-    async getCampaignSales() {
+    // 3. CAMPAIGN SALES (REGISTRO RÁPIDO DE VENTAS POR ANUNCIO)
+    async getCampaignSales(onlyFromCloud = false) {
         try {
             if (supabaseClient) {
                 const { data, error } = await supabaseClient
@@ -1680,8 +1747,8 @@ const Database = {
                     .select('*')
                     .order('created_at', { ascending: false });
 
-                if (!error && data && data.length > 0) {
-                    return data.map(s => ({
+                if (!error && Array.isArray(data)) {
+                    const mapped = data.map(s => ({
                         id: s.id,
                         adId: s.ad_id,
                         adName: s.ad_name,
@@ -1698,22 +1765,29 @@ const Database = {
                         createdAt: s.created_at,
                         updatedAt: s.updated_at
                     }));
+                    if (mapped.length > 0 || onlyFromCloud) {
+                        return mapped;
+                    }
+                } else if (error) {
+                    console.warn('⚠️ Supabase getCampaignSales error:', error.message || error);
                 }
             }
         } catch (error) {
-            console.warn('Supabase getCampaignSales fallback to localStorage:', error);
+            console.warn('⚠️ Supabase getCampaignSales fallback:', error);
         }
+        if (onlyFromCloud) return [];
         const saved = localStorage.getItem('campaignSalesData');
         return saved ? JSON.parse(saved) : [];
     },
 
     async saveCampaignSale(sale) {
+        if (!sale) return;
         try {
             if (supabaseClient) {
-                await supabaseClient
+                const { error } = await supabaseClient
                     .from('campaign_sales')
                     .upsert({
-                        id: sale.id,
+                        id: String(sale.id),
                         ad_id: String(sale.adId || ''),
                         ad_name: sale.adName || '',
                         campaign_code: sale.campaignCode || '',
@@ -1724,14 +1798,17 @@ const Database = {
                         customer_name: sale.customerName || '',
                         order_number: sale.orderNumber || '',
                         city: sale.city || '',
-                        sale_date: sale.date || new Date().toISOString().split('T')[0],
+                        sale_date: this._formatDateStr(sale.date) || sale.date || new Date().toISOString().split('T')[0],
                         notes: sale.notes || '',
                         created_at: sale.createdAt || new Date().toISOString(),
                         updated_at: new Date().toISOString()
                     });
+                if (error) {
+                    console.warn('⚠️ Supabase saveCampaignSale warning:', error.message || error);
+                }
             }
         } catch (error) {
-            console.warn('Supabase saveCampaignSale fallback:', error);
+            console.warn('⚠️ Supabase saveCampaignSale exception:', error);
         }
     },
 
@@ -1741,17 +1818,15 @@ const Database = {
                 await supabaseClient
                     .from('campaign_sales')
                     .delete()
-                    .eq('id', id);
+                    .eq('id', String(id));
             }
         } catch (error) {
-            console.warn('Supabase deleteCampaignSale fallback:', error);
+            console.warn('⚠️ Supabase deleteCampaignSale fallback:', error);
         }
     },
 
-    // ========================================
-    // CAMPAIGN PERFORMANCE (REPORTES IMPORTADOS DE EXCEL/CSV)
-    // ========================================
-    async getCampaignPerformance() {
+    // 4. CAMPAIGN PERFORMANCE (REPORTES IMPORTADOS DE EXCEL/CSV)
+    async getCampaignPerformance(onlyFromCloud = false) {
         try {
             if (supabaseClient) {
                 const { data, error } = await supabaseClient
@@ -1759,8 +1834,8 @@ const Database = {
                     .select('*')
                     .order('created_at', { ascending: false });
 
-                if (!error && data && data.length > 0) {
-                    return data.map(p => ({
+                if (!error && Array.isArray(data)) {
+                    const mapped = data.map(p => ({
                         id: p.id,
                         code: p.code,
                         campaignName: p.campaign_name,
@@ -1777,11 +1852,17 @@ const Database = {
                         createdAt: p.created_at,
                         updatedAt: p.updated_at
                     }));
+                    if (mapped.length > 0 || onlyFromCloud) {
+                        return mapped;
+                    }
+                } else if (error) {
+                    console.warn('⚠️ Supabase getCampaignPerformance error:', error.message || error);
                 }
             }
         } catch (error) {
-            console.warn('Supabase getCampaignPerformance fallback to localStorage:', error);
+            console.warn('⚠️ Supabase getCampaignPerformance fallback:', error);
         }
+        if (onlyFromCloud) return [];
         const saved = localStorage.getItem('campaignPerformanceData');
         return saved ? JSON.parse(saved) : [];
     },
@@ -1802,17 +1883,23 @@ const Database = {
                     conversations: Number(p.conversations) || 0,
                     purchases: Number(p.purchases) || 0,
                     purchase_value: Number(p.purchaseValue) || 0,
-                    start_date: p.startDate || null,
-                    end_date: p.endDate || null,
+                    start_date: this._formatDateStr(p.startDate) || p.startDate || null,
+                    end_date: this._formatDateStr(p.endDate) || p.endDate || null,
                     updated_at: new Date().toISOString()
                 }));
 
-                await supabaseClient
+                const { data, error } = await supabaseClient
                     .from('campaign_performance')
                     .upsert(rows, { onConflict: 'id' });
+
+                if (error) {
+                    console.error('❌ Error guardando campaign_performance en Supabase:', error.message || error);
+                } else {
+                    console.log('✅ campaign_performance sincronizados con Supabase:', rows.length);
+                }
             }
         } catch (error) {
-            console.warn('Supabase saveCampaignPerformance fallback:', error);
+            console.warn('⚠️ Supabase saveCampaignPerformance exception:', error);
         }
         localStorage.setItem('campaignPerformanceData', JSON.stringify(performanceList));
     },
@@ -1826,9 +1913,62 @@ const Database = {
                     .neq('id', '___non_existent___');
             }
         } catch (error) {
-            console.warn('Supabase deleteCampaignPerformance fallback:', error);
+            console.warn('⚠️ Supabase deleteCampaignPerformance fallback:', error);
         }
         localStorage.removeItem('campaignPerformanceData');
+    },
+
+    // 5. UNIVERSAL CAMPAIGNS CLOUD SNAPSHOT (Universal Fallback Sync)
+    async syncCampaignsSnapshotToCloud(data) {
+        if (!supabaseClient || !window.AuthModule || !window.AuthModule.currentUser) return;
+        try {
+            const userId = window.AuthModule.currentUser.id;
+            const { data: existing } = await supabaseClient
+                .from('user_journals')
+                .select('id, principles')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (existing && existing.id) {
+                const currentPrinciples = existing.principles || {};
+                currentPrinciples._campaigns_cloud_backup = {
+                    campaigns: data.campaigns || [],
+                    ads: data.ads || [],
+                    sales: data.sales || [],
+                    performance: data.performance || [],
+                    syncedAt: new Date().toISOString()
+                };
+                await supabaseClient
+                    .from('user_journals')
+                    .update({
+                        principles: currentPrinciples,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing.id);
+                console.log('☁️ Backup global de campañas sincronizado en user_journals');
+            }
+        } catch (e) {
+            console.warn('⚠️ Error en snapshot global de campañas:', e);
+        }
+    },
+
+    async getCampaignsSnapshotFromCloud() {
+        if (!supabaseClient || !window.AuthModule || !window.AuthModule.currentUser) return null;
+        try {
+            const userId = window.AuthModule.currentUser.id;
+            const { data } = await supabaseClient
+                .from('user_journals')
+                .select('principles')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            if (data && data.principles && data.principles._campaigns_cloud_backup) {
+                return data.principles._campaigns_cloud_backup;
+            }
+        } catch (e) {
+            console.warn('⚠️ Error obteniendo snapshot de campañas:', e);
+        }
+        return null;
     }
 };
 

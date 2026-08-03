@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.campaigns (
     country TEXT,
     type TEXT,
     objective TEXT,
-    date DATE,
+    date TEXT,
     product TEXT,
     ad_sets INTEGER DEFAULT 0,
     ads INTEGER DEFAULT 0,
@@ -43,8 +43,8 @@ CREATE TABLE IF NOT EXISTS public.campaign_ads (
     impressions NUMERIC DEFAULT 0,
     reach NUMERIC DEFAULT 0,
     conversations NUMERIC DEFAULT 0,
-    start_date DATE,
-    end_date DATE,
+    start_date TEXT,
+    end_date TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS public.campaign_sales (
     customer_name TEXT,
     order_number TEXT,
     city TEXT,
-    sale_date DATE DEFAULT CURRENT_DATE,
+    sale_date TEXT DEFAULT CURRENT_DATE::text,
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -96,8 +96,8 @@ CREATE TABLE IF NOT EXISTS public.campaign_performance (
     conversations NUMERIC DEFAULT 0,
     purchases NUMERIC DEFAULT 0,
     purchase_value NUMERIC DEFAULT 0,
-    start_date DATE,
-    end_date DATE,
+    start_date TEXT,
+    end_date TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
