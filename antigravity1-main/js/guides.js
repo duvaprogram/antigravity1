@@ -1,5 +1,6 @@
 const GuidesModule = {
     _initialized: false,
+    _eventsBound: false,
     currentGuideItems: [],
     allClients: [],
     allProducts: [],
@@ -12,12 +13,29 @@ const GuidesModule = {
     init() {
         if (this._initialized) return;
         this._initialized = true;
-        this.bindEvents();
+        try {
+            this.bindEvents();
+        } catch (e) {
+            console.error('[GuidesModule] Error in bindEvents:', e);
+        }
         // Preload clients and products in background on startup
         this.preloadData();
     },
 
+    // Ensure events are bound (can be called multiple times safely)
+    _ensureEventsBound() {
+        if (this._eventsBound) return;
+        try {
+            this.bindEvents();
+        } catch (e) {
+            console.error('[GuidesModule] Error in _ensureEventsBound:', e);
+        }
+    },
+
     bindEvents() {
+        if (this._eventsBound) return;
+        this._eventsBound = true;
+
         // New guide button
         const btnNewGuide = document.getElementById('btnNewGuide');
         if (btnNewGuide) {
@@ -39,8 +57,12 @@ const GuidesModule = {
         const clientSearchInput = document.getElementById('guideClientSearch');
         const clientSuggestionsEl = document.getElementById('clientSuggestions');
         if (clientSearchInput) {
+            let clientSearchDebounce = null;
             clientSearchInput.addEventListener('input', () => {
-                this.searchClients(clientSearchInput.value);
+                clearTimeout(clientSearchDebounce);
+                clientSearchDebounce = setTimeout(() => {
+                    this.searchClients(clientSearchInput.value);
+                }, 150);
             });
 
             clientSearchInput.addEventListener('focus', () => {
@@ -72,8 +94,12 @@ const GuidesModule = {
         const productSearchInput = document.getElementById('guideProductSearch');
         const productSuggestionsEl = document.getElementById('productSuggestions');
         if (productSearchInput) {
+            let productSearchDebounce = null;
             productSearchInput.addEventListener('input', () => {
-                this.searchProducts(productSearchInput.value);
+                clearTimeout(productSearchDebounce);
+                productSearchDebounce = setTimeout(() => {
+                    this.searchProducts(productSearchInput.value);
+                }, 150);
             });
 
             productSearchInput.addEventListener('focus', () => {
@@ -131,57 +157,70 @@ const GuidesModule = {
         }
 
         // Search guides
-        document.getElementById('searchGuides').addEventListener('input',
-            Utils.debounce(() => this.filterGuides(), 300)
-        );
+        const searchGuidesEl = document.getElementById('searchGuides');
+        if (searchGuidesEl) {
+            searchGuidesEl.addEventListener('input',
+                Utils.debounce(() => this.filterGuides(), 300)
+            );
+        }
 
         // Filter by status
-        document.getElementById('filterGuideStatus').addEventListener('change', () => {
-            this.filterGuides();
-        });
+        const filterStatusEl = document.getElementById('filterGuideStatus');
+        if (filterStatusEl) {
+            filterStatusEl.addEventListener('change', () => this.filterGuides());
+        }
 
         // Filter by city
-        document.getElementById('filterGuideCity').addEventListener('change', () => {
-            this.filterGuides();
-        });
+        const filterCityEl = document.getElementById('filterGuideCity');
+        if (filterCityEl) {
+            filterCityEl.addEventListener('change', () => this.filterGuides());
+        }
 
         // Filter by payment method
-        document.getElementById('filterGuidePayment').addEventListener('change', () => {
-            this.filterGuides();
-        });
+        const filterPaymentEl = document.getElementById('filterGuidePayment');
+        if (filterPaymentEl) {
+            filterPaymentEl.addEventListener('change', () => this.filterGuides());
+        }
 
         // Filter by date range
-        document.getElementById('filterGuideDateFrom').addEventListener('change', () => {
-            this.filterGuides();
-        });
-        document.getElementById('filterGuideDateTo').addEventListener('change', () => {
-            this.filterGuides();
-        });
+        const filterDateFromEl = document.getElementById('filterGuideDateFrom');
+        if (filterDateFromEl) {
+            filterDateFromEl.addEventListener('change', () => this.filterGuides());
+        }
+        const filterDateToEl = document.getElementById('filterGuideDateTo');
+        if (filterDateToEl) {
+            filterDateToEl.addEventListener('change', () => this.filterGuides());
+        }
         
         // Filter by product
         const filterProductInput = document.getElementById('filterGuideProduct');
-        filterProductInput.addEventListener('input', Utils.debounce(() => {
-            this.filterGuides();
-            this.searchFilterProducts(filterProductInput.value);
-        }, 300));
-        
-        filterProductInput.addEventListener('focus', () => {
-            if (filterProductInput.value.length >= 1) {
+        if (filterProductInput) {
+            filterProductInput.addEventListener('input', Utils.debounce(() => {
+                this.filterGuides();
                 this.searchFilterProducts(filterProductInput.value);
-            }
-        });
+            }, 300));
+            
+            filterProductInput.addEventListener('focus', () => {
+                if (filterProductInput.value.length >= 1) {
+                    this.searchFilterProducts(filterProductInput.value);
+                }
+            });
+        }
 
         // Clear all filters
-        document.getElementById('btnClearFilters').addEventListener('click', () => {
-            document.getElementById('searchGuides').value = '';
-            document.getElementById('filterGuideStatus').value = '';
-            document.getElementById('filterGuideCity').value = '';
-            document.getElementById('filterGuidePayment').value = '';
-            document.getElementById('filterGuideDateFrom').value = '';
-            document.getElementById('filterGuideDateTo').value = '';
-            document.getElementById('filterGuideProduct').value = '';
-            this.filterGuides();
-        });
+        const btnClearFilters = document.getElementById('btnClearFilters');
+        if (btnClearFilters) {
+            btnClearFilters.addEventListener('click', () => {
+                if (searchGuidesEl) searchGuidesEl.value = '';
+                if (filterStatusEl) filterStatusEl.value = '';
+                if (filterCityEl) filterCityEl.value = '';
+                if (filterPaymentEl) filterPaymentEl.value = '';
+                if (filterDateFromEl) filterDateFromEl.value = '';
+                if (filterDateToEl) filterDateToEl.value = '';
+                if (filterProductInput) filterProductInput.value = '';
+                this.filterGuides();
+            });
+        }
 
         // Modal close buttons
         document.querySelectorAll('[data-close="modalGuide"]').forEach(btn => {
@@ -201,9 +240,10 @@ const GuidesModule = {
         });
 
         // Print guide
-        document.getElementById('btnPrintGuide').addEventListener('click', () => {
-            this.printGuide();
-        });
+        const btnPrintGuide = document.getElementById('btnPrintGuide');
+        if (btnPrintGuide) {
+            btnPrintGuide.addEventListener('click', () => this.printGuide());
+        }
 
         // Close autocomplete when clicking outside
         document.addEventListener('click', (e) => {
@@ -217,18 +257,25 @@ const GuidesModule = {
         });
 
         // Handle keyboard navigation in autocomplete
-        document.getElementById('guideClientSearch').addEventListener('keydown', (e) => {
-            this.handleAutocompleteKeyboard(e, 'clientSuggestions');
-        });
+        if (clientSearchInput) {
+            clientSearchInput.addEventListener('keydown', (e) => {
+                this.handleAutocompleteKeyboard(e, 'clientSuggestions');
+            });
+        }
 
-        document.getElementById('guideProductSearch').addEventListener('keydown', (e) => {
-            this.handleAutocompleteKeyboard(e, 'productSuggestions');
-        });
+        if (productSearchInput) {
+            productSearchInput.addEventListener('keydown', (e) => {
+                this.handleAutocompleteKeyboard(e, 'productSuggestions');
+            });
+        }
+
+        console.log('[GuidesModule] Events bound successfully');
     },
 
     // Handle keyboard navigation in autocomplete
     handleAutocompleteKeyboard(e, suggestionsId) {
         const suggestions = document.getElementById(suggestionsId);
+        if (!suggestions) return;
         const items = suggestions.querySelectorAll('.autocomplete-item:not(.disabled)');
         const activeItem = suggestions.querySelector('.autocomplete-item.active');
         let currentIndex = Array.from(items).indexOf(activeItem);
@@ -269,57 +316,64 @@ const GuidesModule = {
     // Search clients for autocomplete
     async searchClients(query) {
         const suggestionsEl = document.getElementById('clientSuggestions');
-        if (!suggestionsEl) return;
+        if (!suggestionsEl) {
+            console.warn('[GuidesModule] clientSuggestions element not found');
+            return;
+        }
 
-        // Ensure data is loaded
-        if (!this.allClients || this.allClients.length === 0) {
-            suggestionsEl.innerHTML = '<div class="autocomplete-no-results">Cargando clientes...</div>';
-            suggestionsEl.classList.add('active');
-            try {
-                this.allClients = await Database.getClients();
-            } catch (e) {
-                console.error('Error fetching clients for autocomplete:', e);
-                this.allClients = [];
+        try {
+            // Ensure data is loaded
+            if (!this.allClients || this.allClients.length === 0) {
+                suggestionsEl.innerHTML = '<div class="autocomplete-no-results">Cargando clientes...</div>';
+                suggestionsEl.classList.add('active');
+                try {
+                    this.allClients = await Database.getClients();
+                } catch (e) {
+                    console.error('[GuidesModule] Error fetching clients:', e);
+                    this.allClients = [];
+                }
             }
-        }
 
-        const queryLower = (query || '').toLowerCase().trim();
-        const searchWords = queryLower.split(/\s+/).filter(w => w.length > 0);
-        let filtered = this.allClients || [];
+            const queryLower = (query || '').toLowerCase().trim();
+            const searchWords = queryLower.split(/\s+/).filter(w => w.length > 0);
+            let filtered = this.allClients || [];
 
-        if (searchWords.length > 0) {
-            filtered = filtered.filter(client => {
-                const name = (client.fullName || client.name || client.full_name || '').toLowerCase();
-                const phone = (client.phone ? String(client.phone) : '').toLowerCase();
-                const city = (client.city || '').toLowerCase();
-                const address = (client.address || '').toLowerCase();
-                const combined = `${name} ${phone} ${city} ${address}`;
-                return searchWords.every(word => combined.includes(word));
-            });
-        }
+            if (searchWords.length > 0) {
+                filtered = filtered.filter(client => {
+                    const name = (client.fullName || client.name || client.full_name || '').toLowerCase();
+                    const phone = (client.phone ? String(client.phone) : '').toLowerCase();
+                    const city = (client.city || '').toLowerCase();
+                    const address = (client.address || '').toLowerCase();
+                    const combined = `${name} ${phone} ${city} ${address}`;
+                    return searchWords.every(word => combined.includes(word));
+                });
+            }
 
-        filtered = filtered.slice(0, 25);
+            filtered = filtered.slice(0, 25);
 
-        if (filtered.length === 0) {
-            suggestionsEl.innerHTML = '<div class="autocomplete-no-results">No se encontraron clientes</div>';
-        } else {
-            suggestionsEl.innerHTML = filtered.map(client => {
-                const name = client.fullName || client.name || client.full_name || 'Sin nombre';
-                const phone = client.phone ? String(client.phone) : '';
-                const city = client.city || '';
-                return `
-                    <div class="autocomplete-item" data-id="${client.id}">
-                        <div class="item-main">${queryLower.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
-                        <div class="item-secondary">
-                            ${phone ? `<span>📞 ${Utils.escapeHtml(phone)}</span>` : ''}
-                            ${city ? `<span class="item-badge">${Utils.escapeHtml(city)}</span>` : ''}
+            if (filtered.length === 0) {
+                suggestionsEl.innerHTML = '<div class="autocomplete-no-results">No se encontraron clientes</div>';
+            } else {
+                suggestionsEl.innerHTML = filtered.map(client => {
+                    const name = client.fullName || client.name || client.full_name || 'Sin nombre';
+                    const phone = client.phone ? String(client.phone) : '';
+                    const city = client.city || '';
+                    return `
+                        <div class="autocomplete-item" data-id="${client.id}">
+                            <div class="item-main">${queryLower.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
+                            <div class="item-secondary">
+                                ${phone ? `<span>📞 ${Utils.escapeHtml(phone)}</span>` : ''}
+                                ${city ? `<span class="item-badge">${Utils.escapeHtml(city)}</span>` : ''}
+                            </div>
                         </div>
-                    </div>
-                `;
-            }).join('');
-        }
+                    `;
+                }).join('');
+            }
 
-        suggestionsEl.classList.add('active');
+            suggestionsEl.classList.add('active');
+        } catch (err) {
+            console.error('[GuidesModule] Error in searchClients:', err);
+        }
     },
 
     // Select a client from autocomplete
@@ -376,83 +430,90 @@ const GuidesModule = {
     // Search products for autocomplete (instant and non-blocking)
     async searchProducts(query) {
         const suggestionsEl = document.getElementById('productSuggestions');
-        if (!suggestionsEl) return;
-
-        // Ensure products are loaded
-        if (!this.allProducts || this.allProducts.length === 0) {
-            suggestionsEl.innerHTML = '<div class="autocomplete-no-results">Cargando productos...</div>';
-            suggestionsEl.classList.add('active');
-            try {
-                const products = await Database.getProducts();
-                this.allProducts = (products || []).filter(p => p.active !== false);
-            } catch (e) {
-                console.error('Error fetching products for autocomplete:', e);
-                this.allProducts = [];
-            }
-        }
-
-        const queryNormalized = this._normalizeText(query || '');
-        const searchWords = queryNormalized.split(/[\s\-]+/).filter(w => w.length > 0);
-        let filtered = this.allProducts || [];
-
-        if (searchWords.length > 0) {
-            filtered = filtered.filter(product => {
-                const haystack = this._normalizeText(`${product.name || ''} ${product.sku || ''} ${product.category || ''} ${product.description || ''}`);
-                return searchWords.every(word => haystack.includes(word));
-            });
-        }
-
-        filtered = filtered.slice(0, 30);
-
-        if (filtered.length === 0) {
-            suggestionsEl.innerHTML = '<div class="autocomplete-no-results">No se encontraron productos</div>';
-            suggestionsEl.classList.add('active');
+        if (!suggestionsEl) {
+            console.warn('[GuidesModule] productSuggestions element not found');
             return;
         }
 
-        // Use cached inventory if present, otherwise trigger background refresh without blocking
-        if (!this._cachedInventory || (Date.now() - (this._cachedInventoryTime || 0) > 60000)) {
-            Database.getInventory().then(inv => {
-                if (inv && inv.length > 0) {
-                    this._cachedInventory = inv;
-                    this._cachedInventoryTime = Date.now();
+        try {
+            // Ensure products are loaded
+            if (!this.allProducts || this.allProducts.length === 0) {
+                suggestionsEl.innerHTML = '<div class="autocomplete-no-results">Cargando productos...</div>';
+                suggestionsEl.classList.add('active');
+                try {
+                    const products = await Database.getProducts();
+                    this.allProducts = (products || []).filter(p => p.active !== false);
+                } catch (e) {
+                    console.error('[GuidesModule] Error fetching products:', e);
+                    this.allProducts = [];
                 }
-            }).catch(e => console.warn('Background inventory refresh error:', e));
-        }
+            }
 
-        const invMap = {};
-        const targetCity = this.selectedCity;
-        if (this._cachedInventory && Array.isArray(this._cachedInventory)) {
-            this._cachedInventory.forEach(inv => {
-                if (inv.productId) {
-                    if (!targetCity || inv.city === targetCity) {
-                        invMap[inv.productId] = (invMap[inv.productId] || 0) + (inv.available || 0);
+            const queryNormalized = this._normalizeText(query || '');
+            const searchWords = queryNormalized.split(/[\s\-]+/).filter(w => w.length > 0);
+            let filtered = this.allProducts || [];
+
+            if (searchWords.length > 0) {
+                filtered = filtered.filter(product => {
+                    const haystack = this._normalizeText(`${product.name || ''} ${product.sku || ''} ${product.category || ''} ${product.description || ''}`);
+                    return searchWords.every(word => haystack.includes(word));
+                });
+            }
+
+            filtered = filtered.slice(0, 30);
+
+            if (filtered.length === 0) {
+                suggestionsEl.innerHTML = '<div class="autocomplete-no-results">No se encontraron productos</div>';
+                suggestionsEl.classList.add('active');
+                return;
+            }
+
+            // Use cached inventory if present, otherwise trigger background refresh without blocking
+            if (!this._cachedInventory || (Date.now() - (this._cachedInventoryTime || 0) > 60000)) {
+                Database.getInventory().then(inv => {
+                    if (inv && inv.length > 0) {
+                        this._cachedInventory = inv;
+                        this._cachedInventoryTime = Date.now();
                     }
-                }
-            });
-        }
+                }).catch(e => console.warn('Background inventory refresh error:', e));
+            }
 
-        suggestionsEl.innerHTML = filtered.map(product => {
-            const hasStockData = this._cachedInventory && this._cachedInventory.length > 0;
-            const stockVal = hasStockData ? (invMap[product.id] !== undefined ? invMap[product.id] : 0) : null;
-            const stockClass = stockVal === null ? 'warning' : (stockVal > 5 ? 'success' : (stockVal > 0 ? 'warning' : 'danger'));
-            const stockLabel = stockVal === null ? 'Stock: Verificando...' : (targetCity ? `Stock (${targetCity}): ${stockVal}` : `Stock: ${stockVal}`);
-            const priceVal = parseFloat(product.price || 0);
-            const name = product.name || 'Sin nombre';
+            const invMap = {};
+            const targetCity = this.selectedCity;
+            if (this._cachedInventory && Array.isArray(this._cachedInventory)) {
+                this._cachedInventory.forEach(inv => {
+                    if (inv.productId) {
+                        if (!targetCity || inv.city === targetCity) {
+                            invMap[inv.productId] = (invMap[inv.productId] || 0) + (inv.available || 0);
+                        }
+                    }
+                });
+            }
 
-            return `
-                <div class="autocomplete-item" data-id="${product.id}">
-                    <div class="item-main">${queryNormalized.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
-                    <div class="item-secondary">
-                        <span>💵 ${Utils.formatCurrency(priceVal)}</span>
-                        <span class="item-badge ${stockClass}">${stockLabel}</span>
-                        ${product.sku ? `<span style="color: var(--text-muted);">SKU: ${Utils.escapeHtml(product.sku)}</span>` : ''}
+            suggestionsEl.innerHTML = filtered.map(product => {
+                const hasStockData = this._cachedInventory && this._cachedInventory.length > 0;
+                const stockVal = hasStockData ? (invMap[product.id] !== undefined ? invMap[product.id] : 0) : null;
+                const stockClass = stockVal === null ? 'warning' : (stockVal > 5 ? 'success' : (stockVal > 0 ? 'warning' : 'danger'));
+                const stockLabel = stockVal === null ? 'Stock: Verificando...' : (targetCity ? `Stock (${targetCity}): ${stockVal}` : `Stock: ${stockVal}`);
+                const priceVal = parseFloat(product.price || 0);
+                const name = product.name || 'Sin nombre';
+
+                return `
+                    <div class="autocomplete-item" data-id="${product.id}">
+                        <div class="item-main">${queryNormalized.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
+                        <div class="item-secondary">
+                            <span>💵 ${Utils.formatCurrency(priceVal)}</span>
+                            <span class="item-badge ${stockClass}">${stockLabel}</span>
+                            ${product.sku ? `<span style="color: var(--text-muted);">SKU: ${Utils.escapeHtml(product.sku)}</span>` : ''}
+                        </div>
                     </div>
-                </div>
-            `;
-        }).join('');
+                `;
+            }).join('');
 
-        suggestionsEl.classList.add('active');
+            suggestionsEl.classList.add('active');
+        } catch (err) {
+            console.error('[GuidesModule] Error in searchProducts:', err);
+        }
     },
 
     // Select a product from autocomplete
@@ -915,6 +976,7 @@ const GuidesModule = {
     },
 
     async openGuideModal(clientId = null) {
+        this._ensureEventsBound();
         const form = document.getElementById('formGuide');
         form.reset();
         document.getElementById('guideId').value = '';
