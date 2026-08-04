@@ -4050,7 +4050,7 @@ const IncomeStatementModule = {
     // ========================================
     // EXPORT TO EXCEL
     // ========================================
-    exportToExcel() {
+    async exportToExcel() {
         if (typeof XLSX === 'undefined') {
             Utils.showToast('La librería XLSX no está disponible', 'error');
             return;
@@ -4058,6 +4058,10 @@ const IncomeStatementModule = {
 
         try {
             Utils.showToast('Generando reporte Excel del Estado de Resultados...', 'info');
+
+            if (!this.guides || this.guides.length === 0) {
+                await this.loadAllData();
+            }
 
             const salesData = this.getSalesByCountry();
             const adExpData = this.getAdExpensesByCountry();

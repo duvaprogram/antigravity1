@@ -867,18 +867,69 @@ const AnalyticsModule = {
         }
 
         try {
-            Utils.showToast('Generando reporte Excel...', 'info');
+            Utils.showToast('Preparando exportación a Excel...', 'info');
 
-            const guides = this.filteredGuides || [];
-            if (guides.length === 0) {
+            let guides = this.filteredGuides;
+            if (!guides || guides.length === 0) {
+                const allGuides = await Database.getGuides();
+                this.filteredGuides = this.applyFilters(allGuides);
+                guides = this.filteredGuides;
+            }
+
+            if (!guides || guides.length === 0) {
                 Utils.showToast('No hay guías para exportar con los filtros actuales', 'warning');
                 return;
             }
 
+            if (!this.allProducts || this.allProducts.length === 0) {
+                await this.loadProducts();
+            }
+
             // Build product cost map
             const productCostMap = {};
-            for (const p of this.allProducts) {
-                productCostMap[p.id] = (parseFloat(p.cost) || 0) * this.COST_FACTOR;
+            for (const p of (this.allProducts || [])) {
+                productCostMap[p.id] = (parseFloat(p.cost) || 0) * (this.COST_FACTOR || 40000);
+            }
+
+            // Fetch all guide items for these guides in BULK
+            const guideIds = guides.map(g => g.id).filter(Boolean);
+            const itemsByGuideId = {};
+
+            if (guideIds.length > 0) {
+                for (let i = 0; i < guideIds.length; i += 400) {
+                    const chunk = guideIds.slice(i, i + 400);
+                    try {
+                        const { data, error } = await supabaseClient
+                            .from('guide_items')
+                            .select(`
+                                *,
+                                products (id, name, sku, cost, price)
+                            `)
+                            .in('guide_id', chunk);
+
+                        if (!error && data) {
+                            data.forEach(item => {
+                                if (!itemsByGuideId[item.guide_id]) {
+                                    itemsByGuideId[item.guide_id] = [];
+                                }
+                                const prod = item.products || {};
+                                const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : ((parseFloat(prod.cost) || 0) * (this.COST_FACTOR || 40000));
+                                itemsByGuideId[item.guide_id].push({
+                                    id: item.id,
+                                    guideId: item.guide_id,
+                                    productId: item.product_id,
+                                    productName: prod.name || item.product_name || 'Producto',
+                                    quantity: parseInt(item.quantity || 1),
+                                    unitPrice: parseFloat(item.unit_price || item.price || 0),
+                                    subtotal: parseFloat(item.subtotal || ((item.quantity || 1) * (item.unit_price || 0))),
+                                    cost: unitCost
+                                });
+                            });
+                        }
+                    } catch (err) {
+                        console.warn('Error al consultar ítems en lote:', err);
+                    }
+                }
             }
 
             // 1. SHEET: DETALLE DE GUÍAS
@@ -899,8 +950,8 @@ const AnalyticsModule = {
                 'Observaciones'
             ];
 
-            const guidesRows = [];
             const sortedGuides = [...guides].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            const guidesRows = [];
 
             for (const guide of sortedGuides) {
                 const isDevol = this.isDevolucion(guide);
@@ -911,21 +962,17 @@ const AnalyticsModule = {
                 const bsVal = isExcluded ? 0 : (parseFloat(guide.paymentBs || 0) || 0);
                 const shippingCost = isCanc ? 0 : (parseFloat(guide.shippingCost || 0) || 0);
 
+                const items = itemsByGuideId[guide.id] || [];
                 let itemsSummary = '';
                 let guideProductCost = 0;
-                try {
-                    const items = await Database.getGuideItems(guide.id);
-                    if (items && items.length > 0) {
-                        itemsSummary = items.map(it => `${it.quantity || 1}x ${it.productName || 'Producto'}`).join(' | ');
-                        if (!isExcluded) {
-                            for (const it of items) {
-                                const uCost = productCostMap[it.productId] || 0;
-                                guideProductCost += uCost * (it.quantity || 1);
-                            }
+
+                if (items.length > 0) {
+                    itemsSummary = items.map(it => `${it.quantity}x ${it.productName}`).join(' | ');
+                    if (!isExcluded) {
+                        for (const it of items) {
+                            guideProductCost += (it.cost || (productCostMap[it.productId] || 0)) * it.quantity;
                         }
                     }
-                } catch (e) {
-                    console.warn('Error al obtener ítems de guía', guide.id, e);
                 }
 
                 const netProfit = totalUsdVal - guideProductCost - shippingCost;
@@ -970,8 +1017,8 @@ const AnalyticsModule = {
             const effectiveGuides = sortedGuides.filter(g => !this.isExcludedFromSales(g));
             const devolucionGuides = sortedGuides.filter(g => this.isDevolucion(g));
             const cancelledGuides = sortedGuides.filter(g => this.isCancelado(g));
-            const deliveredGuides = sortedGuides.filter(g => g.status === 'Entregado');
-            const paidGuides = sortedGuides.filter(g => g.status === 'Pagado');
+            const deliveredGuides = sortedGuides.filter(g => (g.status || '').toLowerCase().includes('entreg'));
+            const paidGuides = sortedGuides.filter(g => (g.status || '').toLowerCase().includes('pagad'));
 
             const totalDollars = effectiveGuides.reduce((sum, g) => sum + (parseFloat(g.totalAmount || g.amountUsd || 0) || 0), 0);
             const totalBs = effectiveGuides.reduce((sum, g) => sum + (parseFloat(g.paymentBs || 0) || 0), 0);
@@ -979,13 +1026,10 @@ const AnalyticsModule = {
 
             let totalCogs = 0;
             for (const g of effectiveGuides) {
-                try {
-                    const items = await Database.getGuideItems(g.id);
-                    for (const it of items) {
-                        const uCost = productCostMap[it.productId] || 0;
-                        totalCogs += uCost * (it.quantity || 1);
-                    }
-                } catch (e) {}
+                const items = itemsByGuideId[g.id] || [];
+                for (const it of items) {
+                    totalCogs += (it.cost || (productCostMap[it.productId] || 0)) * it.quantity;
+                }
             }
 
             const netProfitTotal = totalDollars - totalCogs - totalFletes;
@@ -1023,28 +1067,26 @@ const AnalyticsModule = {
             // 3. SHEET: PRODUCTOS MÁS VENDIDOS
             const productSales = {};
             for (const guide of effectiveGuides) {
-                try {
-                    const items = await Database.getGuideItems(guide.id);
-                    for (const item of items) {
-                        const productName = item.productName || 'Producto';
-                        const productId = item.productId;
-                        const unitCost = productCostMap[productId] || 0;
+                const items = itemsByGuideId[guide.id] || [];
+                for (const item of items) {
+                    const productName = item.productName || 'Producto';
+                    const productId = item.productId || item.productName;
+                    const unitCost = item.cost || (productCostMap[productId] || 0);
 
-                        if (!productSales[productId]) {
-                            productSales[productId] = {
-                                name: productName,
-                                quantity: 0,
-                                revenue: 0,
-                                cost: 0,
-                                guideCount: 0
-                            };
-                        }
-                        productSales[productId].quantity += (item.quantity || 1);
-                        productSales[productId].revenue += item.subtotal || ((item.quantity || 1) * (item.unitPrice || 0));
-                        productSales[productId].cost += unitCost * (item.quantity || 1);
-                        productSales[productId].guideCount++;
+                    if (!productSales[productId]) {
+                        productSales[productId] = {
+                            name: productName,
+                            quantity: 0,
+                            revenue: 0,
+                            cost: 0,
+                            guideCount: 0
+                        };
                     }
-                } catch (e) {}
+                    productSales[productId].quantity += (item.quantity || 1);
+                    productSales[productId].revenue += item.subtotal || ((item.quantity || 1) * (item.unitPrice || 0));
+                    productSales[productId].cost += unitCost * (item.quantity || 1);
+                    productSales[productId].guideCount++;
+                }
             }
 
             const sortedProducts = Object.values(productSales).sort((a, b) => b.quantity - a.quantity);
@@ -1088,7 +1130,7 @@ const AnalyticsModule = {
 
         } catch (error) {
             console.error('Error al exportar análisis a Excel:', error);
-            Utils.showToast('Error al generar archivo Excel', 'error');
+            Utils.showToast('Error al generar archivo Excel: ' + (error.message || ''), 'error');
         }
     }
 };
