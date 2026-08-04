@@ -57,12 +57,8 @@ const GuidesModule = {
         const clientSearchInput = document.getElementById('guideClientSearch');
         const clientSuggestionsEl = document.getElementById('clientSuggestions');
         if (clientSearchInput) {
-            let clientSearchDebounce = null;
             clientSearchInput.addEventListener('input', () => {
-                clearTimeout(clientSearchDebounce);
-                clientSearchDebounce = setTimeout(() => {
-                    this.searchClients(clientSearchInput.value);
-                }, 150);
+                this.searchClients(clientSearchInput.value);
             });
 
             clientSearchInput.addEventListener('focus', () => {
@@ -94,12 +90,8 @@ const GuidesModule = {
         const productSearchInput = document.getElementById('guideProductSearch');
         const productSuggestionsEl = document.getElementById('productSuggestions');
         if (productSearchInput) {
-            let productSearchDebounce = null;
             productSearchInput.addEventListener('input', () => {
-                clearTimeout(productSearchDebounce);
-                productSearchDebounce = setTimeout(() => {
-                    this.searchProducts(productSearchInput.value);
-                }, 150);
+                this.searchProducts(productSearchInput.value);
             });
 
             productSearchInput.addEventListener('focus', () => {
@@ -334,18 +326,18 @@ const GuidesModule = {
                 }
             }
 
-            const queryLower = (query || '').toLowerCase().trim();
-            const searchWords = queryLower.split(/\s+/).filter(w => w.length > 0);
+            const queryNormalized = this._normalizeText(query || '');
+            const searchWords = queryNormalized.split(/[\s\-]+/).filter(w => w.length > 0);
             let filtered = this.allClients || [];
 
             if (searchWords.length > 0) {
                 filtered = filtered.filter(client => {
-                    const name = (client.fullName || client.name || client.full_name || '').toLowerCase();
-                    const phone = (client.phone ? String(client.phone) : '').toLowerCase();
-                    const city = (client.city || '').toLowerCase();
-                    const address = (client.address || '').toLowerCase();
-                    const combined = `${name} ${phone} ${city} ${address}`;
-                    return searchWords.every(word => combined.includes(word));
+                    const name = (client.fullName || client.name || client.full_name || '');
+                    const phone = (client.phone ? String(client.phone) : '');
+                    const city = (client.city || '');
+                    const address = (client.address || '');
+                    const haystack = this._normalizeText(`${name} ${phone} ${city} ${address}`);
+                    return searchWords.every(word => haystack.includes(word));
                 });
             }
 
@@ -360,7 +352,7 @@ const GuidesModule = {
                     const city = client.city || '';
                     return `
                         <div class="autocomplete-item" data-id="${client.id}">
-                            <div class="item-main">${queryLower.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
+                            <div class="item-main">${queryNormalized.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
                             <div class="item-secondary">
                                 ${phone ? `<span>📞 ${Utils.escapeHtml(phone)}</span>` : ''}
                                 ${city ? `<span class="item-badge">${Utils.escapeHtml(city)}</span>` : ''}
@@ -371,6 +363,7 @@ const GuidesModule = {
             }
 
             suggestionsEl.classList.add('active');
+            suggestionsEl.style.display = 'block';
         } catch (err) {
             console.error('[GuidesModule] Error in searchClients:', err);
         }
@@ -511,6 +504,7 @@ const GuidesModule = {
             }).join('');
 
             suggestionsEl.classList.add('active');
+            suggestionsEl.style.display = 'block';
         } catch (err) {
             console.error('[GuidesModule] Error in searchProducts:', err);
         }
@@ -1005,8 +999,12 @@ const GuidesModule = {
         this.clearProductSelection();
         document.getElementById('productSuggestions').classList.remove('active');
 
-        // Refresh caches asynchronously in background without wiping current cache
-        this.preloadData();
+        // Refresh caches - await if empty so search works 100% instantly on first keystroke
+        if (!this.allClients || this.allClients.length === 0 || !this.allProducts || this.allProducts.length === 0) {
+            await this.preloadData();
+        } else {
+            this.preloadData();
+        }
 
         // If clientId provided, select it
         if (clientId) {
