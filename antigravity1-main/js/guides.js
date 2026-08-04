@@ -3,6 +3,8 @@ const GuidesModule = {
     currentGuideItems: [],
     allClients: [],
     allProducts: [],
+    _cachedInventory: null,
+    _cachedInventoryTime: 0,
     selectedCity: null,
     adjustingGuideId: null,
     currentNovedadGuideId: null,
@@ -11,48 +13,101 @@ const GuidesModule = {
         if (this._initialized) return;
         this._initialized = true;
         this.bindEvents();
+        // Preload clients and products in background on startup
+        this.preloadData();
     },
 
     bindEvents() {
         // New guide button
-        document.getElementById('btnNewGuide').addEventListener('click', () => {
-            this.openGuideModal();
-        });
+        const btnNewGuide = document.getElementById('btnNewGuide');
+        if (btnNewGuide) {
+            btnNewGuide.addEventListener('click', () => {
+                this.openGuideModal();
+            });
+        }
 
         // Guide form submission
-        document.getElementById('formGuide').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.saveGuide();
-        });
+        const formGuide = document.getElementById('formGuide');
+        if (formGuide) {
+            formGuide.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.saveGuide();
+            });
+        }
 
         // Client autocomplete search
         const clientSearchInput = document.getElementById('guideClientSearch');
+        const clientSuggestionsEl = document.getElementById('clientSuggestions');
         if (clientSearchInput) {
-            clientSearchInput.addEventListener('input', Utils.debounce(() => {
+            clientSearchInput.addEventListener('input', () => {
                 this.searchClients(clientSearchInput.value);
-            }, 150));
+            });
 
             clientSearchInput.addEventListener('focus', () => {
                 this.searchClients(clientSearchInput.value || '');
+            });
+
+            clientSearchInput.addEventListener('click', () => {
+                this.searchClients(clientSearchInput.value || '');
+            });
+        }
+
+        if (clientSuggestionsEl) {
+            clientSuggestionsEl.addEventListener('mousedown', (e) => {
+                const item = e.target.closest('.autocomplete-item');
+                if (item && item.dataset.id) {
+                    e.preventDefault();
+                    this.selectClient(item.dataset.id);
+                }
+            });
+            clientSuggestionsEl.addEventListener('click', (e) => {
+                const item = e.target.closest('.autocomplete-item');
+                if (item && item.dataset.id) {
+                    this.selectClient(item.dataset.id);
+                }
             });
         }
 
         // Product autocomplete search
         const productSearchInput = document.getElementById('guideProductSearch');
+        const productSuggestionsEl = document.getElementById('productSuggestions');
         if (productSearchInput) {
-            productSearchInput.addEventListener('input', Utils.debounce(() => {
+            productSearchInput.addEventListener('input', () => {
                 this.searchProducts(productSearchInput.value);
-            }, 150));
+            });
 
             productSearchInput.addEventListener('focus', () => {
                 this.searchProducts(productSearchInput.value || '');
             });
+
+            productSearchInput.addEventListener('click', () => {
+                this.searchProducts(productSearchInput.value || '');
+            });
+        }
+
+        if (productSuggestionsEl) {
+            productSuggestionsEl.addEventListener('mousedown', (e) => {
+                const item = e.target.closest('.autocomplete-item');
+                if (item && item.dataset.id) {
+                    e.preventDefault();
+                    this.selectProduct(item.dataset.id, item.dataset.name, item.dataset.price, item.dataset.stock);
+                }
+            });
+            productSuggestionsEl.addEventListener('click', (e) => {
+                const item = e.target.closest('.autocomplete-item');
+                if (item && item.dataset.id) {
+                    this.selectProduct(item.dataset.id, item.dataset.name, item.dataset.price, item.dataset.stock);
+                }
+            });
         }
 
         // Add product to guide
-        document.getElementById('btnAddProductToGuide').addEventListener('click', () => {
-            this.addProductToGuide();
-        });
+        const btnAddProduct = document.getElementById('btnAddProductToGuide');
+        if (btnAddProduct) {
+            btnAddProduct.addEventListener('click', () => {
+                this.addProductToGuide();
+            });
+        }
 
         // Search guides
         document.getElementById('searchGuides').addEventListener('input',
@@ -195,8 +250,10 @@ const GuidesModule = {
         const suggestionsEl = document.getElementById('clientSuggestions');
         if (!suggestionsEl) return;
 
-        // Load all clients if not loaded
+        // Ensure data is loaded
         if (!this.allClients || this.allClients.length === 0) {
+            suggestionsEl.innerHTML = '<div class="autocomplete-no-results">Cargando clientes...</div>';
+            suggestionsEl.classList.add('active');
             try {
                 this.allClients = await Database.getClients();
             } catch (e) {
@@ -206,18 +263,21 @@ const GuidesModule = {
         }
 
         const queryLower = (query || '').toLowerCase().trim();
+        const searchWords = queryLower.split(/\s+/).filter(w => w.length > 0);
         let filtered = this.allClients || [];
 
-        if (queryLower.length >= 1) {
+        if (searchWords.length > 0) {
             filtered = filtered.filter(client => {
                 const name = (client.fullName || client.name || client.full_name || '').toLowerCase();
                 const phone = (client.phone ? String(client.phone) : '').toLowerCase();
                 const city = (client.city || '').toLowerCase();
-                return name.includes(queryLower) || phone.includes(queryLower) || city.includes(queryLower);
+                const address = (client.address || '').toLowerCase();
+                const combined = `${name} ${phone} ${city} ${address}`;
+                return searchWords.every(word => combined.includes(word));
             });
         }
 
-        filtered = filtered.slice(0, 20);
+        filtered = filtered.slice(0, 25);
 
         if (filtered.length === 0) {
             suggestionsEl.innerHTML = '<div class="autocomplete-no-results">No se encontraron clientes</div>';
@@ -236,13 +296,6 @@ const GuidesModule = {
                     </div>
                 `;
             }).join('');
-
-            // Add click handlers
-            suggestionsEl.querySelectorAll('.autocomplete-item').forEach(item => {
-                item.addEventListener('click', () => {
-                    this.selectClient(item.dataset.id);
-                });
-            });
         }
 
         suggestionsEl.classList.add('active');
@@ -250,13 +303,17 @@ const GuidesModule = {
 
     // Select a client from autocomplete
     async selectClient(clientId) {
-        const client = this.allClients.find(c => c.id === clientId) || await Database.getClient(clientId);
+        const client = (this.allClients || []).find(c => c.id === clientId) || await Database.getClient(clientId);
         if (!client) return;
 
         // Update hidden input and search field
-        document.getElementById('guideClient').value = clientId;
-        document.getElementById('guideClientSearch').value = client.fullName;
-        document.getElementById('clientSuggestions').classList.remove('active');
+        const clientHidden = document.getElementById('guideClient');
+        const clientSearch = document.getElementById('guideClientSearch');
+        const suggEl = document.getElementById('clientSuggestions');
+
+        if (clientHidden) clientHidden.value = clientId;
+        if (clientSearch) clientSearch.value = client.fullName;
+        if (suggEl) suggEl.classList.remove('active');
 
         // Store selected city for product filtering
         this.selectedCity = client.city;
@@ -265,16 +322,24 @@ const GuidesModule = {
         await this.onClientSelect(clientId);
 
         // Hide search field and show info
-        document.getElementById('guideClientSearch').parentElement.style.display = 'none';
+        if (clientSearch && clientSearch.parentElement) {
+            clientSearch.parentElement.style.display = 'none';
+        }
     },
 
     // Clear client selection
     clearClientSelection() {
         document.getElementById('guideClient').value = '';
-        document.getElementById('guideClientSearch').value = '';
-        document.getElementById('guideClientSearch').parentElement.style.display = 'block';
+        const searchInput = document.getElementById('guideClientSearch');
+        if (searchInput) {
+            searchInput.value = '';
+            if (searchInput.parentElement) {
+                searchInput.parentElement.style.display = 'block';
+            }
+        }
         document.getElementById('selectedClientInfo').style.display = 'none';
-        document.getElementById('caracasFields').style.display = 'none';
+        const caracasFields = document.getElementById('caracasFields');
+        if (caracasFields) caracasFields.style.display = 'none';
         this.selectedCity = null;
 
         // Clear product selection too since it depends on city
@@ -286,8 +351,10 @@ const GuidesModule = {
         const suggestionsEl = document.getElementById('productSuggestions');
         if (!suggestionsEl) return;
 
-        // Load all products if not loaded
+        // Ensure products are loaded
         if (!this.allProducts || this.allProducts.length === 0) {
+            suggestionsEl.innerHTML = '<div class="autocomplete-no-results">Cargando productos...</div>';
+            suggestionsEl.classList.add('active');
             try {
                 const products = await Database.getProducts();
                 this.allProducts = (products || []).filter(p => p.active !== false);
@@ -298,15 +365,17 @@ const GuidesModule = {
         }
 
         const queryLower = (query || '').toLowerCase().trim();
+        const searchWords = queryLower.split(/\s+/).filter(w => w.length > 0);
         let filtered = this.allProducts || [];
 
-        if (queryLower.length >= 1) {
+        if (searchWords.length > 0) {
             filtered = filtered.filter(product => {
                 const name = (product.name || '').toLowerCase();
                 const sku = (product.sku || '').toLowerCase();
                 const cat = (product.category || '').toLowerCase();
                 const desc = (product.description || '').toLowerCase();
-                return name.includes(queryLower) || sku.includes(queryLower) || cat.includes(queryLower) || desc.includes(queryLower);
+                const combined = `${name} ${sku} ${cat} ${desc}`;
+                return searchWords.every(word => combined.includes(word));
             });
         }
 
@@ -318,22 +387,24 @@ const GuidesModule = {
             return;
         }
 
-        // Get stock for each product efficiently
-        let inventories = [];
-        try {
-            if (this.selectedCity) {
-                inventories = await Database.getInventoryByCity(this.selectedCity) || [];
-            } else {
-                inventories = await Database.getInventory() || [];
+        // Fetch or use cached inventory
+        if (!this._cachedInventory || (Date.now() - (this._cachedInventoryTime || 0) > 30000)) {
+            try {
+                this._cachedInventory = await Database.getInventory() || [];
+                this._cachedInventoryTime = Date.now();
+            } catch (e) {
+                console.warn('Error fetching inventory for autocomplete:', e);
+                this._cachedInventory = this._cachedInventory || [];
             }
-        } catch (e) {
-            console.warn('Error fetching inventory for autocomplete:', e);
         }
 
         const invMap = {};
-        inventories.forEach(inv => {
+        const targetCity = this.selectedCity;
+        (this._cachedInventory || []).forEach(inv => {
             if (inv.productId) {
-                invMap[inv.productId] = (invMap[inv.productId] || 0) + (inv.available || 0);
+                if (!targetCity || inv.city === targetCity) {
+                    invMap[inv.productId] = (invMap[inv.productId] || 0) + (inv.available || 0);
+                }
             }
         });
 
@@ -344,7 +415,7 @@ const GuidesModule = {
 
         suggestionsEl.innerHTML = productsWithStock.map(product => {
             const stockClass = product.stock > 5 ? 'success' : (product.stock > 0 ? 'warning' : 'danger');
-            const stockLabel = this.selectedCity ? `Stock (${this.selectedCity}): ${product.stock}` : `Stock: ${product.stock}`;
+            const stockLabel = targetCity ? `Stock (${targetCity}): ${product.stock}` : `Stock: ${product.stock}`;
             const priceVal = parseFloat(product.price || 0);
             const name = product.name || 'Sin nombre';
             return `
@@ -359,13 +430,6 @@ const GuidesModule = {
             `;
         }).join('');
 
-        // Add click handlers
-        suggestionsEl.querySelectorAll('.autocomplete-item').forEach(item => {
-            item.addEventListener('click', () => {
-                this.selectProduct(item.dataset.id, item.dataset.name, item.dataset.price, item.dataset.stock);
-            });
-        });
-
         suggestionsEl.classList.add('active');
     },
 
@@ -374,11 +438,15 @@ const GuidesModule = {
         const prodSelect = document.getElementById('guideProductSelect');
         const prodSearch = document.getElementById('guideProductSearch');
         const prodPrice = document.getElementById('guideProductPrice');
+        const prodQty = document.getElementById('guideProductQty');
         const suggEl = document.getElementById('productSuggestions');
 
         if (prodSelect) prodSelect.value = productId;
         if (prodSearch) prodSearch.value = productName;
         if (prodPrice) prodPrice.value = price !== undefined ? price : '';
+        if (prodQty && (!prodQty.value || parseInt(prodQty.value) < 1)) {
+            prodQty.value = '1';
+        }
         if (suggEl) suggEl.classList.remove('active');
 
         // Show stock info
@@ -387,6 +455,12 @@ const GuidesModule = {
             const cityLabel = this.selectedCity ? ` (${this.selectedCity})` : '';
             stockEl.textContent = `Stock disponible${cityLabel}: ${stock !== undefined ? stock : 'N/A'}`;
             stockEl.style.display = 'inline';
+        }
+
+        // Focus quantity input for fast adding
+        if (prodQty) {
+            prodQty.focus();
+            prodQty.select();
         }
     },
 
@@ -817,17 +891,19 @@ const GuidesModule = {
         // Reset client search and info display
         document.getElementById('guideClientSearch').value = '';
         document.getElementById('guideClient').value = '';
-        document.getElementById('guideClientSearch').parentElement.style.display = 'block';
+        if (document.getElementById('guideClientSearch').parentElement) {
+            document.getElementById('guideClientSearch').parentElement.style.display = 'block';
+        }
         document.getElementById('selectedClientInfo').style.display = 'none';
+        const caracasFields = document.getElementById('caracasFields');
+        if (caracasFields) caracasFields.style.display = 'none';
         document.getElementById('clientSuggestions').classList.remove('active');
 
         // Reset product search
         this.clearProductSelection();
         document.getElementById('productSuggestions').classList.remove('active');
 
-        // Clear and preload caches asynchronously
-        this.allClients = [];
-        this.allProducts = [];
+        // Refresh caches asynchronously in background without wiping current cache
         this.preloadData();
 
         // If clientId provided, select it
@@ -842,12 +918,17 @@ const GuidesModule = {
 
     async preloadData() {
         try {
-            const [clients, products] = await Promise.all([
+            const [clients, products, inventory] = await Promise.all([
                 Database.getClients(),
-                Database.getProducts()
+                Database.getProducts(),
+                Database.getInventory()
             ]);
-            this.allClients = clients || [];
-            this.allProducts = (products || []).filter(p => p.active !== false);
+            if (clients && clients.length > 0) this.allClients = clients;
+            if (products && products.length > 0) this.allProducts = products.filter(p => p.active !== false);
+            if (inventory && inventory.length > 0) {
+                this._cachedInventory = inventory;
+                this._cachedInventoryTime = Date.now();
+            }
         } catch (e) {
             console.warn('Error preloading data for guides modal:', e);
         }

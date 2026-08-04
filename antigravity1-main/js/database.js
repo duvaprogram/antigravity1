@@ -57,12 +57,14 @@ const Database = {
 
     // Helper: Get city ID by name
     getCityId(cityName) {
+        if (!this._cache.cities || !Array.isArray(this._cache.cities)) return null;
         const city = this._cache.cities.find(c => c.name === cityName);
         return city ? city.id : null;
     },
 
     // Helper: Get city name by ID
     getCityName(cityId) {
+        if (!this._cache.cities || !Array.isArray(this._cache.cities)) return null;
         const city = this._cache.cities.find(c => c.id === cityId);
         return city ? city.name : null;
     },
