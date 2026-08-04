@@ -90,13 +90,34 @@ const GuidesModule = {
                 const item = e.target.closest('.autocomplete-item');
                 if (item && item.dataset.id) {
                     e.preventDefault();
-                    this.selectProduct(item.dataset.id, item.dataset.name, item.dataset.price, item.dataset.stock);
+                    this.selectProduct(item.dataset.id);
                 }
             });
             productSuggestionsEl.addEventListener('click', (e) => {
                 const item = e.target.closest('.autocomplete-item');
                 if (item && item.dataset.id) {
-                    this.selectProduct(item.dataset.id, item.dataset.name, item.dataset.price, item.dataset.stock);
+                    this.selectProduct(item.dataset.id);
+                }
+            });
+        }
+
+        // Fast Enter key on product search, price, and quantity
+        const productQtyInput = document.getElementById('guideProductQty');
+        if (productQtyInput) {
+            productQtyInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.addProductToGuide();
+                }
+            });
+        }
+
+        const productPriceInput = document.getElementById('guideProductPrice');
+        if (productPriceInput) {
+            productPriceInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.addProductToGuide();
                 }
             });
         }
@@ -346,7 +367,13 @@ const GuidesModule = {
         this.clearProductSelection();
     },
 
-    // Search products for autocomplete
+    // Normalize text for flexible searching (lowercase, no accents)
+    _normalizeText(str) {
+        if (!str) return '';
+        return String(str).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    },
+
+    // Search products for autocomplete (instant and non-blocking)
     async searchProducts(query) {
         const suggestionsEl = document.getElementById('productSuggestions');
         if (!suggestionsEl) return;
@@ -364,18 +391,14 @@ const GuidesModule = {
             }
         }
 
-        const queryLower = (query || '').toLowerCase().trim();
-        const searchWords = queryLower.split(/\s+/).filter(w => w.length > 0);
+        const queryNormalized = this._normalizeText(query || '');
+        const searchWords = queryNormalized.split(/[\s\-]+/).filter(w => w.length > 0);
         let filtered = this.allProducts || [];
 
         if (searchWords.length > 0) {
             filtered = filtered.filter(product => {
-                const name = (product.name || '').toLowerCase();
-                const sku = (product.sku || '').toLowerCase();
-                const cat = (product.category || '').toLowerCase();
-                const desc = (product.description || '').toLowerCase();
-                const combined = `${name} ${sku} ${cat} ${desc}`;
-                return searchWords.every(word => combined.includes(word));
+                const haystack = this._normalizeText(`${product.name || ''} ${product.sku || ''} ${product.category || ''} ${product.description || ''}`);
+                return searchWords.every(word => haystack.includes(word));
             });
         }
 
@@ -387,40 +410,39 @@ const GuidesModule = {
             return;
         }
 
-        // Fetch or use cached inventory
-        if (!this._cachedInventory || (Date.now() - (this._cachedInventoryTime || 0) > 30000)) {
-            try {
-                this._cachedInventory = await Database.getInventory() || [];
-                this._cachedInventoryTime = Date.now();
-            } catch (e) {
-                console.warn('Error fetching inventory for autocomplete:', e);
-                this._cachedInventory = this._cachedInventory || [];
-            }
+        // Use cached inventory if present, otherwise trigger background refresh without blocking
+        if (!this._cachedInventory || (Date.now() - (this._cachedInventoryTime || 0) > 60000)) {
+            Database.getInventory().then(inv => {
+                if (inv && inv.length > 0) {
+                    this._cachedInventory = inv;
+                    this._cachedInventoryTime = Date.now();
+                }
+            }).catch(e => console.warn('Background inventory refresh error:', e));
         }
 
         const invMap = {};
         const targetCity = this.selectedCity;
-        (this._cachedInventory || []).forEach(inv => {
-            if (inv.productId) {
-                if (!targetCity || inv.city === targetCity) {
-                    invMap[inv.productId] = (invMap[inv.productId] || 0) + (inv.available || 0);
+        if (this._cachedInventory && Array.isArray(this._cachedInventory)) {
+            this._cachedInventory.forEach(inv => {
+                if (inv.productId) {
+                    if (!targetCity || inv.city === targetCity) {
+                        invMap[inv.productId] = (invMap[inv.productId] || 0) + (inv.available || 0);
+                    }
                 }
-            }
-        });
+            });
+        }
 
-        const productsWithStock = filtered.map(product => ({
-            ...product,
-            stock: invMap[product.id] !== undefined ? invMap[product.id] : 0
-        }));
-
-        suggestionsEl.innerHTML = productsWithStock.map(product => {
-            const stockClass = product.stock > 5 ? 'success' : (product.stock > 0 ? 'warning' : 'danger');
-            const stockLabel = targetCity ? `Stock (${targetCity}): ${product.stock}` : `Stock: ${product.stock}`;
+        suggestionsEl.innerHTML = filtered.map(product => {
+            const hasStockData = this._cachedInventory && this._cachedInventory.length > 0;
+            const stockVal = hasStockData ? (invMap[product.id] !== undefined ? invMap[product.id] : 0) : null;
+            const stockClass = stockVal === null ? 'warning' : (stockVal > 5 ? 'success' : (stockVal > 0 ? 'warning' : 'danger'));
+            const stockLabel = stockVal === null ? 'Stock: Verificando...' : (targetCity ? `Stock (${targetCity}): ${stockVal}` : `Stock: ${stockVal}`);
             const priceVal = parseFloat(product.price || 0);
             const name = product.name || 'Sin nombre';
+
             return `
-                <div class="autocomplete-item" data-id="${product.id}" data-price="${priceVal}" data-stock="${product.stock}" data-name="${Utils.escapeHtml(name)}">
-                    <div class="item-main">${queryLower.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
+                <div class="autocomplete-item" data-id="${product.id}">
+                    <div class="item-main">${queryNormalized.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
                     <div class="item-secondary">
                         <span>💵 ${Utils.formatCurrency(priceVal)}</span>
                         <span class="item-badge ${stockClass}">${stockLabel}</span>
@@ -434,16 +456,28 @@ const GuidesModule = {
     },
 
     // Select a product from autocomplete
-    selectProduct(productId, productName, price, stock) {
+    async selectProduct(productId, productName = null, price = null) {
+        let product = (this.allProducts || []).find(p => p.id === productId);
+        if (!product && productId) {
+            try {
+                product = await Database.getProduct(productId);
+            } catch (e) {
+                console.warn('Error fetching single product:', e);
+            }
+        }
+
+        const name = productName || (product ? product.name : '');
+        const unitPrice = (price !== null && price !== undefined) ? price : (product ? (product.price || 0) : 0);
+
         const prodSelect = document.getElementById('guideProductSelect');
         const prodSearch = document.getElementById('guideProductSearch');
         const prodPrice = document.getElementById('guideProductPrice');
         const prodQty = document.getElementById('guideProductQty');
         const suggEl = document.getElementById('productSuggestions');
 
-        if (prodSelect) prodSelect.value = productId;
-        if (prodSearch) prodSearch.value = productName;
-        if (prodPrice) prodPrice.value = price !== undefined ? price : '';
+        if (prodSelect) prodSelect.value = productId || (product ? product.id : '');
+        if (prodSearch) prodSearch.value = name;
+        if (prodPrice) prodPrice.value = (unitPrice !== undefined && unitPrice !== null) ? unitPrice : 0;
         if (prodQty && (!prodQty.value || parseInt(prodQty.value) < 1)) {
             prodQty.value = '1';
         }
@@ -452,12 +486,18 @@ const GuidesModule = {
         // Show stock info
         const stockEl = document.getElementById('selectedProductStock');
         if (stockEl) {
-            const cityLabel = this.selectedCity ? ` (${this.selectedCity})` : '';
-            stockEl.textContent = `Stock disponible${cityLabel}: ${stock !== undefined ? stock : 'N/A'}`;
+            let availableStock = null;
+            const city = this.selectedCity;
+            if (this._cachedInventory && Array.isArray(this._cachedInventory)) {
+                const invItem = this._cachedInventory.find(i => i.productId === (productId || (product && product.id)) && (!city || i.city === city));
+                if (invItem) availableStock = invItem.available;
+            }
+            const cityLabel = city ? ` (${city})` : '';
+            stockEl.textContent = `Stock disponible${cityLabel}: ${availableStock !== null ? availableStock : 'Consultando...'}`;
             stockEl.style.display = 'inline';
         }
 
-        // Focus quantity input for fast adding
+        // Focus and select quantity input for fast adding
         if (prodQty) {
             prodQty.focus();
             prodQty.select();
@@ -977,16 +1017,16 @@ const GuidesModule = {
 
         // If product ID is not set but search field has text, try to find a matching product
         if (!productId && searchInput && searchInput.value.trim() !== '') {
-            const term = searchInput.value.trim().toLowerCase();
+            const term = this._normalizeText(searchInput.value);
             if (!this.allProducts || this.allProducts.length === 0) {
                 const prods = await Database.getProducts();
                 this.allProducts = (prods || []).filter(p => p.active !== false);
             }
-            const matched = this.allProducts.find(p => p.name.toLowerCase() === term || (p.sku && p.sku.toLowerCase() === term)) ||
-                            this.allProducts.find(p => p.name.toLowerCase().includes(term));
+            const matched = this.allProducts.find(p => this._normalizeText(p.name) === term || (p.sku && this._normalizeText(p.sku) === term)) ||
+                            this.allProducts.find(p => this._normalizeText(p.name).includes(term));
             if (matched) {
                 productId = matched.id;
-                this.selectProduct(matched.id, matched.name, matched.price, 0);
+                await this.selectProduct(matched.id, matched.name, matched.price);
             }
         }
 
@@ -1001,13 +1041,14 @@ const GuidesModule = {
             return;
         }
 
+        const existingIndex = this.currentGuideItems.findIndex(i => i.productId === productId);
+
         // Validate stock if client is selected
         if (clientId) {
             const client = (this.allClients || []).find(c => c.id === clientId) || await Database.getClient(clientId);
             if (client && client.city) {
                 const inventory = await Database.getInventoryByProduct(productId, client.city);
                 const availableStock = inventory ? (inventory.available || 0) : 0;
-                const existingIndex = this.currentGuideItems.findIndex(i => i.productId === productId);
                 const currentQty = existingIndex >= 0 ? this.currentGuideItems[existingIndex].quantity : 0;
 
                 if (quantity + currentQty > availableStock) {
