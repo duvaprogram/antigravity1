@@ -2218,15 +2218,15 @@ form {
     top: 100%;
     left: 0;
     right: 0;
-    max-height: 300px;
+    max-height: 280px;
     overflow-y: auto;
-    background: var(--surface-elevated);
-    border: 1px solid var(--border);
+    background: var(--surface-elevated, #22223a);
+    border: 1px solid var(--border, #2d2d44);
     border-top: none;
     border-radius: 0 0 var(--radius-md) var(--radius-md);
-    z-index: 1000;
+    z-index: 9999;
     display: none;
-    box-shadow: var(--shadow-lg);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
 }
 
 .autocomplete-suggestions.active {

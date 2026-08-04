@@ -541,21 +541,43 @@ const Database = {
                     *,
                     cities (name)
                 `)
-                .eq('active', true)
                 .order('created_at', { ascending: false });
 
-            if (error) throw error;
+            if (error) {
+                console.warn('Clients query with join failed, retrying without join:', error);
+                const { data: rawData, error: rawError } = await supabaseClient
+                    .from('clients')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (rawError) throw rawError;
+
+                return (rawData || []).map(c => ({
+                    id: c.id,
+                    fullName: c.full_name || c.name || '',
+                    phone: c.phone ? String(c.phone) : '',
+                    email: c.email || '',
+                    address: c.address || '',
+                    city: (c.city_id ? this.getCityName(c.city_id) : '') || c.city || '',
+                    cityId: c.city_id,
+                    reference: c.reference || '',
+                    notes: c.notes || '',
+                    active: c.active !== false,
+                    createdAt: c.created_at
+                }));
+            }
 
             return (data || []).map(c => ({
                 id: c.id,
-                fullName: c.full_name,
-                phone: c.phone,
-                email: c.email,
-                address: c.address,
-                city: c.cities?.name || '',
+                fullName: c.full_name || c.name || '',
+                phone: c.phone ? String(c.phone) : '',
+                email: c.email || '',
+                address: c.address || '',
+                city: c.cities?.name || (c.city_id ? this.getCityName(c.city_id) : '') || c.city || '',
                 cityId: c.city_id,
-                reference: c.reference,
-                notes: c.notes,
+                reference: c.reference || '',
+                notes: c.notes || '',
+                active: c.active !== false,
                 createdAt: c.created_at
             }));
         } catch (error) {
@@ -575,18 +597,39 @@ const Database = {
                 .eq('id', id)
                 .single();
 
-            if (error) throw error;
+            if (error) {
+                const { data: rawData, error: rawError } = await supabaseClient
+                    .from('clients')
+                    .select('*')
+                    .eq('id', id)
+                    .single();
+                if (rawError) throw rawError;
+                return rawData ? {
+                    id: rawData.id,
+                    fullName: rawData.full_name || rawData.name || '',
+                    phone: rawData.phone ? String(rawData.phone) : '',
+                    email: rawData.email || '',
+                    address: rawData.address || '',
+                    city: (rawData.city_id ? this.getCityName(rawData.city_id) : '') || rawData.city || '',
+                    cityId: rawData.city_id,
+                    reference: rawData.reference || '',
+                    notes: rawData.notes || '',
+                    active: rawData.active !== false,
+                    createdAt: rawData.created_at
+                } : null;
+            }
 
             return data ? {
                 id: data.id,
-                fullName: data.full_name,
-                phone: data.phone,
-                email: data.email,
-                address: data.address,
-                city: data.cities?.name || '',
+                fullName: data.full_name || data.name || '',
+                phone: data.phone ? String(data.phone) : '',
+                email: data.email || '',
+                address: data.address || '',
+                city: data.cities?.name || (data.city_id ? this.getCityName(data.city_id) : '') || data.city || '',
                 cityId: data.city_id,
-                reference: data.reference,
-                notes: data.notes,
+                reference: data.reference || '',
+                notes: data.notes || '',
+                active: data.active !== false,
                 createdAt: data.created_at
             } : null;
         } catch (error) {

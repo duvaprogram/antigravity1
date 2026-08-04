@@ -27,15 +27,15 @@ const GuidesModule = {
 
         // Client autocomplete search
         const clientSearchInput = document.getElementById('guideClientSearch');
-        clientSearchInput.addEventListener('input', Utils.debounce(() => {
-            this.searchClients(clientSearchInput.value);
-        }, 200));
-
-        clientSearchInput.addEventListener('focus', () => {
-            if (clientSearchInput.value.length >= 1) {
+        if (clientSearchInput) {
+            clientSearchInput.addEventListener('input', Utils.debounce(() => {
                 this.searchClients(clientSearchInput.value);
-            }
-        });
+            }, 150));
+
+            clientSearchInput.addEventListener('focus', () => {
+                this.searchClients(clientSearchInput.value || '');
+            });
+        }
 
         // Product autocomplete search
         const productSearchInput = document.getElementById('guideProductSearch');
@@ -193,35 +193,49 @@ const GuidesModule = {
     // Search clients for autocomplete
     async searchClients(query) {
         const suggestionsEl = document.getElementById('clientSuggestions');
-
-        if (query.length < 1) {
-            suggestionsEl.classList.remove('active');
-            return;
-        }
+        if (!suggestionsEl) return;
 
         // Load all clients if not loaded
-        if (this.allClients.length === 0) {
-            this.allClients = await Database.getClients();
+        if (!this.allClients || this.allClients.length === 0) {
+            try {
+                this.allClients = await Database.getClients();
+            } catch (e) {
+                console.error('Error fetching clients for autocomplete:', e);
+                this.allClients = [];
+            }
         }
 
-        const queryLower = query.toLowerCase();
-        const filtered = this.allClients.filter(client =>
-            client.fullName.toLowerCase().includes(queryLower) ||
-            client.phone.includes(query)
-        ).slice(0, 10);
+        const queryLower = (query || '').toLowerCase().trim();
+        let filtered = this.allClients || [];
+
+        if (queryLower.length >= 1) {
+            filtered = filtered.filter(client => {
+                const name = (client.fullName || client.name || client.full_name || '').toLowerCase();
+                const phone = (client.phone ? String(client.phone) : '').toLowerCase();
+                const city = (client.city || '').toLowerCase();
+                return name.includes(queryLower) || phone.includes(queryLower) || city.includes(queryLower);
+            });
+        }
+
+        filtered = filtered.slice(0, 20);
 
         if (filtered.length === 0) {
             suggestionsEl.innerHTML = '<div class="autocomplete-no-results">No se encontraron clientes</div>';
         } else {
-            suggestionsEl.innerHTML = filtered.map(client => `
-                <div class="autocomplete-item" data-id="${client.id}">
-                    <div class="item-main">${this.highlightMatch(client.fullName, query)}</div>
-                    <div class="item-secondary">
-                        <span>📞 ${client.phone}</span>
-                        <span class="item-badge">${client.city}</span>
+            suggestionsEl.innerHTML = filtered.map(client => {
+                const name = client.fullName || client.name || client.full_name || 'Sin nombre';
+                const phone = client.phone ? String(client.phone) : '';
+                const city = client.city || '';
+                return `
+                    <div class="autocomplete-item" data-id="${client.id}">
+                        <div class="item-main">${queryLower.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
+                        <div class="item-secondary">
+                            ${phone ? `<span>📞 ${Utils.escapeHtml(phone)}</span>` : ''}
+                            ${city ? `<span class="item-badge">${Utils.escapeHtml(city)}</span>` : ''}
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             // Add click handlers
             suggestionsEl.querySelectorAll('.autocomplete-item').forEach(item => {
@@ -274,23 +288,29 @@ const GuidesModule = {
 
         // Load all products if not loaded
         if (!this.allProducts || this.allProducts.length === 0) {
-            const products = await Database.getProducts();
-            this.allProducts = (products || []).filter(p => p.active !== false);
+            try {
+                const products = await Database.getProducts();
+                this.allProducts = (products || []).filter(p => p.active !== false);
+            } catch (e) {
+                console.error('Error fetching products for autocomplete:', e);
+                this.allProducts = [];
+            }
         }
 
         const queryLower = (query || '').toLowerCase().trim();
         let filtered = this.allProducts || [];
 
         if (queryLower.length >= 1) {
-            filtered = filtered.filter(product =>
-                (product.name && product.name.toLowerCase().includes(queryLower)) ||
-                (product.sku && product.sku.toLowerCase().includes(queryLower)) ||
-                (product.category && product.category.toLowerCase().includes(queryLower)) ||
-                (product.description && product.description.toLowerCase().includes(queryLower))
-            );
+            filtered = filtered.filter(product => {
+                const name = (product.name || '').toLowerCase();
+                const sku = (product.sku || '').toLowerCase();
+                const cat = (product.category || '').toLowerCase();
+                const desc = (product.description || '').toLowerCase();
+                return name.includes(queryLower) || sku.includes(queryLower) || cat.includes(queryLower) || desc.includes(queryLower);
+            });
         }
 
-        filtered = filtered.slice(0, 25);
+        filtered = filtered.slice(0, 30);
 
         if (filtered.length === 0) {
             suggestionsEl.innerHTML = '<div class="autocomplete-no-results">No se encontraron productos</div>';
@@ -326,9 +346,10 @@ const GuidesModule = {
             const stockClass = product.stock > 5 ? 'success' : (product.stock > 0 ? 'warning' : 'danger');
             const stockLabel = this.selectedCity ? `Stock (${this.selectedCity}): ${product.stock}` : `Stock: ${product.stock}`;
             const priceVal = parseFloat(product.price || 0);
+            const name = product.name || 'Sin nombre';
             return `
-                <div class="autocomplete-item" data-id="${product.id}" data-price="${priceVal}" data-stock="${product.stock}" data-name="${Utils.escapeHtml(product.name)}">
-                    <div class="item-main">${queryLower.length >= 1 ? this.highlightMatch(product.name, query) : Utils.escapeHtml(product.name)}</div>
+                <div class="autocomplete-item" data-id="${product.id}" data-price="${priceVal}" data-stock="${product.stock}" data-name="${Utils.escapeHtml(name)}">
+                    <div class="item-main">${queryLower.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
                     <div class="item-secondary">
                         <span>💵 ${Utils.formatCurrency(priceVal)}</span>
                         <span class="item-badge ${stockClass}">${stockLabel}</span>
@@ -393,8 +414,12 @@ const GuidesModule = {
         }
 
         if (!this.allProducts || this.allProducts.length === 0) {
-            const products = await Database.getProducts();
-            this.allProducts = (products || []).filter(p => p.active !== false);
+            try {
+                const products = await Database.getProducts();
+                this.allProducts = (products || []).filter(p => p.active !== false);
+            } catch (e) {
+                this.allProducts = [];
+            }
         }
 
         const queryLower = query.toLowerCase().trim();
@@ -418,9 +443,16 @@ const GuidesModule = {
 
     // Highlight matching text
     highlightMatch(text, query) {
-        if (!query) return text;
-        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-        return text.replace(regex, '<span class="autocomplete-highlight">$1</span>');
+        if (!text) return '';
+        if (!query) return Utils.escapeHtml(String(text));
+        try {
+            const safeText = String(text);
+            const safeQuery = String(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${safeQuery})`, 'gi');
+            return Utils.escapeHtml(safeText).replace(regex, '<span class="autocomplete-highlight">$1</span>');
+        } catch (e) {
+            return Utils.escapeHtml(String(text));
+        }
     },
 
     async render() {
@@ -793,9 +825,10 @@ const GuidesModule = {
         this.clearProductSelection();
         document.getElementById('productSuggestions').classList.remove('active');
 
-        // Clear caches to get fresh data
+        // Clear and preload caches asynchronously
         this.allClients = [];
         this.allProducts = [];
+        this.preloadData();
 
         // If clientId provided, select it
         if (clientId) {
@@ -805,6 +838,19 @@ const GuidesModule = {
         this.updateGuideProductsTable();
 
         Utils.openModal('modalGuide');
+    },
+
+    async preloadData() {
+        try {
+            const [clients, products] = await Promise.all([
+                Database.getClients(),
+                Database.getProducts()
+            ]);
+            this.allClients = clients || [];
+            this.allProducts = (products || []).filter(p => p.active !== false);
+        } catch (e) {
+            console.warn('Error preloading data for guides modal:', e);
+        }
     },
 
     async createGuideForClient(clientId) {
