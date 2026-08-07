@@ -3973,6 +3973,39 @@
                     </div>
                 </div>
 
+                <!-- Dynamic Sum of Selected Items Banner -->
+                <div class="card" id="pfSelectedSummaryCard" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(16, 185, 129, 0.1)); border: 1px solid var(--primary); display: none;">
+                    <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1rem 1.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="background: var(--primary); color: #fff; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);">
+                                🧮
+                            </div>
+                            <div>
+                                <h4 style="margin: 0; font-size: 1rem; color: var(--text-primary);">Suma de Ítems Seleccionados</h4>
+                                <span style="font-size: 0.8rem; color: var(--text-muted);" id="pfSelectedCountLabel">0 ítems seleccionados</span>
+                            </div>
+                        </div>
+                        
+                        <div style="display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap;">
+                            <div>
+                                <span style="display: block; font-size: 0.725rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Activos Seleccionados</span>
+                                <span style="font-weight: 700; color: var(--success); font-size: 1.1rem;" id="pfSelectedAssetsVal">$0.00</span>
+                            </div>
+                            <div>
+                                <span style="display: block; font-size: 0.725rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Deudas Seleccionadas</span>
+                                <span style="font-weight: 700; color: var(--danger); font-size: 1.1rem;" id="pfSelectedLiabilitiesVal">$0.00</span>
+                            </div>
+                            <div style="padding-left: 1rem; border-left: 1px solid var(--border);">
+                                <span style="display: block; font-size: 0.725rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Suma / Neto Seleccionado</span>
+                                <span style="font-weight: 800; color: #6366f1; font-size: 1.25rem;" id="pfSelectedNetVal">$0.00</span>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="FinanceModule.clearSelection()" style="font-size: 0.8rem; padding: 0.35rem 0.75rem;">
+                                ✕ Limpiar Selección
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="dashboard-grid" style="margin-bottom: 2rem;">
                     <div class="card">
                         <div class="card-header">
@@ -3982,6 +4015,7 @@
                             <table class="table">
                                 <thead>
                                     <tr>
+                                        <th style="width: 36px; text-align: center;"><input type="checkbox" id="pfSelectAllAssets" title="Seleccionar todos los activos" style="cursor: pointer;"></th>
                                         <th>Nombre</th>
                                         <th>Categoría</th>
                                         <th>Saldo</th>
@@ -4004,6 +4038,7 @@
                             <table class="table">
                                 <thead>
                                     <tr>
+                                        <th style="width: 36px; text-align: center;"><input type="checkbox" id="pfSelectAllLiabilities" title="Seleccionar todas las deudas" style="cursor: pointer;"></th>
                                         <th>Nombre</th>
                                         <th>Categoría</th>
                                         <th>Saldo Deudor</th>

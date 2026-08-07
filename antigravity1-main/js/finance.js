@@ -7,6 +7,7 @@ const FinanceModule = {
     categories: [],
     snapshots: [],
     transactions: [],
+    selectedAccountIds: new Set(),
     distributionChart: null,
     evolutionChart: null,
 
@@ -73,6 +74,35 @@ const FinanceModule = {
         if (pfSearchTransaction) {
             pfSearchTransaction.addEventListener('input', () => this.renderTransactionsTable());
         }
+
+        // Checkbox "Seleccionar todos" listeners
+        const chkSelectAllAssets = document.getElementById('pfSelectAllAssets');
+        if (chkSelectAllAssets) {
+            chkSelectAllAssets.addEventListener('change', (e) => this.toggleSelectAll('asset', e.target.checked));
+        }
+
+        const chkSelectAllLiabilities = document.getElementById('pfSelectAllLiabilities');
+        if (chkSelectAllLiabilities) {
+            chkSelectAllLiabilities.addEventListener('change', (e) => this.toggleSelectAll('liability', e.target.checked));
+        }
+
+        // Event delegation for item checkboxes inside tables
+        const handleTableCheckboxChange = (e) => {
+            if (e.target && e.target.classList.contains('pf-item-checkbox')) {
+                const id = e.target.dataset.id;
+                this.toggleAccountSelection(id, e.target.checked);
+            }
+        };
+
+        const assetsTable = document.getElementById('pfAssetsTable');
+        if (assetsTable) {
+            assetsTable.addEventListener('change', handleTableCheckboxChange);
+        }
+
+        const liabilitiesTable = document.getElementById('pfLiabilitiesTable');
+        if (liabilitiesTable) {
+            liabilitiesTable.addEventListener('change', handleTableCheckboxChange);
+        }
     },
 
     async render() {
@@ -81,6 +111,7 @@ const FinanceModule = {
             await this.loadData();
             await this.updateDashboard();
             this.renderTables();
+            this.updateSelectedSummary();
             this.populateAccountFilterOptions();
             this.renderTransactionsTable();
             this.renderSnapshotsTable();
@@ -193,6 +224,94 @@ const FinanceModule = {
         return 'Sin movimientos';
     },
 
+    toggleAccountSelection(id, isChecked) {
+        if (isChecked) {
+            this.selectedAccountIds.add(id);
+        } else {
+            this.selectedAccountIds.delete(id);
+        }
+        this.updateSelectedSummary();
+    },
+
+    toggleSelectAll(type, isChecked) {
+        const targetAccounts = this.accounts.filter(a => a.type === type);
+        targetAccounts.forEach(acc => {
+            if (isChecked) {
+                this.selectedAccountIds.add(acc.id);
+            } else {
+                this.selectedAccountIds.delete(acc.id);
+            }
+        });
+        this.renderTables();
+        this.updateSelectedSummary();
+    },
+
+    clearSelection() {
+        this.selectedAccountIds.clear();
+        const chkAssets = document.getElementById('pfSelectAllAssets');
+        const chkLiab = document.getElementById('pfSelectAllLiabilities');
+        if (chkAssets) chkAssets.checked = false;
+        if (chkLiab) chkLiab.checked = false;
+        this.renderTables();
+        this.updateSelectedSummary();
+    },
+
+    updateSelectedSummary() {
+        const card = document.getElementById('pfSelectedSummaryCard');
+        if (!card) return;
+
+        if (this.selectedAccountIds.size === 0) {
+            card.style.display = 'none';
+            return;
+        }
+
+        card.style.display = 'block';
+
+        let selectedAssetsSum = 0;
+        let selectedLiabilitiesSum = 0;
+
+        this.selectedAccountIds.forEach(id => {
+            const acc = this.accounts.find(a => a.id === id);
+            if (acc) {
+                const bal = parseFloat(acc.balance || 0);
+                if (acc.type === 'asset') {
+                    selectedAssetsSum += bal;
+                } else if (acc.type === 'liability') {
+                    selectedLiabilitiesSum += bal;
+                }
+            }
+        });
+
+        const netVal = selectedAssetsSum - selectedLiabilitiesSum;
+        const count = this.selectedAccountIds.size;
+
+        const countLabel = document.getElementById('pfSelectedCountLabel');
+        const assetsValEl = document.getElementById('pfSelectedAssetsVal');
+        const liabValEl = document.getElementById('pfSelectedLiabilitiesVal');
+        const netValEl = document.getElementById('pfSelectedNetVal');
+
+        if (countLabel) countLabel.textContent = `${count} ${count === 1 ? 'ítem seleccionado' : 'ítems seleccionados'}`;
+        if (assetsValEl) assetsValEl.textContent = Utils.formatCurrency(selectedAssetsSum);
+        if (liabValEl) liabValEl.textContent = Utils.formatCurrency(selectedLiabilitiesSum);
+        if (netValEl) {
+            netValEl.textContent = Utils.formatCurrency(netVal);
+            netValEl.style.color = netVal < 0 ? 'var(--danger)' : (netVal > 0 ? 'var(--success)' : '#6366f1');
+        }
+
+        // Update top header select-all checkboxes
+        const assets = this.accounts.filter(a => a.type === 'asset');
+        const liabilities = this.accounts.filter(a => a.type === 'liability');
+        const chkAssets = document.getElementById('pfSelectAllAssets');
+        const chkLiab = document.getElementById('pfSelectAllLiabilities');
+
+        if (chkAssets) {
+            chkAssets.checked = assets.length > 0 && assets.every(a => this.selectedAccountIds.has(a.id));
+        }
+        if (chkLiab) {
+            chkLiab.checked = liabilities.length > 0 && liabilities.every(l => this.selectedAccountIds.has(l.id));
+        }
+    },
+
     renderTables() {
         const assetsTable = document.getElementById('pfAssetsTable');
         const liabilitiesTable = document.getElementById('pfLiabilitiesTable');
@@ -204,10 +323,13 @@ const FinanceModule = {
 
         // Render Assets
         if (assets.length === 0) {
-            assetsTable.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No hay activos registrados</td></tr>`;
+            assetsTable.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay activos registrados</td></tr>`;
         } else {
             assetsTable.innerHTML = assets.map(acc => `
-                <tr>
+                <tr style="${this.selectedAccountIds.has(acc.id) ? 'background: rgba(99, 102, 241, 0.08);' : ''}">
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="pf-item-checkbox" data-id="${acc.id}" ${this.selectedAccountIds.has(acc.id) ? 'checked' : ''} style="cursor: pointer;">
+                    </td>
                     <td><strong>${Utils.escapeHtml(acc.name)}</strong></td>
                     <td><span class="badge" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border);">${Utils.escapeHtml(this.getCategoryDisplayName(acc.category))}</span></td>
                     <td style="color: var(--success); font-weight: 600;">${Utils.formatCurrency(acc.balance)} ${acc.currency}</td>
@@ -251,10 +373,13 @@ const FinanceModule = {
 
         // Render Liabilities
         if (liabilities.length === 0) {
-            liabilitiesTable.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No hay pasivos registrados</td></tr>`;
+            liabilitiesTable.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay pasivos registrados</td></tr>`;
         } else {
             liabilitiesTable.innerHTML = liabilities.map(acc => `
-                <tr>
+                <tr style="${this.selectedAccountIds.has(acc.id) ? 'background: rgba(99, 102, 241, 0.08);' : ''}">
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="pf-item-checkbox" data-id="${acc.id}" ${this.selectedAccountIds.has(acc.id) ? 'checked' : ''} style="cursor: pointer;">
+                    </td>
                     <td><strong>${Utils.escapeHtml(acc.name)}</strong></td>
                     <td><span class="badge" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border);">${Utils.escapeHtml(this.getCategoryDisplayName(acc.category))}</span></td>
                     <td style="color: var(--danger); font-weight: 600;">${Utils.formatCurrency(acc.balance)} ${acc.currency}</td>
