@@ -1348,38 +1348,56 @@ const Database = {
     async savePFAccount(account) {
         try {
             let result;
+            const payload = {
+                name: account.name,
+                type: account.type,
+                category: account.category,
+                balance: account.balance,
+                currency: account.currency
+            };
+
+            // Intentar primero con updated_at por si la columna existe en el esquema SQL
             const now = new Date().toISOString();
             if (account.id) {
-                const { data, error } = await supabaseClient
+                const res = await supabaseClient
                     .from('pf_accounts')
-                    .update({
-                        name: account.name,
-                        type: account.type,
-                        category: account.category,
-                        balance: account.balance,
-                        currency: account.currency,
-                        updated_at: now
-                    })
+                    .update({ ...payload, updated_at: now })
                     .eq('id', account.id)
                     .select()
                     .single();
-                if (error) throw error;
-                result = data;
+                
+                if (res.error) {
+                    // Si falla por columna inexistente en PostgreSQL, hacer fallback sin updated_at
+                    const fallback = await supabaseClient
+                        .from('pf_accounts')
+                        .update(payload)
+                        .eq('id', account.id)
+                        .select()
+                        .single();
+                    if (fallback.error) throw fallback.error;
+                    result = fallback.data;
+                } else {
+                    result = res.data;
+                }
             } else {
-                const { data, error } = await supabaseClient
+                const res = await supabaseClient
                     .from('pf_accounts')
-                    .insert({
-                        name: account.name,
-                        type: account.type,
-                        category: account.category,
-                        balance: account.balance,
-                        currency: account.currency,
-                        updated_at: now
-                    })
+                    .insert({ ...payload, updated_at: now })
                     .select()
                     .single();
-                if (error) throw error;
-                result = data;
+
+                if (res.error) {
+                    // Fallback sin updated_at
+                    const fallback = await supabaseClient
+                        .from('pf_accounts')
+                        .insert(payload)
+                        .select()
+                        .single();
+                    if (fallback.error) throw fallback.error;
+                    result = fallback.data;
+                } else {
+                    result = res.data;
+                }
             }
             return result;
         } catch (error) {
@@ -1443,7 +1461,10 @@ const Database = {
 
                 let newBalance = currentBalance + (tx.amount * modifier);
                 const now = new Date().toISOString();
-                await supabaseClient.from('pf_accounts').update({ balance: newBalance, updated_at: now }).eq('id', tx.accountId);
+                const updateRes = await supabaseClient.from('pf_accounts').update({ balance: newBalance, updated_at: now }).eq('id', tx.accountId);
+                if (updateRes.error) {
+                    await supabaseClient.from('pf_accounts').update({ balance: newBalance }).eq('id', tx.accountId);
+                }
             }
             return data;
         } catch (error) {
@@ -1475,7 +1496,10 @@ const Database = {
                     // Revertir efecto de la transacción
                     let newBalance = currentBalance - (parseFloat(tx.amount || 0) * modifier);
                     const now = new Date().toISOString();
-                    await supabaseClient.from('pf_accounts').update({ balance: newBalance, updated_at: now }).eq('id', tx.account_id);
+                    const updateRes = await supabaseClient.from('pf_accounts').update({ balance: newBalance, updated_at: now }).eq('id', tx.account_id);
+                    if (updateRes.error) {
+                        await supabaseClient.from('pf_accounts').update({ balance: newBalance }).eq('id', tx.account_id);
+                    }
                 }
             }
 
