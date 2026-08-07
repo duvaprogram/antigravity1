@@ -3985,6 +3985,7 @@
                                         <th>Nombre</th>
                                         <th>Categoría</th>
                                         <th>Saldo</th>
+                                        <th>Última Fecha</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -4006,11 +4007,45 @@
                                         <th>Nombre</th>
                                         <th>Categoría</th>
                                         <th>Saldo Deudor</th>
+                                        <th>Última Fecha</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody id="pfLiabilitiesTable">
                                     <!-- Dynamic -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transactions / Abonos History Card -->
+                <div class="card" style="margin-bottom: 2rem;">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                        <h3>Historial de Transacciones, Abonos y Movimientos</h3>
+                        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                            <select id="pfFilterAccount" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.85rem;">
+                                <option value="">Todas las cuentas / deudas</option>
+                            </select>
+                            <input type="text" id="pfSearchTransaction" placeholder="Buscar movimiento..." style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.75rem; border-radius: 6px; font-size: 0.85rem;">
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Cuenta / Activo / Deuda</th>
+                                        <th>Tipo de Movimiento</th>
+                                        <th>Monto</th>
+                                        <th>Descripción</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="pfTransactionsTable">
+                                    <!-- Dynamic -->
+                                    <tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No hay transacciones registradas</td></tr>
                                 </tbody>
                             </table>
                         </div>

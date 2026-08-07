@@ -1348,6 +1348,7 @@ const Database = {
     async savePFAccount(account) {
         try {
             let result;
+            const now = new Date().toISOString();
             if (account.id) {
                 const { data, error } = await supabaseClient
                     .from('pf_accounts')
@@ -1356,7 +1357,8 @@ const Database = {
                         type: account.type,
                         category: account.category,
                         balance: account.balance,
-                        currency: account.currency
+                        currency: account.currency,
+                        updated_at: now
                     })
                     .eq('id', account.id)
                     .select()
@@ -1371,7 +1373,8 @@ const Database = {
                         type: account.type,
                         category: account.category,
                         balance: account.balance,
-                        currency: account.currency
+                        currency: account.currency,
+                        updated_at: now
                     })
                     .select()
                     .single();
@@ -1426,29 +1429,60 @@ const Database = {
                 .single();
             if (error) throw error;
 
-            // Actualizar balance de cuenta
+            // Actualizar balance y fecha de actualización de la cuenta
             const accountData = await supabaseClient.from('pf_accounts').select('balance, type').eq('id', tx.accountId).single();
             if (accountData.data) {
                 let currentBalance = parseFloat(accountData.data.balance || 0);
                 
-                // Si la cuenta es un Activo: income suma, expense resta.
-                // Si la cuenta es un Pasivo (deuda): un pago (expense de deuda) reduce el saldo, un préstamo (income de deuda) lo aumenta.
-                // Asumimos lógica simple: para cuentas normales (asset), ingresar dinero aumenta balance.
                 let modifier = 1;
                 if (accountData.data.type === 'asset') {
                     modifier = (tx.type === 'income') ? 1 : -1;
                 } else if (accountData.data.type === 'liability') {
-                    // Si tienes una deuda, y recibes dinero prestado (income), la deuda crece.
-                    // Si pagas (expense), la deuda se reduce.
                     modifier = (tx.type === 'income') ? 1 : -1;
                 }
 
                 let newBalance = currentBalance + (tx.amount * modifier);
-                await supabaseClient.from('pf_accounts').update({ balance: newBalance }).eq('id', tx.accountId);
+                const now = new Date().toISOString();
+                await supabaseClient.from('pf_accounts').update({ balance: newBalance, updated_at: now }).eq('id', tx.accountId);
             }
             return data;
         } catch (error) {
             console.error('Error saving PF transaction:', error);
+            throw error;
+        }
+    },
+
+    async deletePFTransaction(id) {
+        try {
+            // Obtener transacción para revertir el balance
+            const { data: tx, error: fetchErr } = await supabaseClient
+                .from('pf_transactions')
+                .select('*')
+                .eq('id', id)
+                .single();
+            
+            if (!fetchErr && tx) {
+                const accountData = await supabaseClient.from('pf_accounts').select('balance, type').eq('id', tx.account_id).single();
+                if (accountData.data) {
+                    let currentBalance = parseFloat(accountData.data.balance || 0);
+                    let modifier = 1;
+                    if (accountData.data.type === 'asset') {
+                        modifier = (tx.type === 'income') ? 1 : -1;
+                    } else if (accountData.data.type === 'liability') {
+                        modifier = (tx.type === 'income') ? 1 : -1;
+                    }
+
+                    // Revertir efecto de la transacción
+                    let newBalance = currentBalance - (parseFloat(tx.amount || 0) * modifier);
+                    const now = new Date().toISOString();
+                    await supabaseClient.from('pf_accounts').update({ balance: newBalance, updated_at: now }).eq('id', tx.account_id);
+                }
+            }
+
+            const { error } = await supabaseClient.from('pf_transactions').delete().eq('id', id);
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting PF transaction:', error);
             throw error;
         }
     },

@@ -6,6 +6,7 @@ const FinanceModule = {
     accounts: [],
     categories: [],
     snapshots: [],
+    transactions: [],
     distributionChart: null,
     evolutionChart: null,
 
@@ -61,6 +62,17 @@ const FinanceModule = {
         if (pfAccountType) {
             pfAccountType.addEventListener('change', () => this.updateCategorySelectOptions());
         }
+
+        // Filter and search transactions listeners
+        const pfFilterAccount = document.getElementById('pfFilterAccount');
+        if (pfFilterAccount) {
+            pfFilterAccount.addEventListener('change', () => this.renderTransactionsTable());
+        }
+
+        const pfSearchTransaction = document.getElementById('pfSearchTransaction');
+        if (pfSearchTransaction) {
+            pfSearchTransaction.addEventListener('input', () => this.renderTransactionsTable());
+        }
     },
 
     async render() {
@@ -69,6 +81,8 @@ const FinanceModule = {
             await this.loadData();
             await this.updateDashboard();
             this.renderTables();
+            this.populateAccountFilterOptions();
+            this.renderTransactionsTable();
             this.renderSnapshotsTable();
             await this.renderCharts();
         } catch (error) {
@@ -81,19 +95,22 @@ const FinanceModule = {
 
     async loadData() {
         try {
-            const [accounts, categories, snapshots] = await Promise.all([
+            const [accounts, categories, snapshots, transactions] = await Promise.all([
                 Database.getPFAccounts(),
                 Database.getPFCategories(),
-                Database.getPFSnapshots()
+                Database.getPFSnapshots(),
+                Database.getPFTransactions()
             ]);
             this.accounts = accounts;
             this.categories = categories;
             this.snapshots = snapshots;
+            this.transactions = transactions || [];
         } catch (error) {
             console.error('Error loading finance data:', error);
             this.accounts = [];
             this.categories = [];
             this.snapshots = [];
+            this.transactions = [];
         }
     },
 
@@ -159,6 +176,23 @@ const FinanceModule = {
         }
     },
 
+    getAccountLastDate(acc) {
+        const accountTxs = this.transactions.filter(t => t.account_id === acc.id);
+        if (accountTxs.length > 0) {
+            const latestTx = accountTxs.reduce((latest, current) => {
+                const currentDate = new Date(current.date || current.created_at);
+                const latestDate = new Date(latest.date || latest.created_at);
+                return currentDate > latestDate ? current : latest;
+            }, accountTxs[0]);
+
+            return Utils.formatDate(latestTx.date || latestTx.created_at);
+        }
+
+        if (acc.updated_at) return Utils.formatDate(acc.updated_at);
+        if (acc.created_at) return Utils.formatDate(acc.created_at);
+        return 'Sin movimientos';
+    },
+
     renderTables() {
         const assetsTable = document.getElementById('pfAssetsTable');
         const liabilitiesTable = document.getElementById('pfLiabilitiesTable');
@@ -170,13 +204,14 @@ const FinanceModule = {
 
         // Render Assets
         if (assets.length === 0) {
-            assetsTable.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No hay activos registrados</td></tr>`;
+            assetsTable.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No hay activos registrados</td></tr>`;
         } else {
             assetsTable.innerHTML = assets.map(acc => `
                 <tr>
                     <td><strong>${Utils.escapeHtml(acc.name)}</strong></td>
                     <td><span class="badge" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border);">${Utils.escapeHtml(this.getCategoryDisplayName(acc.category))}</span></td>
                     <td style="color: var(--success); font-weight: 600;">${Utils.formatCurrency(acc.balance)} ${acc.currency}</td>
+                    <td style="font-size: 0.85rem; color: var(--text-muted);">📅 ${this.getAccountLastDate(acc)}</td>
                     <td>
                         <button class="btn btn-sm btn-icon" style="color: var(--primary);" title="Editar Cuenta" onclick="FinanceModule.editAccount('${acc.id}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -195,6 +230,14 @@ const FinanceModule = {
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                             </svg>
                         </button>
+                        <button class="btn btn-sm btn-icon" style="color: #6366f1;" title="Ver Historial de Movimientos" onclick="FinanceModule.filterByAccount('${acc.id}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                        </button>
                         <button class="btn btn-sm btn-icon" style="color: var(--text-muted);" title="Eliminar" onclick="FinanceModule.deleteAccount('${acc.id}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -208,13 +251,14 @@ const FinanceModule = {
 
         // Render Liabilities
         if (liabilities.length === 0) {
-            liabilitiesTable.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No hay pasivos registrados</td></tr>`;
+            liabilitiesTable.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No hay pasivos registrados</td></tr>`;
         } else {
             liabilitiesTable.innerHTML = liabilities.map(acc => `
                 <tr>
                     <td><strong>${Utils.escapeHtml(acc.name)}</strong></td>
                     <td><span class="badge" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border);">${Utils.escapeHtml(this.getCategoryDisplayName(acc.category))}</span></td>
                     <td style="color: var(--danger); font-weight: 600;">${Utils.formatCurrency(acc.balance)} ${acc.currency}</td>
+                    <td style="font-size: 0.85rem; color: var(--text-muted);">📅 ${this.getAccountLastDate(acc)}</td>
                     <td>
                         <button class="btn btn-sm btn-icon" style="color: var(--primary);" title="Editar Cuenta" onclick="FinanceModule.editAccount('${acc.id}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -233,6 +277,14 @@ const FinanceModule = {
                                 <polyline points="20 6 9 17 4 12"></polyline>
                             </svg>
                         </button>
+                        <button class="btn btn-sm btn-icon" style="color: #6366f1;" title="Ver Historial de Movimientos" onclick="FinanceModule.filterByAccount('${acc.id}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                <line x1="16" y1="2" x2="16" y2="6"></line>
+                                <line x1="8" y1="2" x2="8" y2="6"></line>
+                                <line x1="3" y1="10" x2="21" y2="10"></line>
+                            </svg>
+                        </button>
                         <button class="btn btn-sm btn-icon" style="color: var(--text-muted);" title="Eliminar" onclick="FinanceModule.deleteAccount('${acc.id}')">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"></polyline>
@@ -242,6 +294,113 @@ const FinanceModule = {
                     </td>
                 </tr>
             `).join('');
+        }
+    },
+
+    populateAccountFilterOptions() {
+        const select = document.getElementById('pfFilterAccount');
+        if (!select) return;
+        const currentVal = select.value;
+        select.innerHTML = '<option value="">Todas las cuentas / deudas</option>' +
+            this.accounts.map(acc => `<option value="${acc.id}">${Utils.escapeHtml(acc.name)} (${acc.type === 'asset' ? 'Activo' : 'Deuda'})</option>`).join('');
+        select.value = currentVal;
+    },
+
+    filterByAccount(accountId) {
+        const select = document.getElementById('pfFilterAccount');
+        if (select) {
+            select.value = accountId;
+            this.renderTransactionsTable();
+            const txSection = document.getElementById('pfTransactionsTable');
+            if (txSection) {
+                txSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    },
+
+    renderTransactionsTable() {
+        const tbody = document.getElementById('pfTransactionsTable');
+        if (!tbody) return;
+
+        const filterAccountId = document.getElementById('pfFilterAccount')?.value || '';
+        const searchQuery = (document.getElementById('pfSearchTransaction')?.value || '').toLowerCase().trim();
+
+        let filtered = this.transactions.filter(tx => {
+            if (filterAccountId && tx.account_id !== filterAccountId) return false;
+            if (searchQuery) {
+                const acc = this.accounts.find(a => a.id === tx.account_id);
+                const accName = acc ? acc.name : (tx.pf_accounts?.name || '');
+                const desc = tx.description || '';
+                const matchAcc = accName.toLowerCase().includes(searchQuery);
+                const matchDesc = desc.toLowerCase().includes(searchQuery);
+                const matchDate = (tx.date || '').includes(searchQuery);
+                if (!matchAcc && !matchDesc && !matchDate) return false;
+            }
+            return true;
+        });
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">No hay transacciones ni abonos registrados</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(tx => {
+            const acc = this.accounts.find(a => a.id === tx.account_id);
+            const accName = acc ? acc.name : (tx.pf_accounts?.name || 'Cuenta no encontrada');
+            const isLiability = acc ? acc.type === 'liability' : false;
+
+            let badgeHtml = '';
+            if (isLiability) {
+                if (tx.type === 'expense') {
+                    badgeHtml = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid var(--success);">✓ Abono a Deuda</span>`;
+                } else {
+                    badgeHtml = `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid var(--danger);">(+) Aumento de Deuda</span>`;
+                }
+            } else {
+                if (tx.type === 'income') {
+                    badgeHtml = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: var(--success); border: 1px solid var(--success);">(+) Ingreso</span>`;
+                } else {
+                    badgeHtml = `<span class="badge" style="background: rgba(239, 68, 68, 0.15); color: var(--danger); border: 1px solid var(--danger);">(-) Retiro</span>`;
+                }
+            }
+
+            const formattedDate = Utils.formatDate(tx.date || tx.created_at);
+
+            return `
+                <tr>
+                    <td><strong>${formattedDate}</strong></td>
+                    <td><strong>${Utils.escapeHtml(accName)}</strong></td>
+                    <td>${badgeHtml}</td>
+                    <td style="font-weight: 600; color: ${tx.type === 'income' ? (isLiability ? 'var(--danger)' : 'var(--success)') : (isLiability ? 'var(--success)' : 'var(--danger)')}">
+                        ${Utils.formatCurrency(tx.amount)}
+                    </td>
+                    <td>${Utils.escapeHtml(tx.description || '-')}</td>
+                    <td>
+                        <button class="btn btn-sm btn-icon" style="color: var(--danger);" title="Eliminar transacción" onclick="FinanceModule.deleteTransaction('${tx.id}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    },
+
+    async deleteTransaction(id) {
+        if (!confirm('¿Estás seguro de eliminar este movimiento? Se reajustará automáticamente el saldo de la cuenta.')) return;
+
+        App.showLoading(true);
+        try {
+            await Database.deletePFTransaction(id);
+            Utils.showToast('Transacción eliminada y saldo actualizado', 'success');
+            await this.render();
+        } catch (error) {
+            console.error('Error deleting transaction:', error);
+            Utils.showToast('Error al eliminar transacción', 'error');
+        } finally {
+            App.showLoading(false);
         }
     },
 
