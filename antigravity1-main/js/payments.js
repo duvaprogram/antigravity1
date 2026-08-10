@@ -100,9 +100,34 @@ const PaymentsModule = {
             this.clearFilters();
         });
 
+        // Quick Selection Buttons
+        document.getElementById('btnPaySelectAllQuick')?.addEventListener('click', () => {
+            this.selectAllPayments(true);
+        });
+
+        document.getElementById('btnPayDeselectAllQuick')?.addEventListener('click', () => {
+            this.clearPaymentSelection();
+        });
+
         // Select All Checkbox in Table Header
         document.getElementById('selectAllPaymentsHeader')?.addEventListener('change', (e) => {
             this.selectAllPayments(e.target.checked);
+        });
+
+        // Easy Row Click Delegation for Main Payments Table
+        document.getElementById('paymentsTable')?.addEventListener('click', (e) => {
+            if (e.target.closest('button') || e.target.closest('svg') || e.target.closest('a')) {
+                return;
+            }
+            const row = e.target.closest('.payment-table-row');
+            if (!row) return;
+            const paymentId = row.getAttribute('data-payment-id');
+            if (!paymentId) return;
+
+            if (e.target.type !== 'checkbox') {
+                const isSelected = this.selectedPaymentIds.has(paymentId);
+                this.togglePaymentSelection(paymentId, !isSelected);
+            }
         });
 
         // Floating Calculator Clear Button
@@ -126,8 +151,25 @@ const PaymentsModule = {
                 } else {
                     this.selectedGuideIds.delete(cb.value);
                 }
+                const row = cb.closest('.modal-guide-row');
+                if (row) row.classList.toggle('is-selected', cb.checked);
             });
             this.updateSelectedCount();
+        });
+
+        // Easy Row Click Delegation for Modal Guides Table
+        document.getElementById('paymentGuidesTableBody')?.addEventListener('click', (e) => {
+            if (e.target.closest('button') || e.target.closest('a')) return;
+            const row = e.target.closest('.modal-guide-row');
+            if (!row) return;
+
+            if (e.target.type !== 'checkbox') {
+                const cb = row.querySelector('.payment-guide-checkbox');
+                if (cb && !cb.disabled) {
+                    cb.checked = !cb.checked;
+                    this.toggleGuideSelection(cb);
+                }
+            }
         });
     },
 
@@ -414,7 +456,7 @@ const PaymentsModule = {
     },
 
     /**
-     * Render Payments Table with Checkboxes and Smart Country Badges
+     * Render Payments Table with Checkboxes, Hit Areas and Smart Country Badges
      */
     renderPaymentsTable() {
         const tbody = document.getElementById('paymentsTable');
@@ -434,7 +476,6 @@ const PaymentsModule = {
             return;
         }
 
-        // Check if all filtered payments are currently selected
         const allFilteredSelected = this.filteredPayments.length > 0 && this.filteredPayments.every(p => this.selectedPaymentIds.has(p.id));
         const headerCb = document.getElementById('selectAllPaymentsHeader');
         if (headerCb) headerCb.checked = allFilteredSelected;
@@ -448,10 +489,8 @@ const PaymentsModule = {
             const guidesCount = payment.payment_guides ? payment.payment_guides.length : 0;
             const originText = payment.origin || 'N/A';
 
-            // Smart country detection
             const countryInfo = this.detectCountry(payment);
 
-            // Format guides preview
             let guidesPreview = '<span style="color: var(--text-muted);">Ninguna</span>';
             if (guidesCount > 0) {
                 const guideNos = payment.payment_guides
@@ -466,12 +505,12 @@ const PaymentsModule = {
                 ? `COP $${Math.round(amountNum).toLocaleString('es-CO')}`
                 : `$${amountNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-            const rowStyle = isSelected ? 'background: rgba(139, 92, 246, 0.08);' : '';
-
             return `
-                <tr style="${rowStyle}">
-                    <td style="text-align: center;">
-                        <input type="checkbox" class="payment-row-checkbox" value="${payment.id}" ${isSelected ? 'checked' : ''} onchange="PaymentsModule.togglePaymentSelection('${payment.id}', this.checked)">
+                <tr class="payment-table-row ${isSelected ? 'is-selected' : ''}" data-payment-id="${payment.id}">
+                    <td style="text-align: center; padding: 4px;">
+                        <div class="checkbox-hit-area" title="Marcar / Desmarcar pago">
+                            <input type="checkbox" class="payment-row-checkbox" value="${payment.id}" ${isSelected ? 'checked' : ''} onchange="PaymentsModule.togglePaymentSelection('${payment.id}', this.checked)">
+                        </div>
                     </td>
                     <td><strong style="color: var(--primary, #8b5cf6); font-family: monospace; font-size: 0.95rem;">${payment.code}</strong></td>
                     <td>${date}</td>
@@ -704,9 +743,11 @@ const PaymentsModule = {
             const bsVal = parseFloat(guide.payment_bs || guide.paymentBs || 0);
             const hasBs = !isNaN(bsVal) && bsVal > 0;
             return `
-                <tr>
-                    <td>
-                        <input type="checkbox" class="payment-guide-checkbox" value="${guide.id}" ${isChecked} onchange="PaymentsModule.toggleGuideSelection(this)">
+                <tr class="modal-guide-row ${isChecked ? 'is-selected' : ''}" data-guide-id="${guide.id}">
+                    <td style="text-align: center; width: 44px; padding: 4px;">
+                        <div class="checkbox-hit-area" title="Marcar / Desmarcar guía">
+                            <input type="checkbox" class="payment-guide-checkbox" value="${guide.id}" ${isChecked} onchange="PaymentsModule.toggleGuideSelection(this)">
+                        </div>
                     </td>
                     <td><strong>${guide.guide_number}</strong></td>
                     <td>${date}</td>
@@ -727,6 +768,8 @@ const PaymentsModule = {
         } else {
             this.selectedGuideIds.delete(checkbox.value);
         }
+        const row = checkbox.closest('.modal-guide-row');
+        if (row) row.classList.toggle('is-selected', checkbox.checked);
         this.updateSelectedCount();
     },
 

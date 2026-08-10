@@ -940,13 +940,30 @@
                     </div>
                 </div>
 
+                <!-- Quick Selection Toolbar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                        <button type="button" class="btn btn-sm btn-secondary" id="btnPaySelectAllQuick" style="font-size: 0.8rem; padding: 0.4rem 0.85rem; border-radius: 8px; display: flex; align-items: center; gap: 5px; font-weight: 500;">
+                            <span>✓</span> Seleccionar Todo
+                        </button>
+                        <button type="button" class="btn btn-sm btn-secondary" id="btnPayDeselectAllQuick" style="font-size: 0.8rem; padding: 0.4rem 0.85rem; border-radius: 8px; display: flex; align-items: center; gap: 5px;">
+                            <span>✕</span> Desmarcar Todo
+                        </button>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); margin-left: 6px;">
+                            💡 <em>Tip: Haz clic en cualquier lugar de la fila para marcarla o desmarcarla</em>
+                        </span>
+                    </div>
+                </div>
+
                 <!-- Payments Table -->
                 <div class="table-container" style="position: relative;">
                     <table class="table">
                         <thead>
                             <tr>
-                                <th style="width: 42px; text-align: center;">
-                                    <input type="checkbox" id="selectAllPaymentsHeader" title="Seleccionar todos los pagos visibles">
+                                <th style="width: 52px; text-align: center; padding: 8px 4px;">
+                                    <div class="checkbox-hit-area" title="Seleccionar / Desmarcar todos los pagos visibles">
+                                        <input type="checkbox" id="selectAllPaymentsHeader">
+                                    </div>
                                 </th>
                                 <th>Código</th>
                                 <th>Fecha</th>
