@@ -469,6 +469,10 @@ const IncomeStatementModule = {
         );
     },
 
+    getFilteredOpExpenses() {
+        return this.getFilteredOperationalExpenses();
+    },
+
     getOpExpensesByCountry() {
         const expenses = this.getFilteredOperationalExpenses();
         const byCountry = {};
@@ -4059,6 +4063,17 @@ const IncomeStatementModule = {
         try {
             Utils.showToast('Generando reporte Excel del Estado de Resultados...', 'info');
 
+            // Sync current filter values from DOM if available
+            if (document.getElementById('isCountryFilter')) {
+                this.filters.country = document.getElementById('isCountryFilter').value || '';
+            }
+            if (document.getElementById('isDateFrom')) {
+                this.filters.dateFrom = document.getElementById('isDateFrom').value || null;
+            }
+            if (document.getElementById('isDateTo')) {
+                this.filters.dateTo = document.getElementById('isDateTo').value || null;
+            }
+
             if (!this.guides || this.guides.length === 0) {
                 await this.loadAllData();
             }
@@ -4200,7 +4215,8 @@ const IncomeStatementModule = {
             const filteredGuides = this.guides || [];
             filteredGuides.forEach(g => {
                 if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
-                if (this.filters.country && g.country !== this.filters.country) return;
+                const gCountry = g.country || this.getCountryFromCity(g.cities);
+                if (this.filters.country && gCountry !== this.filters.country) return;
                 const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
                 if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
                 if (this.filters.dateTo && gDate > this.filters.dateTo) return;
@@ -4245,7 +4261,9 @@ const IncomeStatementModule = {
                 if (!productMap[name]) {
                     productMap[name] = { name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: 0 };
                 }
-                productMap[name].orders += (parseInt(s.delivered || 0) + parseInt(s.returned || 0));
+                const ordersQty = (parseInt(s.delivered || 0) + parseInt(s.returned || 0));
+                productMap[name].orders += ordersQty;
+                productMap[name].units += (parseInt(s.units || ordersQty || 0));
                 productMap[name].revenue += parseFloat(s.revenue || 0);
                 productMap[name].cost += parseFloat(s.product_cost || 0);
                 productMap[name].shipping += (parseFloat(s.shipping_cost || 0) + parseFloat(s.return_shipping_cost || 0));
@@ -4318,7 +4336,8 @@ const IncomeStatementModule = {
 
             const orderRows = [];
             filteredGuides.forEach(g => {
-                if (this.filters.country && g.country !== this.filters.country) return;
+                const gCountry = g.country || this.getCountryFromCity(g.cities);
+                if (this.filters.country && gCountry !== this.filters.country) return;
                 const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
                 if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
                 if (this.filters.dateTo && gDate > this.filters.dateTo) return;
@@ -4350,7 +4369,7 @@ const IncomeStatementModule = {
                     gDate,
                     g.guide_number || g.guideNumber || '',
                     g.client_name || g.clientName || 'N/A',
-                    g.country || this.getCountryFromCity(g.cities) || '',
+                    gCountry || '',
                     g.cities?.name || g.city || '',
                     g.guide_statuses?.name || g.status || '',
                     isDevol ? 'SÍ (Devolución)' : (isCanc ? 'SÍ (Cancelado)' : 'No'),
@@ -4385,7 +4404,7 @@ const IncomeStatementModule = {
             adExpenses.forEach(a => {
                 expRows.push([
                     'Publicidad (Ads)',
-                    a.date || '',
+                    a.date_start || a.date || '',
                     a.country || '',
                     a.product_name || a.campaign_name || 'General',
                     a.notes || '',
@@ -4393,11 +4412,11 @@ const IncomeStatementModule = {
                 ]);
             });
 
-            const opExpenses = this.getFilteredOpExpenses();
+            const opExpenses = this.getFilteredOperationalExpenses ? this.getFilteredOperationalExpenses() : [];
             opExpenses.forEach(o => {
                 expRows.push([
                     'Gasto Operativo',
-                    o.date || '',
+                    o.expense_date || o.date || '',
                     o.country || '',
                     o.category || 'Operativo',
                     o.description || '',
@@ -4429,7 +4448,7 @@ const IncomeStatementModule = {
 
         } catch (error) {
             console.error('Error al exportar estado de resultados a Excel:', error);
-            Utils.showToast('Error al generar Excel del Estado de Resultados', 'error');
+            Utils.showToast('Error al generar Excel del Estado de Resultados: ' + (error.message || error), 'error');
         }
     },
 
