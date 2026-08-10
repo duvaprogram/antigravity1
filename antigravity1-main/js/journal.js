@@ -161,18 +161,35 @@ const JournalModule = {
                 _weekly_goals: this.weeklyGoals
             };
 
-            // Check if record exists for this user
-            const { data: existing, error: checkError } = await supabaseClient
+            // Use upsert on user_id
+            let { error: saveError } = await supabaseClient
                 .from('user_journals')
-                .select('id')
-                .eq('user_id', userId)
-                .maybeSingle();
+                .upsert({
+                    user_id: userId,
+                    entries: this.entries,
+                    goals: this.goals,
+                    weekly_goals: this.weeklyGoals,
+                    principles: principlesToSave,
+                    updated_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
 
-            let saveError = null;
+            if (saveError && (saveError.message?.includes('weekly_goals') || saveError.code === '42703')) {
+                // Fallback without weekly_goals column
+                const { error: fallbackErr } = await supabaseClient
+                    .from('user_journals')
+                    .upsert({
+                        user_id: userId,
+                        entries: this.entries,
+                        goals: this.goals,
+                        principles: principlesToSave,
+                        updated_at: new Date().toISOString()
+                    }, { onConflict: 'user_id' });
+                saveError = fallbackErr;
+            }
 
-            if (existing && existing.id) {
-                // Update existing record
-                const { error: updateErr } = await supabaseClient
+            if (saveError) {
+                // Fallback: direct update by user_id
+                const { error: patchErr } = await supabaseClient
                     .from('user_journals')
                     .update({
                         entries: this.entries,
@@ -181,51 +198,8 @@ const JournalModule = {
                         principles: principlesToSave,
                         updated_at: new Date().toISOString()
                     })
-                    .eq('id', existing.id);
-
-                if (updateErr && (updateErr.message?.includes('weekly_goals') || updateErr.code === '42703')) {
-                    // Retry update without weekly_goals column
-                    const { error: fallbackErr } = await supabaseClient
-                        .from('user_journals')
-                        .update({
-                            entries: this.entries,
-                            goals: this.goals,
-                            principles: principlesToSave,
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq('id', existing.id);
-                    saveError = fallbackErr;
-                } else {
-                    saveError = updateErr;
-                }
-            } else {
-                // Insert new record
-                const { error: insertErr } = await supabaseClient
-                    .from('user_journals')
-                    .insert([{
-                        user_id: userId,
-                        entries: this.entries,
-                        goals: this.goals,
-                        weekly_goals: this.weeklyGoals,
-                        principles: principlesToSave,
-                        updated_at: new Date().toISOString()
-                    }]);
-
-                if (insertErr && (insertErr.message?.includes('weekly_goals') || insertErr.code === '42703')) {
-                    // Retry insert without weekly_goals column
-                    const { error: fallbackErr } = await supabaseClient
-                        .from('user_journals')
-                        .insert([{
-                            user_id: userId,
-                            entries: this.entries,
-                            goals: this.goals,
-                            principles: principlesToSave,
-                            updated_at: new Date().toISOString()
-                        }]);
-                    saveError = fallbackErr;
-                } else {
-                    saveError = insertErr;
-                }
+                    .eq('user_id', userId);
+                saveError = patchErr;
             }
 
             if (saveError) {

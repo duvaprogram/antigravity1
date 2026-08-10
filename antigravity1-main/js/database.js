@@ -2028,11 +2028,11 @@ const Database = {
             const userId = window.AuthModule.currentUser.id;
             const { data: existing } = await supabaseClient
                 .from('user_journals')
-                .select('id, principles')
+                .select('principles')
                 .eq('user_id', userId)
                 .maybeSingle();
 
-            if (existing && existing.id) {
+            if (existing) {
                 const currentPrinciples = existing.principles || {};
                 currentPrinciples._campaigns_cloud_backup = {
                     campaigns: data.campaigns || [],
@@ -2047,7 +2047,7 @@ const Database = {
                         principles: currentPrinciples,
                         updated_at: new Date().toISOString()
                     })
-                    .eq('id', existing.id);
+                    .eq('user_id', userId);
                 console.log('☁️ Backup global de campañas sincronizado en user_journals');
             }
         } catch (e) {
