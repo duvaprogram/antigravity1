@@ -4,8 +4,18 @@
 
 const PaymentsModule = {
     payments: [],
+    filteredPayments: [],
     availableGuides: [],
     selectedGuideIds: new Set(),
+    selectedPaymentIds: new Set(),
+
+    filters: {
+        search: '',
+        country: '',
+        currency: '',
+        dateStart: '',
+        dateEnd: ''
+    },
 
     _initialized: false,
 
@@ -16,19 +26,88 @@ const PaymentsModule = {
     },
 
     bindEvents() {
+        // New Payment Button
         document.getElementById('btnNewPayment')?.addEventListener('click', () => this.showPaymentModal());
 
+        // Payment Form Submit
         document.getElementById('formPayment')?.addEventListener('submit', (e) => this.handlePaymentSubmit(e));
 
+        // Origin select in Modal (Smart auto-config)
         document.getElementById('paymentOrigin')?.addEventListener('change', (e) => {
+            const val = e.target.value;
             const customGroup = document.getElementById('paymentOriginCustomGroup');
-            if (e.target.value === 'Otro') {
-                customGroup.style.display = 'block';
-                document.getElementById('paymentOriginCustom').required = true;
+            const customInput = document.getElementById('paymentOriginCustom');
+            const currencySelect = document.getElementById('paymentCurrency');
+            const cityFilter = document.getElementById('filterPaymentGuideCity');
+
+            if (val === 'Otro') {
+                if (customGroup) customGroup.style.display = 'block';
+                if (customInput) customInput.required = true;
             } else {
-                customGroup.style.display = 'none';
-                document.getElementById('paymentOriginCustom').required = false;
+                if (customGroup) customGroup.style.display = 'none';
+                if (customInput) customInput.required = false;
             }
+
+            // Smart auto-preset for currency & modal guide city
+            if (val.includes('Bogotá') || val.includes('Medellín') || val.includes('Hoko')) {
+                if (currencySelect) currencySelect.value = 'COP';
+                if (cityFilter) {
+                    cityFilter.value = val.includes('Bogotá') ? 'Bogota' : val.includes('Medellín') ? 'Medellin' : '';
+                    this.filterModalGuides();
+                }
+            } else if (val.includes('Ecuador')) {
+                if (currencySelect) currencySelect.value = 'USD';
+                if (cityFilter) {
+                    cityFilter.value = 'Quito';
+                    this.filterModalGuides();
+                }
+            } else if (val.includes('Venezuela') || val.includes('Binance')) {
+                if (currencySelect) currencySelect.value = 'USD';
+                if (cityFilter) {
+                    cityFilter.value = 'Caracas';
+                    this.filterModalGuides();
+                }
+            }
+        });
+
+        // Search & Filters in Main Payments Section
+        document.getElementById('payFilterSearch')?.addEventListener('input', (e) => {
+            this.filters.search = e.target.value.trim().toLowerCase();
+            this.applyFilters();
+        });
+
+        document.getElementById('payFilterCountry')?.addEventListener('change', (e) => {
+            this.filters.country = e.target.value;
+            this.applyFilters();
+        });
+
+        document.getElementById('payFilterCurrency')?.addEventListener('change', (e) => {
+            this.filters.currency = e.target.value;
+            this.applyFilters();
+        });
+
+        document.getElementById('payFilterDateStart')?.addEventListener('change', (e) => {
+            this.filters.dateStart = e.target.value;
+            this.applyFilters();
+        });
+
+        document.getElementById('payFilterDateEnd')?.addEventListener('change', (e) => {
+            this.filters.dateEnd = e.target.value;
+            this.applyFilters();
+        });
+
+        document.getElementById('btnPayClearFilters')?.addEventListener('click', () => {
+            this.clearFilters();
+        });
+
+        // Select All Checkbox in Table Header
+        document.getElementById('selectAllPaymentsHeader')?.addEventListener('change', (e) => {
+            this.selectAllPayments(e.target.checked);
+        });
+
+        // Floating Calculator Clear Button
+        document.getElementById('btnCalcClearSelection')?.addEventListener('click', () => {
+            this.clearPaymentSelection();
         });
 
         // Search inputs for guides in the modal
@@ -37,7 +116,7 @@ const PaymentsModule = {
         document.getElementById('filterPaymentGuideDateStart')?.addEventListener('change', () => this.filterModalGuides());
         document.getElementById('filterPaymentGuideDateEnd')?.addEventListener('change', () => this.filterModalGuides());
 
-        // Select all checkbox
+        // Select all checkbox in Modal
         document.getElementById('selectAllPaymentGuides')?.addEventListener('change', (e) => {
             const checkboxes = document.querySelectorAll('.payment-guide-checkbox:not(:disabled)');
             checkboxes.forEach(cb => {
@@ -52,11 +131,96 @@ const PaymentsModule = {
         });
     },
 
+    /**
+     * Smart Country Detection from Origin, Notes and Associated Guide Cities
+     */
+    detectCountry(payment) {
+        const origin = (payment.origin || '').toLowerCase();
+        const notes = (payment.notes || '').toLowerCase();
+
+        let guideCities = [];
+        if (payment.payment_guides && Array.isArray(payment.payment_guides)) {
+            guideCities = payment.payment_guides
+                .map(pg => pg.guides?.cities?.name || pg.guides?.city_name || '')
+                .filter(Boolean)
+                .map(c => c.toLowerCase());
+        }
+
+        const combined = `${origin} ${notes} ${guideCities.join(' ')}`.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+        // 1. Colombia detection (Bogota, Medellin, Cali, Barranquilla, Hoko, etc.)
+        if (
+            combined.includes('bogota') ||
+            combined.includes('medellin') ||
+            combined.includes('cali') ||
+            combined.includes('barranquilla') ||
+            combined.includes('bucaramanga') ||
+            combined.includes('colombia') ||
+            combined.includes('hoko') ||
+            combined.includes('domiciliarios bogota') ||
+            combined.includes('domiciliarios medellin')
+        ) {
+            return {
+                name: 'Colombia',
+                flag: '🇨🇴',
+                color: '#3b82f6',
+                bg: 'rgba(59, 130, 246, 0.15)',
+                border: 'rgba(59, 130, 246, 0.3)'
+            };
+        }
+
+        // 2. Ecuador detection (Quito, Guayaquil, Cuenca, Machala, Ecuador, etc.)
+        if (
+            combined.includes('quito') ||
+            combined.includes('guayaquil') ||
+            combined.includes('cuenca') ||
+            combined.includes('machala') ||
+            combined.includes('ecuador') ||
+            combined.includes('domicilios ecuador')
+        ) {
+            return {
+                name: 'Ecuador',
+                flag: '🇪🇨',
+                color: '#f59e0b',
+                bg: 'rgba(245, 158, 11, 0.15)',
+                border: 'rgba(245, 158, 11, 0.3)'
+            };
+        }
+
+        // 3. Venezuela detection (Caracas, Binance, Venezuela, Bolivares, etc.)
+        if (
+            combined.includes('caracas') ||
+            combined.includes('maracaibo') ||
+            combined.includes('valencia') ||
+            combined.includes('venezuela') ||
+            combined.includes('binance') ||
+            combined.includes('bolivar') ||
+            combined.includes(' bs')
+        ) {
+            return {
+                name: 'Venezuela',
+                flag: '🇻🇪',
+                color: '#a855f7',
+                bg: 'rgba(168, 85, 247, 0.15)',
+                border: 'rgba(168, 85, 247, 0.3)'
+            };
+        }
+
+        // 4. Default / Other
+        return {
+            name: 'Otro',
+            flag: '🌐',
+            color: '#94a3b8',
+            bg: 'rgba(148, 163, 184, 0.15)',
+            border: 'rgba(148, 163, 184, 0.3)'
+        };
+    },
+
     async render() {
         App.showLoading(true);
         try {
             await this.loadPayments();
-            this.renderPaymentsTable();
+            this.applyFilters();
         } catch (error) {
             console.error('Error rendering payments:', error);
             Utils.showToast('Error al cargar pagos', 'error');
@@ -78,70 +242,359 @@ const PaymentsModule = {
 
         if (error) throw error;
         this.payments = data || [];
+        this.filteredPayments = [...this.payments];
     },
 
+    applyFilters() {
+        const { search, country, currency, dateStart, dateEnd } = this.filters;
+
+        this.filteredPayments = this.payments.filter(payment => {
+            // 1. Search Query
+            if (search) {
+                const code = (payment.code || '').toLowerCase();
+                const origin = (payment.origin || '').toLowerCase();
+                const notes = (payment.notes || '').toLowerCase();
+                const guidesStr = (payment.payment_guides || [])
+                    .map(pg => `${pg.guides?.guide_number || ''} ${pg.guides?.clients?.full_name || ''}`)
+                    .join(' ')
+                    .toLowerCase();
+
+                if (!code.includes(search) && !origin.includes(search) && !notes.includes(search) && !guidesStr.includes(search)) {
+                    return false;
+                }
+            }
+
+            // 2. Country Filter (Smart)
+            if (country) {
+                const detected = this.detectCountry(payment);
+                if (detected.name !== country) {
+                    return false;
+                }
+            }
+
+            // 3. Currency Filter
+            if (currency) {
+                const payCurrency = (payment.currency || 'USD').toUpperCase();
+                if (payCurrency !== currency.toUpperCase()) {
+                    return false;
+                }
+            }
+
+            // 4. Date Range Filter
+            if (dateStart || dateEnd) {
+                const payDate = payment.created_at ? new Date(payment.created_at).toISOString().split('T')[0] : '';
+                if (dateStart && payDate < dateStart) return false;
+                if (dateEnd && payDate > dateEnd) return false;
+            }
+
+            return true;
+        });
+
+        this.renderPaymentsDashboard(this.filteredPayments);
+        this.renderPaymentsTable();
+        this.updateCalculatorWidget();
+    },
+
+    clearFilters() {
+        this.filters = { search: '', country: '', currency: '', dateStart: '', dateEnd: '' };
+
+        const searchEl = document.getElementById('payFilterSearch');
+        if (searchEl) searchEl.value = '';
+
+        const countryEl = document.getElementById('payFilterCountry');
+        if (countryEl) countryEl.value = '';
+
+        const currEl = document.getElementById('payFilterCurrency');
+        if (currEl) currEl.value = '';
+
+        const dStartEl = document.getElementById('payFilterDateStart');
+        if (dStartEl) dStartEl.value = '';
+
+        const dEndEl = document.getElementById('payFilterDateEnd');
+        if (dEndEl) dEndEl.value = '';
+
+        this.applyFilters();
+    },
+
+    /**
+     * Render the Multi-Currency Payments Dashboard
+     */
+    renderPaymentsDashboard(paymentsList = this.filteredPayments) {
+        let totalUsd = 0;
+        let countUsd = 0;
+        let totalCop = 0;
+        let countCop = 0;
+        let totalGuides = 0;
+
+        const countryMap = {
+            'Colombia': { count: 0, usd: 0, cop: 0, flag: '🇨🇴' },
+            'Ecuador': { count: 0, usd: 0, cop: 0, flag: '🇪🇨' },
+            'Venezuela': { count: 0, usd: 0, cop: 0, flag: '🇻🇪' },
+            'Otro': { count: 0, usd: 0, cop: 0, flag: '🌐' }
+        };
+
+        paymentsList.forEach(payment => {
+            const amount = parseFloat(payment.amount || 0);
+            const currency = (payment.currency || 'USD').toUpperCase();
+            const guidesCount = payment.payment_guides ? payment.payment_guides.length : 0;
+            totalGuides += guidesCount;
+
+            const countryInfo = this.detectCountry(payment);
+            const countryKey = countryMap[countryInfo.name] ? countryInfo.name : 'Otro';
+
+            countryMap[countryKey].count++;
+
+            if (currency === 'COP') {
+                totalCop += amount;
+                countCop++;
+                countryMap[countryKey].cop += amount;
+            } else {
+                totalUsd += amount;
+                countUsd++;
+                countryMap[countryKey].usd += amount;
+            }
+        });
+
+        // 1. Total USD Card
+        const elUsd = document.getElementById('payStatTotalUsd');
+        if (elUsd) {
+            elUsd.textContent = `$${totalUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+        const elCountUsd = document.getElementById('payStatCountUsd');
+        if (elCountUsd) {
+            elCountUsd.textContent = `${countUsd} pago${countUsd === 1 ? '' : 's'} en USD`;
+        }
+
+        // 2. Total COP Card
+        const elCop = document.getElementById('payStatTotalCop');
+        if (elCop) {
+            elCop.textContent = `COP $${Math.round(totalCop).toLocaleString('es-CO')}`;
+        }
+        const elCountCop = document.getElementById('payStatCountCop');
+        if (elCountCop) {
+            elCountCop.textContent = `${countCop} pago${countCop === 1 ? '' : 's'} en COP`;
+        }
+
+        // 3. Total Guides Card
+        const elGuides = document.getElementById('payStatTotalGuides');
+        if (elGuides) {
+            elGuides.textContent = totalGuides.toLocaleString();
+        }
+        const elTotalPayments = document.getElementById('payStatTotalPayments');
+        if (elTotalPayments) {
+            elTotalPayments.textContent = `${paymentsList.length} pago${paymentsList.length === 1 ? '' : 's'} registrados`;
+        }
+
+        // 4. Country Breakdown Card
+        const elBreakdown = document.getElementById('payStatCountryBreakdown');
+        if (elBreakdown) {
+            const activeCountries = Object.entries(countryMap).filter(([_, data]) => data.count > 0);
+            if (activeCountries.length === 0) {
+                elBreakdown.innerHTML = `<span style="color: var(--text-muted);">Sin pagos en el filtro</span>`;
+            } else {
+                elBreakdown.innerHTML = activeCountries.map(([name, data]) => {
+                    let amountText = '';
+                    if (data.usd > 0 && data.cop > 0) {
+                        amountText = `$${data.usd.toFixed(0)} + COP $${(data.cop / 1000000).toFixed(1)}M`;
+                    } else if (data.cop > 0) {
+                        amountText = `COP $${Math.round(data.cop).toLocaleString('es-CO')}`;
+                    } else {
+                        amountText = `$${data.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    }
+
+                    return `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span>${data.flag} <strong>${name}</strong> <small style="color: var(--text-muted);">(${data.count})</small></span>
+                            <span style="font-weight: 600; color: var(--text-primary);">${amountText}</span>
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    },
+
+    /**
+     * Render Payments Table with Checkboxes and Smart Country Badges
+     */
     renderPaymentsTable() {
         const tbody = document.getElementById('paymentsTable');
         if (!tbody) return;
 
-        if (this.payments.length === 0) {
+        if (this.filteredPayments.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="6" class="text-center text-muted">No hay pagos registrados.</td>
+                    <td colspan="7" class="text-center text-muted" style="padding: 2.5rem 1rem;">
+                        <div style="font-size: 2rem; margin-bottom: 0.5rem; opacity: 0.6;">🔍</div>
+                        <div>No se encontraron pagos con los filtros seleccionados.</div>
+                    </td>
                 </tr>
             `;
+            const headerCb = document.getElementById('selectAllPaymentsHeader');
+            if (headerCb) headerCb.checked = false;
             return;
         }
 
-        tbody.innerHTML = this.payments.map(payment => {
-            const date = new Date(payment.created_at).toLocaleDateString('es-EC');
-            const amount = parseFloat(payment.amount).toFixed(2);
-            const currency = payment.currency || 'USD';
-            const currencySymbol = currency === 'COP' ? 'COP $' : '$';
+        // Check if all filtered payments are currently selected
+        const allFilteredSelected = this.filteredPayments.length > 0 && this.filteredPayments.every(p => this.selectedPaymentIds.has(p.id));
+        const headerCb = document.getElementById('selectAllPaymentsHeader');
+        if (headerCb) headerCb.checked = allFilteredSelected;
+
+        tbody.innerHTML = this.filteredPayments.map(payment => {
+            const isSelected = this.selectedPaymentIds.has(payment.id);
+            const date = payment.created_at ? new Date(payment.created_at).toLocaleDateString('es-EC') : 'N/A';
+            const amountNum = parseFloat(payment.amount || 0);
+            const currency = (payment.currency || 'USD').toUpperCase();
+            const isCop = currency === 'COP';
             const guidesCount = payment.payment_guides ? payment.payment_guides.length : 0;
             const originText = payment.origin || 'N/A';
 
+            // Smart country detection
+            const countryInfo = this.detectCountry(payment);
+
             // Format guides preview
-            let guidesPreview = 'Ninguna';
+            let guidesPreview = '<span style="color: var(--text-muted);">Ninguna</span>';
             if (guidesCount > 0) {
                 const guideNos = payment.payment_guides
                     .slice(0, 3)
                     .map(pg => pg.guides?.guide_number)
                     .filter(Boolean)
                     .join(', ');
-                guidesPreview = `${guidesCount} guías (${guideNos}${guidesCount > 3 ? '...' : ''})`;
+                guidesPreview = `<strong>${guidesCount}</strong> guías <small style="color: var(--text-muted);">(${guideNos}${guidesCount > 3 ? '...' : ''})</small>`;
             }
 
+            const formattedAmount = isCop
+                ? `COP $${Math.round(amountNum).toLocaleString('es-CO')}`
+                : `$${amountNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            const rowStyle = isSelected ? 'background: rgba(139, 92, 246, 0.08);' : '';
+
             return `
-                <tr>
-                    <td><strong>${payment.code}</strong></td>
+                <tr style="${rowStyle}">
+                    <td style="text-align: center;">
+                        <input type="checkbox" class="payment-row-checkbox" value="${payment.id}" ${isSelected ? 'checked' : ''} onchange="PaymentsModule.togglePaymentSelection('${payment.id}', this.checked)">
+                    </td>
+                    <td><strong style="color: var(--primary, #8b5cf6); font-family: monospace; font-size: 0.95rem;">${payment.code}</strong></td>
                     <td>${date}</td>
-                    <td><span class="badge" style="background: var(--surface-hover); color: var(--text-primary);">${originText}</span></td>
-                    <td style="color: var(--success); font-weight: 500;">${currencySymbol}${amount}</td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                            <span class="badge" style="background: ${countryInfo.bg}; color: ${countryInfo.color}; border: 1px solid ${countryInfo.border}; font-weight: 600; font-size: 0.75rem; padding: 2px 7px; border-radius: 6px;">
+                                ${countryInfo.flag} ${countryInfo.name}
+                            </span>
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">${Utils.escapeHtml(originText)}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span style="font-weight: 700; font-size: 1rem; color: ${isCop ? '#60a5fa' : 'var(--success, #10b981)'};">
+                            ${formattedAmount}
+                        </span>
+                        <span class="badge" style="font-size: 0.68rem; margin-left: 4px; background: rgba(255,255,255,0.06); color: var(--text-muted);">${currency}</span>
+                    </td>
                     <td><small>${guidesPreview}</small></td>
                     <td>
-                        <button class="btn btn-icon btn-sm" onclick="PaymentsModule.viewPayment('${payment.id}')" title="Ver detalle">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                <circle cx="12" cy="12" r="3"></circle>
-                            </svg>
-                        </button>
-                        <button class="btn btn-icon btn-sm" onclick="PaymentsModule.editPayment('${payment.id}')" title="Editar pago">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                            </svg>
-                        </button>
-                        <button class="btn btn-icon btn-sm text-danger" onclick="PaymentsModule.deletePayment('${payment.id}')" title="Eliminar pago">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                            </svg>
-                        </button>
+                        <div style="display: flex; gap: 4px;">
+                            <button class="btn btn-icon btn-sm" onclick="PaymentsModule.viewPayment('${payment.id}')" title="Ver detalle">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </button>
+                            <button class="btn btn-icon btn-sm" onclick="PaymentsModule.editPayment('${payment.id}')" title="Editar pago">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                            <button class="btn btn-icon btn-sm text-danger" onclick="PaymentsModule.deletePayment('${payment.id}')" title="Eliminar pago">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
         }).join('');
+    },
+
+    /**
+     * Toggle individual payment checkbox selection
+     */
+    togglePaymentSelection(paymentId, isChecked) {
+        if (isChecked) {
+            this.selectedPaymentIds.add(paymentId);
+        } else {
+            this.selectedPaymentIds.delete(paymentId);
+        }
+        this.updateCalculatorWidget();
+        this.renderPaymentsTable();
+    },
+
+    /**
+     * Select / Deselect all visible filtered payments
+     */
+    selectAllPayments(isChecked) {
+        if (isChecked) {
+            this.filteredPayments.forEach(p => this.selectedPaymentIds.add(p.id));
+        } else {
+            this.filteredPayments.forEach(p => this.selectedPaymentIds.delete(p.id));
+        }
+        this.updateCalculatorWidget();
+        this.renderPaymentsTable();
+    },
+
+    /**
+     * Clear all payment selections
+     */
+    clearPaymentSelection() {
+        this.selectedPaymentIds.clear();
+        this.updateCalculatorWidget();
+        this.renderPaymentsTable();
+    },
+
+    /**
+     * Update Live Floating Calculator Widget
+     */
+    updateCalculatorWidget() {
+        const widget = document.getElementById('paymentsFloatingCalculator');
+        if (!widget) return;
+
+        const count = this.selectedPaymentIds.size;
+        if (count === 0) {
+            widget.style.display = 'none';
+            return;
+        }
+
+        let sumUsd = 0;
+        let sumCop = 0;
+
+        this.selectedPaymentIds.forEach(id => {
+            const payment = this.payments.find(p => p.id === id);
+            if (payment) {
+                const amount = parseFloat(payment.amount || 0);
+                const curr = (payment.currency || 'USD').toUpperCase();
+                if (curr === 'COP') {
+                    sumCop += amount;
+                } else {
+                    sumUsd += amount;
+                }
+            }
+        });
+
+        widget.style.display = 'block';
+
+        const countEl = document.getElementById('calcSelectedCount');
+        if (countEl) countEl.textContent = count;
+
+        const sumUsdEl = document.getElementById('calcSumUsd');
+        if (sumUsdEl) {
+            sumUsdEl.textContent = `$${sumUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        }
+
+        const sumCopEl = document.getElementById('calcSumCop');
+        if (sumCopEl) {
+            sumCopEl.textContent = `COP $${Math.round(sumCop).toLocaleString('es-CO')}`;
+        }
     },
 
     async showPaymentModal() {
@@ -180,7 +633,6 @@ const PaymentsModule = {
         document.getElementById('paymentId').value = payment.id;
 
         let originSelect = document.getElementById('paymentOrigin');
-        // Check if origin is one of the predefined options
         let isPredefined = Array.from(originSelect.options).some(opt => opt.value === payment.origin);
 
         if (isPredefined && payment.origin) {
@@ -224,9 +676,6 @@ const PaymentsModule = {
     },
 
     async loadAvailableGuides() {
-        // Fetch all guides to let user search and select
-        // In a real app we might only fetch unpaid guides. Here we fetch recent guides ordered by date.
-
         const { data, error } = await window.supabaseClient
             .from('v_guides_complete')
             .select(`
@@ -330,7 +779,6 @@ const PaymentsModule = {
 
         let guides = payment.payment_guides?.map(pg => pg.guides).filter(Boolean) || [];
 
-        // Helper to check if a guide is in return or cancelled status
         const isReturnOrCancel = (g) => {
             const st = (g.status || g.status_name || g.guide_statuses?.name || '').toLowerCase().trim();
             return st.includes('devol') || st.includes('cancel');
@@ -367,11 +815,9 @@ const PaymentsModule = {
             console.warn('Error enriching payment guides:', e);
         }
 
-        // Separate effective guides (paid) from return/cancelled guides
         const effectiveGuides = guides.filter(g => !isReturnOrCancel(g));
         const devolucionGuides = guides.filter(g => isReturnOrCancel(g));
 
-        // Totals only sum effective guides (returns do NOT sum payments)
         const totalDollars = effectiveGuides.reduce((sum, g) => sum + (parseFloat(g.total_amount || g.amount_usd || 0) || 0), 0);
         const totalBs = effectiveGuides.reduce((sum, g) => {
             const val = parseFloat(g.payment_bs || g.paymentBs || 0);
@@ -386,6 +832,8 @@ const PaymentsModule = {
         const formatUsd = (num) => {
             return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         };
+
+        const countryInfo = this.detectCountry(payment);
 
         let guidesHtml = guides.length === 0 ? '<p class="text-muted" style="padding: 1rem 0;">No hay guías asociadas a este pago.</p>' : `
             <div style="overflow-x: auto; margin-top: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
@@ -486,6 +934,11 @@ const PaymentsModule = {
             document.body.appendChild(modalEl);
         }
 
+        const isCop = (payment.currency || 'USD').toUpperCase() === 'COP';
+        const formattedPayAmount = isCop
+            ? `COP $${Math.round(parseFloat(payment.amount || 0)).toLocaleString('es-CO')}`
+            : `$${parseFloat(payment.amount || 0).toFixed(2)}`;
+
         modalEl.innerHTML = `
             <div class="modal-content" style="max-width: 700px;">
                 <div class="modal-header">
@@ -494,8 +947,14 @@ const PaymentsModule = {
                 </div>
                 <div class="card-body">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
-                        <p style="margin: 0;"><strong>Origen:</strong> ${payment.origin || 'N/A'}</p>
-                        <p style="margin: 0;"><strong>Monto:</strong> ${(payment.currency === 'COP' ? 'COP $' : '$')}${parseFloat(payment.amount).toFixed(2)}</p>
+                        <p style="margin: 0;">
+                            <strong>País / Origen:</strong> 
+                            <span class="badge" style="background: ${countryInfo.bg}; color: ${countryInfo.color}; border: 1px solid ${countryInfo.border}; margin-left: 4px;">
+                                ${countryInfo.flag} ${countryInfo.name}
+                            </span>
+                            ${payment.origin ? ` - ${payment.origin}` : ''}
+                        </p>
+                        <p style="margin: 0;"><strong>Monto Recibido:</strong> <span style="color: ${isCop ? '#60a5fa' : 'var(--success)'}; font-weight: 600;">${formattedPayAmount}</span></p>
                         <p style="margin: 0;"><strong>Fecha:</strong> ${new Date(payment.created_at).toLocaleString()}</p>
                     </div>
                     <p style="margin-bottom: 1.25rem;"><strong>Notas:</strong> ${Utils.escapeHtml(payment.notes || 'Ninguna')}</p>
@@ -514,13 +973,13 @@ const PaymentsModule = {
 
     generatePaymentCode(origin) {
         let prefix = 'P-';
-        const lowerOut = origin.toLowerCase();
+        const lowerOut = (origin || '').toLowerCase();
 
-        if (lowerOut.includes('ecuador')) prefix = 'PAY-EC-';
-        else if (lowerOut.includes('venezuela') || lowerOut.includes('binance')) prefix = 'PAY-VE-';
-        else if (lowerOut.includes('bogotá')) prefix = 'PAY-BOG-';
-        else if (lowerOut.includes('medellín')) prefix = 'PAY-MED-';
-        else if (lowerOut.includes('hoko')) return Math.floor(Math.random() * 65535).toString(16).toUpperCase().padStart(4, '0'); // e.g. 23F3
+        if (lowerOut.includes('ecuador') || lowerOut.includes('quito') || lowerOut.includes('guayaquil')) prefix = 'PAY-EC-';
+        else if (lowerOut.includes('venezuela') || lowerOut.includes('binance') || lowerOut.includes('caracas')) prefix = 'PAY-VE-';
+        else if (lowerOut.includes('bogot')) prefix = 'PAY-BOG-';
+        else if (lowerOut.includes('medell')) prefix = 'PAY-MED-';
+        else if (lowerOut.includes('hoko')) return Math.floor(Math.random() * 65535).toString(16).toUpperCase().padStart(4, '0');
 
         const randomNum = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
         return `${prefix}${randomNum}`;
@@ -541,9 +1000,7 @@ const PaymentsModule = {
 
         App.showLoading(true);
         try {
-            // Include created_at if possible
             let createdAtTarget = new Date(date);
-            // set time to current time logic
             const now = new Date();
             createdAtTarget.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
 
@@ -587,7 +1044,7 @@ const PaymentsModule = {
                 currentPaymentId = newPayment.id;
             }
 
-            // Insert new payment_guides associations (whether new or update)
+            // Insert new payment_guides associations
             if (this.selectedGuideIds.size > 0) {
                 const associations = Array.from(this.selectedGuideIds).map(guideId => ({
                     payment_id: currentPaymentId,
@@ -605,7 +1062,7 @@ const PaymentsModule = {
             document.getElementById('modalPayment').classList.remove('active');
             document.body.style.overflow = '';
 
-            this.render();
+            await this.render();
 
         } catch (error) {
             console.error('Error saving payment:', error);
@@ -626,8 +1083,9 @@ const PaymentsModule = {
                 .eq('id', id);
 
             if (error) throw error;
+            this.selectedPaymentIds.delete(id);
             Utils.showToast('Pago eliminado correctamente', 'success');
-            this.render();
+            await this.render();
         } catch (error) {
             console.error('Error deleting payment:', error);
             Utils.showToast('Error al eliminar pago', 'error');
