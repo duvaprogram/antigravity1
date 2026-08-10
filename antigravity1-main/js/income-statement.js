@@ -1238,14 +1238,18 @@ const IncomeStatementModule = {
 
     getExternalSalesSummary() {
         const sales = this.getFilteredExternalSales();
-        let totalRevenue = 0, totalCost = 0, totalShipping = 0, totalReturnShipping = 0;
+        let totalRevenue = 0, totalCost = 0, totalShipping = 0, totalReturnShipping = 0, totalDelivered = 0, totalUnits = 0;
         sales.forEach(s => {
             totalRevenue += parseFloat(s.revenue || 0);
             totalCost += parseFloat(s.product_cost || 0);
             totalShipping += parseFloat(s.shipping_cost || 0);
             totalReturnShipping += parseFloat(s.return_shipping_cost || 0);
+            const del = parseInt(s.delivered || 0);
+            const ret = parseInt(s.returned || 0);
+            totalDelivered += del;
+            totalUnits += parseInt(s.units || (del + ret) || 0);
         });
-        return { totalRevenue, totalCost, totalShipping, totalReturnShipping };
+        return { totalRevenue, totalCost, totalShipping, totalReturnShipping, totalDelivered, totalUnits };
     },
 
     isExternalSalesExpanded: false,

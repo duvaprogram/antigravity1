@@ -262,15 +262,21 @@ const AnalyticsModule = {
 
         // Date filter
         if (this.currentFilters.dateFrom) {
-            const fromDate = new Date(this.currentFilters.dateFrom);
-            fromDate.setHours(0, 0, 0, 0);
-            filtered = filtered.filter(g => new Date(g.createdAt) >= fromDate);
+            filtered = filtered.filter(g => {
+                const dateVal = g.createdAt || g.created_at || g.date;
+                if (!dateVal) return false;
+                const dStr = new Date(dateVal).toISOString().split('T')[0];
+                return dStr >= this.currentFilters.dateFrom;
+            });
         }
 
         if (this.currentFilters.dateTo) {
-            const toDate = new Date(this.currentFilters.dateTo);
-            toDate.setHours(23, 59, 59, 999);
-            filtered = filtered.filter(g => new Date(g.createdAt) <= toDate);
+            filtered = filtered.filter(g => {
+                const dateVal = g.createdAt || g.created_at || g.date;
+                if (!dateVal) return false;
+                const dStr = new Date(dateVal).toISOString().split('T')[0];
+                return dStr <= this.currentFilters.dateTo;
+            });
         }
 
         // City filter
