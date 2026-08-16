@@ -1,9 +1,11 @@
 // ==============================================================================
-// Multimedia Module (Imágenes y Videos)
+// Multimedia Module (Imágenes y Videos) - Versión 2.1.28
 // Gestión de galería de imágenes y subida / reproducción de videos
+// Incluye Diagnóstico Avanzado e Identificador de Errores en Pantalla
 // ==============================================================================
 
 const MultimediaModule = {
+    version: '2.1.28',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -16,6 +18,101 @@ const MultimediaModule = {
     selectedFileObject: null,
     selectedFileMetadata: null,
     db: null,
+    errorsLog: [], // Registro de errores con identificadores únicos
+
+    // --------------------------------------------------------------------------
+    // 0. Sistema de Identificación y Diagnóstico de Errores
+    // --------------------------------------------------------------------------
+    logError(code, message, details = null) {
+        const timestamp = new Date().toLocaleTimeString();
+        const errObj = {
+            id: 'ERR-' + Date.now().toString().slice(-4),
+            code: `[${code}]`,
+            message: message,
+            details: details ? (details.message || String(details)) : null,
+            time: timestamp
+        };
+
+        this.errorsLog.unshift(errObj);
+        if (this.errorsLog.length > 20) this.errorsLog.pop();
+
+        console.error(`🚨 MULTIMEDIA ERROR ${errObj.code} (${errObj.time}): ${errObj.message}`, details || '');
+
+        // Mostrar notificación visual con el identificador del error
+        if (typeof Utils !== 'undefined' && Utils.showToast) {
+            Utils.showToast(`${errObj.code} ${message}`, 'danger');
+        } else {
+            alert(`${errObj.code}: ${message}`);
+        }
+
+        this.updateDiagnosticsUI();
+        return errObj;
+    },
+
+    openDiagnosticsModal() {
+        const modal = document.getElementById('modalMultimediaDiagnostics');
+        if (!modal) {
+            alert(`[ERR_DIAG_MODAL_404] Modal de diagnóstico no encontrado en el DOM.`);
+            return;
+        }
+
+        this.updateDiagnosticsUI();
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    },
+
+    closeDiagnosticsModal() {
+        const modal = document.getElementById('modalMultimediaDiagnostics');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
+    },
+
+    updateDiagnosticsUI() {
+        const versionEl = document.getElementById('diagVersion');
+        const initEl = document.getElementById('diagInitStatus');
+        const dbEl = document.getElementById('diagDbStatus');
+        const modalEl = document.getElementById('diagModalStatus');
+        const countEl = document.getElementById('diagVideoCount');
+        const errorsContainer = document.getElementById('diagErrorsList');
+
+        if (versionEl) versionEl.textContent = `v${this.version}`;
+        if (initEl) initEl.innerHTML = this.initialized ? '<span style="color: #10b981;">✅ Inicializado</span>' : '<span style="color: #ef4444;">❌ No inicializado</span>';
+        if (dbEl) dbEl.innerHTML = this.db ? '<span style="color: #10b981;">✅ IndexedDB Conectado</span>' : '<span style="color: #f59e0b;">⚠️ IndexedDB en espera / Fallback</span>';
+        
+        const uploadModal = document.getElementById('modalUploadVideo');
+        if (modalEl) modalEl.innerHTML = uploadModal ? '<span style="color: #10b981;">✅ Modal en DOM</span>' : '<span style="color: #ef4444;">❌ Modal #modalUploadVideo ausente</span>';
+        
+        if (countEl) countEl.textContent = `${this.videos.length} videos cargados`;
+
+        if (errorsContainer) {
+            if (this.errorsLog.length === 0) {
+                errorsContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0;">No se han registrado errores hasta el momento.</div>';
+            } else {
+                errorsContainer.innerHTML = this.errorsLog.map(e => `
+                    <div style="background: rgba(239, 68, 68, 0.12); border-left: 3px solid #ef4444; padding: 0.6rem 0.8rem; border-radius: 4px; margin-bottom: 0.5rem; font-size: 0.82rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong style="color: #f87171;">${e.code} ${e.id}</strong>
+                            <span style="color: var(--text-muted); font-size: 0.75rem;">${e.time}</span>
+                        </div>
+                        <div style="color: var(--text-primary); margin-top: 0.2rem;">${this.escapeHtml(e.message)}</div>
+                        ${e.details ? `<div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.2rem; font-family: monospace;">${this.escapeHtml(e.details)}</div>` : ''}
+                    </div>
+                `).join('');
+            }
+        }
+    },
+
+    clearErrorsLog() {
+        this.errorsLog = [];
+        this.updateDiagnosticsUI();
+        if (typeof Utils !== 'undefined' && Utils.showToast) {
+            Utils.showToast('Historial de errores limpiado', 'info');
+        }
+    },
 
     // --------------------------------------------------------------------------
     // 1. Inicialización de IndexedDB para almacenamiento de videos pesados (Blobs)
@@ -23,7 +120,20 @@ const MultimediaModule = {
     async initDB() {
         return new Promise((resolve) => {
             if (this.db) return resolve(this.db);
+            
+            // Timeout de seguridad de 2 segundos para evitar bloqueos
+            const safetyTimeout = setTimeout(() => {
+                console.warn('⚠️ [ERR_INDEXEDDB_TIMEOUT] Tiempo de espera agotado al conectar con IndexedDB. Continuando con almacenamiento en memoria.');
+                resolve(null);
+            }, 2000);
+
             try {
+                if (!window.indexedDB) {
+                    clearTimeout(safetyTimeout);
+                    console.warn('⚠️ [ERR_INDEXEDDB_UNAVAILABLE] IndexedDB no soportado en este entorno.');
+                    return resolve(null);
+                }
+
                 const request = indexedDB.open('MultimediaDB', 1);
                 request.onupgradeneeded = (e) => {
                     const db = e.target.result;
@@ -32,15 +142,18 @@ const MultimediaModule = {
                     }
                 };
                 request.onsuccess = (e) => {
+                    clearTimeout(safetyTimeout);
                     this.db = e.target.result;
                     resolve(this.db);
                 };
                 request.onerror = (err) => {
-                    console.warn('⚠️ No se pudo inicializar IndexedDB para videos:', err);
+                    clearTimeout(safetyTimeout);
+                    this.logError('ERR_INDEXEDDB_INIT', 'No se pudo abrir la base de datos local IndexedDB', err);
                     resolve(null);
                 };
             } catch (e) {
-                console.warn('⚠️ Error al abrir IndexedDB:', e);
+                clearTimeout(safetyTimeout);
+                this.logError('ERR_INDEXEDDB_EXCEPTION', 'Excepción al inicializar IndexedDB', e);
                 resolve(null);
             }
         });
@@ -55,9 +168,12 @@ const MultimediaModule = {
                 const store = tx.objectStore('video_files');
                 store.put({ id, blob, updated_at: new Date().toISOString() });
                 tx.oncomplete = () => resolve(true);
-                tx.onerror = () => resolve(false);
+                tx.onerror = (err) => {
+                    this.logError('ERR_BLOB_WRITE', 'Error al guardar el archivo de video en IndexedDB', err);
+                    resolve(false);
+                };
             } catch (e) {
-                console.warn('Error guardando blob:', e);
+                this.logError('ERR_BLOB_TX_EXCEPTION', 'Excepción en transacción de guardado blob', e);
                 resolve(false);
             }
         });
@@ -100,17 +216,22 @@ const MultimediaModule = {
             return;
         }
 
-        await this.initDB();
-        this.setupEventListeners();
-        await this.loadVideos();
+        try {
+            await this.initDB();
+            this.setupEventListeners();
+            await this.loadVideos();
 
-        const savedTab = localStorage.getItem('multimedia_active_tab');
-        if (savedTab && (savedTab === 'images' || savedTab === 'videos')) {
-            this.activeTab = savedTab;
+            const savedTab = localStorage.getItem('multimedia_active_tab');
+            if (savedTab && (savedTab === 'images' || savedTab === 'videos')) {
+                this.activeTab = savedTab;
+            }
+
+            this.initialized = true;
+            this.render();
+            console.log(`✅ MultimediaModule v${this.version} inicializado correctamente.`);
+        } catch(err) {
+            this.logError('ERR_MODULE_INIT', 'Error general al inicializar MultimediaModule', err);
         }
-
-        this.initialized = true;
-        this.render();
     },
 
     async render() {
@@ -170,7 +291,7 @@ const MultimediaModule = {
                 loadedVideos = JSON.parse(localSaved);
             }
         } catch (e) {
-            console.warn('Error leyendo videos locales:', e);
+            this.logError('ERR_LOCAL_STORAGE_READ', 'Error leyendo videos de localStorage', e);
         }
 
         // 2. Intentar cargar desde Supabase si está disponible
@@ -223,7 +344,7 @@ const MultimediaModule = {
             }));
             localStorage.setItem('multimedia_videos_meta', JSON.stringify(metaList));
         } catch (e) {
-            console.warn('Error guardando metadata local de videos:', e);
+            this.logError('ERR_LOCAL_STORAGE_SAVE', 'Error guardando metadata local de videos', e);
         }
     },
 
@@ -255,12 +376,6 @@ const MultimediaModule = {
                 this.sortBy = e.target.value;
                 this.renderVideosList();
             });
-        }
-
-        // Botón Subir Video
-        const btnOpenUpload = document.getElementById('btnOpenUploadVideoModal');
-        if (btnOpenUpload) {
-            btnOpenUpload.addEventListener('click', () => this.openUploadModal());
         }
 
         // Drag & Drop en el Modal de Subida
@@ -348,12 +463,13 @@ const MultimediaModule = {
     // 6. Manejo de Selección de Archivo y Extracción de Metadatos
     // --------------------------------------------------------------------------
     handleFileSelected(file) {
-        if (!file || !file.type.startsWith('video/')) {
-            if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast('Por favor selecciona un archivo de video válido (.mp4, .webm, .mov, etc.)', 'warning');
-            } else {
-                alert('Por favor selecciona un archivo de video válido (.mp4, .webm, .mov, etc.)');
-            }
+        if (!file) {
+            this.logError('ERR_FILE_NULL', 'No se detectó ningún archivo seleccionado');
+            return;
+        }
+
+        if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|webm|mov|mkv|avi|m4v)$/i)) {
+            this.logError('ERR_INVALID_FORMAT', `El archivo "${file.name}" no parece ser un formato de video válido (.mp4, .webm, .mov, etc.)`);
             return;
         }
 
@@ -371,31 +487,42 @@ const MultimediaModule = {
         const previewVideo = document.getElementById('videoFilePreview');
         const previewInfo = document.getElementById('videoFilePreviewInfo');
 
-        const tempUrl = URL.createObjectURL(file);
-        if (previewVideo) {
-            previewVideo.src = tempUrl;
-            previewVideo.onloadedmetadata = () => {
-                const duration = previewVideo.duration || 0;
-                const width = previewVideo.videoWidth || 0;
-                const height = previewVideo.videoHeight || 0;
+        try {
+            const tempUrl = URL.createObjectURL(file);
+            if (previewVideo) {
+                previewVideo.src = tempUrl;
+                previewVideo.onloadedmetadata = () => {
+                    const duration = previewVideo.duration || 0;
+                    const width = previewVideo.videoWidth || 0;
+                    const height = previewVideo.videoHeight || 0;
 
-                this.selectedFileMetadata = {
-                    duration_seconds: duration,
-                    width,
-                    height,
-                    size_bytes: file.size,
-                    file_type: file.type || 'video/mp4'
+                    this.selectedFileMetadata = {
+                        duration_seconds: duration,
+                        width,
+                        height,
+                        size_bytes: file.size,
+                        file_type: file.type || 'video/mp4'
+                    };
+
+                    if (previewInfo) {
+                        previewInfo.innerHTML = `
+                            <strong>${file.name}</strong> • ${this.formatFileSize(file.size)} • ${this.formatDuration(duration)} 
+                            ${width && height ? `(${width}x${height}px)` : ''}
+                        `;
+                    }
                 };
 
-                if (previewInfo) {
-                    previewInfo.innerHTML = `
-                        <strong>${file.name}</strong> • ${this.formatFileSize(file.size)} • ${this.formatDuration(duration)} 
-                        ${width && height ? `(${width}x${height}px)` : ''}
-                    `;
-                }
-            };
+                previewVideo.onerror = (e) => {
+                    console.warn('No se pudo generar vista previa automática del video, pero el archivo se guardará correctamente.');
+                    if (previewInfo) {
+                        previewInfo.innerHTML = `<strong>${file.name}</strong> • ${this.formatFileSize(file.size)}`;
+                    }
+                };
 
-            if (previewContainer) previewContainer.style.display = 'block';
+                if (previewContainer) previewContainer.style.display = 'block';
+            }
+        } catch(previewErr) {
+            this.logError('ERR_PREVIEW_GEN', 'No se pudo generar vista previa del archivo', previewErr);
         }
     },
 
@@ -413,11 +540,8 @@ const MultimediaModule = {
         const isFile = sourceTypeRadio ? sourceTypeRadio.value === 'file' : true;
 
         if (!title) {
-            if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast('El título del video es obligatorio', 'warning');
-            } else {
-                alert('El título del video es obligatorio');
-            }
+            this.logError('ERR_TITLE_REQUIRED', 'Debes escribir un título para el video');
+            if (titleInput) titleInput.focus();
             return;
         }
 
@@ -428,7 +552,7 @@ const MultimediaModule = {
 
         if (submitBtn) submitBtn.disabled = true;
         if (progressContainer) progressContainer.style.display = 'block';
-        if (progressBar) progressBar.style.width = '15%';
+        if (progressBar) progressBar.style.width = '20%';
         if (progressStatus) progressStatus.textContent = 'Procesando video...';
 
         try {
@@ -459,11 +583,7 @@ const MultimediaModule = {
             } else if (isFile) {
                 // Modo Subida de Archivo
                 if (!this.selectedFileObject) {
-                    if (typeof Utils !== 'undefined' && Utils.showToast) {
-                        Utils.showToast('Por favor selecciona un archivo de video primero', 'warning');
-                    } else {
-                        alert('Por favor selecciona un archivo de video primero');
-                    }
+                    this.logError('ERR_NO_FILE_ATTACHED', 'Por favor selecciona o arrastra un archivo de video antes de guardar.');
                     if (submitBtn) submitBtn.disabled = false;
                     if (progressContainer) progressContainer.style.display = 'none';
                     return;
@@ -474,17 +594,20 @@ const MultimediaModule = {
                 durationSeconds = this.selectedFileMetadata ? this.selectedFileMetadata.duration_seconds : 0;
                 fileType = file.type || 'video/mp4';
 
-                if (progressBar) progressBar.style.width = '45%';
+                if (progressBar) progressBar.style.width = '50%';
                 if (progressStatus) progressStatus.textContent = 'Guardando en biblioteca segura...';
 
                 // Guardar Blob en IndexedDB
-                await this.saveVideoBlob(videoId, file);
+                const savedBlob = await this.saveVideoBlob(videoId, file);
+                if (!savedBlob) {
+                    console.warn('⚠️ Guardado en IndexedDB no disponible, usando URL temporal.');
+                }
                 finalUrl = URL.createObjectURL(file);
 
-                // Intentar subir a Supabase Storage si está configurado y accesible
+                // Intentar sincronizar con Supabase Storage si está configurado
                 if (window.supabaseClient && window.supabaseClient.storage) {
                     try {
-                        if (progressBar) progressBar.style.width = '70%';
+                        if (progressBar) progressBar.style.width = '75%';
                         if (progressStatus) progressStatus.textContent = 'Sincronizando con la nube...';
                         const path = `videos/${videoId}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
                         const { data: uploadRes, error: uploadErr } = await supabaseClient.storage
@@ -503,7 +626,7 @@ const MultimediaModule = {
                             }
                         }
                     } catch (storageErr) {
-                        console.log('ℹ️ Almacenamiento local IndexedDB activo');
+                        console.log('ℹ️ Almacenamiento local activo (Supabase Storage no accesible)');
                     }
                 }
             } else {
@@ -511,11 +634,8 @@ const MultimediaModule = {
                 const urlInput = document.getElementById('videoUrlInput');
                 const urlVal = urlInput ? urlInput.value.trim() : '';
                 if (!urlVal) {
-                    if (typeof Utils !== 'undefined' && Utils.showToast) {
-                        Utils.showToast('Por favor ingresa la URL del video', 'warning');
-                    } else {
-                        alert('Por favor ingresa la URL del video');
-                    }
+                    this.logError('ERR_URL_EMPTY', 'Por favor ingresa el enlace o URL del video.');
+                    if (urlInput) urlInput.focus();
                     if (submitBtn) submitBtn.disabled = false;
                     if (progressContainer) progressContainer.style.display = 'none';
                     return;
@@ -528,7 +648,7 @@ const MultimediaModule = {
                 durationSeconds = 0;
             }
 
-            if (progressBar) progressBar.style.width = '90%';
+            if (progressBar) progressBar.style.width = '95%';
             if (progressStatus) progressStatus.textContent = 'Finalizando...';
 
             const videoRecord = {
@@ -554,7 +674,7 @@ const MultimediaModule = {
                 this.videos.unshift(videoRecord);
             }
 
-            // Sincronizar con base de datos de Supabase si está disponible
+            // Sincronizar con Supabase DB si está disponible
             if (window.supabaseClient) {
                 try {
                     await supabaseClient.from('multimedia_videos').upsert({
@@ -573,7 +693,7 @@ const MultimediaModule = {
                         updated_at: videoRecord.updated_at
                     });
                 } catch(dbErr) {
-                    console.log('ℹ️ Registro guardado localmente');
+                    console.log('ℹ️ Registro persistido localmente');
                 }
             }
 
@@ -586,12 +706,7 @@ const MultimediaModule = {
                 Utils.showToast(this.editingVideoId ? '¡Video actualizado con éxito!' : '¡Video subido y agregado a la galería!', 'success');
             }
         } catch (error) {
-            console.error('Error al guardar el video:', error);
-            if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast('Ocurrió un error al guardar el video: ' + error.message, 'danger');
-            } else {
-                alert('Error al guardar el video: ' + error.message);
-            }
+            this.logError('ERR_SAVE_EXCEPTION', 'Excepción al procesar o guardar el video', error);
         } finally {
             if (submitBtn) submitBtn.disabled = false;
             if (progressContainer) progressContainer.style.display = 'none';
@@ -681,7 +796,7 @@ const MultimediaModule = {
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                 </button>
                                 <button type="button" class="btn-video-action" title="Descargar Video" onclick="MultimediaModule.downloadVideo('${v.id}')">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="3" x2="12" y2="3"></line></svg>
                                 </button>
                                 <button type="button" class="btn-video-action" title="Editar Detalles" onclick="MultimediaModule.openEditModal('${v.id}')">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -725,55 +840,65 @@ const MultimediaModule = {
     // 9. Reproductor de Video en Modal
     // --------------------------------------------------------------------------
     async openPlayerModal(videoId) {
-        const video = this.videos.find(v => v.id === videoId);
-        if (!video) return;
-
-        this.currentPlayingVideo = video;
-        const modal = document.getElementById('modalVideoPlayer');
-        const titleEl = document.getElementById('playerModalTitle');
-        const descEl = document.getElementById('playerModalDesc');
-        const container = document.getElementById('playerModalMediaContainer');
-
-        if (titleEl) titleEl.textContent = video.title;
-        if (descEl) descEl.textContent = video.description || `Categoría: ${video.category || 'General'} • Subido el ${this.formatDate(video.created_at)}`;
-
-        // Rehidratar URL si es local y aún no tiene objectUrl
-        let playUrl = video.url;
-        if ((!playUrl || playUrl === '') && video.source_type === 'local') {
-            const blob = await this.getVideoBlob(video.id);
-            if (blob) {
-                playUrl = URL.createObjectURL(blob);
-                video.url = playUrl;
+        try {
+            const video = this.videos.find(v => v.id === videoId);
+            if (!video) {
+                this.logError('ERR_PLAYER_VIDEO_NOT_FOUND', `Video con ID "${videoId}" no encontrado.`);
+                return;
             }
-        }
 
-        if (container) {
-            if (video.source_type === 'youtube') {
-                const embedUrl = this.getYoutubeEmbedUrl(playUrl);
-                container.innerHTML = `<iframe src="${embedUrl}?autoplay=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 450px; border: none; border-radius: 8px;"></iframe>`;
-            } else {
-                container.innerHTML = `
-                    <video id="activeModalVideoPlayer" controls autoplay playsinline style="width: 100%; max-height: 70vh; background: #000; border-radius: 8px;">
-                        <source src="${playUrl}" type="${video.file_type || 'video/mp4'}">
-                        Tu navegador no soporta reproducción de video HTML5.
-                    </video>
-                    <div class="video-player-quick-controls">
-                        <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem;">
-                            <span style="font-size: 0.8rem; color: var(--text-muted);">Velocidad:</span>
-                            <button type="button" class="btn btn-sm btn-secondary" onclick="MultimediaModule.setPlaybackRate(1)">1.0x</button>
-                            <button type="button" class="btn btn-sm btn-secondary" onclick="MultimediaModule.setPlaybackRate(1.25)">1.25x</button>
-                            <button type="button" class="btn btn-sm btn-secondary" onclick="MultimediaModule.setPlaybackRate(1.5)">1.5x</button>
-                            <button type="button" class="btn btn-sm btn-secondary" onclick="MultimediaModule.setPlaybackRate(2)">2.0x</button>
+            this.currentPlayingVideo = video;
+            const modal = document.getElementById('modalVideoPlayer');
+            const titleEl = document.getElementById('playerModalTitle');
+            const descEl = document.getElementById('playerModalDesc');
+            const container = document.getElementById('playerModalMediaContainer');
+
+            if (!modal) {
+                this.logError('ERR_PLAYER_MODAL_404', 'Modal de reproducción #modalVideoPlayer no encontrado en el DOM.');
+                return;
+            }
+
+            if (titleEl) titleEl.textContent = video.title;
+            if (descEl) descEl.textContent = video.description || `Categoría: ${video.category || 'General'} • Subido el ${this.formatDate(video.created_at)}`;
+
+            // Rehidratar URL si es local y aún no tiene objectUrl
+            let playUrl = video.url;
+            if ((!playUrl || playUrl === '') && video.source_type === 'local') {
+                const blob = await this.getVideoBlob(video.id);
+                if (blob) {
+                    playUrl = URL.createObjectURL(blob);
+                    video.url = playUrl;
+                }
+            }
+
+            if (container) {
+                if (video.source_type === 'youtube') {
+                    const embedUrl = this.getYoutubeEmbedUrl(playUrl);
+                    container.innerHTML = `<iframe src="${embedUrl}?autoplay=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 450px; border: none; border-radius: 8px;"></iframe>`;
+                } else {
+                    container.innerHTML = `
+                        <video id="activeModalVideoPlayer" controls autoplay playsinline style="width: 100%; max-height: 70vh; background: #000; border-radius: 8px;">
+                            <source src="${playUrl}" type="${video.file_type || 'video/mp4'}">
+                            Tu navegador no soporta reproducción de video HTML5.
+                        </video>
+                        <div class="video-player-quick-controls">
+                            <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.75rem;">
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">Velocidad:</span>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="MultimediaModule.setPlaybackRate(1)">1.0x</button>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="MultimediaModule.setPlaybackRate(1.25)">1.25x</button>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="MultimediaModule.setPlaybackRate(1.5)">1.5x</button>
+                                <button type="button" class="btn btn-sm btn-secondary" onclick="MultimediaModule.setPlaybackRate(2)">2.0x</button>
+                            </div>
                         </div>
-                    </div>
-                `;
+                    `;
+                }
             }
-        }
 
-        if (modal) {
             modal.classList.add('active');
             modal.style.display = 'flex';
             document.body.style.overflow = 'hidden';
+        } catch(playerErr) {
+            this.logError('ERR_PLAYER_EXCEPTION', 'Excepción al abrir el reproductor de video', playerErr);
         }
     },
 
@@ -847,11 +972,7 @@ const MultimediaModule = {
         }
 
         if (!downloadUrl) {
-            if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast('No se puede descargar este video directamente', 'warning');
-            } else {
-                alert('No se puede descargar este video directamente');
-            }
+            this.logError('ERR_DOWNLOAD_UNAVAILABLE', 'No se pudo generar enlace directo para descargar este video.');
             return;
         }
 
@@ -867,71 +988,90 @@ const MultimediaModule = {
     },
 
     openUploadModal() {
-        this.editingVideoId = null;
-        const modal = document.getElementById('modalUploadVideo');
-        const titleEl = document.getElementById('uploadModalTitle');
-        const submitBtn = document.getElementById('btnSubmitVideo');
-        const form = document.getElementById('videoUploadForm');
-        const previewContainer = document.getElementById('videoFilePreviewContainer');
-        const fileSection = document.getElementById('videoUploadFileSection');
-        const urlSection = document.getElementById('videoUploadUrlSection');
-        const progressContainer = document.getElementById('videoUploadProgressContainer');
+        try {
+            this.editingVideoId = null;
+            const modal = document.getElementById('modalUploadVideo');
+            const titleEl = document.getElementById('uploadModalTitle');
+            const submitBtn = document.getElementById('btnSubmitVideo');
+            const form = document.getElementById('videoUploadForm');
+            const previewContainer = document.getElementById('videoFilePreviewContainer');
+            const fileSection = document.getElementById('videoUploadFileSection');
+            const urlSection = document.getElementById('videoUploadUrlSection');
+            const progressContainer = document.getElementById('videoUploadProgressContainer');
 
-        if (form) form.reset();
-        if (titleEl) titleEl.textContent = 'Subir Nuevo Video';
-        if (submitBtn) submitBtn.textContent = 'Subir y Guardar Video';
-        if (previewContainer) previewContainer.style.display = 'none';
-        if (progressContainer) progressContainer.style.display = 'none';
+            if (!modal) {
+                this.logError('ERR_MODAL_NOT_FOUND', 'El elemento #modalUploadVideo no existe en el DOM.');
+                return;
+            }
 
-        // Mostrar sección de archivo por defecto
-        if (fileSection) fileSection.style.display = 'block';
-        if (urlSection) urlSection.style.display = 'none';
+            if (form) form.reset();
+            if (titleEl) titleEl.textContent = 'Subir Nuevo Video';
+            if (submitBtn) submitBtn.textContent = 'Subir y Guardar Video';
+            if (previewContainer) previewContainer.style.display = 'none';
+            if (progressContainer) progressContainer.style.display = 'none';
 
-        this.selectedFileObject = null;
-        this.selectedFileMetadata = null;
+            // Mostrar sección de archivo por defecto
+            if (fileSection) fileSection.style.display = 'block';
+            if (urlSection) urlSection.style.display = 'none';
 
-        const radioFile = document.querySelector('input[name="videoSourceType"][value="file"]');
-        if (radioFile) radioFile.checked = true;
+            this.selectedFileObject = null;
+            this.selectedFileMetadata = null;
 
-        if (modal) {
+            const radioFile = document.querySelector('input[name="videoSourceType"][value="file"]');
+            if (radioFile) radioFile.checked = true;
+
             modal.classList.add('active');
             modal.style.display = 'flex';
+            modal.style.zIndex = '9999';
             document.body.style.overflow = 'hidden';
+        } catch(err) {
+            this.logError('ERR_OPEN_MODAL_EXCEPTION', 'Excepción al intentar abrir el modal de subida', err);
         }
     },
 
     openEditModal(videoId) {
-        const video = this.videos.find(v => v.id === videoId);
-        if (!video) return;
+        try {
+            const video = this.videos.find(v => v.id === videoId);
+            if (!video) {
+                this.logError('ERR_EDIT_NOT_FOUND', `Video con ID "${videoId}" no encontrado para edición.`);
+                return;
+            }
 
-        this.editingVideoId = videoId;
-        const modal = document.getElementById('modalUploadVideo');
-        const titleEl = document.getElementById('uploadModalTitle');
-        const submitBtn = document.getElementById('btnSubmitVideo');
-        const titleInput = document.getElementById('videoTitleInput');
-        const catSelect = document.getElementById('videoCategorySelect');
-        const descInput = document.getElementById('videoDescriptionInput');
-        const previewContainer = document.getElementById('videoFilePreviewContainer');
-        const fileSection = document.getElementById('videoUploadFileSection');
-        const urlSection = document.getElementById('videoUploadUrlSection');
-        const progressContainer = document.getElementById('videoUploadProgressContainer');
+            this.editingVideoId = videoId;
+            const modal = document.getElementById('modalUploadVideo');
+            const titleEl = document.getElementById('uploadModalTitle');
+            const submitBtn = document.getElementById('btnSubmitVideo');
+            const titleInput = document.getElementById('videoTitleInput');
+            const catSelect = document.getElementById('videoCategorySelect');
+            const descInput = document.getElementById('videoDescriptionInput');
+            const previewContainer = document.getElementById('videoFilePreviewContainer');
+            const fileSection = document.getElementById('videoUploadFileSection');
+            const urlSection = document.getElementById('videoUploadUrlSection');
+            const progressContainer = document.getElementById('videoUploadProgressContainer');
 
-        if (titleEl) titleEl.textContent = 'Editar Detalles del Video';
-        if (submitBtn) submitBtn.textContent = 'Guardar Cambios';
-        if (titleInput) titleInput.value = video.title || '';
-        if (catSelect) catSelect.value = video.category || 'General';
-        if (descInput) descInput.value = video.description || '';
+            if (!modal) {
+                this.logError('ERR_MODAL_NOT_FOUND', 'El modal de subida no está en el DOM');
+                return;
+            }
 
-        // Ocultar zonas de archivo en modo edición rápida de metadatos
-        if (fileSection) fileSection.style.display = 'none';
-        if (urlSection) urlSection.style.display = 'none';
-        if (previewContainer) previewContainer.style.display = 'none';
-        if (progressContainer) progressContainer.style.display = 'none';
+            if (titleEl) titleEl.textContent = 'Editar Detalles del Video';
+            if (submitBtn) submitBtn.textContent = 'Guardar Cambios';
+            if (titleInput) titleInput.value = video.title || '';
+            if (catSelect) catSelect.value = video.category || 'General';
+            if (descInput) descInput.value = video.description || '';
 
-        if (modal) {
+            // Ocultar zonas de archivo en modo edición rápida de metadatos
+            if (fileSection) fileSection.style.display = 'none';
+            if (urlSection) urlSection.style.display = 'none';
+            if (previewContainer) previewContainer.style.display = 'none';
+            if (progressContainer) progressContainer.style.display = 'none';
+
             modal.classList.add('active');
             modal.style.display = 'flex';
+            modal.style.zIndex = '9999';
             document.body.style.overflow = 'hidden';
+        } catch(err) {
+            this.logError('ERR_EDIT_EXCEPTION', 'Excepción al abrir modal de edición', err);
         }
     },
 
@@ -956,10 +1096,8 @@ const MultimediaModule = {
         }
 
         try {
-            // Eliminar de IndexedDB
             await this.deleteVideoBlob(videoId);
 
-            // Eliminar de Supabase si existe
             if (window.supabaseClient) {
                 try {
                     await supabaseClient.from('multimedia_videos').delete().eq('id', videoId);
@@ -980,10 +1118,7 @@ const MultimediaModule = {
                 Utils.showToast('Video eliminado con éxito', 'info');
             }
         } catch (e) {
-            console.error('Error al eliminar video:', e);
-            if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast('Error al eliminar el video', 'danger');
-            }
+            this.logError('ERR_DELETE_VIDEO', 'Error al eliminar el video', e);
         }
     },
 
