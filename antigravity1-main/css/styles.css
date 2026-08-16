@@ -4302,14 +4302,45 @@ form {
     position: absolute;
     top: 8px;
     left: 8px;
-    background: rgba(15, 15, 35, 0.85);
-    color: #cbd5e1;
-    font-size: 0.68rem;
+    font-size: 0.7rem;
     font-weight: 600;
-    padding: 2px 7px;
+    padding: 2px 8px;
     border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    backdrop-filter: blur(4px);
+    backdrop-filter: blur(6px);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.video-source-badge.badge-online {
+    background: rgba(16, 185, 129, 0.9);
+    color: #ffffff;
+    border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.video-source-badge.badge-cloudflare {
+    background: rgba(249, 115, 22, 0.9);
+    color: #ffffff;
+    border: 1px solid rgba(251, 146, 60, 0.4);
+}
+
+.video-source-badge.badge-youtube {
+    background: rgba(239, 68, 68, 0.9);
+    color: #ffffff;
+    border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+.video-source-badge.badge-web {
+    background: rgba(99, 102, 241, 0.9);
+    color: #ffffff;
+    border: 1px solid rgba(129, 140, 248, 0.4);
+}
+
+.video-source-badge.badge-local {
+    background: rgba(51, 65, 85, 0.9);
+    color: #e2e8f0;
+    border: 1px solid rgba(148, 163, 184, 0.3);
 }
 
 .video-card-body {

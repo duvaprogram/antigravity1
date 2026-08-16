@@ -1,11 +1,12 @@
 // ==============================================================================
-// Multimedia Module (Imágenes y Videos) - Versión 2.1.30
+// Multimedia Module (Imágenes y Videos) - Versión 2.1.31
 // Gestión de galería de imágenes y subida / reproducción de videos
-// Incluye Diagnóstico Avanzado e Identificador de Errores en Pantalla
+// Con soporte completo de subida Online a la nube (Supabase Storage / CDN)
+// y generación de enlaces públicos para anuncios y campañas.
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.1.30',
+    version: '2.1.31',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -62,11 +63,11 @@ const MultimediaModule = {
             }
 
             // 2. Abrir modal
-            const modal = document.getElementById('modalMultimediaDiagnostics');
-            if (modal) {
-                if (typeof Utils !== 'undefined' && Utils.openModal) {
-                    Utils.openModal('modalMultimediaDiagnostics');
-                } else {
+            if (typeof Utils !== 'undefined' && Utils.openModal) {
+                Utils.openModal('modalMultimediaDiagnostics');
+            } else {
+                const modal = document.getElementById('modalMultimediaDiagnostics');
+                if (modal) {
                     modal.classList.add('active');
                     modal.style.setProperty('display', 'flex', 'important');
                     modal.style.zIndex = '10002';
@@ -107,7 +108,9 @@ const MultimediaModule = {
         const uploadModal = document.getElementById('modalUploadVideo');
         if (modalEl) modalEl.innerHTML = uploadModal ? '<span style="color: #10b981;">✅ Modal en DOM (#modalUploadVideo)</span>' : '<span style="color: #ef4444;">❌ Modal ausente en el DOM</span>';
         
-        if (countEl) countEl.textContent = `${this.videos.length} videos registrados`;
+        const onlineCount = this.videos.filter(v => v.source_type === 'supabase' || v.source_type === 'cloudflare' || v.source_type === 'youtube' || v.source_type === 'url').length;
+        const localCount = this.videos.filter(v => v.source_type === 'local').length;
+        if (countEl) countEl.textContent = `${this.videos.length} videos (${onlineCount} Online 🌐, ${localCount} Local 💾)`;
 
         const errorsHtml = this.errorsLog.length === 0
             ? '<div style="color: #10b981; font-size: 0.85rem; padding: 0.5rem 0;">✅ Todo en orden. Sin errores registrados.</div>'
@@ -128,8 +131,8 @@ const MultimediaModule = {
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;">
                     <div><strong>Versión:</strong> v${this.version}</div>
                     <div><strong>Módulo:</strong> ${this.initialized ? '✅ Listo' : '❌ Pendiente'}</div>
-                    <div><strong>DB Local:</strong> ${this.db ? '✅ Activa' : 'ℹ️ Memoria'}</div>
-                    <div><strong>Videos:</strong> ${this.videos.length}</div>
+                    <div><strong>Videos Online:</strong> <span style="color: #10b981;">${onlineCount} 🌐</span></div>
+                    <div><strong>Videos Locales:</strong> ${localCount} 💾</div>
                 </div>
                 <div>${errorsHtml}</div>
             `;
@@ -145,7 +148,116 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 1. Inicialización de IndexedDB para almacenamiento de videos pesados (Blobs)
+    // 1. Subida a la Nube (Supabase Storage con Fallback de Buckets)
+    // --------------------------------------------------------------------------
+    async uploadFileToCloud(videoId, file) {
+        if (!window.supabaseClient || !window.supabaseClient.storage) {
+            return { success: false, error: 'Cliente de Supabase Storage no disponible' };
+        }
+
+        const cleanFileName = (file.name || 'video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `videos/${videoId}_${cleanFileName}`;
+
+        // Intentar en los buckets disponibles en Supabase
+        const bucketsToTry = ['multimedia', 'videos', 'images', 'public'];
+        let lastError = null;
+
+        for (const bucket of bucketsToTry) {
+            try {
+                const { data, error } = await supabaseClient.storage
+                    .from(bucket)
+                    .upload(path, file, { cacheControl: '3600', upsert: true });
+
+                if (!error && data) {
+                    const { data: publicUrlData } = supabaseClient.storage
+                        .from(bucket)
+                        .getPublicUrl(path);
+
+                    if (publicUrlData && publicUrlData.publicUrl) {
+                        return {
+                            success: true,
+                            publicUrl: publicUrlData.publicUrl,
+                            storagePath: path,
+                            bucket: bucket
+                        };
+                    }
+                } else if (error) {
+                    lastError = error;
+                }
+            } catch (e) {
+                lastError = e;
+            }
+        }
+
+        return { 
+            success: false, 
+            error: lastError ? (lastError.message || String(lastError)) : 'No se pudo subir a Supabase Storage' 
+        };
+    },
+
+    async uploadExistingLocalVideoToCloud(videoId) {
+        const video = this.videos.find(v => v.id === videoId);
+        if (!video) return;
+
+        const blob = await this.getVideoBlob(videoId);
+        if (!blob) {
+            this.logError('ERR_NO_LOCAL_BLOB', 'No se encontró el archivo del video en la memoria local.');
+            return;
+        }
+
+        if (typeof Utils !== 'undefined' && Utils.showToast) {
+            Utils.showToast('Subiendo video a la nube para generar enlace público online...', 'info');
+        }
+
+        const file = new File([blob], (video.title || 'video').replace(/[^a-zA-Z0-9._-]/g, '_') + '.mp4', { 
+            type: video.file_type || 'video/mp4' 
+        });
+
+        const cloudRes = await this.uploadFileToCloud(videoId, file);
+
+        if (cloudRes.success) {
+            video.url = cloudRes.publicUrl;
+            video.storage_path = cloudRes.storagePath;
+            video.source_type = 'supabase';
+            video.updated_at = new Date().toISOString();
+
+            if (window.supabaseClient) {
+                try {
+                    await supabaseClient.from('multimedia_videos').upsert({
+                        id: video.id,
+                        title: video.title,
+                        description: video.description,
+                        category: video.category,
+                        url: video.url,
+                        storage_path: video.storage_path,
+                        thumbnail_url: video.thumbnail_url,
+                        size_bytes: video.size_bytes,
+                        duration_seconds: video.duration_seconds,
+                        file_type: video.file_type,
+                        source_type: 'supabase',
+                        created_at: video.created_at,
+                        updated_at: video.updated_at
+                    });
+                } catch(e) {
+                    console.warn('Error guardando en BD Supabase:', e);
+                }
+            }
+
+            this.saveLocalMeta();
+            await this.renderVideosList();
+            this.updateStats();
+
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('¡Video subido a la nube con éxito! Enlace público generado.', 'success');
+            }
+        } else {
+            this.logError('ERR_CLOUD_UPLOAD', 'No se pudo subir a Supabase Storage: ' + cloudRes.error);
+            alert(`Para que los videos se suban a la nube de Supabase:\n1. Ve a Supabase -> Storage\n2. Crea un bucket público llamado "multimedia"\n3. Ejecuta el archivo SQL "supabase_multimedia_schema.sql" en el editor SQL.\n\nDetalle: ${cloudRes.error}`);
+        }
+    },
+
+    // --------------------------------------------------------------------------
+    // 2. Almacenamiento Local en IndexedDB (Caché / Offline)
     // --------------------------------------------------------------------------
     async initDB() {
         return new Promise((resolve) => {
@@ -236,7 +348,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 2. Inicialización del Módulo
+    // 3. Inicialización del Módulo
     // --------------------------------------------------------------------------
     async init() {
         if (this.initialized) {
@@ -271,7 +383,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 3. Gestión de Pestañas (Imágenes vs Videos)
+    // 4. Gestión de Pestañas (Imágenes vs Videos)
     // --------------------------------------------------------------------------
     switchTab(tabName, save = true) {
         this.activeTab = tabName;
@@ -307,7 +419,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 4. Carga y Persistencia de Videos (Supabase + LocalStorage + IndexedDB)
+    // 5. Carga y Persistencia de Videos
     // --------------------------------------------------------------------------
     async loadVideos() {
         let loadedVideos = [];
@@ -322,7 +434,7 @@ const MultimediaModule = {
             this.logError('ERR_LOCAL_STORAGE_READ', 'Error leyendo videos de localStorage', e);
         }
 
-        // 2. Intentar cargar desde Supabase si está disponible
+        // 2. Intentar sincronizar desde Supabase DB
         if (window.supabaseClient) {
             try {
                 const { data, error } = await supabaseClient
@@ -361,7 +473,7 @@ const MultimediaModule = {
                 title: v.title,
                 description: v.description || '',
                 category: v.category || 'General',
-                url: v.source_type === 'local' ? '' : v.url,
+                url: (v.source_type === 'local' && v.url && v.url.startsWith('blob:')) ? '' : v.url,
                 storage_path: v.storage_path || '',
                 thumbnail_url: v.thumbnail_url || '',
                 size_bytes: v.size_bytes || 0,
@@ -377,7 +489,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 5. Configuración de Eventos de la Interfaz
+    // 6. Configuración de Eventos de la Interfaz
     // --------------------------------------------------------------------------
     setupEventListeners() {
         // Selector de Pestañas
@@ -450,7 +562,9 @@ const MultimediaModule = {
         this.renderCategoryPills();
     },
 
-    // Subida directa desde tarjeta en la página sin depender de modales
+    // --------------------------------------------------------------------------
+    // 7. Subida Directa desde Tarjeta en Pantalla
+    // --------------------------------------------------------------------------
     async handleDirectFileUpload(input) {
         if (!input || !input.files || input.files.length === 0) return;
         const file = input.files[0];
@@ -463,13 +577,27 @@ const MultimediaModule = {
         
         if (statusEl) {
             statusEl.style.display = 'block';
-            statusEl.textContent = `⏳ Subiendo video "${file.name}" (${this.formatFileSize(file.size)})...`;
+            statusEl.innerHTML = `<span>⏳ Subiendo video <strong>"${this.escapeHtml(file.name)}"</strong> a la nube para generar enlace online...</span>`;
         }
         
         try {
             const videoId = 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+            
+            // 1. Guardar blob en IndexedDB como copia local inmediata
             await this.saveVideoBlob(videoId, file);
-            const finalUrl = URL.createObjectURL(file);
+            let finalUrl = URL.createObjectURL(file);
+            let sourceType = 'local';
+            let storagePath = '';
+
+            // 2. Intentar subir a Supabase Storage para tener link ONLINE público
+            const cloudRes = await this.uploadFileToCloud(videoId, file);
+            if (cloudRes.success) {
+                finalUrl = cloudRes.publicUrl;
+                sourceType = 'supabase';
+                storagePath = cloudRes.storagePath;
+            } else {
+                console.warn('⚠️ No se pudo subir a Supabase Storage, guardado localmente:', cloudRes.error);
+            }
             
             const videoRecord = {
                 id: videoId,
@@ -477,28 +605,55 @@ const MultimediaModule = {
                 description: '',
                 category: category,
                 url: finalUrl,
-                storage_path: '',
+                storage_path: storagePath,
                 thumbnail_url: '',
                 size_bytes: file.size,
                 duration_seconds: 0,
                 file_type: file.type || 'video/mp4',
-                source_type: 'local',
+                source_type: sourceType,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
             };
             
             this.videos.unshift(videoRecord);
+
+            // Sincronizar en BD Supabase si existe
+            if (window.supabaseClient) {
+                try {
+                    await supabaseClient.from('multimedia_videos').upsert({
+                        id: videoRecord.id,
+                        title: videoRecord.title,
+                        description: videoRecord.description,
+                        category: videoRecord.category,
+                        url: videoRecord.source_type === 'local' ? '' : videoRecord.url,
+                        storage_path: videoRecord.storage_path,
+                        thumbnail_url: videoRecord.thumbnail_url,
+                        size_bytes: videoRecord.size_bytes,
+                        duration_seconds: videoRecord.duration_seconds,
+                        file_type: videoRecord.file_type,
+                        source_type: videoRecord.source_type,
+                        created_at: videoRecord.created_at,
+                        updated_at: videoRecord.updated_at
+                    });
+                } catch(e) {}
+            }
+
             this.saveLocalMeta();
             await this.renderVideosList();
             this.updateStats();
             
             if (titleInput) titleInput.value = '';
             if (statusEl) {
-                statusEl.innerHTML = `<span style="color: #10b981;">✅ ¡Video "${this.escapeHtml(title)}" subido y listo en la galería!</span>`;
-                setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+                if (sourceType === 'supabase') {
+                    statusEl.innerHTML = `<span style="color: #10b981;">✅ ¡Video <strong>"${this.escapeHtml(title)}"</strong> subido ONLINE a la nube con éxito! Enlace público disponible.</span>`;
+                } else {
+                    statusEl.innerHTML = `<span style="color: #fbbf24;">💾 Guardado localmente. Haz clic en "Subir a la nube" en la tarjeta para generar su enlace público.</span>`;
+                }
+                setTimeout(() => { statusEl.style.display = 'none'; }, 6000);
             }
+
             if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast(`¡Video "${title}" subido con éxito!`, 'success');
+                Utils.showToast(sourceType === 'supabase' ? `¡Video "${title}" subido ONLINE con éxito!` : `Video "${title}" guardado`, 'success');
             }
         } catch(err) {
             this.logError('ERR_DIRECT_UPLOAD', 'Error al subir el video directamente', err);
@@ -548,7 +703,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 6. Manejo de Selección de Archivo y Extracción de Metadatos
+    // 8. Manejo de Selección de Archivo y Extracción de Metadatos
     // --------------------------------------------------------------------------
     handleFileSelected(file) {
         if (!file) {
@@ -601,7 +756,6 @@ const MultimediaModule = {
                 };
 
                 previewVideo.onerror = () => {
-                    console.warn('No se pudo generar vista previa automática del video, pero el archivo se guardará correctamente.');
                     if (previewInfo) {
                         previewInfo.innerHTML = `<strong>${file.name}</strong> • ${this.formatFileSize(file.size)}`;
                     }
@@ -615,7 +769,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 7. Guardar / Subir Video
+    // 9. Guardar / Subir Video desde Modal
     // --------------------------------------------------------------------------
     async saveVideo() {
         const titleInput = document.getElementById('videoTitleInput');
@@ -682,37 +836,24 @@ const MultimediaModule = {
                 durationSeconds = this.selectedFileMetadata ? this.selectedFileMetadata.duration_seconds : 0;
                 fileType = file.type || 'video/mp4';
 
-                if (progressBar) progressBar.style.width = '50%';
-                if (progressStatus) progressStatus.textContent = 'Guardando en biblioteca segura...';
+                if (progressBar) progressBar.style.width = '40%';
+                if (progressStatus) progressStatus.textContent = 'Guardando copia local segura...';
 
                 // Guardar Blob en IndexedDB
                 await this.saveVideoBlob(videoId, file);
                 finalUrl = URL.createObjectURL(file);
 
-                // Intentar sincronizar con Supabase Storage si está configurado
-                if (window.supabaseClient && window.supabaseClient.storage) {
-                    try {
-                        if (progressBar) progressBar.style.width = '75%';
-                        if (progressStatus) progressStatus.textContent = 'Sincronizando con la nube...';
-                        const path = `videos/${videoId}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-                        const { data: uploadRes, error: uploadErr } = await supabaseClient.storage
-                            .from('multimedia')
-                            .upload(path, file, { cacheControl: '3600', upsert: true });
+                // Subir a Supabase Storage para tener link público ONLINE
+                if (progressBar) progressBar.style.width = '65%';
+                if (progressStatus) progressStatus.textContent = 'Subiendo a la nube de Supabase para generar enlace online...';
 
-                        if (!uploadErr && uploadRes) {
-                            const { data: publicUrlData } = supabaseClient.storage
-                                .from('multimedia')
-                                .getPublicUrl(path);
-
-                            if (publicUrlData && publicUrlData.publicUrl) {
-                                finalUrl = publicUrlData.publicUrl;
-                                storagePath = path;
-                                sourceType = 'supabase';
-                            }
-                        }
-                    } catch (storageErr) {
-                        console.log('ℹ️ Almacenamiento local activo (Supabase Storage no accesible)');
-                    }
+                const cloudRes = await this.uploadFileToCloud(videoId, file);
+                if (cloudRes.success) {
+                    finalUrl = cloudRes.publicUrl;
+                    storagePath = cloudRes.storagePath;
+                    sourceType = 'supabase';
+                } else {
+                    console.warn('⚠️ Almacenamiento online falló, usando local:', cloudRes.error);
                 }
             } else {
                 // Modo Enlace URL Externo
@@ -767,7 +908,7 @@ const MultimediaModule = {
                         title: videoRecord.title,
                         description: videoRecord.description,
                         category: videoRecord.category,
-                        url: videoRecord.url.startsWith('blob:') ? '' : videoRecord.url,
+                        url: videoRecord.source_type === 'local' ? '' : videoRecord.url,
                         storage_path: videoRecord.storage_path,
                         thumbnail_url: videoRecord.thumbnail_url,
                         size_bytes: videoRecord.size_bytes,
@@ -788,7 +929,7 @@ const MultimediaModule = {
             this.updateStats();
 
             if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast(this.editingVideoId ? '¡Video actualizado con éxito!' : '¡Video subido y agregado a la galería!', 'success');
+                Utils.showToast(this.editingVideoId ? '¡Video actualizado con éxito!' : (sourceType === 'supabase' ? '¡Video subido ONLINE con éxito!' : '¡Video agregado a la galería!'), 'success');
             }
         } catch (error) {
             this.logError('ERR_SAVE_EXCEPTION', 'Excepción al procesar o guardar el video', error);
@@ -804,11 +945,12 @@ const MultimediaModule = {
         if (url.includes('vimeo.com')) return 'vimeo';
         if (url.includes('cloudflarestream.com') || url.includes('videodelivery.net')) return 'cloudflare';
         if (url.includes('drive.google.com')) return 'google-drive';
+        if (url.includes('supabase.co')) return 'supabase';
         return 'url';
     },
 
     // --------------------------------------------------------------------------
-    // 8. Renderizado de la Lista de Videos
+    // 10. Renderizado de la Lista de Videos
     // --------------------------------------------------------------------------
     async renderVideosList() {
         const grid = document.getElementById('multimediaVideosGrid');
@@ -852,7 +994,8 @@ const MultimediaModule = {
             const durationLabel = v.duration_seconds ? this.formatDuration(v.duration_seconds) : '';
             const sizeLabel = v.size_bytes ? this.formatFileSize(v.size_bytes) : (v.source_type === 'youtube' ? 'YouTube' : 'Enlace Web');
             const dateLabel = this.formatDate(v.created_at);
-            const sourceBadge = this.getSourceBadge(v.source_type);
+            const isOnline = v.source_type === 'supabase' || v.source_type === 'cloudflare' || v.source_type === 'youtube' || v.source_type === 'url';
+            const sourceBadgeHtml = this.getSourceBadgeHtml(v.source_type);
 
             return `
                 <div class="video-card glass-card" data-id="${v.id}">
@@ -864,16 +1007,33 @@ const MultimediaModule = {
                             </div>
                         </div>
                         ${durationLabel ? `<span class="video-duration-badge">${durationLabel}</span>` : ''}
-                        <span class="video-source-badge">${sourceBadge}</span>
+                        ${sourceBadgeHtml}
                     </div>
                     <div class="video-card-body">
                         <div class="video-card-header">
-                            <span class="video-category-tag">${v.category || 'General'}</span>
+                            <span class="video-category-tag">${this.escapeHtml(v.category || 'General')}</span>
                             <span class="video-date-text">${dateLabel}</span>
                         </div>
                         <h4 class="video-card-title" title="${this.escapeHtml(v.title)}">${this.escapeHtml(v.title)}</h4>
                         ${v.description ? `<p class="video-card-desc">${this.escapeHtml(v.description)}</p>` : ''}
                         
+                        <!-- Barra de Enlace Online Directo -->
+                        <div style="margin-top: 0.25rem;">
+                            ${isOnline ? `
+                                <button type="button" class="btn btn-sm" onclick="MultimediaModule.copyVideoUrl('${v.id}')" 
+                                    style="width: 100%; font-size: 0.76rem; padding: 4px 8px; background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: 6px;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                    <span>Copiar Enlace Online</span>
+                                </button>
+                            ` : `
+                                <button type="button" class="btn btn-sm" onclick="MultimediaModule.uploadExistingLocalVideoToCloud('${v.id}')" 
+                                    style="width: 100%; font-size: 0.76rem; padding: 4px 8px; background: rgba(99, 102, 241, 0.12); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: 6px;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
+                                    <span>☁️ Subir a la Nube (Online)</span>
+                                </button>
+                            `}
+                        </div>
+
                         <div class="video-card-footer">
                             <span class="video-size-info">${sizeLabel}</span>
                             <div class="video-card-actions">
@@ -911,18 +1071,23 @@ const MultimediaModule = {
         `;
     },
 
-    getSourceBadge(sourceType) {
+    getSourceBadgeHtml(sourceType) {
         switch (sourceType) {
-            case 'youtube': return 'YouTube';
-            case 'vimeo': return 'Vimeo';
-            case 'cloudflare': return 'Cloudflare';
-            case 'supabase': return 'Nube';
-            default: return 'Local';
+            case 'supabase':
+                return `<span class="video-source-badge badge-online">🌐 Online</span>`;
+            case 'cloudflare':
+                return `<span class="video-source-badge badge-cloudflare">⚡ Cloudflare</span>`;
+            case 'youtube':
+                return `<span class="video-source-badge badge-youtube">▶️ YouTube</span>`;
+            case 'url':
+                return `<span class="video-source-badge badge-web">🔗 Web URL</span>`;
+            default:
+                return `<span class="video-source-badge badge-local">💾 Local</span>`;
         }
     },
 
     // --------------------------------------------------------------------------
-    // 9. Reproductor de Video en Modal
+    // 11. Reproductor de Video en Modal
     // --------------------------------------------------------------------------
     async openPlayerModal(videoId) {
         try {
@@ -1026,21 +1191,30 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 10. Acciones Rápidas: Copiar URL, Descargar, Editar, Eliminar
+    // 12. Acciones Rápidas: Copiar URL, Descargar, Editar, Eliminar
     // --------------------------------------------------------------------------
     async copyVideoUrl(videoId) {
         const video = this.videos.find(v => v.id === videoId);
         if (!video) return;
 
         let urlToCopy = video.url;
-        if (!urlToCopy || urlToCopy.startsWith('blob:')) {
-            urlToCopy = window.location.origin + window.location.pathname + '#multimedia';
+
+        // Si es un video local sin link online, ofrecer subir a la nube
+        if (!urlToCopy || urlToCopy.startsWith('blob:') || video.source_type === 'local') {
+            if (confirm('Este video se encuentra guardado en tu equipo local.\n\n¿Deseas subirlo a la nube ahora para generar un enlace online público compatible con anuncios y redes?')) {
+                await this.uploadExistingLocalVideoToCloud(videoId);
+                return;
+            } else {
+                urlToCopy = window.location.origin + window.location.pathname + '#multimedia';
+            }
         }
 
         try {
             await navigator.clipboard.writeText(urlToCopy);
             if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast('¡Enlace del video copiado al portapapeles!', 'success');
+                Utils.showToast(`¡Enlace online copiado al portapapeles! 📋\n${urlToCopy}`, 'success');
+            } else {
+                alert(`¡Enlace copiado!\n${urlToCopy}`);
             }
         } catch(e) {
             const tempInput = document.createElement('input');
@@ -1050,7 +1224,7 @@ const MultimediaModule = {
             document.execCommand('copy');
             document.body.removeChild(tempInput);
             if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast('¡Enlace del video copiado al portapapeles!', 'success');
+                Utils.showToast(`¡Enlace online copiado! 📋`, 'success');
             }
         }
     },
@@ -1101,7 +1275,7 @@ const MultimediaModule = {
             }
 
             if (form) form.reset();
-            if (titleEl) titleEl.textContent = 'Subir Nuevo Video';
+            if (titleEl) titleEl.textContent = 'Subir Nuevo Video a la Nube';
             if (submitBtn) submitBtn.textContent = 'Subir y Guardar Video';
             if (previewContainer) previewContainer.style.display = 'none';
             if (progressContainer) progressContainer.style.display = 'none';
@@ -1231,7 +1405,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 11. Estadísticas del Módulo
+    // 13. Estadísticas del Módulo
     // --------------------------------------------------------------------------
     updateStats() {
         const totalCountEl = document.getElementById('statTotalVideos');
@@ -1252,7 +1426,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 12. Utilidades Formato
+    // 14. Utilidades Formato
     // --------------------------------------------------------------------------
     formatFileSize(bytes) {
         if (!bytes || bytes === 0) return '0 MB';
