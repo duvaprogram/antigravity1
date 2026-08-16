@@ -1,11 +1,11 @@
 // ==============================================================================
-// Multimedia Module (Imágenes y Videos) - Versión 2.1.28
+// Multimedia Module (Imágenes y Videos) - Versión 2.1.29
 // Gestión de galería de imágenes y subida / reproducción de videos
 // Incluye Diagnóstico Avanzado e Identificador de Errores en Pantalla
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.1.28',
+    version: '2.1.29',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -34,11 +34,11 @@ const MultimediaModule = {
         };
 
         this.errorsLog.unshift(errObj);
-        if (this.errorsLog.length > 20) this.errorsLog.pop();
+        if (this.errorsLog.length > 25) this.errorsLog.pop();
 
         console.error(`🚨 MULTIMEDIA ERROR ${errObj.code} (${errObj.time}): ${errObj.message}`, details || '');
 
-        // Mostrar notificación visual con el identificador del error
+        // Notificación visual destacada con el código del error
         if (typeof Utils !== 'undefined' && Utils.showToast) {
             Utils.showToast(`${errObj.code} ${message}`, 'danger');
         } else {
@@ -50,23 +50,29 @@ const MultimediaModule = {
     },
 
     openDiagnosticsModal() {
-        const modal = document.getElementById('modalMultimediaDiagnostics');
-        if (!modal) {
-            alert(`[ERR_DIAG_MODAL_404] Modal de diagnóstico no encontrado en el DOM.`);
-            return;
-        }
+        try {
+            console.log('🩺 Abriendo modal de diagnóstico Multimedia v' + this.version);
+            const modal = document.getElementById('modalMultimediaDiagnostics');
+            if (!modal) {
+                alert(`[ERR_DIAG_MODAL_404] El modal #modalMultimediaDiagnostics no se encontró en el HTML.`);
+                return;
+            }
 
-        this.updateDiagnosticsUI();
-        modal.classList.add('active');
-        modal.style.display = 'flex';
-        document.body.style.overflow = 'hidden';
+            this.updateDiagnosticsUI();
+            modal.classList.add('active');
+            modal.style.setProperty('display', 'flex', 'important');
+            modal.style.zIndex = '10002';
+            document.body.style.overflow = 'hidden';
+        } catch(e) {
+            alert('[ERR_DIAG_EXCEPTION] ' + e.message);
+        }
     },
 
     closeDiagnosticsModal() {
         const modal = document.getElementById('modalMultimediaDiagnostics');
         if (modal) {
             modal.classList.remove('active');
-            modal.style.display = 'none';
+            modal.style.display = '';
             document.body.style.overflow = '';
         }
     },
@@ -80,17 +86,17 @@ const MultimediaModule = {
         const errorsContainer = document.getElementById('diagErrorsList');
 
         if (versionEl) versionEl.textContent = `v${this.version}`;
-        if (initEl) initEl.innerHTML = this.initialized ? '<span style="color: #10b981;">✅ Inicializado</span>' : '<span style="color: #ef4444;">❌ No inicializado</span>';
-        if (dbEl) dbEl.innerHTML = this.db ? '<span style="color: #10b981;">✅ IndexedDB Conectado</span>' : '<span style="color: #f59e0b;">⚠️ IndexedDB en espera / Fallback</span>';
+        if (initEl) initEl.innerHTML = this.initialized ? '<span style="color: #10b981;">✅ Inicializado (Activo)</span>' : '<span style="color: #f59e0b;">⏳ Pendiente de inicialización</span>';
+        if (dbEl) dbEl.innerHTML = this.db ? '<span style="color: #10b981;">✅ IndexedDB Conectado</span>' : '<span style="color: #3b82f6;">ℹ️ Memoria Local / Supabase</span>';
         
         const uploadModal = document.getElementById('modalUploadVideo');
-        if (modalEl) modalEl.innerHTML = uploadModal ? '<span style="color: #10b981;">✅ Modal en DOM</span>' : '<span style="color: #ef4444;">❌ Modal #modalUploadVideo ausente</span>';
+        if (modalEl) modalEl.innerHTML = uploadModal ? '<span style="color: #10b981;">✅ Modal en DOM (#modalUploadVideo)</span>' : '<span style="color: #ef4444;">❌ Modal ausente en el DOM</span>';
         
-        if (countEl) countEl.textContent = `${this.videos.length} videos cargados`;
+        if (countEl) countEl.textContent = `${this.videos.length} videos registrados`;
 
         if (errorsContainer) {
             if (this.errorsLog.length === 0) {
-                errorsContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.85rem; padding: 0.5rem 0;">No se han registrado errores hasta el momento.</div>';
+                errorsContainer.innerHTML = '<div style="color: #10b981; font-size: 0.85rem; padding: 0.5rem 0;">✅ Todo en orden. Sin errores registrados.</div>';
             } else {
                 errorsContainer.innerHTML = this.errorsLog.map(e => `
                     <div style="background: rgba(239, 68, 68, 0.12); border-left: 3px solid #ef4444; padding: 0.6rem 0.8rem; border-radius: 4px; margin-bottom: 0.5rem; font-size: 0.82rem;">
@@ -121,16 +127,14 @@ const MultimediaModule = {
         return new Promise((resolve) => {
             if (this.db) return resolve(this.db);
             
-            // Timeout de seguridad de 2 segundos para evitar bloqueos
             const safetyTimeout = setTimeout(() => {
-                console.warn('⚠️ [ERR_INDEXEDDB_TIMEOUT] Tiempo de espera agotado al conectar con IndexedDB. Continuando con almacenamiento en memoria.');
+                console.warn('⚠️ [ERR_INDEXEDDB_TIMEOUT] Tiempo agotado al conectar IndexedDB. Usando modo memoria.');
                 resolve(null);
-            }, 2000);
+            }, 1500);
 
             try {
                 if (!window.indexedDB) {
                     clearTimeout(safetyTimeout);
-                    console.warn('⚠️ [ERR_INDEXEDDB_UNAVAILABLE] IndexedDB no soportado en este entorno.');
                     return resolve(null);
                 }
 
@@ -169,7 +173,7 @@ const MultimediaModule = {
                 store.put({ id, blob, updated_at: new Date().toISOString() });
                 tx.oncomplete = () => resolve(true);
                 tx.onerror = (err) => {
-                    this.logError('ERR_BLOB_WRITE', 'Error al guardar el archivo de video en IndexedDB', err);
+                    this.logError('ERR_BLOB_WRITE', 'Error al escribir el archivo de video en IndexedDB', err);
                     resolve(false);
                 };
             } catch (e) {
@@ -228,7 +232,7 @@ const MultimediaModule = {
 
             this.initialized = true;
             this.render();
-            console.log(`✅ MultimediaModule v${this.version} inicializado correctamente.`);
+            console.log(`✅ MultimediaModule v${this.version} listo.`);
         } catch(err) {
             this.logError('ERR_MODULE_INIT', 'Error general al inicializar MultimediaModule', err);
         }
@@ -512,7 +516,7 @@ const MultimediaModule = {
                     }
                 };
 
-                previewVideo.onerror = (e) => {
+                previewVideo.onerror = () => {
                     console.warn('No se pudo generar vista previa automática del video, pero el archivo se guardará correctamente.');
                     if (previewInfo) {
                         previewInfo.innerHTML = `<strong>${file.name}</strong> • ${this.formatFileSize(file.size)}`;
@@ -598,10 +602,7 @@ const MultimediaModule = {
                 if (progressStatus) progressStatus.textContent = 'Guardando en biblioteca segura...';
 
                 // Guardar Blob en IndexedDB
-                const savedBlob = await this.saveVideoBlob(videoId, file);
-                if (!savedBlob) {
-                    console.warn('⚠️ Guardado en IndexedDB no disponible, usando URL temporal.');
-                }
+                await this.saveVideoBlob(videoId, file);
                 finalUrl = URL.createObjectURL(file);
 
                 // Intentar sincronizar con Supabase Storage si está configurado
@@ -796,7 +797,7 @@ const MultimediaModule = {
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                                 </button>
                                 <button type="button" class="btn-video-action" title="Descargar Video" onclick="MultimediaModule.downloadVideo('${v.id}')">
-                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="3" x2="12" y2="3"></line></svg>
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                                 </button>
                                 <button type="button" class="btn-video-action" title="Editar Detalles" onclick="MultimediaModule.openEditModal('${v.id}')">
                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
@@ -895,7 +896,8 @@ const MultimediaModule = {
             }
 
             modal.classList.add('active');
-            modal.style.display = 'flex';
+            modal.style.setProperty('display', 'flex', 'important');
+            modal.style.zIndex = '10001';
             document.body.style.overflow = 'hidden';
         } catch(playerErr) {
             this.logError('ERR_PLAYER_EXCEPTION', 'Excepción al abrir el reproductor de video', playerErr);
@@ -918,7 +920,7 @@ const MultimediaModule = {
         if (container) container.innerHTML = '';
         if (modal) {
             modal.classList.remove('active');
-            modal.style.display = 'none';
+            modal.style.display = '';
             document.body.style.overflow = '';
         }
         this.currentPlayingVideo = null;
@@ -989,6 +991,7 @@ const MultimediaModule = {
 
     openUploadModal() {
         try {
+            console.log('🚀 Abriendo modal de subida de video v' + this.version);
             this.editingVideoId = null;
             const modal = document.getElementById('modalUploadVideo');
             const titleEl = document.getElementById('uploadModalTitle');
@@ -1001,6 +1004,7 @@ const MultimediaModule = {
 
             if (!modal) {
                 this.logError('ERR_MODAL_NOT_FOUND', 'El elemento #modalUploadVideo no existe en el DOM.');
+                alert('[ERR_MODAL_NOT_FOUND] No se encontró el modal #modalUploadVideo');
                 return;
             }
 
@@ -1021,8 +1025,8 @@ const MultimediaModule = {
             if (radioFile) radioFile.checked = true;
 
             modal.classList.add('active');
-            modal.style.display = 'flex';
-            modal.style.zIndex = '9999';
+            modal.style.setProperty('display', 'flex', 'important');
+            modal.style.zIndex = '10001';
             document.body.style.overflow = 'hidden';
         } catch(err) {
             this.logError('ERR_OPEN_MODAL_EXCEPTION', 'Excepción al intentar abrir el modal de subida', err);
@@ -1067,8 +1071,8 @@ const MultimediaModule = {
             if (progressContainer) progressContainer.style.display = 'none';
 
             modal.classList.add('active');
-            modal.style.display = 'flex';
-            modal.style.zIndex = '9999';
+            modal.style.setProperty('display', 'flex', 'important');
+            modal.style.zIndex = '10001';
             document.body.style.overflow = 'hidden';
         } catch(err) {
             this.logError('ERR_EDIT_EXCEPTION', 'Excepción al abrir modal de edición', err);
@@ -1079,7 +1083,7 @@ const MultimediaModule = {
         const modal = document.getElementById('modalUploadVideo');
         if (modal) {
             modal.classList.remove('active');
-            modal.style.display = 'none';
+            modal.style.display = '';
             document.body.style.overflow = '';
         }
         this.editingVideoId = null;
@@ -1182,11 +1186,47 @@ const MultimediaModule = {
     }
 };
 
+// Exportar globalmente
+window.MultimediaModule = MultimediaModule;
+
+// Funciones globales seguras directas para HTML
+window.openVideoUploadModal = function() {
+    try {
+        if (window.MultimediaModule) {
+            window.MultimediaModule.openUploadModal();
+        } else {
+            alert('[ERR_MULTIMEDIA_NOT_FOUND] MultimediaModule no está cargado');
+        }
+    } catch(e) {
+        alert('[ERR_OPEN_UPLOAD_MODAL] ' + e.message);
+    }
+};
+
+window.openVideoDiagnosticsModal = function() {
+    try {
+        if (window.MultimediaModule) {
+            window.MultimediaModule.openDiagnosticsModal();
+        } else {
+            alert('[ERR_MULTIMEDIA_NOT_FOUND] MultimediaModule no está cargado');
+        }
+    } catch(e) {
+        alert('[ERR_OPEN_DIAG_MODAL] ' + e.message);
+    }
+};
+
+window.switchMultimediaTab = function(tab) {
+    try {
+        if (window.MultimediaModule) {
+            window.MultimediaModule.switchTab(tab);
+        }
+    } catch(e) {
+        console.error('Error al cambiar pestaña:', e);
+    }
+};
+
 // Auto-inicializar si el DOM ya cargó
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => MultimediaModule.init());
 } else {
-    setTimeout(() => MultimediaModule.init(), 100);
+    setTimeout(() => MultimediaModule.init(), 50);
 }
-
-window.MultimediaModule = MultimediaModule;

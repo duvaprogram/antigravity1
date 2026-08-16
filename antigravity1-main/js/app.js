@@ -374,6 +374,7 @@ const App = {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
                     modal.classList.remove('active');
+                    modal.style.display = '';
                     document.body.style.overflow = '';
                 }
             });
@@ -384,6 +385,7 @@ const App = {
             if (e.key === 'Escape') {
                 document.querySelectorAll('.modal.active').forEach(modal => {
                     modal.classList.remove('active');
+                    modal.style.display = '';
                     document.body.style.overflow = '';
                 });
             }
@@ -398,6 +400,7 @@ const App = {
                     const modal = document.getElementById(modalId);
                     if (modal) {
                         modal.classList.remove('active');
+                        modal.style.display = '';
                         document.body.style.overflow = '';
                     }
                 }
