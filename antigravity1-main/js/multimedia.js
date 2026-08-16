@@ -1,11 +1,11 @@
 // ==============================================================================
-// Multimedia Module (Imágenes y Videos) - Versión 2.1.29
+// Multimedia Module (Imágenes y Videos) - Versión 2.1.30
 // Gestión de galería de imágenes y subida / reproducción de videos
 // Incluye Diagnóstico Avanzado e Identificador de Errores en Pantalla
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.1.29',
+    version: '2.1.30',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -28,7 +28,7 @@ const MultimediaModule = {
         const errObj = {
             id: 'ERR-' + Date.now().toString().slice(-4),
             code: `[${code}]`,
-            message: message,
+            message: String(message || 'Error desconocido'),
             details: details ? (details.message || String(details)) : null,
             time: timestamp
         };
@@ -51,29 +51,43 @@ const MultimediaModule = {
 
     openDiagnosticsModal() {
         try {
-            console.log('🩺 Abriendo modal de diagnóstico Multimedia v' + this.version);
-            const modal = document.getElementById('modalMultimediaDiagnostics');
-            if (!modal) {
-                alert(`[ERR_DIAG_MODAL_404] El modal #modalMultimediaDiagnostics no se encontró en el HTML.`);
-                return;
+            console.log('🩺 Abriendo diagnóstico Multimedia v' + this.version);
+            this.updateDiagnosticsUI();
+
+            // 1. Mostrar panel en página si existe
+            const inPageDiag = document.getElementById('multimediaInPageDiag');
+            if (inPageDiag) {
+                inPageDiag.style.display = 'block';
+                inPageDiag.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
 
-            this.updateDiagnosticsUI();
-            modal.classList.add('active');
-            modal.style.setProperty('display', 'flex', 'important');
-            modal.style.zIndex = '10002';
-            document.body.style.overflow = 'hidden';
+            // 2. Abrir modal
+            const modal = document.getElementById('modalMultimediaDiagnostics');
+            if (modal) {
+                if (typeof Utils !== 'undefined' && Utils.openModal) {
+                    Utils.openModal('modalMultimediaDiagnostics');
+                } else {
+                    modal.classList.add('active');
+                    modal.style.setProperty('display', 'flex', 'important');
+                    modal.style.zIndex = '10002';
+                    document.body.style.overflow = 'hidden';
+                }
+            }
         } catch(e) {
             alert('[ERR_DIAG_EXCEPTION] ' + e.message);
         }
     },
 
     closeDiagnosticsModal() {
-        const modal = document.getElementById('modalMultimediaDiagnostics');
-        if (modal) {
-            modal.classList.remove('active');
-            modal.style.display = '';
-            document.body.style.overflow = '';
+        if (typeof Utils !== 'undefined' && Utils.closeModal) {
+            Utils.closeModal('modalMultimediaDiagnostics');
+        } else {
+            const modal = document.getElementById('modalMultimediaDiagnostics');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.style.display = '';
+                document.body.style.overflow = '';
+            }
         }
     },
 
@@ -84,6 +98,7 @@ const MultimediaModule = {
         const modalEl = document.getElementById('diagModalStatus');
         const countEl = document.getElementById('diagVideoCount');
         const errorsContainer = document.getElementById('diagErrorsList');
+        const inPageContent = document.getElementById('inPageDiagContent');
 
         if (versionEl) versionEl.textContent = `v${this.version}`;
         if (initEl) initEl.innerHTML = this.initialized ? '<span style="color: #10b981;">✅ Inicializado (Activo)</span>' : '<span style="color: #f59e0b;">⏳ Pendiente de inicialización</span>';
@@ -94,21 +109,30 @@ const MultimediaModule = {
         
         if (countEl) countEl.textContent = `${this.videos.length} videos registrados`;
 
-        if (errorsContainer) {
-            if (this.errorsLog.length === 0) {
-                errorsContainer.innerHTML = '<div style="color: #10b981; font-size: 0.85rem; padding: 0.5rem 0;">✅ Todo en orden. Sin errores registrados.</div>';
-            } else {
-                errorsContainer.innerHTML = this.errorsLog.map(e => `
-                    <div style="background: rgba(239, 68, 68, 0.12); border-left: 3px solid #ef4444; padding: 0.6rem 0.8rem; border-radius: 4px; margin-bottom: 0.5rem; font-size: 0.82rem;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <strong style="color: #f87171;">${e.code} ${e.id}</strong>
-                            <span style="color: var(--text-muted); font-size: 0.75rem;">${e.time}</span>
-                        </div>
-                        <div style="color: var(--text-primary); margin-top: 0.2rem;">${this.escapeHtml(e.message)}</div>
-                        ${e.details ? `<div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.2rem; font-family: monospace;">${this.escapeHtml(e.details)}</div>` : ''}
+        const errorsHtml = this.errorsLog.length === 0
+            ? '<div style="color: #10b981; font-size: 0.85rem; padding: 0.5rem 0;">✅ Todo en orden. Sin errores registrados.</div>'
+            : this.errorsLog.map(e => `
+                <div style="background: rgba(239, 68, 68, 0.12); border-left: 3px solid #ef4444; padding: 0.6rem 0.8rem; border-radius: 4px; margin-bottom: 0.5rem; font-size: 0.82rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <strong style="color: #f87171;">${e.code} ${e.id}</strong>
+                        <span style="color: var(--text-muted); font-size: 0.75rem;">${e.time}</span>
                     </div>
-                `).join('');
-            }
+                    <div style="color: var(--text-primary); margin-top: 0.2rem;">${this.escapeHtml(e.message)}</div>
+                    ${e.details ? `<div style="color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.2rem; font-family: monospace;">${this.escapeHtml(e.details)}</div>` : ''}
+                </div>
+            `).join('');
+
+        if (errorsContainer) errorsContainer.innerHTML = errorsHtml;
+        if (inPageContent) {
+            inPageContent.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <div><strong>Versión:</strong> v${this.version}</div>
+                    <div><strong>Módulo:</strong> ${this.initialized ? '✅ Listo' : '❌ Pendiente'}</div>
+                    <div><strong>DB Local:</strong> ${this.db ? '✅ Activa' : 'ℹ️ Memoria'}</div>
+                    <div><strong>Videos:</strong> ${this.videos.length}</div>
+                </div>
+                <div>${errorsHtml}</div>
+            `;
         }
     },
 
@@ -424,6 +448,66 @@ const MultimediaModule = {
         }
 
         this.renderCategoryPills();
+    },
+
+    // Subida directa desde tarjeta en la página sin depender de modales
+    async handleDirectFileUpload(input) {
+        if (!input || !input.files || input.files.length === 0) return;
+        const file = input.files[0];
+        const statusEl = document.getElementById('directVideoStatus');
+        const titleInput = document.getElementById('directVideoTitleInput');
+        const catSelect = document.getElementById('directVideoCategorySelect');
+        
+        let title = (titleInput && titleInput.value.trim()) ? titleInput.value.trim() : file.name.replace(/\.[^/.]+$/, "");
+        let category = (catSelect && catSelect.value) ? catSelect.value : 'General';
+        
+        if (statusEl) {
+            statusEl.style.display = 'block';
+            statusEl.textContent = `⏳ Subiendo video "${file.name}" (${this.formatFileSize(file.size)})...`;
+        }
+        
+        try {
+            const videoId = 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+            await this.saveVideoBlob(videoId, file);
+            const finalUrl = URL.createObjectURL(file);
+            
+            const videoRecord = {
+                id: videoId,
+                title: title,
+                description: '',
+                category: category,
+                url: finalUrl,
+                storage_path: '',
+                thumbnail_url: '',
+                size_bytes: file.size,
+                duration_seconds: 0,
+                file_type: file.type || 'video/mp4',
+                source_type: 'local',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+            };
+            
+            this.videos.unshift(videoRecord);
+            this.saveLocalMeta();
+            await this.renderVideosList();
+            this.updateStats();
+            
+            if (titleInput) titleInput.value = '';
+            if (statusEl) {
+                statusEl.innerHTML = `<span style="color: #10b981;">✅ ¡Video "${this.escapeHtml(title)}" subido y listo en la galería!</span>`;
+                setTimeout(() => { statusEl.style.display = 'none'; }, 4000);
+            }
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast(`¡Video "${title}" subido con éxito!`, 'success');
+            }
+        } catch(err) {
+            this.logError('ERR_DIRECT_UPLOAD', 'Error al subir el video directamente', err);
+            if (statusEl) {
+                statusEl.innerHTML = `<span style="color: #ef4444;">❌ Error: ${err.message}</span>`;
+            }
+        } finally {
+            input.value = '';
+        }
     },
 
     onSourceTypeChange(type) {
@@ -895,10 +979,14 @@ const MultimediaModule = {
                 }
             }
 
-            modal.classList.add('active');
-            modal.style.setProperty('display', 'flex', 'important');
-            modal.style.zIndex = '10001';
-            document.body.style.overflow = 'hidden';
+            if (typeof Utils !== 'undefined' && Utils.openModal) {
+                Utils.openModal('modalVideoPlayer');
+            } else {
+                modal.classList.add('active');
+                modal.style.setProperty('display', 'flex', 'important');
+                modal.style.zIndex = '10001';
+                document.body.style.overflow = 'hidden';
+            }
         } catch(playerErr) {
             this.logError('ERR_PLAYER_EXCEPTION', 'Excepción al abrir el reproductor de video', playerErr);
         }
@@ -915,13 +1003,17 @@ const MultimediaModule = {
     },
 
     closePlayerModal() {
-        const modal = document.getElementById('modalVideoPlayer');
         const container = document.getElementById('playerModalMediaContainer');
         if (container) container.innerHTML = '';
-        if (modal) {
-            modal.classList.remove('active');
-            modal.style.display = '';
-            document.body.style.overflow = '';
+        if (typeof Utils !== 'undefined' && Utils.closeModal) {
+            Utils.closeModal('modalVideoPlayer');
+        } else {
+            const modal = document.getElementById('modalVideoPlayer');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.style.display = '';
+                document.body.style.overflow = '';
+            }
         }
         this.currentPlayingVideo = null;
     },
@@ -1024,10 +1116,14 @@ const MultimediaModule = {
             const radioFile = document.querySelector('input[name="videoSourceType"][value="file"]');
             if (radioFile) radioFile.checked = true;
 
-            modal.classList.add('active');
-            modal.style.setProperty('display', 'flex', 'important');
-            modal.style.zIndex = '10001';
-            document.body.style.overflow = 'hidden';
+            if (typeof Utils !== 'undefined' && Utils.openModal) {
+                Utils.openModal('modalUploadVideo');
+            } else {
+                modal.classList.add('active');
+                modal.style.setProperty('display', 'flex', 'important');
+                modal.style.zIndex = '10001';
+                document.body.style.overflow = 'hidden';
+            }
         } catch(err) {
             this.logError('ERR_OPEN_MODAL_EXCEPTION', 'Excepción al intentar abrir el modal de subida', err);
         }
@@ -1070,21 +1166,29 @@ const MultimediaModule = {
             if (previewContainer) previewContainer.style.display = 'none';
             if (progressContainer) progressContainer.style.display = 'none';
 
-            modal.classList.add('active');
-            modal.style.setProperty('display', 'flex', 'important');
-            modal.style.zIndex = '10001';
-            document.body.style.overflow = 'hidden';
+            if (typeof Utils !== 'undefined' && Utils.openModal) {
+                Utils.openModal('modalUploadVideo');
+            } else {
+                modal.classList.add('active');
+                modal.style.setProperty('display', 'flex', 'important');
+                modal.style.zIndex = '10001';
+                document.body.style.overflow = 'hidden';
+            }
         } catch(err) {
             this.logError('ERR_EDIT_EXCEPTION', 'Excepción al abrir modal de edición', err);
         }
     },
 
     closeUploadModal() {
-        const modal = document.getElementById('modalUploadVideo');
-        if (modal) {
-            modal.classList.remove('active');
-            modal.style.display = '';
-            document.body.style.overflow = '';
+        if (typeof Utils !== 'undefined' && Utils.closeModal) {
+            Utils.closeModal('modalUploadVideo');
+        } else {
+            const modal = document.getElementById('modalUploadVideo');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.style.display = '';
+                document.body.style.overflow = '';
+            }
         }
         this.editingVideoId = null;
         this.selectedFileObject = null;
@@ -1171,13 +1275,13 @@ const MultimediaModule = {
             const d = new Date(dateStr);
             return d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
         } catch(e) {
-            return dateStr;
+            return String(dateStr);
         }
     },
 
     escapeHtml(text) {
         if (!text) return '';
-        return text
+        return String(text)
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
