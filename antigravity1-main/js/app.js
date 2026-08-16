@@ -41,6 +41,9 @@ const App = {
             MaterialsCalculatorModule.init();
             FinanceModule.init();
             JournalModule.init();
+            if (typeof MultimediaModule !== 'undefined') {
+                MultimediaModule.init();
+            }
 
             // Bind navigation events
             this.bindNavigation();

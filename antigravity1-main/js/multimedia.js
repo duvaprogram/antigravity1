@@ -13,6 +13,8 @@ const MultimediaModule = {
     sortBy: 'newest', // 'newest' | 'oldest' | 'name' | 'size'
     currentPlayingVideo: null,
     editingVideoId: null,
+    selectedFileObject: null,
+    selectedFileMetadata: null,
     db: null,
 
     // --------------------------------------------------------------------------
@@ -148,6 +150,7 @@ const MultimediaModule = {
             } else {
                 imagesView.style.display = 'none';
                 videosView.style.display = 'block';
+                this.renderCategoryPills();
                 this.renderVideosList();
                 this.updateStats();
             }
@@ -179,13 +182,12 @@ const MultimediaModule = {
                     .order('created_at', { ascending: false });
 
                 if (!error && data && data.length > 0) {
-                    // Combinar respetando los más recientes
                     const cloudIds = new Set(data.map(v => v.id));
                     const localOnly = loadedVideos.filter(v => !cloudIds.has(v.id));
                     loadedVideos = [...data, ...localOnly];
                 }
             } catch (err) {
-                console.log('ℹ️ Modo local activo para videos (Supabase table multimedia_videos no disponible aún)');
+                console.log('ℹ️ Modo local activo para videos');
             }
         }
 
@@ -205,7 +207,6 @@ const MultimediaModule = {
 
     saveLocalMeta() {
         try {
-            // Guardamos la metadata (sin la data url gigante si es blob)
             const metaList = this.videos.map(v => ({
                 id: v.id,
                 title: v.title,
@@ -294,18 +295,6 @@ const MultimediaModule = {
             });
         }
 
-        // Tipo de origen (Archivo vs Enlace URL)
-        const uploadTypeRadios = document.querySelectorAll('input[name="videoSourceType"]');
-        uploadTypeRadios.forEach(radio => {
-            radio.addEventListener('change', (e) => {
-                const isFile = e.target.value === 'file';
-                const fileSection = document.getElementById('videoUploadFileSection');
-                const urlSection = document.getElementById('videoUploadUrlSection');
-                if (fileSection) fileSection.style.display = isFile ? 'block' : 'none';
-                if (urlSection) urlSection.style.display = isFile ? 'none' : 'block';
-            });
-        });
-
         // Formulario de Subida/Guardado
         const uploadForm = document.getElementById('videoUploadForm');
         if (uploadForm) {
@@ -315,8 +304,26 @@ const MultimediaModule = {
             });
         }
 
-        // Filtro de categorías dinámico
         this.renderCategoryPills();
+    },
+
+    onSourceTypeChange(type) {
+        const isFile = type === 'file';
+        const fileSection = document.getElementById('videoUploadFileSection');
+        const urlSection = document.getElementById('videoUploadUrlSection');
+        if (fileSection) fileSection.style.display = isFile ? 'block' : 'none';
+        if (urlSection) urlSection.style.display = isFile ? 'none' : 'block';
+    },
+
+    handleFileInputChange(input) {
+        if (input && input.files && input.files.length > 0) {
+            this.handleFileSelected(input.files[0]);
+        }
+    },
+
+    onSortChange(sortBy) {
+        this.sortBy = sortBy;
+        this.renderVideosList();
     },
 
     renderCategoryPills() {
@@ -340,12 +347,13 @@ const MultimediaModule = {
     // --------------------------------------------------------------------------
     // 6. Manejo de Selección de Archivo y Extracción de Metadatos
     // --------------------------------------------------------------------------
-    selectedFileObject: null,
-    selectedFileMetadata: null,
-
     handleFileSelected(file) {
         if (!file || !file.type.startsWith('video/')) {
-            Utils.showToast('Por favor selecciona un archivo de video válido (.mp4, .webm, .mov, etc.)', 'warning');
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Por favor selecciona un archivo de video válido (.mp4, .webm, .mov, etc.)', 'warning');
+            } else {
+                alert('Por favor selecciona un archivo de video válido (.mp4, .webm, .mov, etc.)');
+            }
             return;
         }
 
@@ -385,11 +393,6 @@ const MultimediaModule = {
                         ${width && height ? `(${width}x${height}px)` : ''}
                     `;
                 }
-
-                // Generar thumbnail con canvas
-                try {
-                    previewVideo.currentTime = Math.min(1.0, duration / 2);
-                } catch(e) {}
             };
 
             if (previewContainer) previewContainer.style.display = 'block';
@@ -400,14 +403,21 @@ const MultimediaModule = {
     // 7. Guardar / Subir Video
     // --------------------------------------------------------------------------
     async saveVideo() {
-        const title = document.getElementById('videoTitleInput').value.trim();
-        const category = document.getElementById('videoCategorySelect').value || 'General';
-        const description = document.getElementById('videoDescriptionInput').value.trim();
+        const titleInput = document.getElementById('videoTitleInput');
+        const title = titleInput ? titleInput.value.trim() : '';
+        const catSelect = document.getElementById('videoCategorySelect');
+        const category = catSelect ? catSelect.value : 'General';
+        const descInput = document.getElementById('videoDescriptionInput');
+        const description = descInput ? descInput.value.trim() : '';
         const sourceTypeRadio = document.querySelector('input[name="videoSourceType"]:checked');
         const isFile = sourceTypeRadio ? sourceTypeRadio.value === 'file' : true;
 
         if (!title) {
-            Utils.showToast('El título del video es obligatorio', 'warning');
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('El título del video es obligatorio', 'warning');
+            } else {
+                alert('El título del video es obligatorio');
+            }
             return;
         }
 
@@ -449,7 +459,11 @@ const MultimediaModule = {
             } else if (isFile) {
                 // Modo Subida de Archivo
                 if (!this.selectedFileObject) {
-                    Utils.showToast('Por favor selecciona un archivo de video', 'warning');
+                    if (typeof Utils !== 'undefined' && Utils.showToast) {
+                        Utils.showToast('Por favor selecciona un archivo de video primero', 'warning');
+                    } else {
+                        alert('Por favor selecciona un archivo de video primero');
+                    }
                     if (submitBtn) submitBtn.disabled = false;
                     if (progressContainer) progressContainer.style.display = 'none';
                     return;
@@ -460,7 +474,7 @@ const MultimediaModule = {
                 durationSeconds = this.selectedFileMetadata ? this.selectedFileMetadata.duration_seconds : 0;
                 fileType = file.type || 'video/mp4';
 
-                if (progressBar) progressBar.style.width = '40%';
+                if (progressBar) progressBar.style.width = '45%';
                 if (progressStatus) progressStatus.textContent = 'Guardando en biblioteca segura...';
 
                 // Guardar Blob en IndexedDB
@@ -489,21 +503,26 @@ const MultimediaModule = {
                             }
                         }
                     } catch (storageErr) {
-                        console.log('ℹ️ Almacenamiento local IndexedDB activo (Bucket multimedia no configurado en Supabase)');
+                        console.log('ℹ️ Almacenamiento local IndexedDB activo');
                     }
                 }
             } else {
                 // Modo Enlace URL Externo
-                const urlInput = document.getElementById('videoUrlInput').value.trim();
-                if (!urlInput) {
-                    Utils.showToast('Por favor ingresa la URL del video', 'warning');
+                const urlInput = document.getElementById('videoUrlInput');
+                const urlVal = urlInput ? urlInput.value.trim() : '';
+                if (!urlVal) {
+                    if (typeof Utils !== 'undefined' && Utils.showToast) {
+                        Utils.showToast('Por favor ingresa la URL del video', 'warning');
+                    } else {
+                        alert('Por favor ingresa la URL del video');
+                    }
                     if (submitBtn) submitBtn.disabled = false;
                     if (progressContainer) progressContainer.style.display = 'none';
                     return;
                 }
 
-                finalUrl = urlInput;
-                sourceType = this.detectSourceType(urlInput);
+                finalUrl = urlVal;
+                sourceType = this.detectSourceType(urlVal);
                 fileType = 'video/url';
                 sizeBytes = 0;
                 durationSeconds = 0;
@@ -563,10 +582,16 @@ const MultimediaModule = {
             await this.renderVideosList();
             this.updateStats();
 
-            Utils.showToast(this.editingVideoId ? '¡Video actualizado con éxito!' : '¡Video subido y agregado a la galería!', 'success');
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast(this.editingVideoId ? '¡Video actualizado con éxito!' : '¡Video subido y agregado a la galería!', 'success');
+            }
         } catch (error) {
             console.error('Error al guardar el video:', error);
-            Utils.showToast('Ocurrió un error al guardar el video: ' + error.message, 'danger');
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Ocurrió un error al guardar el video: ' + error.message, 'danger');
+            } else {
+                alert('Error al guardar el video: ' + error.message);
+            }
         } finally {
             if (submitBtn) submitBtn.disabled = false;
             if (progressContainer) progressContainer.style.display = 'none';
@@ -747,6 +772,7 @@ const MultimediaModule = {
 
         if (modal) {
             modal.classList.add('active');
+            modal.style.display = 'flex';
             document.body.style.overflow = 'hidden';
         }
     },
@@ -755,7 +781,9 @@ const MultimediaModule = {
         const player = document.getElementById('activeModalVideoPlayer');
         if (player) {
             player.playbackRate = rate;
-            Utils.showToast(`Velocidad de reproducción: ${rate}x`, 'info');
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast(`Velocidad de reproducción: ${rate}x`, 'info');
+            }
         }
     },
 
@@ -765,6 +793,7 @@ const MultimediaModule = {
         if (container) container.innerHTML = '';
         if (modal) {
             modal.classList.remove('active');
+            modal.style.display = 'none';
             document.body.style.overflow = '';
         }
         this.currentPlayingVideo = null;
@@ -791,7 +820,9 @@ const MultimediaModule = {
 
         try {
             await navigator.clipboard.writeText(urlToCopy);
-            Utils.showToast('¡Enlace del video copiado al portapapeles!', 'success');
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('¡Enlace del video copiado al portapapeles!', 'success');
+            }
         } catch(e) {
             const tempInput = document.createElement('input');
             tempInput.value = urlToCopy;
@@ -799,7 +830,9 @@ const MultimediaModule = {
             tempInput.select();
             document.execCommand('copy');
             document.body.removeChild(tempInput);
-            Utils.showToast('¡Enlace del video copiado al portapapeles!', 'success');
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('¡Enlace del video copiado al portapapeles!', 'success');
+            }
         }
     },
 
@@ -814,7 +847,11 @@ const MultimediaModule = {
         }
 
         if (!downloadUrl) {
-            Utils.showToast('No se puede descargar este video directamente', 'warning');
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('No se puede descargar este video directamente', 'warning');
+            } else {
+                alert('No se puede descargar este video directamente');
+            }
             return;
         }
 
@@ -824,7 +861,9 @@ const MultimediaModule = {
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        Utils.showToast('Descargando video...', 'info');
+        if (typeof Utils !== 'undefined' && Utils.showToast) {
+            Utils.showToast('Descargando video...', 'info');
+        }
     },
 
     openUploadModal() {
@@ -834,23 +873,31 @@ const MultimediaModule = {
         const submitBtn = document.getElementById('btnSubmitVideo');
         const form = document.getElementById('videoUploadForm');
         const previewContainer = document.getElementById('videoFilePreviewContainer');
+        const fileSection = document.getElementById('videoUploadFileSection');
+        const urlSection = document.getElementById('videoUploadUrlSection');
+        const progressContainer = document.getElementById('videoUploadProgressContainer');
 
         if (form) form.reset();
         if (titleEl) titleEl.textContent = 'Subir Nuevo Video';
         if (submitBtn) submitBtn.textContent = 'Subir y Guardar Video';
         if (previewContainer) previewContainer.style.display = 'none';
+        if (progressContainer) progressContainer.style.display = 'none';
+
+        // Mostrar sección de archivo por defecto
+        if (fileSection) fileSection.style.display = 'block';
+        if (urlSection) urlSection.style.display = 'none';
 
         this.selectedFileObject = null;
         this.selectedFileMetadata = null;
 
-        // Mostrar selector de archivo por defecto
         const radioFile = document.querySelector('input[name="videoSourceType"][value="file"]');
-        if (radioFile) {
-            radioFile.checked = true;
-            radioFile.dispatchEvent(new Event('change'));
-        }
+        if (radioFile) radioFile.checked = true;
 
-        if (modal) modal.classList.add('active');
+        if (modal) {
+            modal.classList.add('active');
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
     },
 
     openEditModal(videoId) {
@@ -867,6 +914,7 @@ const MultimediaModule = {
         const previewContainer = document.getElementById('videoFilePreviewContainer');
         const fileSection = document.getElementById('videoUploadFileSection');
         const urlSection = document.getElementById('videoUploadUrlSection');
+        const progressContainer = document.getElementById('videoUploadProgressContainer');
 
         if (titleEl) titleEl.textContent = 'Editar Detalles del Video';
         if (submitBtn) submitBtn.textContent = 'Guardar Cambios';
@@ -874,17 +922,26 @@ const MultimediaModule = {
         if (catSelect) catSelect.value = video.category || 'General';
         if (descInput) descInput.value = video.description || '';
 
-        // Ocultar zonas de subida en modo edición rápida de metadatos
+        // Ocultar zonas de archivo en modo edición rápida de metadatos
         if (fileSection) fileSection.style.display = 'none';
         if (urlSection) urlSection.style.display = 'none';
         if (previewContainer) previewContainer.style.display = 'none';
+        if (progressContainer) progressContainer.style.display = 'none';
 
-        if (modal) modal.classList.add('active');
+        if (modal) {
+            modal.classList.add('active');
+            modal.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        }
     },
 
     closeUploadModal() {
         const modal = document.getElementById('modalUploadVideo');
-        if (modal) modal.classList.remove('active');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }
         this.editingVideoId = null;
         this.selectedFileObject = null;
         this.selectedFileMetadata = null;
@@ -919,10 +976,14 @@ const MultimediaModule = {
             await this.renderVideosList();
             this.updateStats();
 
-            Utils.showToast('Video eliminado con éxito', 'info');
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Video eliminado con éxito', 'info');
+            }
         } catch (e) {
             console.error('Error al eliminar video:', e);
-            Utils.showToast('Error al eliminar el video', 'danger');
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Error al eliminar el video', 'danger');
+            }
         }
     },
 
@@ -985,5 +1046,12 @@ const MultimediaModule = {
             .replace(/'/g, "&#039;");
     }
 };
+
+// Auto-inicializar si el DOM ya cargó
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => MultimediaModule.init());
+} else {
+    setTimeout(() => MultimediaModule.init(), 100);
+}
 
 window.MultimediaModule = MultimediaModule;
