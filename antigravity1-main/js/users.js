@@ -106,11 +106,11 @@ const UsersModule = {
                 'dashboard', 'products', 'inventory', 'clients', 'guides', 
                 'confirmation', 'purchases', 'analytics', 'freights', 
                 'payments', 'accounts', 'campaigns', 'income-statement', 
-                'calculator', 'materials-calculator', 'finance', 'images', 'journal', 'users'
+                'calculator', 'materials-calculator', 'finance', 'multimedia', 'journal', 'users'
             ];
 
             modules.forEach(module => {
-                const perm = data.find(p => p.module === module);
+                const perm = data.find(p => p.module === module) || (module === 'multimedia' ? data.find(p => p.module === 'images') : null);
                 this.pendingPermissions[module] = {
                     can_access: perm ? perm.can_access : true,
                     can_edit: perm ? perm.can_edit : true
@@ -143,7 +143,7 @@ const UsersModule = {
             calculator: { name: 'Calculadora de Utilidad', icon: '🧮' },
             'materials-calculator': { name: 'Calculadora de Materiales', icon: '📐' },
             finance: { name: 'Finanzas Personales', icon: '💵' },
-            images: { name: 'Galería de Imágenes', icon: '🖼️' },
+            multimedia: { name: 'Multimedia (Imágenes y Videos)', icon: '🎬' },
             journal: { name: 'Diario y Metas', icon: '📔' },
             users: { name: 'Usuarios y Permisos', icon: '🛡️' }
         };

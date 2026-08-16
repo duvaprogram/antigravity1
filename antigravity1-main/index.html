@@ -213,13 +213,12 @@
                     </svg>
                     <span>Campañas</span>
                 </a>
-                <a href="#images" class="nav-item" data-section="images">
+                <a href="#multimedia" class="nav-item" data-section="multimedia">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <polyline points="21 15 16 10 5 21"></polyline>
+                        <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                        <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                     </svg>
-                    <span>Imágenes</span>
+                    <span>Multimedia</span>
                 </a>
                 <a href="#journal" class="nav-item" data-section="journal">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -4282,9 +4281,129 @@
                 </div>
             </section>
 
-            <!-- Images Section -->
-            <section class="content-section" id="section-images">
-                <iframe src="https://cloudflare-image-manager.vercel.app?v=3" style="width: 100%; height: calc(100vh - 80px); border: none; border-radius: 8px;" allow="clipboard-write"></iframe>
+            <!-- Multimedia Section (Imágenes y Videos) -->
+            <section class="content-section" id="section-multimedia">
+                <div class="multimedia-container">
+                    <!-- Multimedia Header & Submodule Tabs -->
+                    <div class="multimedia-header-bar">
+                        <div class="multimedia-title-area">
+                            <h2 style="margin: 0; display: flex; align-items: center; gap: 0.6rem;">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                                </svg>
+                                Multimedia
+                            </h2>
+                            <p style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
+                                Biblioteca centralizada de imágenes y videos para anuncios, creativos y contenido
+                            </p>
+                        </div>
+
+                        <!-- Submodule Tab Switcher -->
+                        <div class="multimedia-tabs-nav">
+                            <button type="button" class="multimedia-tab-btn active" data-tab="images">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                                    <polyline points="21 15 16 10 5 21"></polyline>
+                                </svg>
+                                <span>Imágenes</span>
+                            </button>
+                            <button type="button" class="multimedia-tab-btn" data-tab="videos">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                                </svg>
+                                <span>Videos</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Submodule 1: Imágenes -->
+                    <div id="multimedia-subtab-images" class="multimedia-subtab-pane">
+                        <iframe src="https://cloudflare-image-manager.vercel.app?v=3" style="width: 100%; height: calc(100vh - 145px); border: none; border-radius: 12px;" allow="clipboard-write"></iframe>
+                    </div>
+
+                    <!-- Submodule 2: Videos -->
+                    <div id="multimedia-subtab-videos" class="multimedia-subtab-pane" style="display: none;">
+                        <!-- Videos Stats Bar -->
+                        <div class="multimedia-stats-grid">
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                                </div>
+                                <div class="stat-info">
+                                    <div class="stat-value" id="statTotalVideos">0</div>
+                                    <div class="stat-label">Total Videos</div>
+                                </div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                                </div>
+                                <div class="stat-info">
+                                    <div class="stat-value" id="statTotalVideoStorage">0 MB</div>
+                                    <div class="stat-label">Espacio Estimado</div>
+                                </div>
+                            </div>
+                            <div class="stat-card glass-card">
+                                <div class="stat-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                </div>
+                                <div class="stat-info">
+                                    <div class="stat-value" id="statTotalVideoCategories">0</div>
+                                    <div class="stat-label">Categorías Activas</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Videos Filter & Action Bar -->
+                        <div class="multimedia-toolbar glass-card">
+                            <div class="multimedia-toolbar-left">
+                                <div class="search-box">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                    <input type="text" id="videoSearchInput" placeholder="Buscar videos por nombre o etiqueta...">
+                                </div>
+                                <div class="video-sort-box">
+                                    <select id="videoSortSelect">
+                                        <option value="newest">Más recientes</option>
+                                        <option value="oldest">Más antiguos</option>
+                                        <option value="name">Por nombre (A-Z)</option>
+                                        <option value="size">Mayor tamaño</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="multimedia-toolbar-right">
+                                <button type="button" class="btn btn-primary" id="btnOpenUploadVideoModal" style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                    <span>Subir Video</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Category Filter Pills -->
+                        <div class="video-categories-bar" id="videoCategoryPills">
+                            <!-- Categorías inyectadas vía JS -->
+                        </div>
+
+                        <!-- Videos Grid -->
+                        <div class="multimedia-videos-grid" id="multimediaVideosGrid">
+                            <!-- Tarjetas de video inyectadas vía JS -->
+                        </div>
+
+                        <!-- Empty State -->
+                        <div class="multimedia-empty-state glass-card" id="multimediaVideosEmpty" style="display: none;">
+                            <div class="empty-icon">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                            </div>
+                            <h3>No hay videos registrados</h3>
+                            <p>Sube tu primer video en formato MP4, WebM o MOV, o añade un enlace para gestionarlo aquí.</p>
+                            <button type="button" class="btn btn-primary" onclick="MultimediaModule.openUploadModal()" style="margin-top: 1rem;">
+                                + Subir Video Ahora
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- Journal Section -->
@@ -6185,7 +6304,122 @@
         </div>
     </div>
 
-    <!-- Modals for Edit Campaign and Ad Details are generated dynamically by campaigns.js -->
+    <!-- Modal: Upload / Edit Video -->
+    <div class="modal" id="modalUploadVideo">
+        <div class="modal-content" style="max-width: 650px;">
+            <div class="modal-header">
+                <h2 id="uploadModalTitle">Subir Nuevo Video</h2>
+                <button type="button" class="modal-close" onclick="MultimediaModule.closeUploadModal()">&times;</button>
+            </div>
+            <form id="videoUploadForm">
+                <div class="modal-body" style="padding: 1.25rem 0;">
+                    <!-- Source Type Switcher -->
+                    <div class="form-group" style="margin-bottom: 1.25rem;">
+                        <label style="font-weight: 600; display: block; margin-bottom: 0.5rem;">Método de subida / origen:</label>
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                                <input type="radio" name="videoSourceType" value="file" checked>
+                                <span>Subir archivo (.mp4, .webm, .mov)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                                <input type="radio" name="videoSourceType" value="url">
+                                <span>Enlace URL externo (Web / YouTube / Cloudflare)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- File Dropzone Section -->
+                    <div id="videoUploadFileSection">
+                        <div class="video-dropzone" id="videoDropzone">
+                            <input type="file" id="videoFileInput" accept="video/mp4,video/webm,video/ogg,video/quicktime,video/*" style="display: none;">
+                            <div class="dropzone-icon">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="17 8 12 3 7 8"></polyline>
+                                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                                </svg>
+                            </div>
+                            <h4 style="margin: 0.5rem 0 0.25rem 0;">Arrastra tu video aquí o haz clic para examinar</h4>
+                            <p style="margin: 0; font-size: 0.8rem; color: var(--text-muted);">Soporta MP4, WebM, MOV, MKV de alta resolución</p>
+                        </div>
+
+                        <div id="videoFilePreviewContainer" style="display: none; margin-top: 1rem;">
+                            <div style="border-radius: 8px; overflow: hidden; background: #000; max-height: 200px; display: flex; justify-content: center;">
+                                <video id="videoFilePreview" controls style="max-height: 200px; width: 100%; object-fit: contain;"></video>
+                            </div>
+                            <div id="videoFilePreviewInfo" style="font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.5rem; text-align: center;"></div>
+                        </div>
+                    </div>
+
+                    <!-- External URL Section -->
+                    <div id="videoUploadUrlSection" style="display: none;">
+                        <div class="form-group">
+                            <label for="videoUrlInput" style="font-weight: 600; margin-bottom: 0.4rem; display: block;">URL del Video:</label>
+                            <input type="url" id="videoUrlInput" class="form-control" placeholder="https://ejemplo.com/video.mp4 o enlace de YouTube/Cloudflare">
+                            <small style="color: var(--text-muted); display: block; margin-top: 0.3rem;">Puedes ingresar enlaces directos a archivos MP4, Cloudflare Stream o videos de YouTube.</small>
+                        </div>
+                    </div>
+
+                    <!-- Metadata Fields -->
+                    <div class="form-group" style="margin-top: 1rem;">
+                        <label for="videoTitleInput" style="font-weight: 600; margin-bottom: 0.4rem; display: block;">Título del Video *:</label>
+                        <input type="text" id="videoTitleInput" class="form-control" placeholder="Ej: Creativo Anuncio Producto X - Ganador V1" required>
+                    </div>
+
+                    <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                        <div class="form-group">
+                            <label for="videoCategorySelect" style="font-weight: 600; margin-bottom: 0.4rem; display: block;">Categoría:</label>
+                            <select id="videoCategorySelect" class="form-control">
+                                <option value="Anuncios / Ads">Anuncios / Ads</option>
+                                <option value="Creativos">Creativos</option>
+                                <option value="Productos">Productos</option>
+                                <option value="UGC">UGC</option>
+                                <option value="Testimonios">Testimonios</option>
+                                <option value="Tutoriales">Tutoriales</option>
+                                <option value="General" selected>General</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="videoDescriptionInput" style="font-weight: 600; margin-bottom: 0.4rem; display: block;">Descripción / Notas:</label>
+                            <input type="text" id="videoDescriptionInput" class="form-control" placeholder="Notas sobre el video o campaña...">
+                        </div>
+                    </div>
+
+                    <!-- Upload Progress -->
+                    <div id="videoUploadProgressContainer" style="display: none; margin-top: 1rem;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.3rem;">
+                            <span id="videoUploadProgressText">Subiendo video...</span>
+                        </div>
+                        <div class="progress-bar-track" style="height: 6px; background: var(--surface-hover); border-radius: 4px; overflow: hidden;">
+                            <div id="videoUploadProgressBar" style="height: 100%; width: 0%; background: var(--primary); transition: width 0.2s;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;">
+                    <button type="button" class="btn btn-secondary" onclick="MultimediaModule.closeUploadModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="btnSubmitVideo">Subir y Guardar Video</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Video Player -->
+    <div class="modal" id="modalVideoPlayer">
+        <div class="modal-content" style="max-width: 850px; background: #0c0c1e; border: 1px solid var(--border);">
+            <div class="modal-header" style="border-bottom: 1px solid var(--border);">
+                <div>
+                    <h2 id="playerModalTitle" style="margin: 0; font-size: 1.25rem;">Reproduciendo Video</h2>
+                    <p id="playerModalDesc" style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-muted);"></p>
+                </div>
+                <button type="button" class="modal-close" onclick="MultimediaModule.closePlayerModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1rem 0;">
+                <div id="playerModalMediaContainer" style="width: 100%; text-align: center;">
+                    <!-- Video player element injected via JS -->
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
@@ -6195,30 +6429,30 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase-config.js?v=2.1.26"></script>
-    <script src="js/utils.js?v=2.1.26"></script>
-    <script src="js/database.js?v=2.1.26"></script>
-    <script src="js/products.js?v=2.1.26"></script>
-    <script src="js/inventory.js?v=2.1.26"></script>
-    <script src="js/clients.js?v=2.1.26"></script>
-    <script src="js/guides.js?v=2.1.26"></script>
-    <script src="js/analytics.js?v=2.1.26"></script>
-    <script src="js/confirmation.js?v=2.1.26"></script>
-    <script src="js/purchases.js?v=2.1.26"></script>
-    <script src="js/freights.js?v=2.1.26"></script>
-    <script src="js/payments.js?v=2.1.26"></script>
-    <script src="js/accounts.js?v=2.1.26"></script>
-    <script src="js/users.js?v=2.1.26"></script>
-    <script src="js/campaigns.js?v=2.1.26"></script>
-    <script src="js/calculator.js?v=2.1.26"></script>
-
-    <script src="js/finance.js?v=2.1.26"></script>
-    <script src="js/income-statement.js?v=2.1.26"></script>
-    <script src="js/materials-calculator.js?v=2.1.26"></script>
-    <script src="js/journal-data.js?v=2.1.26"></script>
-    <script src="js/journal.js?v=2.1.26"></script>
-    <script src="js/app.js?v=2.1.26"></script>
-    <script src="js/auth.js?v=2.1.26"></script>
+    <script src="js/supabase-config.js?v=2.1.27"></script>
+    <script src="js/utils.js?v=2.1.27"></script>
+    <script src="js/database.js?v=2.1.27"></script>
+    <script src="js/products.js?v=2.1.27"></script>
+    <script src="js/inventory.js?v=2.1.27"></script>
+    <script src="js/clients.js?v=2.1.27"></script>
+    <script src="js/guides.js?v=2.1.27"></script>
+    <script src="js/analytics.js?v=2.1.27"></script>
+    <script src="js/confirmation.js?v=2.1.27"></script>
+    <script src="js/purchases.js?v=2.1.27"></script>
+    <script src="js/freights.js?v=2.1.27"></script>
+    <script src="js/payments.js?v=2.1.27"></script>
+    <script src="js/accounts.js?v=2.1.27"></script>
+    <script src="js/users.js?v=2.1.27"></script>
+    <script src="js/campaigns.js?v=2.1.27"></script>
+    <script src="js/calculator.js?v=2.1.27"></script>
+    <script src="js/multimedia.js?v=2.1.27"></script>
+    <script src="js/finance.js?v=2.1.27"></script>
+    <script src="js/income-statement.js?v=2.1.27"></script>
+    <script src="js/materials-calculator.js?v=2.1.27"></script>
+    <script src="js/journal-data.js?v=2.1.27"></script>
+    <script src="js/journal.js?v=2.1.27"></script>
+    <script src="js/app.js?v=2.1.27"></script>
+    <script src="js/auth.js?v=2.1.27"></script>
 </body>
 
 </html>

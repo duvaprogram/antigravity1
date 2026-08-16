@@ -101,6 +101,7 @@ const AuthModule = {
                 calculator: { can_access: true, can_edit: true },
                 'materials-calculator': { can_access: true, can_edit: true },
                 finance: { can_access: true, can_edit: true },
+                multimedia: { can_access: true, can_edit: true },
                 images: { can_access: true, can_edit: true },
                 journal: { can_access: true, can_edit: true },
                 users: { can_access: true, can_edit: true }
@@ -124,6 +125,13 @@ const AuthModule = {
                     can_edit: p.can_edit
                 };
             });
+
+            // Si tiene permiso de images, sincronizar con multimedia
+            if (this.permissions['images'] && !this.permissions['multimedia']) {
+                this.permissions['multimedia'] = { ...this.permissions['images'] };
+            } else if (this.permissions['multimedia'] && !this.permissions['images']) {
+                this.permissions['images'] = { ...this.permissions['multimedia'] };
+            }
 
         } catch (err) {
             console.error('Error loading permissions:', err);
@@ -190,7 +198,7 @@ const AuthModule = {
             }
 
             // Check permission for this module
-            const perm = this.permissions[section];
+            const perm = this.permissions[section] || (section === 'multimedia' ? this.permissions['images'] : (section === 'images' ? this.permissions['multimedia'] : null));
             if (perm && !perm.can_access) {
                 item.style.display = 'none';
             } else {
@@ -201,11 +209,13 @@ const AuthModule = {
 
     canAccess(module) {
         if (this.currentUser?.role === 'admin') return true;
+        if (module === 'multimedia') return (this.permissions['multimedia']?.can_access || this.permissions['images']?.can_access || false);
         return this.permissions[module]?.can_access || false;
     },
 
     canEdit(module) {
         if (this.currentUser?.role === 'admin') return true;
+        if (module === 'multimedia') return (this.permissions['multimedia']?.can_edit || this.permissions['images']?.can_edit || false);
         return this.permissions[module]?.can_edit || false;
     },
 

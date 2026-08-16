@@ -132,9 +132,12 @@ const App = {
         window.location.hash = section;
 
         // Update active nav item
+        // Normalize images alias to multimedia
+        const normalizedSection = section === 'images' ? 'multimedia' : section;
+
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
-            if (item.dataset.section === section) {
+            if (item.dataset.section === normalizedSection || (normalizedSection === 'multimedia' && item.dataset.section === 'images')) {
                 item.classList.add('active');
             }
         });
@@ -158,29 +161,30 @@ const App = {
             'calculator': 'Calculadora de Utilidad',
             'materials-calculator': 'Calculadora de Materiales',
             'finance': 'Finanzas Personales',
-            'images': 'Galería de Imágenes',
+            'multimedia': 'Multimedia (Imágenes y Videos)',
+            'images': 'Multimedia (Imágenes y Videos)',
             'journal': 'Diario y Metas'
         };
 
-        document.getElementById('pageTitle').textContent = titles[section] || 'Dashboard';
+        document.getElementById('pageTitle').textContent = titles[normalizedSection] || titles[section] || 'Dashboard';
 
         // Show/hide sections
         document.querySelectorAll('.content-section').forEach(s => {
             s.classList.remove('active');
         });
 
-        const targetSection = document.getElementById(`section-${section}`);
+        const targetSection = document.getElementById(`section-${normalizedSection}`) || document.getElementById(`section-${section}`);
         if (targetSection) {
             targetSection.classList.add('active');
         }
 
         // Render section content
-        this.renderSection(section);
+        this.renderSection(normalizedSection);
 
         // Close mobile menu
         document.getElementById('sidebar').classList.remove('open');
 
-        this.currentSection = section;
+        this.currentSection = normalizedSection;
     },
 
     handleHashChange() {
@@ -249,7 +253,11 @@ const App = {
                     FinanceModule.init();
                 }
                 break;
+            case 'multimedia':
             case 'images':
+                if (typeof MultimediaModule !== 'undefined') {
+                    await MultimediaModule.init();
+                }
                 break;
             case 'journal':
                 if (typeof JournalModule.render === 'function') {
