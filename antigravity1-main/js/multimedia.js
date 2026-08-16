@@ -1,11 +1,11 @@
 // ==============================================================================
-// Multimedia Module (Imágenes y Videos) - Versión 2.1.36
+// Multimedia Module (Imágenes y Videos) - Versión 2.1.37
 // Gestión de galería de imágenes y subida / reproducción de videos
-// Integración Directa con Cloudflare Stream y CDN (Enlaces Online Automáticos)
+// Integración Directa con Cloudflare Stream Gateway (Sin errores de CORS)
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.1.36',
+    version: '2.1.37',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -39,21 +39,11 @@ const MultimediaModule = {
 
             const cf = this.getCloudflareConfig();
             
-            // 1. Llenar campos principales en pantalla
             const mainAcc = document.getElementById('cfAccountIdInputMain');
             const mainTok = document.getElementById('cfApiTokenInputMain');
             if (mainAcc) mainAcc.value = cf.accountId || '';
             if (mainTok) mainTok.value = cf.apiToken || '';
 
-            // 2. Llenar campos en modal si existe
-            const accInput = document.getElementById('cfAccountIdInput');
-            const tokenInput = document.getElementById('cfApiTokenInput');
-            const domainInput = document.getElementById('cfDeliveryDomainInput');
-            if (accInput) accInput.value = cf.accountId || '';
-            if (tokenInput) tokenInput.value = cf.apiToken || '';
-            if (domainInput) domainInput.value = cf.deliveryDomain || '';
-
-            // 3. Enfocar el campo en pantalla
             const mainCard = document.getElementById('cfMainConfigCard');
             if (mainCard) {
                 mainCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -64,7 +54,6 @@ const MultimediaModule = {
                 }
             }
 
-            // 4. Intentar abrir modal como alternativa
             const modal = document.getElementById('modalCloudflareConfig');
             if (modal) {
                 modal.classList.add('active');
@@ -113,7 +102,7 @@ const MultimediaModule = {
         this.updateDiagnosticsUI();
 
         if (typeof Utils !== 'undefined' && Utils.showToast) {
-            Utils.showToast('✅ ¡Cloudflare conectado con éxito para videos!', 'success');
+            Utils.showToast('✅ ¡Cloudflare conectado con éxito!', 'success');
         } else {
             alert('✅ ¡Cloudflare conectado con éxito!');
         }
@@ -147,7 +136,7 @@ const MultimediaModule = {
         this.updateDiagnosticsUI();
 
         if (typeof Utils !== 'undefined' && Utils.showToast) {
-            Utils.showToast('✅ ¡Cloudflare conectado con éxito para videos!', 'success');
+            Utils.showToast('✅ ¡Cloudflare conectado con éxito!', 'success');
         } else {
             alert('✅ ¡Cloudflare conectado con éxito!');
         }
@@ -163,13 +152,11 @@ const MultimediaModule = {
         const cf = this.getCloudflareConfig();
         const isConfigured = Boolean(cf.accountId && cf.apiToken);
 
-        // Actualizar inputs en pantalla
         const mainAcc = document.getElementById('cfAccountIdInputMain');
         const mainTok = document.getElementById('cfApiTokenInputMain');
         if (mainAcc && !mainAcc.value) mainAcc.value = cf.accountId || '';
         if (mainTok && !mainTok.value) mainTok.value = cf.apiToken || '';
 
-        // Actualizar badge de estado en la tarjeta
         const badge = document.getElementById('cfConnectionStatusBadge');
         if (badge) {
             if (isConfigured) {
@@ -187,7 +174,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 1. Subida Online Directa a Cloudflare Stream
+    // 1. Subida Online a Cloudflare Stream (Vía Serverless Gateway sin CORS)
     // --------------------------------------------------------------------------
     async uploadToCloudflare(file) {
         const cf = this.getCloudflareConfig();
@@ -195,92 +182,110 @@ const MultimediaModule = {
             return {
                 success: false,
                 requiresConfig: true,
-                error: 'Faltan las credenciales de Cloudflare. Configúralas en la tarjeta superior.'
+                error: 'Faltan las credenciales de Cloudflare. Por favor configúralas en la tarjeta superior.'
             };
         }
 
         try {
-            // Método A: Direct Creator Upload
-            const initRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cf.accountId}/stream/direct_upload`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${cf.apiToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    maxDurationSeconds: 3600,
-                    meta: { name: file.name }
-                })
-            });
+            console.log('🚀 Iniciando subida a Cloudflare Stream para:', file.name);
 
-            const initData = await initRes.json();
+            // PASO 1: Obtener Direct Creator Upload URL a través del Serverless Gateway (evita CORS)
+            let uploadURL = null;
+            let uid = null;
 
-            if (initData.success && initData.result && initData.result.uploadURL) {
-                const uploadUrl = initData.result.uploadURL;
-                const uid = initData.result.uid;
-
-                const uploadFormData = new FormData();
-                uploadFormData.append('file', file);
-
-                const uploadRes = await fetch(uploadUrl, {
-                    method: 'POST',
-                    body: uploadFormData
+            try {
+                const gatewayRes = await fetch('/api/cloudflare-stream?action=get_upload_url', {
+                    method: 'GET',
+                    headers: {
+                        'x-account-id': cf.accountId,
+                        'x-api-token': cf.apiToken,
+                        'x-video-name': encodeURIComponent(file.name)
+                    }
                 });
 
-                if (!uploadRes.ok) {
-                    throw new Error('Error al transmitir el video a Cloudflare.');
+                if (gatewayRes.ok) {
+                    const gatewayData = await gatewayRes.json();
+                    if (gatewayData.success && gatewayData.uploadURL) {
+                        uploadURL = gatewayData.uploadURL;
+                        uid = gatewayData.uid;
+                        console.log('✅ URL de subida directa obtenida del Gateway:', uid);
+                    } else if (gatewayData.error) {
+                        throw new Error(gatewayData.error);
+                    }
+                } else {
+                    const errData = await gatewayRes.json().catch(() => ({}));
+                    if (errData.error) throw new Error(errData.error);
                 }
-
-                const watchUrl = `https://iframe.videodelivery.net/${uid}`;
-                const manifestUrl = `https://videodelivery.net/${uid}/manifest/video.m3u8`;
-                const thumbUrl = `https://videodelivery.net/${uid}/thumbnails/thumbnail.jpg`;
-
-                return {
-                    success: true,
-                    uid: uid,
-                    publicUrl: watchUrl,
-                    downloadUrl: `https://videodelivery.net/${uid}`,
-                    playbackUrl: manifestUrl,
-                    thumbnailUrl: thumbUrl,
-                    sourceType: 'cloudflare'
-                };
+            } catch (gwErr) {
+                console.warn('Gateway local no disponible o error, intentando método fallback:', gwErr.message);
+                if (gwErr.message.includes('Cloudflare Error') || gwErr.message.includes('Unauthorized') || gwErr.message.includes('Authentication')) {
+                    throw gwErr; // Error real de credenciales
+                }
             }
 
-            // Método B: Subida multipart directa
-            const directFormData = new FormData();
-            directFormData.append('file', file);
+            // Fallback si no hay gateway (ej. entorno de pruebas local puro): intentar directo
+            if (!uploadURL) {
+                const directInit = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cf.accountId}/stream/direct_upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${cf.apiToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        maxDurationSeconds: 3600,
+                        meta: { name: file.name }
+                    })
+                });
+                const directData = await directInit.json();
+                if (directData.success && directData.result) {
+                    uploadURL = directData.result.uploadURL;
+                    uid = directData.result.uid;
+                } else {
+                    const msg = directData.errors && directData.errors[0] ? directData.errors[0].message : 'Error al conectar con Cloudflare Stream';
+                    throw new Error(msg);
+                }
+            }
 
-            const directRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cf.accountId}/stream`, {
+            if (!uploadURL || !uid) {
+                throw new Error('No se pudo generar la URL de subida en Cloudflare Stream.');
+            }
+
+            // PASO 2: Transmitir el archivo de video a la URL de Cloudflare (Tiene CORS nativo de Cloudflare)
+            console.log('📤 Transmitiendo binario de video hacia Cloudflare Stream...');
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const uploadRes = await fetch(uploadURL, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${cf.apiToken}`
-                },
-                body: directFormData
+                body: formData
             });
 
-            const directData = await directRes.json();
-            if (directData.success && directData.result) {
-                const uid = directData.result.uid;
-                const watchUrl = `https://iframe.videodelivery.net/${uid}`;
-                const manifestUrl = `https://videodelivery.net/${uid}/manifest/video.m3u8`;
-                const thumbUrl = directData.result.thumbnail || `https://videodelivery.net/${uid}/thumbnails/thumbnail.jpg`;
-
-                return {
-                    success: true,
-                    uid: uid,
-                    publicUrl: watchUrl,
-                    downloadUrl: `https://videodelivery.net/${uid}`,
-                    playbackUrl: manifestUrl,
-                    thumbnailUrl: thumbUrl,
-                    sourceType: 'cloudflare'
-                };
+            if (!uploadRes.ok) {
+                throw new Error(`Error en la transmisión a Cloudflare (HTTP ${uploadRes.status})`);
             }
 
-            const errorMsg = directData.errors && directData.errors[0] ? directData.errors[0].message : 'Error al conectar con Cloudflare Stream';
-            return { success: false, error: errorMsg };
+            const watchUrl = `https://iframe.videodelivery.net/${uid}`;
+            const manifestUrl = `https://videodelivery.net/${uid}/manifest/video.m3u8`;
+            const thumbUrl = `https://videodelivery.net/${uid}/thumbnails/thumbnail.jpg`;
+
+            console.log('🎉 Subida a Cloudflare Stream completada exitosamente:', watchUrl);
+
+            return {
+                success: true,
+                uid: uid,
+                publicUrl: watchUrl,
+                downloadUrl: `https://videodelivery.net/${uid}`,
+                playbackUrl: manifestUrl,
+                thumbnailUrl: thumbUrl,
+                sourceType: 'cloudflare'
+            };
 
         } catch (err) {
-            return { success: false, error: err.message || String(err) };
+            console.error('❌ Error en uploadToCloudflare:', err);
+            return { 
+                success: false, 
+                error: err.message || String(err) 
+            };
         }
     },
 
@@ -297,7 +302,7 @@ const MultimediaModule = {
 
         const blob = await this.getVideoBlob(videoId);
         if (!blob) {
-            this.logError('ERR_NO_LOCAL_BLOB', 'No se encontró el archivo del video en la memoria.');
+            this.logError('ERR_NO_LOCAL_BLOB', 'No se encontró el archivo del video en la memoria del navegador.');
             return;
         }
 
@@ -800,7 +805,7 @@ const MultimediaModule = {
                 if (sourceType === 'cloudflare') {
                     statusEl.innerHTML = `<span style="color: #10b981;">⚡ ¡Video <strong>"${this.escapeHtml(title)}"</strong> subido a <strong>Cloudflare Stream</strong> con éxito! Enlace online disponible.</span>`;
                 } else {
-                    statusEl.innerHTML = `<span style="color: #fbbf24;">💾 Video listo en la galería. Haz clic en "⚡ Subir a Cloudflare" para subirlo.</span>`;
+                    statusEl.innerHTML = `<span style="color: #fbbf24;">💾 Video listo en la galería. Haz clic en "⚡ Subir a Cloudflare" para sincronizarlo.</span>`;
                 }
                 setTimeout(() => { statusEl.style.display = 'none'; }, 6000);
             }
