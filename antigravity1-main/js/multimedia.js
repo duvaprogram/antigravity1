@@ -1,12 +1,11 @@
 // ==============================================================================
-// Multimedia Module (Imágenes y Videos) - Versión 2.1.31
+// Multimedia Module (Imágenes y Videos) - Versión 2.1.32
 // Gestión de galería de imágenes y subida / reproducción de videos
-// Con soporte completo de subida Online a la nube (Supabase Storage / CDN)
-// y generación de enlaces públicos para anuncios y campañas.
+// Integración con Cloudflare Stream, CDN y almacenamiento online
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.1.31',
+    version: '2.1.32',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -22,7 +21,212 @@ const MultimediaModule = {
     errorsLog: [], // Registro de errores con identificadores únicos
 
     // --------------------------------------------------------------------------
-    // 0. Sistema de Identificación y Diagnóstico de Errores
+    // 0. Configuración de Cloudflare
+    // --------------------------------------------------------------------------
+    getCloudflareConfig() {
+        return {
+            accountId: localStorage.getItem('cf_account_id') || '',
+            apiToken: localStorage.getItem('cf_api_token') || '',
+            deliveryDomain: localStorage.getItem('cf_delivery_domain') || ''
+        };
+    },
+
+    openCloudflareConfigModal() {
+        const cf = this.getCloudflareConfig();
+        const accInput = document.getElementById('cfAccountIdInput');
+        const tokenInput = document.getElementById('cfApiTokenInput');
+        const domainInput = document.getElementById('cfDeliveryDomainInput');
+
+        if (accInput) accInput.value = cf.accountId;
+        if (tokenInput) tokenInput.value = cf.apiToken;
+        if (domainInput) domainInput.value = cf.deliveryDomain;
+
+        if (typeof Utils !== 'undefined' && Utils.openModal) {
+            Utils.openModal('modalCloudflareConfig');
+        } else {
+            const modal = document.getElementById('modalCloudflareConfig');
+            if (modal) {
+                modal.classList.add('active');
+                modal.style.setProperty('display', 'flex', 'important');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+    },
+
+    saveCloudflareForm() {
+        const accInput = document.getElementById('cfAccountIdInput');
+        const tokenInput = document.getElementById('cfApiTokenInput');
+        const domainInput = document.getElementById('cfDeliveryDomainInput');
+
+        const accountId = accInput ? accInput.value.trim() : '';
+        const apiToken = tokenInput ? tokenInput.value.trim() : '';
+        const deliveryDomain = domainInput ? domainInput.value.trim() : '';
+
+        if (!accountId || !apiToken) {
+            alert('Por favor ingresa tu Cloudflare Account ID y tu API Token.');
+            return;
+        }
+
+        localStorage.setItem('cf_account_id', accountId);
+        localStorage.setItem('cf_api_token', apiToken);
+        localStorage.setItem('cf_delivery_domain', deliveryDomain);
+
+        if (typeof Utils !== 'undefined' && Utils.closeModal) {
+            Utils.closeModal('modalCloudflareConfig');
+            Utils.showToast('✅ Credenciales de Cloudflare guardadas correctamente', 'success');
+        } else {
+            const modal = document.getElementById('modalCloudflareConfig');
+            if (modal) modal.classList.remove('active');
+            alert('✅ Credenciales de Cloudflare guardadas correctamente');
+        }
+
+        this.updateDiagnosticsUI();
+    },
+
+    // --------------------------------------------------------------------------
+    // 1. Subida a Cloudflare Stream (Online)
+    // --------------------------------------------------------------------------
+    async uploadToCloudflare(file, onProgress = null) {
+        const cf = this.getCloudflareConfig();
+        if (!cf.accountId || !cf.apiToken) {
+            return {
+                success: false,
+                requiresConfig: true,
+                error: 'Faltan las credenciales de Cloudflare. Configúralas en "⚡ Cloudflare Setup".'
+            };
+        }
+
+        try {
+            // Intento 1: Direct Creator Upload de Cloudflare Stream
+            const initRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cf.accountId}/stream/direct_upload`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${cf.apiToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    maxDurationSeconds: 3600,
+                    meta: { name: file.name }
+                })
+            });
+
+            const initData = await initRes.json();
+
+            if (initData.success && initData.result && initData.result.uploadURL) {
+                const uploadUrl = initData.result.uploadURL;
+                const uid = initData.result.uid;
+
+                const uploadFormData = new FormData();
+                uploadFormData.append('file', file);
+
+                const uploadRes = await fetch(uploadUrl, {
+                    method: 'POST',
+                    body: uploadFormData
+                });
+
+                if (!uploadRes.ok) {
+                    throw new Error('Error al transferir el archivo a los servidores de Cloudflare.');
+                }
+
+                const watchUrl = `https://iframe.videodelivery.net/${uid}`;
+                const manifestUrl = `https://videodelivery.net/${uid}/manifest/video.m3u8`;
+                const thumbUrl = `https://videodelivery.net/${uid}/thumbnails/thumbnail.jpg`;
+
+                return {
+                    success: true,
+                    uid: uid,
+                    publicUrl: watchUrl,
+                    downloadUrl: `https://videodelivery.net/${uid}`,
+                    playbackUrl: manifestUrl,
+                    thumbnailUrl: thumbUrl,
+                    sourceType: 'cloudflare'
+                };
+            }
+
+            // Intento 2: Subida multipart directa a Stream
+            const directFormData = new FormData();
+            directFormData.append('file', file);
+
+            const directRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cf.accountId}/stream`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${cf.apiToken}`
+                },
+                body: directFormData
+            });
+
+            const directData = await directRes.json();
+            if (directData.success && directData.result) {
+                const uid = directData.result.uid;
+                const watchUrl = `https://iframe.videodelivery.net/${uid}`;
+                const manifestUrl = `https://videodelivery.net/${uid}/manifest/video.m3u8`;
+                const thumbUrl = directData.result.thumbnail || `https://videodelivery.net/${uid}/thumbnails/thumbnail.jpg`;
+
+                return {
+                    success: true,
+                    uid: uid,
+                    publicUrl: watchUrl,
+                    downloadUrl: `https://videodelivery.net/${uid}`,
+                    playbackUrl: manifestUrl,
+                    thumbnailUrl: thumbUrl,
+                    sourceType: 'cloudflare'
+                };
+            }
+
+            const errorMsg = directData.errors && directData.errors[0] ? directData.errors[0].message : 'Error desconocido al subir a Cloudflare Stream';
+            return { success: false, error: errorMsg };
+
+        } catch (err) {
+            return { success: false, error: err.message || String(err) };
+        }
+    },
+
+    async uploadExistingVideoToCloudflare(videoId) {
+        const video = this.videos.find(v => v.id === videoId);
+        if (!video) return;
+
+        const cf = this.getCloudflareConfig();
+        if (!cf.accountId || !cf.apiToken) {
+            this.openCloudflareConfigModal();
+            return;
+        }
+
+        const blob = await this.getVideoBlob(videoId);
+        if (!blob) {
+            this.logError('ERR_NO_LOCAL_BLOB', 'No se encontró el archivo del video en la memoria.');
+            return;
+        }
+
+        if (typeof Utils !== 'undefined' && Utils.showToast) {
+            Utils.showToast('Subiendo video a Cloudflare Stream...', 'info');
+        }
+
+        const file = new File([blob], (video.title || 'video').replace(/[^a-zA-Z0-9._-]/g, '_') + '.mp4', { 
+            type: video.file_type || 'video/mp4' 
+        });
+
+        const res = await this.uploadToCloudflare(file);
+
+        if (res.success) {
+            video.url = res.publicUrl;
+            video.thumbnail_url = res.thumbnailUrl || '';
+            video.source_type = 'cloudflare';
+            video.updated_at = new Date().toISOString();
+
+            this.saveLocalMeta();
+            await this.renderVideosList();
+            this.updateStats();
+
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('¡Video subido a Cloudflare Stream con éxito! Enlace online generado.', 'success');
+            }
+        } else {
+            this.logError('ERR_CF_UPLOAD', 'Error al subir a Cloudflare: ' + res.error);
+        }
+    },
+
+    // --------------------------------------------------------------------------
+    // 2. Sistema de Diagnóstico y Errores
     // --------------------------------------------------------------------------
     logError(code, message, details = null) {
         const timestamp = new Date().toLocaleTimeString();
@@ -39,7 +243,6 @@ const MultimediaModule = {
 
         console.error(`🚨 MULTIMEDIA ERROR ${errObj.code} (${errObj.time}): ${errObj.message}`, details || '');
 
-        // Notificación visual destacada con el código del error
         if (typeof Utils !== 'undefined' && Utils.showToast) {
             Utils.showToast(`${errObj.code} ${message}`, 'danger');
         } else {
@@ -52,17 +255,14 @@ const MultimediaModule = {
 
     openDiagnosticsModal() {
         try {
-            console.log('🩺 Abriendo diagnóstico Multimedia v' + this.version);
             this.updateDiagnosticsUI();
 
-            // 1. Mostrar panel en página si existe
             const inPageDiag = document.getElementById('multimediaInPageDiag');
             if (inPageDiag) {
                 inPageDiag.style.display = 'block';
                 inPageDiag.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
 
-            // 2. Abrir modal
             if (typeof Utils !== 'undefined' && Utils.openModal) {
                 Utils.openModal('modalMultimediaDiagnostics');
             } else {
@@ -70,7 +270,6 @@ const MultimediaModule = {
                 if (modal) {
                     modal.classList.add('active');
                     modal.style.setProperty('display', 'flex', 'important');
-                    modal.style.zIndex = '10002';
                     document.body.style.overflow = 'hidden';
                 }
             }
@@ -101,16 +300,19 @@ const MultimediaModule = {
         const errorsContainer = document.getElementById('diagErrorsList');
         const inPageContent = document.getElementById('inPageDiagContent');
 
+        const cf = this.getCloudflareConfig();
+        const hasCf = cf.accountId && cf.apiToken;
+
         if (versionEl) versionEl.textContent = `v${this.version}`;
-        if (initEl) initEl.innerHTML = this.initialized ? '<span style="color: #10b981;">✅ Inicializado (Activo)</span>' : '<span style="color: #f59e0b;">⏳ Pendiente de inicialización</span>';
-        if (dbEl) dbEl.innerHTML = this.db ? '<span style="color: #10b981;">✅ IndexedDB Conectado</span>' : '<span style="color: #3b82f6;">ℹ️ Memoria Local / Supabase</span>';
+        if (initEl) initEl.innerHTML = this.initialized ? '<span style="color: #10b981;">✅ Inicializado (Activo)</span>' : '<span style="color: #f59e0b;">⏳ Pendiente</span>';
+        if (dbEl) dbEl.innerHTML = hasCf ? '<span style="color: #f97316;">⚡ Cloudflare Stream Configurado</span>' : '<span style="color: #3b82f6;">ℹ️ Memoria Local / Pendiente Cloudflare</span>';
         
         const uploadModal = document.getElementById('modalUploadVideo');
-        if (modalEl) modalEl.innerHTML = uploadModal ? '<span style="color: #10b981;">✅ Modal en DOM (#modalUploadVideo)</span>' : '<span style="color: #ef4444;">❌ Modal ausente en el DOM</span>';
+        if (modalEl) modalEl.innerHTML = uploadModal ? '<span style="color: #10b981;">✅ Modal en DOM (#modalUploadVideo)</span>' : '<span style="color: #ef4444;">❌ Modal ausente</span>';
         
-        const onlineCount = this.videos.filter(v => v.source_type === 'supabase' || v.source_type === 'cloudflare' || v.source_type === 'youtube' || v.source_type === 'url').length;
-        const localCount = this.videos.filter(v => v.source_type === 'local').length;
-        if (countEl) countEl.textContent = `${this.videos.length} videos (${onlineCount} Online 🌐, ${localCount} Local 💾)`;
+        const cfCount = this.videos.filter(v => v.source_type === 'cloudflare').length;
+        const onlineCount = this.videos.filter(v => v.source_type === 'cloudflare' || v.source_type === 'youtube' || v.source_type === 'url' || v.source_type === 'supabase').length;
+        if (countEl) countEl.textContent = `${this.videos.length} videos (${cfCount} en Cloudflare ⚡, ${onlineCount} Online 🌐)`;
 
         const errorsHtml = this.errorsLog.length === 0
             ? '<div style="color: #10b981; font-size: 0.85rem; padding: 0.5rem 0;">✅ Todo en orden. Sin errores registrados.</div>'
@@ -128,11 +330,11 @@ const MultimediaModule = {
         if (errorsContainer) errorsContainer.innerHTML = errorsHtml;
         if (inPageContent) {
             inPageContent.innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;">
                     <div><strong>Versión:</strong> v${this.version}</div>
-                    <div><strong>Módulo:</strong> ${this.initialized ? '✅ Listo' : '❌ Pendiente'}</div>
-                    <div><strong>Videos Online:</strong> <span style="color: #10b981;">${onlineCount} 🌐</span></div>
-                    <div><strong>Videos Locales:</strong> ${localCount} 💾</div>
+                    <div><strong>Cloudflare:</strong> ${hasCf ? '<span style="color: #10b981;">✅ Conectado</span>' : '<span style="color: #fbbf24;">⚠️ Sin Token</span>'}</div>
+                    <div><strong>Videos Cloudflare:</strong> <span style="color: #f97316;">${cfCount} ⚡</span></div>
+                    <div><strong>Total Videos:</strong> ${this.videos.length}</div>
                 </div>
                 <div>${errorsHtml}</div>
             `;
@@ -148,123 +350,13 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 1. Subida a la Nube (Supabase Storage con Fallback de Buckets)
-    // --------------------------------------------------------------------------
-    async uploadFileToCloud(videoId, file) {
-        if (!window.supabaseClient || !window.supabaseClient.storage) {
-            return { success: false, error: 'Cliente de Supabase Storage no disponible' };
-        }
-
-        const cleanFileName = (file.name || 'video.mp4').replace(/[^a-zA-Z0-9._-]/g, '_');
-        const path = `videos/${videoId}_${cleanFileName}`;
-
-        // Intentar en los buckets disponibles en Supabase
-        const bucketsToTry = ['multimedia', 'videos', 'images', 'public'];
-        let lastError = null;
-
-        for (const bucket of bucketsToTry) {
-            try {
-                const { data, error } = await supabaseClient.storage
-                    .from(bucket)
-                    .upload(path, file, { cacheControl: '3600', upsert: true });
-
-                if (!error && data) {
-                    const { data: publicUrlData } = supabaseClient.storage
-                        .from(bucket)
-                        .getPublicUrl(path);
-
-                    if (publicUrlData && publicUrlData.publicUrl) {
-                        return {
-                            success: true,
-                            publicUrl: publicUrlData.publicUrl,
-                            storagePath: path,
-                            bucket: bucket
-                        };
-                    }
-                } else if (error) {
-                    lastError = error;
-                }
-            } catch (e) {
-                lastError = e;
-            }
-        }
-
-        return { 
-            success: false, 
-            error: lastError ? (lastError.message || String(lastError)) : 'No se pudo subir a Supabase Storage' 
-        };
-    },
-
-    async uploadExistingLocalVideoToCloud(videoId) {
-        const video = this.videos.find(v => v.id === videoId);
-        if (!video) return;
-
-        const blob = await this.getVideoBlob(videoId);
-        if (!blob) {
-            this.logError('ERR_NO_LOCAL_BLOB', 'No se encontró el archivo del video en la memoria local.');
-            return;
-        }
-
-        if (typeof Utils !== 'undefined' && Utils.showToast) {
-            Utils.showToast('Subiendo video a la nube para generar enlace público online...', 'info');
-        }
-
-        const file = new File([blob], (video.title || 'video').replace(/[^a-zA-Z0-9._-]/g, '_') + '.mp4', { 
-            type: video.file_type || 'video/mp4' 
-        });
-
-        const cloudRes = await this.uploadFileToCloud(videoId, file);
-
-        if (cloudRes.success) {
-            video.url = cloudRes.publicUrl;
-            video.storage_path = cloudRes.storagePath;
-            video.source_type = 'supabase';
-            video.updated_at = new Date().toISOString();
-
-            if (window.supabaseClient) {
-                try {
-                    await supabaseClient.from('multimedia_videos').upsert({
-                        id: video.id,
-                        title: video.title,
-                        description: video.description,
-                        category: video.category,
-                        url: video.url,
-                        storage_path: video.storage_path,
-                        thumbnail_url: video.thumbnail_url,
-                        size_bytes: video.size_bytes,
-                        duration_seconds: video.duration_seconds,
-                        file_type: video.file_type,
-                        source_type: 'supabase',
-                        created_at: video.created_at,
-                        updated_at: video.updated_at
-                    });
-                } catch(e) {
-                    console.warn('Error guardando en BD Supabase:', e);
-                }
-            }
-
-            this.saveLocalMeta();
-            await this.renderVideosList();
-            this.updateStats();
-
-            if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast('¡Video subido a la nube con éxito! Enlace público generado.', 'success');
-            }
-        } else {
-            this.logError('ERR_CLOUD_UPLOAD', 'No se pudo subir a Supabase Storage: ' + cloudRes.error);
-            alert(`Para que los videos se suban a la nube de Supabase:\n1. Ve a Supabase -> Storage\n2. Crea un bucket público llamado "multimedia"\n3. Ejecuta el archivo SQL "supabase_multimedia_schema.sql" en el editor SQL.\n\nDetalle: ${cloudRes.error}`);
-        }
-    },
-
-    // --------------------------------------------------------------------------
-    // 2. Almacenamiento Local en IndexedDB (Caché / Offline)
+    // 3. Almacenamiento Local en IndexedDB
     // --------------------------------------------------------------------------
     async initDB() {
         return new Promise((resolve) => {
             if (this.db) return resolve(this.db);
             
             const safetyTimeout = setTimeout(() => {
-                console.warn('⚠️ [ERR_INDEXEDDB_TIMEOUT] Tiempo agotado al conectar IndexedDB. Usando modo memoria.');
                 resolve(null);
             }, 1500);
 
@@ -286,14 +378,12 @@ const MultimediaModule = {
                     this.db = e.target.result;
                     resolve(this.db);
                 };
-                request.onerror = (err) => {
+                request.onerror = () => {
                     clearTimeout(safetyTimeout);
-                    this.logError('ERR_INDEXEDDB_INIT', 'No se pudo abrir la base de datos local IndexedDB', err);
                     resolve(null);
                 };
             } catch (e) {
                 clearTimeout(safetyTimeout);
-                this.logError('ERR_INDEXEDDB_EXCEPTION', 'Excepción al inicializar IndexedDB', e);
                 resolve(null);
             }
         });
@@ -308,12 +398,8 @@ const MultimediaModule = {
                 const store = tx.objectStore('video_files');
                 store.put({ id, blob, updated_at: new Date().toISOString() });
                 tx.oncomplete = () => resolve(true);
-                tx.onerror = (err) => {
-                    this.logError('ERR_BLOB_WRITE', 'Error al escribir el archivo de video en IndexedDB', err);
-                    resolve(false);
-                };
+                tx.onerror = () => resolve(false);
             } catch (e) {
-                this.logError('ERR_BLOB_TX_EXCEPTION', 'Excepción en transacción de guardado blob', e);
                 resolve(false);
             }
         });
@@ -342,13 +428,11 @@ const MultimediaModule = {
             const tx = this.db.transaction('video_files', 'readwrite');
             const store = tx.objectStore('video_files');
             store.delete(id);
-        } catch (e) {
-            console.warn('Error eliminando blob:', e);
-        }
+        } catch (e) {}
     },
 
     // --------------------------------------------------------------------------
-    // 3. Inicialización del Módulo
+    // 4. Inicialización del Módulo
     // --------------------------------------------------------------------------
     async init() {
         if (this.initialized) {
@@ -370,7 +454,7 @@ const MultimediaModule = {
             this.render();
             console.log(`✅ MultimediaModule v${this.version} listo.`);
         } catch(err) {
-            this.logError('ERR_MODULE_INIT', 'Error general al inicializar MultimediaModule', err);
+            this.logError('ERR_MODULE_INIT', 'Error al inicializar MultimediaModule', err);
         }
     },
 
@@ -383,7 +467,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 4. Gestión de Pestañas (Imágenes vs Videos)
+    // 5. Gestión de Pestañas (Imágenes vs Videos)
     // --------------------------------------------------------------------------
     switchTab(tabName, save = true) {
         this.activeTab = tabName;
@@ -391,7 +475,6 @@ const MultimediaModule = {
             localStorage.setItem('multimedia_active_tab', tabName);
         }
 
-        // Actualizar botones de pestañas
         document.querySelectorAll('.multimedia-tab-btn').forEach(btn => {
             if (btn.dataset.tab === tabName) {
                 btn.classList.add('active');
@@ -400,7 +483,6 @@ const MultimediaModule = {
             }
         });
 
-        // Alternar vistas
         const imagesView = document.getElementById('multimedia-subtab-images');
         const videosView = document.getElementById('multimedia-subtab-videos');
 
@@ -419,12 +501,11 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 5. Carga y Persistencia de Videos
+    // 6. Carga y Persistencia de Videos
     // --------------------------------------------------------------------------
     async loadVideos() {
         let loadedVideos = [];
 
-        // 1. Cargar desde LocalStorage
         try {
             const localSaved = localStorage.getItem('multimedia_videos_meta');
             if (localSaved) {
@@ -434,25 +515,7 @@ const MultimediaModule = {
             this.logError('ERR_LOCAL_STORAGE_READ', 'Error leyendo videos de localStorage', e);
         }
 
-        // 2. Intentar sincronizar desde Supabase DB
-        if (window.supabaseClient) {
-            try {
-                const { data, error } = await supabaseClient
-                    .from('multimedia_videos')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
-                if (!error && data && data.length > 0) {
-                    const cloudIds = new Set(data.map(v => v.id));
-                    const localOnly = loadedVideos.filter(v => !cloudIds.has(v.id));
-                    loadedVideos = [...data, ...localOnly];
-                }
-            } catch (err) {
-                console.log('ℹ️ Modo local activo para videos');
-            }
-        }
-
-        // 3. Rehidratar Object URLs para videos almacenados en IndexedDB
+        // Rehidratar Object URLs para videos almacenados localmente
         for (const video of loadedVideos) {
             if (video.source_type === 'local' && (!video.url || video.url.startsWith('blob:'))) {
                 const blob = await this.getVideoBlob(video.id);
@@ -489,10 +552,9 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 6. Configuración de Eventos de la Interfaz
+    // 7. Configuración de Eventos de la Interfaz
     // --------------------------------------------------------------------------
     setupEventListeners() {
-        // Selector de Pestañas
         document.querySelectorAll('.multimedia-tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const tab = e.currentTarget.dataset.tab;
@@ -500,7 +562,6 @@ const MultimediaModule = {
             });
         });
 
-        // Buscador de videos
         const searchInput = document.getElementById('videoSearchInput');
         if (searchInput) {
             searchInput.addEventListener('input', (e) => {
@@ -509,7 +570,6 @@ const MultimediaModule = {
             });
         }
 
-        // Ordenamiento
         const sortSelect = document.getElementById('videoSortSelect');
         if (sortSelect) {
             sortSelect.addEventListener('change', (e) => {
@@ -518,7 +578,6 @@ const MultimediaModule = {
             });
         }
 
-        // Drag & Drop en el Modal de Subida
         const dropzone = document.getElementById('videoDropzone');
         const fileInput = document.getElementById('videoFileInput');
 
@@ -550,7 +609,6 @@ const MultimediaModule = {
             });
         }
 
-        // Formulario de Subida/Guardado
         const uploadForm = document.getElementById('videoUploadForm');
         if (uploadForm) {
             uploadForm.addEventListener('submit', (e) => {
@@ -563,7 +621,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 7. Subida Directa desde Tarjeta en Pantalla
+    // 8. Subida Directa desde Tarjeta en Pantalla
     // --------------------------------------------------------------------------
     async handleDirectFileUpload(input) {
         if (!input || !input.files || input.files.length === 0) return;
@@ -577,26 +635,32 @@ const MultimediaModule = {
         
         if (statusEl) {
             statusEl.style.display = 'block';
-            statusEl.innerHTML = `<span>⏳ Subiendo video <strong>"${this.escapeHtml(file.name)}"</strong> a la nube para generar enlace online...</span>`;
+            statusEl.innerHTML = `<span>⏳ Procesando video <strong>"${this.escapeHtml(file.name)}"</strong>...</span>`;
         }
         
         try {
             const videoId = 'vid_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
             
-            // 1. Guardar blob en IndexedDB como copia local inmediata
+            // 1. Guardar blob en IndexedDB
             await this.saveVideoBlob(videoId, file);
             let finalUrl = URL.createObjectURL(file);
             let sourceType = 'local';
-            let storagePath = '';
+            let thumbnailUrl = '';
 
-            // 2. Intentar subir a Supabase Storage para tener link ONLINE público
-            const cloudRes = await this.uploadFileToCloud(videoId, file);
-            if (cloudRes.success) {
-                finalUrl = cloudRes.publicUrl;
-                sourceType = 'supabase';
-                storagePath = cloudRes.storagePath;
-            } else {
-                console.warn('⚠️ No se pudo subir a Supabase Storage, guardado localmente:', cloudRes.error);
+            // 2. Intentar subir a Cloudflare Stream si las credenciales están configuradas
+            const cf = this.getCloudflareConfig();
+            if (cf.accountId && cf.apiToken) {
+                if (statusEl) {
+                    statusEl.innerHTML = `<span>⚡ Subiendo a <strong>Cloudflare Stream</strong> para generar enlace online público...</span>`;
+                }
+                const cfRes = await this.uploadToCloudflare(file);
+                if (cfRes.success) {
+                    finalUrl = cfRes.publicUrl;
+                    sourceType = 'cloudflare';
+                    thumbnailUrl = cfRes.thumbnailUrl || '';
+                } else {
+                    console.warn('⚠️ Subida a Cloudflare falló, guardando local:', cfRes.error);
+                }
             }
             
             const videoRecord = {
@@ -605,8 +669,8 @@ const MultimediaModule = {
                 description: '',
                 category: category,
                 url: finalUrl,
-                storage_path: storagePath,
-                thumbnail_url: '',
+                storage_path: '',
+                thumbnail_url: thumbnailUrl,
                 size_bytes: file.size,
                 duration_seconds: 0,
                 file_type: file.type || 'video/mp4',
@@ -616,47 +680,25 @@ const MultimediaModule = {
             };
             
             this.videos.unshift(videoRecord);
-
-            // Sincronizar en BD Supabase si existe
-            if (window.supabaseClient) {
-                try {
-                    await supabaseClient.from('multimedia_videos').upsert({
-                        id: videoRecord.id,
-                        title: videoRecord.title,
-                        description: videoRecord.description,
-                        category: videoRecord.category,
-                        url: videoRecord.source_type === 'local' ? '' : videoRecord.url,
-                        storage_path: videoRecord.storage_path,
-                        thumbnail_url: videoRecord.thumbnail_url,
-                        size_bytes: videoRecord.size_bytes,
-                        duration_seconds: videoRecord.duration_seconds,
-                        file_type: videoRecord.file_type,
-                        source_type: videoRecord.source_type,
-                        created_at: videoRecord.created_at,
-                        updated_at: videoRecord.updated_at
-                    });
-                } catch(e) {}
-            }
-
             this.saveLocalMeta();
             await this.renderVideosList();
             this.updateStats();
             
             if (titleInput) titleInput.value = '';
             if (statusEl) {
-                if (sourceType === 'supabase') {
-                    statusEl.innerHTML = `<span style="color: #10b981;">✅ ¡Video <strong>"${this.escapeHtml(title)}"</strong> subido ONLINE a la nube con éxito! Enlace público disponible.</span>`;
+                if (sourceType === 'cloudflare') {
+                    statusEl.innerHTML = `<span style="color: #10b981;">⚡ ¡Video <strong>"${this.escapeHtml(title)}"</strong> subido a <strong>Cloudflare</strong> con enlace online público disponible!</span>`;
                 } else {
-                    statusEl.innerHTML = `<span style="color: #fbbf24;">💾 Guardado localmente. Haz clic en "Subir a la nube" en la tarjeta para generar su enlace público.</span>`;
+                    statusEl.innerHTML = `<span style="color: #fbbf24;">💾 Video listo en tu galería. Para subirlo a Cloudflare Stream haz clic en <strong>"⚡ Subir a Cloudflare"</strong> o configura tus credenciales.</span>`;
                 }
                 setTimeout(() => { statusEl.style.display = 'none'; }, 6000);
             }
 
             if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast(sourceType === 'supabase' ? `¡Video "${title}" subido ONLINE con éxito!` : `Video "${title}" guardado`, 'success');
+                Utils.showToast(sourceType === 'cloudflare' ? `¡Video "${title}" subido a Cloudflare!` : `Video "${title}" agregado a la galería`, 'success');
             }
         } catch(err) {
-            this.logError('ERR_DIRECT_UPLOAD', 'Error al subir el video directamente', err);
+            this.logError('ERR_DIRECT_UPLOAD', 'Error al subir el video', err);
             if (statusEl) {
                 statusEl.innerHTML = `<span style="color: #ef4444;">❌ Error: ${err.message}</span>`;
             }
@@ -703,7 +745,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 8. Manejo de Selección de Archivo y Extracción de Metadatos
+    // 9. Manejo de Archivo Seleccionado
     // --------------------------------------------------------------------------
     handleFileSelected(file) {
         if (!file) {
@@ -712,20 +754,18 @@ const MultimediaModule = {
         }
 
         if (!file.type.startsWith('video/') && !file.name.match(/\.(mp4|webm|mov|mkv|avi|m4v)$/i)) {
-            this.logError('ERR_INVALID_FORMAT', `El archivo "${file.name}" no parece ser un formato de video válido (.mp4, .webm, .mov, etc.)`);
+            this.logError('ERR_INVALID_FORMAT', `El archivo "${file.name}" no es un video válido (.mp4, .webm, .mov)`);
             return;
         }
 
         this.selectedFileObject = file;
 
-        // Auto-completar título si está vacío
         const titleInput = document.getElementById('videoTitleInput');
         if (titleInput && (!titleInput.value || titleInput.value.trim() === '')) {
             const cleanName = file.name.replace(/\.[^/.]+$/, "");
             titleInput.value = cleanName;
         }
 
-        // Previsualizar archivo y leer duración / dimensiones
         const previewContainer = document.getElementById('videoFilePreviewContainer');
         const previewVideo = document.getElementById('videoFilePreview');
         const previewInfo = document.getElementById('videoFilePreviewInfo');
@@ -755,21 +795,15 @@ const MultimediaModule = {
                     }
                 };
 
-                previewVideo.onerror = () => {
-                    if (previewInfo) {
-                        previewInfo.innerHTML = `<strong>${file.name}</strong> • ${this.formatFileSize(file.size)}`;
-                    }
-                };
-
                 if (previewContainer) previewContainer.style.display = 'block';
             }
         } catch(previewErr) {
-            this.logError('ERR_PREVIEW_GEN', 'No se pudo generar vista previa del archivo', previewErr);
+            this.logError('ERR_PREVIEW_GEN', 'No se pudo generar vista previa', previewErr);
         }
     },
 
     // --------------------------------------------------------------------------
-    // 9. Guardar / Subir Video desde Modal
+    // 10. Guardar / Subir Video desde Modal
     // --------------------------------------------------------------------------
     async saveVideo() {
         const titleInput = document.getElementById('videoTitleInput');
@@ -825,7 +859,7 @@ const MultimediaModule = {
             } else if (isFile) {
                 // Modo Subida de Archivo
                 if (!this.selectedFileObject) {
-                    this.logError('ERR_NO_FILE_ATTACHED', 'Por favor selecciona o arrastra un archivo de video antes de guardar.');
+                    this.logError('ERR_NO_FILE_ATTACHED', 'Por favor selecciona un archivo de video antes de guardar.');
                     if (submitBtn) submitBtn.disabled = false;
                     if (progressContainer) progressContainer.style.display = 'none';
                     return;
@@ -837,30 +871,30 @@ const MultimediaModule = {
                 fileType = file.type || 'video/mp4';
 
                 if (progressBar) progressBar.style.width = '40%';
-                if (progressStatus) progressStatus.textContent = 'Guardando copia local segura...';
+                if (progressStatus) progressStatus.textContent = 'Guardando copia local...';
 
-                // Guardar Blob en IndexedDB
                 await this.saveVideoBlob(videoId, file);
                 finalUrl = URL.createObjectURL(file);
 
-                // Subir a Supabase Storage para tener link público ONLINE
-                if (progressBar) progressBar.style.width = '65%';
-                if (progressStatus) progressStatus.textContent = 'Subiendo a la nube de Supabase para generar enlace online...';
+                // Subir a Cloudflare si está configurado
+                const cf = this.getCloudflareConfig();
+                if (cf.accountId && cf.apiToken) {
+                    if (progressBar) progressBar.style.width = '65%';
+                    if (progressStatus) progressStatus.textContent = 'Subiendo a Cloudflare Stream...';
 
-                const cloudRes = await this.uploadFileToCloud(videoId, file);
-                if (cloudRes.success) {
-                    finalUrl = cloudRes.publicUrl;
-                    storagePath = cloudRes.storagePath;
-                    sourceType = 'supabase';
-                } else {
-                    console.warn('⚠️ Almacenamiento online falló, usando local:', cloudRes.error);
+                    const cfRes = await this.uploadToCloudflare(file);
+                    if (cfRes.success) {
+                        finalUrl = cfRes.publicUrl;
+                        thumbnailUrl = cfRes.thumbnailUrl || '';
+                        sourceType = 'cloudflare';
+                    }
                 }
             } else {
-                // Modo Enlace URL Externo
+                // Modo Enlace URL Externo (Cloudflare, YouTube, etc.)
                 const urlInput = document.getElementById('videoUrlInput');
                 const urlVal = urlInput ? urlInput.value.trim() : '';
                 if (!urlVal) {
-                    this.logError('ERR_URL_EMPTY', 'Por favor ingresa el enlace o URL del video.');
+                    this.logError('ERR_URL_EMPTY', 'Por favor ingresa el enlace del video.');
                     if (urlInput) urlInput.focus();
                     if (submitBtn) submitBtn.disabled = false;
                     if (progressContainer) progressContainer.style.display = 'none';
@@ -872,6 +906,12 @@ const MultimediaModule = {
                 fileType = 'video/url';
                 sizeBytes = 0;
                 durationSeconds = 0;
+                if (sourceType === 'cloudflare' && urlVal.includes('videodelivery.net/')) {
+                    const uidMatch = urlVal.match(/videodelivery\.net\/([a-zA-Z0-9_-]+)/);
+                    if (uidMatch && uidMatch[1]) {
+                        thumbnailUrl = `https://videodelivery.net/${uidMatch[1]}/thumbnails/thumbnail.jpg`;
+                    }
+                }
             }
 
             if (progressBar) progressBar.style.width = '95%';
@@ -900,39 +940,16 @@ const MultimediaModule = {
                 this.videos.unshift(videoRecord);
             }
 
-            // Sincronizar con Supabase DB si está disponible
-            if (window.supabaseClient) {
-                try {
-                    await supabaseClient.from('multimedia_videos').upsert({
-                        id: videoRecord.id,
-                        title: videoRecord.title,
-                        description: videoRecord.description,
-                        category: videoRecord.category,
-                        url: videoRecord.source_type === 'local' ? '' : videoRecord.url,
-                        storage_path: videoRecord.storage_path,
-                        thumbnail_url: videoRecord.thumbnail_url,
-                        size_bytes: videoRecord.size_bytes,
-                        duration_seconds: videoRecord.duration_seconds,
-                        file_type: videoRecord.file_type,
-                        source_type: videoRecord.source_type,
-                        created_at: videoRecord.created_at,
-                        updated_at: videoRecord.updated_at
-                    });
-                } catch(dbErr) {
-                    console.log('ℹ️ Registro persistido localmente');
-                }
-            }
-
             this.saveLocalMeta();
             this.closeUploadModal();
             await this.renderVideosList();
             this.updateStats();
 
             if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast(this.editingVideoId ? '¡Video actualizado con éxito!' : (sourceType === 'supabase' ? '¡Video subido ONLINE con éxito!' : '¡Video agregado a la galería!'), 'success');
+                Utils.showToast(this.editingVideoId ? '¡Video actualizado con éxito!' : (sourceType === 'cloudflare' ? '¡Video subido a Cloudflare!' : '¡Video agregado a la galería!'), 'success');
             }
         } catch (error) {
-            this.logError('ERR_SAVE_EXCEPTION', 'Excepción al procesar o guardar el video', error);
+            this.logError('ERR_SAVE_EXCEPTION', 'Excepción al guardar el video', error);
         } finally {
             if (submitBtn) submitBtn.disabled = false;
             if (progressContainer) progressContainer.style.display = 'none';
@@ -941,23 +958,21 @@ const MultimediaModule = {
 
     detectSourceType(url) {
         if (!url) return 'url';
+        if (url.includes('cloudflarestream.com') || url.includes('videodelivery.net') || url.includes('cloudflare') || url.includes('pages.dev') || url.includes('r2.dev') || url.includes('workers.dev')) return 'cloudflare';
         if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
         if (url.includes('vimeo.com')) return 'vimeo';
-        if (url.includes('cloudflarestream.com') || url.includes('videodelivery.net')) return 'cloudflare';
         if (url.includes('drive.google.com')) return 'google-drive';
-        if (url.includes('supabase.co')) return 'supabase';
         return 'url';
     },
 
     // --------------------------------------------------------------------------
-    // 10. Renderizado de la Lista de Videos
+    // 11. Renderizado de la Lista de Videos
     // --------------------------------------------------------------------------
     async renderVideosList() {
         const grid = document.getElementById('multimediaVideosGrid');
         const emptyState = document.getElementById('multimediaVideosEmpty');
         if (!grid) return;
 
-        // Filtrar
         let filtered = [...this.videos];
 
         if (this.selectedCategory && this.selectedCategory !== 'Todos') {
@@ -972,7 +987,6 @@ const MultimediaModule = {
             );
         }
 
-        // Ordenar
         filtered.sort((a, b) => {
             if (this.sortBy === 'newest') return new Date(b.created_at) - new Date(a.created_at);
             if (this.sortBy === 'oldest') return new Date(a.created_at) - new Date(b.created_at);
@@ -989,12 +1003,11 @@ const MultimediaModule = {
 
         if (emptyState) emptyState.style.display = 'none';
 
-        // Construir HTML de las tarjetas
         grid.innerHTML = filtered.map(v => {
             const durationLabel = v.duration_seconds ? this.formatDuration(v.duration_seconds) : '';
-            const sizeLabel = v.size_bytes ? this.formatFileSize(v.size_bytes) : (v.source_type === 'youtube' ? 'YouTube' : 'Enlace Web');
+            const sizeLabel = v.size_bytes ? this.formatFileSize(v.size_bytes) : (v.source_type === 'youtube' ? 'YouTube' : 'Cloudflare / Web');
             const dateLabel = this.formatDate(v.created_at);
-            const isOnline = v.source_type === 'supabase' || v.source_type === 'cloudflare' || v.source_type === 'youtube' || v.source_type === 'url';
+            const isOnline = v.source_type === 'cloudflare' || v.source_type === 'youtube' || v.source_type === 'url' || v.source_type === 'supabase';
             const sourceBadgeHtml = this.getSourceBadgeHtml(v.source_type);
 
             return `
@@ -1021,15 +1034,15 @@ const MultimediaModule = {
                         <div style="margin-top: 0.25rem;">
                             ${isOnline ? `
                                 <button type="button" class="btn btn-sm" onclick="MultimediaModule.copyVideoUrl('${v.id}')" 
-                                    style="width: 100%; font-size: 0.76rem; padding: 4px 8px; background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: 6px;">
+                                    style="width: 100%; font-size: 0.76rem; padding: 4px 8px; background: rgba(249, 115, 22, 0.12); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: 6px;">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                                    <span>Copiar Enlace Online</span>
+                                    <span>Copiar Enlace Cloudflare / Online</span>
                                 </button>
                             ` : `
-                                <button type="button" class="btn btn-sm" onclick="MultimediaModule.uploadExistingLocalVideoToCloud('${v.id}')" 
-                                    style="width: 100%; font-size: 0.76rem; padding: 4px 8px; background: rgba(99, 102, 241, 0.12); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.3); display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: 6px;">
+                                <button type="button" class="btn btn-sm" onclick="MultimediaModule.uploadExistingVideoToCloudflare('${v.id}')" 
+                                    style="width: 100%; font-size: 0.76rem; padding: 4px 8px; background: rgba(249, 115, 22, 0.12); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3); display: flex; align-items: center; justify-content: center; gap: 0.35rem; border-radius: 6px;">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
-                                    <span>☁️ Subir a la Nube (Online)</span>
+                                    <span>⚡ Subir a Cloudflare (Online)</span>
                                 </button>
                             `}
                         </div>
@@ -1073,12 +1086,12 @@ const MultimediaModule = {
 
     getSourceBadgeHtml(sourceType) {
         switch (sourceType) {
-            case 'supabase':
-                return `<span class="video-source-badge badge-online">🌐 Online</span>`;
             case 'cloudflare':
                 return `<span class="video-source-badge badge-cloudflare">⚡ Cloudflare</span>`;
             case 'youtube':
                 return `<span class="video-source-badge badge-youtube">▶️ YouTube</span>`;
+            case 'supabase':
+                return `<span class="video-source-badge badge-online">🌐 Online</span>`;
             case 'url':
                 return `<span class="video-source-badge badge-web">🔗 Web URL</span>`;
             default:
@@ -1087,7 +1100,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 11. Reproductor de Video en Modal
+    // 12. Reproductor de Video en Modal
     // --------------------------------------------------------------------------
     async openPlayerModal(videoId) {
         try {
@@ -1103,15 +1116,11 @@ const MultimediaModule = {
             const descEl = document.getElementById('playerModalDesc');
             const container = document.getElementById('playerModalMediaContainer');
 
-            if (!modal) {
-                this.logError('ERR_PLAYER_MODAL_404', 'Modal de reproducción #modalVideoPlayer no encontrado en el DOM.');
-                return;
-            }
+            if (!modal) return;
 
             if (titleEl) titleEl.textContent = video.title;
             if (descEl) descEl.textContent = video.description || `Categoría: ${video.category || 'General'} • Subido el ${this.formatDate(video.created_at)}`;
 
-            // Rehidratar URL si es local y aún no tiene objectUrl
             let playUrl = video.url;
             if ((!playUrl || playUrl === '') && video.source_type === 'local') {
                 const blob = await this.getVideoBlob(video.id);
@@ -1122,7 +1131,9 @@ const MultimediaModule = {
             }
 
             if (container) {
-                if (video.source_type === 'youtube') {
+                if (video.source_type === 'cloudflare' && (playUrl.includes('iframe.videodelivery.net') || playUrl.includes('cloudflarestream.com'))) {
+                    container.innerHTML = `<iframe src="${playUrl}?autoplay=true" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowfullscreen="true" style="border: none; width: 100%; height: 450px; border-radius: 8px;"></iframe>`;
+                } else if (video.source_type === 'youtube') {
                     const embedUrl = this.getYoutubeEmbedUrl(playUrl);
                     container.innerHTML = `<iframe src="${embedUrl}?autoplay=1" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 450px; border: none; border-radius: 8px;"></iframe>`;
                 } else {
@@ -1149,7 +1160,6 @@ const MultimediaModule = {
             } else {
                 modal.classList.add('active');
                 modal.style.setProperty('display', 'flex', 'important');
-                modal.style.zIndex = '10001';
                 document.body.style.overflow = 'hidden';
             }
         } catch(playerErr) {
@@ -1191,7 +1201,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 12. Acciones Rápidas: Copiar URL, Descargar, Editar, Eliminar
+    // 13. Copiar Enlace, Descargar, Editar, Eliminar
     // --------------------------------------------------------------------------
     async copyVideoUrl(videoId) {
         const video = this.videos.find(v => v.id === videoId);
@@ -1199,10 +1209,9 @@ const MultimediaModule = {
 
         let urlToCopy = video.url;
 
-        // Si es un video local sin link online, ofrecer subir a la nube
         if (!urlToCopy || urlToCopy.startsWith('blob:') || video.source_type === 'local') {
-            if (confirm('Este video se encuentra guardado en tu equipo local.\n\n¿Deseas subirlo a la nube ahora para generar un enlace online público compatible con anuncios y redes?')) {
-                await this.uploadExistingLocalVideoToCloud(videoId);
+            if (confirm('Este video está guardado localmente.\n\n¿Deseas subirlo a Cloudflare ahora para generar su enlace público online?')) {
+                await this.uploadExistingVideoToCloudflare(videoId);
                 return;
             } else {
                 urlToCopy = window.location.origin + window.location.pathname + '#multimedia';
@@ -1212,7 +1221,7 @@ const MultimediaModule = {
         try {
             await navigator.clipboard.writeText(urlToCopy);
             if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast(`¡Enlace online copiado al portapapeles! 📋\n${urlToCopy}`, 'success');
+                Utils.showToast(`¡Enlace copiado al portapapeles! 📋\n${urlToCopy}`, 'success');
             } else {
                 alert(`¡Enlace copiado!\n${urlToCopy}`);
             }
@@ -1240,7 +1249,7 @@ const MultimediaModule = {
         }
 
         if (!downloadUrl) {
-            this.logError('ERR_DOWNLOAD_UNAVAILABLE', 'No se pudo generar enlace directo para descargar este video.');
+            this.logError('ERR_DOWNLOAD_UNAVAILABLE', 'No se pudo generar enlace de descarga.');
             return;
         }
 
@@ -1257,7 +1266,6 @@ const MultimediaModule = {
 
     openUploadModal() {
         try {
-            console.log('🚀 Abriendo modal de subida de video v' + this.version);
             this.editingVideoId = null;
             const modal = document.getElementById('modalUploadVideo');
             const titleEl = document.getElementById('uploadModalTitle');
@@ -1268,19 +1276,14 @@ const MultimediaModule = {
             const urlSection = document.getElementById('videoUploadUrlSection');
             const progressContainer = document.getElementById('videoUploadProgressContainer');
 
-            if (!modal) {
-                this.logError('ERR_MODAL_NOT_FOUND', 'El elemento #modalUploadVideo no existe en el DOM.');
-                alert('[ERR_MODAL_NOT_FOUND] No se encontró el modal #modalUploadVideo');
-                return;
-            }
+            if (!modal) return;
 
             if (form) form.reset();
-            if (titleEl) titleEl.textContent = 'Subir Nuevo Video a la Nube';
+            if (titleEl) titleEl.textContent = 'Subir Nuevo Video a Cloudflare';
             if (submitBtn) submitBtn.textContent = 'Subir y Guardar Video';
             if (previewContainer) previewContainer.style.display = 'none';
             if (progressContainer) progressContainer.style.display = 'none';
 
-            // Mostrar sección de archivo por defecto
             if (fileSection) fileSection.style.display = 'block';
             if (urlSection) urlSection.style.display = 'none';
 
@@ -1295,21 +1298,17 @@ const MultimediaModule = {
             } else {
                 modal.classList.add('active');
                 modal.style.setProperty('display', 'flex', 'important');
-                modal.style.zIndex = '10001';
                 document.body.style.overflow = 'hidden';
             }
         } catch(err) {
-            this.logError('ERR_OPEN_MODAL_EXCEPTION', 'Excepción al intentar abrir el modal de subida', err);
+            this.logError('ERR_OPEN_MODAL_EXCEPTION', 'Excepción al abrir modal de subida', err);
         }
     },
 
     openEditModal(videoId) {
         try {
             const video = this.videos.find(v => v.id === videoId);
-            if (!video) {
-                this.logError('ERR_EDIT_NOT_FOUND', `Video con ID "${videoId}" no encontrado para edición.`);
-                return;
-            }
+            if (!video) return;
 
             this.editingVideoId = videoId;
             const modal = document.getElementById('modalUploadVideo');
@@ -1323,10 +1322,7 @@ const MultimediaModule = {
             const urlSection = document.getElementById('videoUploadUrlSection');
             const progressContainer = document.getElementById('videoUploadProgressContainer');
 
-            if (!modal) {
-                this.logError('ERR_MODAL_NOT_FOUND', 'El modal de subida no está en el DOM');
-                return;
-            }
+            if (!modal) return;
 
             if (titleEl) titleEl.textContent = 'Editar Detalles del Video';
             if (submitBtn) submitBtn.textContent = 'Guardar Cambios';
@@ -1334,7 +1330,6 @@ const MultimediaModule = {
             if (catSelect) catSelect.value = video.category || 'General';
             if (descInput) descInput.value = video.description || '';
 
-            // Ocultar zonas de archivo en modo edición rápida de metadatos
             if (fileSection) fileSection.style.display = 'none';
             if (urlSection) urlSection.style.display = 'none';
             if (previewContainer) previewContainer.style.display = 'none';
@@ -1345,7 +1340,6 @@ const MultimediaModule = {
             } else {
                 modal.classList.add('active');
                 modal.style.setProperty('display', 'flex', 'important');
-                modal.style.zIndex = '10001';
                 document.body.style.overflow = 'hidden';
             }
         } catch(err) {
@@ -1373,24 +1367,12 @@ const MultimediaModule = {
         const video = this.videos.find(v => v.id === videoId);
         if (!video) return;
 
-        if (!confirm(`¿Estás seguro de que deseas eliminar el video "${video.title}"? Esta acción no se puede deshacer.`)) {
+        if (!confirm(`¿Estás seguro de que deseas eliminar el video "${video.title}"?`)) {
             return;
         }
 
         try {
             await this.deleteVideoBlob(videoId);
-
-            if (window.supabaseClient) {
-                try {
-                    await supabaseClient.from('multimedia_videos').delete().eq('id', videoId);
-                    if (video.storage_path) {
-                        await supabaseClient.storage.from('multimedia').remove([video.storage_path]);
-                    }
-                } catch(err) {
-                    console.warn('Error eliminando de Supabase:', err);
-                }
-            }
-
             this.videos = this.videos.filter(v => v.id !== videoId);
             this.saveLocalMeta();
             await this.renderVideosList();
@@ -1405,7 +1387,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 13. Estadísticas del Módulo
+    // 14. Estadísticas del Módulo
     // --------------------------------------------------------------------------
     updateStats() {
         const totalCountEl = document.getElementById('statTotalVideos');
@@ -1426,7 +1408,7 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // 14. Utilidades Formato
+    // 15. Utilidades Formato
     // --------------------------------------------------------------------------
     formatFileSize(bytes) {
         if (!bytes || bytes === 0) return '0 MB';
@@ -1472,11 +1454,9 @@ window.openVideoUploadModal = function() {
     try {
         if (window.MultimediaModule) {
             window.MultimediaModule.openUploadModal();
-        } else {
-            alert('[ERR_MULTIMEDIA_NOT_FOUND] MultimediaModule no está cargado');
         }
     } catch(e) {
-        alert('[ERR_OPEN_UPLOAD_MODAL] ' + e.message);
+        console.error('Error openVideoUploadModal:', e);
     }
 };
 
@@ -1484,11 +1464,9 @@ window.openVideoDiagnosticsModal = function() {
     try {
         if (window.MultimediaModule) {
             window.MultimediaModule.openDiagnosticsModal();
-        } else {
-            alert('[ERR_MULTIMEDIA_NOT_FOUND] MultimediaModule no está cargado');
         }
     } catch(e) {
-        alert('[ERR_OPEN_DIAG_MODAL] ' + e.message);
+        console.error('Error openVideoDiagnosticsModal:', e);
     }
 };
 
@@ -1497,12 +1475,10 @@ window.switchMultimediaTab = function(tab) {
         if (window.MultimediaModule) {
             window.MultimediaModule.switchTab(tab);
         }
-    } catch(e) {
-        console.error('Error al cambiar pestaña:', e);
-    }
+    } catch(e) {}
 };
 
-// Auto-inicializar si el DOM ya cargó
+// Auto-inicializar
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => MultimediaModule.init());
 } else {
