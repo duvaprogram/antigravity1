@@ -1,11 +1,11 @@
 // ==============================================================================
-// Multimedia Module (Imágenes y Videos) - Versión 2.1.33
+// Multimedia Module (Imágenes y Videos) - Versión 2.1.34
 // Gestión de galería de imágenes y subida / reproducción de videos
 // Integración Directa con Cloudflare Stream y CDN (Enlaces Online Automáticos)
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.1.33',
+    version: '2.1.34',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
