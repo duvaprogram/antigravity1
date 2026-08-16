@@ -1,11 +1,11 @@
 // ==============================================================================
-// Multimedia Module (Imágenes y Videos) - Versión 2.1.34
+// Multimedia Module (Imágenes y Videos) - Versión 2.1.35
 // Gestión de galería de imágenes y subida / reproducción de videos
 // Integración Directa con Cloudflare Stream y CDN (Enlaces Online Automáticos)
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.1.34',
+    version: '2.1.35',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -33,58 +33,106 @@ const MultimediaModule = {
     },
 
     openCloudflareConfigModal() {
-        const cf = this.getCloudflareConfig();
-        const accInput = document.getElementById('cfAccountIdInput');
-        const tokenInput = document.getElementById('cfApiTokenInput');
-        const domainInput = document.getElementById('cfDeliveryDomainInput');
+        try {
+            console.log('⚡ Abriendo configuración de Cloudflare v' + this.version);
+            const cf = this.getCloudflareConfig();
+            
+            // Llenar campos del modal
+            const accInput = document.getElementById('cfAccountIdInput');
+            const tokenInput = document.getElementById('cfApiTokenInput');
+            const domainInput = document.getElementById('cfDeliveryDomainInput');
 
-        if (accInput) accInput.value = cf.accountId;
-        if (tokenInput) tokenInput.value = cf.apiToken;
-        if (domainInput) domainInput.value = cf.deliveryDomain;
+            if (accInput) accInput.value = cf.accountId || '';
+            if (tokenInput) tokenInput.value = cf.apiToken || '';
+            if (domainInput) domainInput.value = cf.deliveryDomain || '';
 
-        if (typeof Utils !== 'undefined' && Utils.openModal) {
-            Utils.openModal('modalCloudflareConfig');
-        } else {
+            // Llenar campos de panel en página si existen
+            const accInputIn = document.getElementById('cfAccountIdInputInPage');
+            const tokenInputIn = document.getElementById('cfApiTokenInputInPage');
+            if (accInputIn) accInputIn.value = cf.accountId || '';
+            if (tokenInputIn) tokenInputIn.value = cf.apiToken || '';
+
+            // 1. Mostrar panel en la página
+            const inPageCard = document.getElementById('cfInPageConfigCard');
+            if (inPageCard) {
+                inPageCard.style.display = 'block';
+                inPageCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+
+            // 2. Abrir modal
             const modal = document.getElementById('modalCloudflareConfig');
             if (modal) {
                 modal.classList.add('active');
                 modal.style.setProperty('display', 'flex', 'important');
+                modal.style.zIndex = '10005';
                 document.body.style.overflow = 'hidden';
+            }
+
+            if (typeof Utils !== 'undefined' && Utils.openModal) {
+                Utils.openModal('modalCloudflareConfig');
+            }
+        } catch(e) {
+            console.error('Error al abrir modal de Cloudflare:', e);
+            alert('Error al abrir configuración de Cloudflare: ' + e.message);
+        }
+    },
+
+    closeCloudflareConfigModal() {
+        if (typeof Utils !== 'undefined' && Utils.closeModal) {
+            Utils.closeModal('modalCloudflareConfig');
+        } else {
+            const modal = document.getElementById('modalCloudflareConfig');
+            if (modal) {
+                modal.classList.remove('active');
+                modal.style.display = '';
+                document.body.style.overflow = '';
             }
         }
     },
 
-    async saveCloudflareForm() {
-        const accInput = document.getElementById('cfAccountIdInput');
-        const tokenInput = document.getElementById('cfApiTokenInput');
-        const domainInput = document.getElementById('cfDeliveryDomainInput');
+    async saveCloudflareForm(fromInPage = false) {
+        let accountId = '';
+        let apiToken = '';
+        let deliveryDomain = '';
 
-        const accountId = accInput ? accInput.value.trim() : '';
-        const apiToken = tokenInput ? tokenInput.value.trim() : '';
-        const deliveryDomain = domainInput ? domainInput.value.trim() : '';
+        if (fromInPage) {
+            const accInputIn = document.getElementById('cfAccountIdInputInPage');
+            const tokenInputIn = document.getElementById('cfApiTokenInputInPage');
+            accountId = accInputIn ? accInputIn.value.trim() : '';
+            apiToken = tokenInputIn ? tokenInputIn.value.trim() : '';
+        } else {
+            const accInput = document.getElementById('cfAccountIdInput');
+            const tokenInput = document.getElementById('cfApiTokenInput');
+            const domainInput = document.getElementById('cfDeliveryDomainInput');
+            accountId = accInput ? accInput.value.trim() : '';
+            apiToken = tokenInput ? tokenInput.value.trim() : '';
+            deliveryDomain = domainInput ? domainInput.value.trim() : '';
+        }
 
         if (!accountId || !apiToken) {
-            alert('Por favor ingresa tu Cloudflare Account ID y tu API Token para poder subir a Cloudflare.');
+            alert('Por favor ingresa tu Cloudflare Account ID y tu API Token.');
             return;
         }
 
         localStorage.setItem('cf_account_id', accountId);
         localStorage.setItem('cf_api_token', apiToken);
-        localStorage.setItem('cf_delivery_domain', deliveryDomain);
+        if (deliveryDomain) localStorage.setItem('cf_delivery_domain', deliveryDomain);
 
-        if (typeof Utils !== 'undefined' && Utils.closeModal) {
-            Utils.closeModal('modalCloudflareConfig');
+        this.closeCloudflareConfigModal();
+
+        const inPageCard = document.getElementById('cfInPageConfigCard');
+        if (inPageCard) inPageCard.style.display = 'none';
+
+        if (typeof Utils !== 'undefined' && Utils.showToast) {
             Utils.showToast('✅ Credenciales de Cloudflare guardadas correctamente', 'success');
         } else {
-            const modal = document.getElementById('modalCloudflareConfig');
-            if (modal) modal.classList.remove('active');
-            alert('✅ Credenciales de Cloudflare guardadas');
+            alert('✅ Credenciales de Cloudflare guardadas correctamente');
         }
 
         this.checkCloudflareBanner();
         this.updateDiagnosticsUI();
 
-        // Si había un archivo pendiente de subida, proceder inmediatamente
+        // Si había un archivo pendiente de subida, continuar
         if (this.pendingFileForUpload) {
             const file = this.pendingFileForUpload;
             this.pendingFileForUpload = null;
@@ -109,7 +157,7 @@ const MultimediaModule = {
             return {
                 success: false,
                 requiresConfig: true,
-                error: 'Faltan las credenciales de Cloudflare. Por favor configúralas en "⚡ Cloudflare Setup".'
+                error: 'Faltan las credenciales de Cloudflare. Por favor configúralas en "⚡ Configurar Cloudflare".'
             };
         }
 
@@ -160,7 +208,7 @@ const MultimediaModule = {
                 };
             }
 
-            // Método B: Subida directa por FormData a /stream
+            // Método B: Subida multipart directa a /stream
             const directFormData = new FormData();
             directFormData.append('file', file);
 
@@ -279,15 +327,16 @@ const MultimediaModule = {
                 inPageDiag.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
 
+            const modal = document.getElementById('modalMultimediaDiagnostics');
+            if (modal) {
+                modal.classList.add('active');
+                modal.style.setProperty('display', 'flex', 'important');
+                modal.style.zIndex = '10004';
+                document.body.style.overflow = 'hidden';
+            }
+
             if (typeof Utils !== 'undefined' && Utils.openModal) {
                 Utils.openModal('modalMultimediaDiagnostics');
-            } else {
-                const modal = document.getElementById('modalMultimediaDiagnostics');
-                if (modal) {
-                    modal.classList.add('active');
-                    modal.style.setProperty('display', 'flex', 'important');
-                    document.body.style.overflow = 'hidden';
-                }
             }
         } catch(e) {
             console.error('Error al abrir diagnóstico:', e);
@@ -534,7 +583,6 @@ const MultimediaModule = {
             this.logError('ERR_LOCAL_STORAGE_READ', 'Error leyendo videos de localStorage', e);
         }
 
-        // Rehidratar Object URLs para videos almacenados localmente
         for (const video of loadedVideos) {
             if (video.source_type === 'local' && (!video.url || video.url.startsWith('blob:'))) {
                 const blob = await this.getVideoBlob(video.id);
@@ -658,12 +706,12 @@ const MultimediaModule = {
         let title = (titleInput && titleInput.value.trim()) ? titleInput.value.trim() : file.name.replace(/\.[^/.]+$/, "");
         let category = (catSelect && catSelect.value) ? catSelect.value : 'General';
 
-        // Si Cloudflare no está configurado, abrir modal de credenciales
+        // Si Cloudflare no está configurado, abrir modal/panel de credenciales
         if (!cf.accountId || !cf.apiToken) {
             this.pendingFileForUpload = file;
             if (statusEl) {
                 statusEl.style.display = 'block';
-                statusEl.innerHTML = `<span style="color: #fb923c;">⚠️ Ingresa tu Cloudflare Account ID y Token en la ventana para continuar la subida automática a Cloudflare.</span>`;
+                statusEl.innerHTML = `<span style="color: #fb923c;">⚠️ Ingresa tu Cloudflare Account ID y Token para continuar la subida automática a Cloudflare.</span>`;
             }
             this.openCloudflareConfigModal();
             return;
@@ -1465,6 +1513,24 @@ const MultimediaModule = {
 window.MultimediaModule = MultimediaModule;
 
 // Funciones globales seguras directas para HTML
+window.openCloudflareConfigModal = function() {
+    try {
+        if (window.MultimediaModule && typeof window.MultimediaModule.openCloudflareConfigModal === 'function') {
+            window.MultimediaModule.openCloudflareConfigModal();
+        } else {
+            const modal = document.getElementById('modalCloudflareConfig');
+            if (modal) {
+                modal.classList.add('active');
+                modal.style.setProperty('display', 'flex', 'important');
+                modal.style.zIndex = '10005';
+                document.body.style.overflow = 'hidden';
+            }
+        }
+    } catch(e) {
+        console.error('Error openCloudflareConfigModal:', e);
+    }
+};
+
 window.openVideoUploadModal = function() {
     try {
         if (window.MultimediaModule) {

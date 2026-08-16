@@ -8,11 +8,30 @@
     <meta name="description" content="Sistema de gestión de domicilios para Quito y Guayaquil">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="css/styles.css?v=2.1.34">
+    <link rel="stylesheet" href="css/styles.css?v=2.1.35">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
-        // Stubs globales a prueba de fallos para el módulo Multimedia
+        window.openCloudflareConfigModal = function() {
+            try {
+                if (window.MultimediaModule && typeof window.MultimediaModule.openCloudflareConfigModal === 'function') {
+                    window.MultimediaModule.openCloudflareConfigModal();
+                } else {
+                    const modal = document.getElementById('modalCloudflareConfig');
+                    if (modal) {
+                        modal.classList.add('active');
+                        modal.style.setProperty('display', 'flex', 'important');
+                        modal.style.zIndex = '10005';
+                        document.body.style.overflow = 'hidden';
+                    }
+                    const inPage = document.getElementById('cfInPageConfigCard');
+                    if (inPage) inPage.style.display = 'block';
+                }
+            } catch(e) {
+                alert('Error al abrir configuración: ' + e.message);
+            }
+        };
+
         window.openVideoUploadModal = function() {
             try {
                 if (window.MultimediaModule && typeof window.MultimediaModule.openUploadModal === 'function') {
@@ -4334,7 +4353,7 @@
                                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                                 </svg>
                                 Multimedia
-                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.1.34</span>
+                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.1.35</span>
                             </h2>
                             <p style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
                                 Biblioteca centralizada de imágenes y videos (Cloudflare & CDN) para anuncios y creativos
@@ -4342,9 +4361,9 @@
                         </div>
 
                         <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-                            <button type="button" class="btn btn-sm" onclick="MultimediaModule.openCloudflareConfigModal()" title="Configurar Cloudflare Stream para subidas online automáticas" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3);">
+                            <button type="button" class="btn btn-sm" onclick="openCloudflareConfigModal()" title="Configurar Cloudflare Stream para subidas online automáticas" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3);">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>
-                                <span>⚡ Cloudflare Setup</span>
+                                <span>⚡ Configurar Cloudflare</span>
                             </button>
 
                             <button type="button" class="btn btn-sm btn-secondary" onclick="openVideoDiagnosticsModal()" title="Diagnóstico de errores y estado del módulo" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem;">
@@ -4416,7 +4435,7 @@
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <h4 style="margin: 0; color: #fbbf24; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem;">
                                     <span>🩺 Consola de Diagnóstico Multimedia</span>
-                                    <span style="font-size: 0.75rem; background: #fbbf24; color: #000; padding: 1px 6px; border-radius: 4px; font-weight: bold;">v2.1.34</span>
+                                    <span style="font-size: 0.75rem; background: #fbbf24; color: #000; padding: 1px 6px; border-radius: 4px; font-weight: bold;">v2.1.35</span>
                                 </h4>
                                 <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('multimediaInPageDiag').style.display='none'" style="font-size: 0.75rem; padding: 2px 8px;">Cerrar Consola</button>
                             </div>
@@ -6646,30 +6665,30 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase-config.js?v=2.1.34"></script>
-    <script src="js/utils.js?v=2.1.34"></script>
-    <script src="js/database.js?v=2.1.34"></script>
-    <script src="js/products.js?v=2.1.34"></script>
-    <script src="js/inventory.js?v=2.1.34"></script>
-    <script src="js/clients.js?v=2.1.34"></script>
-    <script src="js/guides.js?v=2.1.34"></script>
-    <script src="js/analytics.js?v=2.1.34"></script>
-    <script src="js/confirmation.js?v=2.1.34"></script>
-    <script src="js/purchases.js?v=2.1.34"></script>
-    <script src="js/freights.js?v=2.1.34"></script>
-    <script src="js/payments.js?v=2.1.34"></script>
-    <script src="js/accounts.js?v=2.1.34"></script>
-    <script src="js/users.js?v=2.1.34"></script>
-    <script src="js/campaigns.js?v=2.1.34"></script>
-    <script src="js/calculator.js?v=2.1.34"></script>
-    <script src="js/multimedia.js?v=2.1.34"></script>
-    <script src="js/finance.js?v=2.1.34"></script>
-    <script src="js/income-statement.js?v=2.1.34"></script>
-    <script src="js/materials-calculator.js?v=2.1.34"></script>
-    <script src="js/journal-data.js?v=2.1.34"></script>
-    <script src="js/journal.js?v=2.1.34"></script>
-    <script src="js/app.js?v=2.1.34"></script>
-    <script src="js/auth.js?v=2.1.34"></script>
+    <script src="js/supabase-config.js?v=2.1.35"></script>
+    <script src="js/utils.js?v=2.1.35"></script>
+    <script src="js/database.js?v=2.1.35"></script>
+    <script src="js/products.js?v=2.1.35"></script>
+    <script src="js/inventory.js?v=2.1.35"></script>
+    <script src="js/clients.js?v=2.1.35"></script>
+    <script src="js/guides.js?v=2.1.35"></script>
+    <script src="js/analytics.js?v=2.1.35"></script>
+    <script src="js/confirmation.js?v=2.1.35"></script>
+    <script src="js/purchases.js?v=2.1.35"></script>
+    <script src="js/freights.js?v=2.1.35"></script>
+    <script src="js/payments.js?v=2.1.35"></script>
+    <script src="js/accounts.js?v=2.1.35"></script>
+    <script src="js/users.js?v=2.1.35"></script>
+    <script src="js/campaigns.js?v=2.1.35"></script>
+    <script src="js/calculator.js?v=2.1.35"></script>
+    <script src="js/multimedia.js?v=2.1.35"></script>
+    <script src="js/finance.js?v=2.1.35"></script>
+    <script src="js/income-statement.js?v=2.1.35"></script>
+    <script src="js/materials-calculator.js?v=2.1.35"></script>
+    <script src="js/journal-data.js?v=2.1.35"></script>
+    <script src="js/journal.js?v=2.1.35"></script>
+    <script src="js/app.js?v=2.1.35"></script>
+    <script src="js/auth.js?v=2.1.35"></script>
 </body>
 
 </html>
