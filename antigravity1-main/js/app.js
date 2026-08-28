@@ -238,6 +238,7 @@ const App = {
                     await CampaignsModule.init();
                 } else {
                     await CampaignsModule.loadAllDataFromDb();
+                    await CampaignsModule.loadProducts();
                 }
                 break;
             case 'income-statement':

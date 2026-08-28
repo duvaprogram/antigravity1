@@ -368,27 +368,63 @@ const CampaignsModule = {
         return adSetCodes;
     },
 
+    // Helper to normalize text (remove accents and lowercase)
+    _normalizeText(str) {
+        return String(str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    },
+
     // Load products from database
     async loadProducts() {
         try {
-            if (window.Database && window.Database.getProducts) {
-                this.products = await Database.getProducts();
+            if (window.Database && typeof window.Database.getProducts === 'function') {
+                const prods = await Database.getProducts();
+                if (Array.isArray(prods) && prods.length > 0) {
+                    this.products = prods;
+                    return this.products;
+                }
+            }
+            if (window.ProductsModule && Array.isArray(window.ProductsModule.products) && window.ProductsModule.products.length > 0) {
+                this.products = window.ProductsModule.products;
+                return this.products;
             }
         } catch (error) {
-            console.error('Error loading products:', error);
-            this.products = [];
+            console.error('[CampaignsModule] Error loading products:', error);
         }
+        return this.products || [];
+    },
+
+    // Reset campaign generator form
+    resetForm() {
+        const form = document.getElementById('campaignForm');
+        if (form) form.reset();
+        const prodHidden = document.getElementById('campaignProduct');
+        if (prodHidden) prodHidden.value = '';
+        const prodSearch = document.getElementById('campaignProductSearch');
+        if (prodSearch) prodSearch.value = '';
+        const suggestionsEl = document.getElementById('campaignProductSuggestions');
+        if (suggestionsEl) {
+            suggestionsEl.style.display = 'none';
+            suggestionsEl.classList.remove('active');
+        }
+        this.setDefaultDate();
+        const previewEl = document.getElementById('campaignPreview');
+        if (previewEl) {
+            previewEl.style.display = 'none';
+            previewEl.classList.remove('preview-active');
+        }
+        const resultEl = document.getElementById('campaignResult');
+        if (resultEl) resultEl.style.display = 'none';
     },
 
     // Generate the campaign name
     generateCampaignName() {
-        const country = document.getElementById('campaignCountry').value;
-        const type = document.getElementById('campaignType').value;
-        const objective = document.getElementById('campaignObjective').value;
-        const date = document.getElementById('campaignDate').value;
-        const product = document.getElementById('campaignProduct').value.trim();
-        const adSets = parseInt(document.getElementById('campaignAdSets').value) || 0;
-        const ads = parseInt(document.getElementById('campaignAds').value) || 0;
+        const country = document.getElementById('campaignCountry')?.value || '';
+        const type = document.getElementById('campaignType')?.value || '';
+        const objective = document.getElementById('campaignObjective')?.value || '';
+        const date = document.getElementById('campaignDate')?.value || '';
+        const product = (document.getElementById('campaignProduct')?.value || document.getElementById('campaignProductSearch')?.value || '').trim();
+        const adSets = parseInt(document.getElementById('campaignAdSets')?.value) || 0;
+        const ads = parseInt(document.getElementById('campaignAds')?.value) || 0;
 
         if (!country || !type || !objective || !date || !product) {
             Utils.showNotification('Por favor complete todos los campos obligatorios', 'error');
@@ -425,10 +461,14 @@ const CampaignsModule = {
         this.showResult(campaignName, campaignCode, adSets, ads, adSetCodes, adCodes);
 
         // Reset form inputs
-        document.getElementById('campaignProduct').value = '';
-        document.getElementById('campaignProductSearch').value = '';
-        document.getElementById('campaignAdSets').value = '';
-        document.getElementById('campaignAds').value = '';
+        const prodHidden = document.getElementById('campaignProduct');
+        if (prodHidden) prodHidden.value = '';
+        const prodSearch = document.getElementById('campaignProductSearch');
+        if (prodSearch) prodSearch.value = '';
+        const adSetsInput = document.getElementById('campaignAdSets');
+        if (adSetsInput) adSetsInput.value = '';
+        const adsInput = document.getElementById('campaignAds');
+        if (adsInput) adsInput.value = '';
         this.updatePreview();
     },
 
@@ -470,15 +510,22 @@ const CampaignsModule = {
 
         // Product Autocomplete for Campaign Generator
         const productSearchInput = document.getElementById('campaignProductSearch');
+        const productHiddenInput = document.getElementById('campaignProduct');
         if (productSearchInput) {
+            // Keep hidden input and preview in sync when user types directly
+            productSearchInput.addEventListener('input', () => {
+                if (productHiddenInput) {
+                    productHiddenInput.value = productSearchInput.value;
+                }
+                this.updatePreview();
+            });
+
             productSearchInput.addEventListener('input', Utils.debounce(() => {
                 this.searchProducts(productSearchInput.value);
-            }, 200));
+            }, 150));
 
             productSearchInput.addEventListener('focus', () => {
-                if (productSearchInput.value.length >= 1) {
-                    this.searchProducts(productSearchInput.value);
-                }
+                this.searchProducts(productSearchInput.value || '');
             });
 
             productSearchInput.addEventListener('keydown', (e) => {
@@ -528,7 +575,7 @@ const CampaignsModule = {
     // Handle keyboard navigation in autocomplete
     handleAutocompleteKeyboard(e, suggestionsId) {
         const suggestions = document.getElementById(suggestionsId);
-        if (!suggestions) return;
+        if (!suggestions || suggestions.style.display === 'none') return;
         const items = suggestions.querySelectorAll('.autocomplete-item:not(.disabled)');
         const activeItem = suggestions.querySelector('.autocomplete-item.active');
         let currentIndex = Array.from(items).indexOf(activeItem);
@@ -553,54 +600,78 @@ const CampaignsModule = {
                 }
                 break;
             case 'Enter':
-                e.preventDefault();
                 if (activeItem) {
+                    e.preventDefault();
                     activeItem.click();
                 }
                 break;
             case 'Escape':
+                suggestions.style.display = 'none';
                 suggestions.classList.remove('active');
                 break;
         }
     },
 
     // Search products for autocomplete
-    searchProducts(query) {
+    async searchProducts(query = '') {
         const suggestionsEl = document.getElementById('campaignProductSuggestions');
         if (!suggestionsEl) return;
 
-        if (query.length < 1) {
-            suggestionsEl.classList.remove('active');
-            return;
+        // Ensure products are loaded
+        if (!this.products || this.products.length === 0) {
+            suggestionsEl.innerHTML = '<div class="autocomplete-no-results" style="padding: 0.5rem; color: var(--text-muted);">Cargando productos...</div>';
+            suggestionsEl.style.display = 'block';
+            suggestionsEl.classList.add('active');
+            try {
+                await this.loadProducts();
+            } catch (e) {
+                console.error('[CampaignsModule] Error loading products in searchProducts:', e);
+            }
         }
 
-        const queryLower = query.toLowerCase();
-        const activeProducts = this.products.filter(p => p.active !== false);
+        const queryNormalized = this._normalizeText(query);
+        const searchWords = queryNormalized.split(/[\s\-]+/).filter(w => w.length > 0);
+        const activeProducts = (this.products || []).filter(p => p.active !== false);
 
-        const filtered = activeProducts.filter(product =>
-            product.name.toLowerCase().includes(queryLower) ||
-            (product.sku && product.sku.toLowerCase().includes(queryLower))
-        ).slice(0, 10);
+        let filtered = activeProducts;
+        if (searchWords.length > 0) {
+            filtered = activeProducts.filter(product => {
+                const haystack = this._normalizeText(`${product.name || ''} ${product.sku || ''} ${product.category || ''} ${product.description || ''}`);
+                return searchWords.every(word => haystack.includes(word));
+            });
+        }
+
+        filtered = filtered.slice(0, 15);
 
         if (filtered.length === 0) {
             suggestionsEl.innerHTML = '<div class="autocomplete-no-results" style="padding: 0.5rem; color: var(--text-muted);">No se encontraron productos</div>';
         } else {
-            suggestionsEl.innerHTML = filtered.map(product => `
-                <div class="autocomplete-item" data-id="${product.id}" data-name="${product.name}" data-sku="${product.sku || ''}">
-                    <div class="item-main" style="font-weight: 600;">${this.highlightMatch(product.name, query)}</div>
-                    <div class="item-secondary">
-                        ${product.sku ? `<span style="color: var(--text-muted); font-size: 0.75rem;">SKU: ${product.sku}</span>` : ''}
+            suggestionsEl.innerHTML = filtered.map(product => {
+                const safeName = Utils.escapeHtml(product.name || '');
+                const safeSku = Utils.escapeHtml(product.sku || '');
+                const highlightedName = searchWords.length > 0 ? this.highlightMatch(safeName, query) : safeName;
+                return `
+                    <div class="autocomplete-item" data-id="${product.id}">
+                        <div class="item-main" style="font-weight: 600;">${highlightedName}</div>
+                        <div class="item-secondary">
+                            ${safeSku ? `<span style="color: var(--text-muted); font-size: 0.75rem;">SKU: ${safeSku}</span>` : ''}
+                            ${product.category ? `<span style="color: var(--text-muted); font-size: 0.75rem;">Categoría: ${Utils.escapeHtml(product.category)}</span>` : ''}
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `;
+            }).join('');
 
             suggestionsEl.querySelectorAll('.autocomplete-item').forEach(item => {
                 item.addEventListener('click', () => {
-                    this.selectProduct(item.dataset.id, item.dataset.name, item.dataset.sku);
+                    const foundProd = (this.products || []).find(p => String(p.id) === String(item.dataset.id));
+                    if (foundProd) {
+                        this.selectProduct(foundProd.id, foundProd.name, foundProd.sku);
+                    }
                 });
             });
         }
 
+        suggestionsEl.style.display = 'block';
         suggestionsEl.classList.add('active');
     },
 
@@ -611,15 +682,24 @@ const CampaignsModule = {
         if (prodInput) prodInput.value = productName;
         if (prodSearch) prodSearch.value = productName;
         const sugg = document.getElementById('campaignProductSuggestions');
-        if (sugg) sugg.classList.remove('active');
+        if (sugg) {
+            sugg.style.display = 'none';
+            sugg.classList.remove('active');
+        }
         this.updatePreview();
     },
 
     // Highlight matching text
     highlightMatch(text, query) {
-        if (!query) return text;
-        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-        return text.replace(regex, '<span class="autocomplete-highlight" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; font-weight: 700;">$1</span>');
+        if (!query || !text) return text || '';
+        try {
+            const queryWords = this._normalizeText(query).split(/[\s\-]+/).filter(w => w.length > 0);
+            if (queryWords.length === 0) return text;
+            const regex = new RegExp(`(${queryWords.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+            return text.replace(regex, '<span class="autocomplete-highlight" style="background: rgba(99, 102, 241, 0.2); color: #818cf8; font-weight: 700;">$1</span>');
+        } catch (e) {
+            return text;
+        }
     },
 
     // Set default date to today
@@ -651,7 +731,7 @@ const CampaignsModule = {
         const type = document.getElementById('campaignType')?.value || '';
         const objective = document.getElementById('campaignObjective')?.value || '';
         const date = document.getElementById('campaignDate')?.value || '';
-        const product = document.getElementById('campaignProduct')?.value || '';
+        const product = (document.getElementById('campaignProduct')?.value || document.getElementById('campaignProductSearch')?.value || '').trim();
         const adSets = document.getElementById('campaignAdSets')?.value || '';
         const ads = document.getElementById('campaignAds')?.value || '';
 
@@ -661,7 +741,7 @@ const CampaignsModule = {
 
         if (!previewEl || !previewTextEl) return;
 
-        if (country && type && objective && date && product.trim()) {
+        if (country && type && objective && date && product) {
             const formattedDate = this.formatDate(date);
             const formattedProduct = product.toUpperCase().trim().replace(/\s+/g, '-');
             const campaignName = `${country}-${type}-${objective}-${formattedDate}-${formattedProduct}-XY01`;
