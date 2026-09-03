@@ -54,6 +54,19 @@ CREATE TABLE IF NOT EXISTS public.product_liquidations (
     total_batch_profit NUMERIC DEFAULT 0,
     total_batch_revenue NUMERIC DEFAULT 0,
     
+    -- Métricas específicas calculadas para ambos canales simultáneamente
+    cod_sale_price NUMERIC DEFAULT 0,
+    cod_net_profit NUMERIC DEFAULT 0,
+    cod_net_margin_percent NUMERIC DEFAULT 0,
+    cod_total_batch_profit NUMERIC DEFAULT 0,
+    
+    mp_sale_price NUMERIC DEFAULT 0,
+    mp_net_profit NUMERIC DEFAULT 0,
+    mp_net_margin_percent NUMERIC DEFAULT 0,
+    mp_total_batch_profit NUMERIC DEFAULT 0,
+    
+    best_channel TEXT DEFAULT 'cod',
+    
     -- Metadatos y notas
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),

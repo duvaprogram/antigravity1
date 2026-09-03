@@ -1726,34 +1726,6 @@
                                     </div>
                                 </div>
                                 <div class="card-body">
-                                    <!-- Asistente de Importación en Dólares (USD) -->
-                                    <div class="calc-usd-helper" id="calcUsdHelperBox" style="background: rgba(99, 102, 241, 0.08); border: 1px dashed rgba(99, 102, 241, 0.3); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 1.25rem;">
-                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
-                                            <span style="font-size: 0.82rem; font-weight: 700; color: #818cf8; display: flex; align-items: center; gap: 0.4rem;">
-                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                                                Asistente de Importación en Dólares (USD)
-                                            </span>
-                                            <span style="font-size: 0.75rem; color: var(--text-muted);" id="labelCurrentTrmBadge">1 USD = $4.000 COP</span>
-                                        </div>
-                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) auto; gap: 0.5rem; align-items: end;">
-                                            <div>
-                                                <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Compra ($ USD)</label>
-                                                <input type="number" id="calcUsdHelperPurchase" placeholder="Ej: 5.50" step="0.01" min="0" style="padding: 0.45rem 0.65rem; font-size: 0.82rem;">
-                                            </div>
-                                            <div>
-                                                <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Flete Int. ($ USD)</label>
-                                                <input type="number" id="calcUsdHelperShipping" placeholder="Ej: 1.20" step="0.01" min="0" style="padding: 0.45rem 0.65rem; font-size: 0.82rem;">
-                                            </div>
-                                            <div>
-                                                <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Aduana / Arancel ($ USD)</label>
-                                                <input type="number" id="calcUsdHelperCustoms" placeholder="Ej: 0.30" step="0.01" min="0" style="padding: 0.45rem 0.65rem; font-size: 0.82rem;">
-                                            </div>
-                                            <button type="button" class="btn btn-primary btn-sm" id="btnApplyUsdHelper" style="height: 34px; font-size: 0.78rem; white-space: nowrap;">
-                                                ⚡ Convertir a Costo
-                                            </button>
-                                        </div>
-                                    </div>
-
                                     <form id="landedForm" class="calculator-form">
                                         <div class="form-grid">
                                             <div class="form-group">
@@ -2122,52 +2094,282 @@
 
                 <!-- VIEW 2: HISTORIAL DE LIQUIDACIONES GUARDADAS -->
                 <div id="calcViewSaved" style="display: none;">
-                    <div class="calc-saved-toolbar">
-                        <div class="calc-saved-filters">
-                            <input type="text" id="searchSavedLiquidations" placeholder="🔍 Buscar por nombre o SKU..." style="min-width: 250px;">
-                            <select id="filterSavedChannel">
-                                <option value="all">Todos los Canales</option>
-                                <option value="cod">🚚 Contra Entrega (COD)</option>
-                                <option value="marketplace">🛒 Marketplace</option>
-                            </select>
+                    <div class="calc-saved-container">
+                        <!-- KPI Header Cards -->
+                        <div class="calc-saved-kpi-grid">
+                            <div class="calc-saved-kpi-card">
+                                <div class="calc-saved-kpi-icon" style="background: rgba(99, 102, 241, 0.15); color: #818cf8;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                </div>
+                                <div>
+                                    <span class="calc-saved-kpi-label">Liquidaciones Guardadas</span>
+                                    <div class="calc-saved-kpi-value" id="kpiSavedTotal">0</div>
+                                </div>
+                            </div>
+                            <div class="calc-saved-kpi-card">
+                                <div class="calc-saved-kpi-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>
+                                </div>
+                                <div>
+                                    <span class="calc-saved-kpi-label">Margen Neto Promedio</span>
+                                    <div class="calc-saved-kpi-value" id="kpiSavedAvgMargin" style="color: #10b981;">0%</div>
+                                </div>
+                            </div>
+                            <div class="calc-saved-kpi-card">
+                                <div class="calc-saved-kpi-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                                </div>
+                                <div>
+                                    <span class="calc-saved-kpi-label">Canal Más Rentable Frecuente</span>
+                                    <div class="calc-saved-kpi-value" id="kpiSavedBestChannel" style="font-size: 1.15rem; color: #fbbf24;">Contra Entrega</div>
+                                </div>
+                            </div>
                         </div>
-                        <div style="display: flex; gap: 1rem; align-items: center; color: var(--text-muted); font-size: 0.85rem;">
-                            <span>Total Guardadas: <strong id="kpiSavedTotal" style="color: var(--text-primary);">0</strong></span>
-                            <span>Margen Promedio: <strong id="kpiSavedAvgMargin" style="color: #10b981;">0%</strong></span>
+
+                        <!-- Barra de Búsqueda y Filtros -->
+                        <div class="calc-saved-toolbar">
+                            <div class="calc-saved-search-box">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                                <input type="text" id="searchSavedLiquidations" placeholder="🔍 Buscar por producto, referencia o SKU...">
+                            </div>
+                            <div class="calc-saved-filters-group">
+                                <select id="filterSavedChannel" class="calc-select-filter">
+                                    <option value="all">📦 Todos los Canales</option>
+                                    <option value="cod">🚚 Más rentable en Contra Entrega</option>
+                                    <option value="marketplace">🛒 Más rentable en Marketplace</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Tabla Moderna de Liquidaciones -->
+                        <div class="card calc-saved-table-card">
+                            <div class="table-responsive">
+                                <table class="data-table calc-table-modern" id="tableSavedLiquidations">
+                                    <thead>
+                                        <tr>
+                                            <th style="min-width: 220px;">Producto / SKU</th>
+                                            <th style="min-width: 120px;">Costo Landed</th>
+                                            <th style="min-width: 170px;">🚚 Contra Entrega (COD)</th>
+                                            <th style="min-width: 170px;">🛒 Marketplace</th>
+                                            <th style="min-width: 150px;">🏆 Más Rentable</th>
+                                            <th style="min-width: 110px;">Fecha</th>
+                                            <th style="text-align: right; min-width: 220px;">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="savedLiquidationsTbody">
+                                        <!-- Filas dinámicas -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="savedEmptyState" class="calc-empty-state" style="display: none;">
+                                <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                                    <line x1="8" y1="6" x2="16" y2="6"></line>
+                                    <line x1="16" y1="14" x2="16" y2="18"></line>
+                                    <path d="M16 10h.01"></path>
+                                    <path d="M12 10h.01"></path>
+                                    <path d="M8 10h.01"></path>
+                                </svg>
+                                <h3>No hay liquidaciones guardadas todavía</h3>
+                                <p>Ingresa los costos de tu producto en la calculadora activa y haz clic en <strong>Guardar Liquidación</strong>.</p>
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="card">
-                        <div class="table-responsive">
-                            <table class="data-table" id="tableSavedLiquidations">
-                                <thead>
-                                    <tr>
-                                        <th>Producto / Referencia</th>
-                                        <th>Canal</th>
-                                        <th>Costo Landed</th>
-                                        <th>Precio Venta</th>
-                                        <th>Utilidad Neta</th>
-                                        <th>Margen Neto</th>
-                                        <th>Fecha</th>
-                                        <th style="text-align: right;">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="savedLiquidationsTbody">
-                                    <!-- Dynamic rows loaded from Database / LocalStorage -->
-                                </tbody>
-                            </table>
+                <!-- MODAL: DETALLES Y GRÁFICAS DE LIQUIDACIÓN (IMAGEN 3) -->
+                <div class="calc-modal-backdrop" id="modalLiquidationDetail" style="display: none;" onclick="if(event.target === this) CalculatorModule.closeLiquidationDetail()">
+                    <div class="calc-modal-dialog">
+                        <!-- Modal Header -->
+                        <div class="calc-modal-header">
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.25rem;">
+                                    <h3 id="modalDetailTitle" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">Nombre del Producto</h3>
+                                    <span id="modalDetailCurrencyBadge" class="badge" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa; font-weight: 700;">USD</span>
+                                    <span id="modalDetailChannelBadge" class="calc-channel-pill cod" style="font-size: 0.72rem; padding: 2px 8px;">🚚 Contra Entrega</span>
+                                </div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);" id="modalDetailSubtitle">SKU: --- | Liquidado recientemente</div>
+                            </div>
+                            <button type="button" class="calc-modal-close" onclick="CalculatorModule.closeLiquidationDetail()" title="Cerrar ventana">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
                         </div>
-                        <div id="savedEmptyState" class="calc-empty-state" style="display: none;">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
-                                <line x1="8" y1="6" x2="16" y2="6"></line>
-                                <line x1="16" y1="14" x2="16" y2="18"></line>
-                                <path d="M16 10h.01"></path>
-                                <path d="M12 10h.01"></path>
-                                <path d="M8 10h.01"></path>
-                            </svg>
-                            <h3>No hay liquidaciones guardadas todavía</h3>
-                            <p>Calcula los costos de un producto en la calculadora activa y haz clic en "Guardar Liquidación".</p>
+
+                        <!-- Modal Body (Estructura idéntica a Imagen 3) -->
+                        <div class="calc-modal-body">
+                            <!-- Main Result Card (Top of Image 3) -->
+                            <div class="result-card main-result" style="margin-bottom: 1.25rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                                    <div>
+                                        <span class="result-label" style="text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px;">Utilidad Neta Estimada por Unidad</span>
+                                        <div class="result-value" id="modalResNetProfit" style="font-size: 2.5rem; font-weight: 900; line-height: 1.1;">$0.00</div>
+                                    </div>
+                                    <div class="result-badge" id="modalResNetMarginBadge" style="font-size: 1.15rem; padding: 0.4rem 0.9rem; font-weight: 800;">0%</div>
+                                </div>
+
+                                <div class="calc-price-display" style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.1);">
+                                    <div>
+                                        <div class="price-title" id="modalResPriceLabel" style="font-size: 0.8rem; text-transform: uppercase;">Precio de Venta Fijado</div>
+                                        <div class="calc-psychological-price" id="modalResPsychological" style="font-size: 0.82rem; color: rgba(255,255,255,0.7);">Sugerido Comercial: $0.00</div>
+                                    </div>
+                                    <div class="price-amount" id="modalResPriceAmount" style="font-size: 1.9rem; font-weight: 800; color: #60a5fa;">$0.00</div>
+                                </div>
+
+                                <div id="modalResDualCurrencyRow" style="margin-top: 0.75rem; padding-top: 0.65rem; border-top: 1px dashed rgba(255,255,255,0.18); font-size: 0.82rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                                    <span id="modalResDualLabel" style="color: rgba(255,255,255,0.75);">Equivalente en Moneda Local (TRM $4.000):</span>
+                                    <strong id="modalResDualValue" style="color: #34d399; font-size: 0.92rem;">P. Venta: $ 0 | Ganancia: $ 0</strong>
+                                </div>
+                            </div>
+
+                            <!-- Proyección Total del Lote (Image 3 middle-top) -->
+                            <div class="card calc-batch-summary-card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-lg); padding: 1.15rem; margin-bottom: 1.25rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                    <h4 style="font-size: 0.85rem; text-transform: uppercase; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 0.4rem; margin: 0;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                        Proyección Total del Lote
+                                    </h4>
+                                    <div style="font-size: 0.82rem; color: var(--text-muted);">
+                                        Lote: <strong id="modalResBatchUnits" style="color: var(--text-primary); font-size: 0.9rem;">100</strong> unid.
+                                    </div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 0.6rem;">
+                                    <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 0.65rem 0.85rem;">
+                                        <div style="font-size: 0.72rem; text-transform: uppercase; color: #34d399; font-weight: 700;">Ganancia Total Lote</div>
+                                        <div id="modalResBatchProfit" style="font-size: 1.4rem; font-weight: 800; color: #10b981; line-height: 1.2;">$0.00</div>
+                                    </div>
+                                    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.65rem 0.85rem;">
+                                        <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Venta Total Lote</div>
+                                        <div id="modalResBatchRevenue" style="font-size: 1.05rem; font-weight: 700; color: #60a5fa; line-height: 1.2;">$0.00</div>
+                                    </div>
+                                    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.65rem 0.85rem;">
+                                        <div style="font-size: 0.72rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Inversión Landed</div>
+                                        <div id="modalResBatchCost" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); line-height: 1.2;">$0.00</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- KPI Grid (Image 3 middle: 6 cards) -->
+                            <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom: 1.25rem;">
+                                <div class="stat-card" style="padding: 0.9rem;">
+                                    <div class="stat-info">
+                                        <span class="stat-label">Costo Landed Bodega</span>
+                                        <span class="stat-value" id="modalKpiLanded" style="font-size: 1.35rem; font-weight: 800;">$0.00</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card" style="padding: 0.9rem;">
+                                    <div class="stat-info">
+                                        <span class="stat-label">Costo Canal / Operación</span>
+                                        <span class="stat-value" id="modalKpiChannelCost" style="font-size: 1.35rem; font-weight: 800;">$0.00</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card" style="padding: 0.9rem;">
+                                    <div class="stat-info">
+                                        <span class="stat-label">Precio Equilibrio (Break-even)</span>
+                                        <span class="stat-value" id="modalKpiBreakEven" style="font-size: 1.35rem; font-weight: 800;">$0.00</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card" style="padding: 0.9rem;">
+                                    <div class="stat-info">
+                                        <span class="stat-label" id="modalLabelMaxCpa">CPA Máximo Permitido</span>
+                                        <span class="stat-value" id="modalKpiMaxCpa" style="font-size: 1.35rem; font-weight: 800;">$0.00</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card" style="padding: 0.9rem;">
+                                    <div class="stat-info">
+                                        <span class="stat-label">Retorno Inversión (ROI)</span>
+                                        <span class="stat-value" id="modalKpiRoi" style="font-size: 1.35rem; font-weight: 800; color: #10b981;">0%</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card" style="padding: 0.9rem;">
+                                    <div class="stat-info">
+                                        <span class="stat-label">ROAS Mínimo Necesario</span>
+                                        <span class="stat-value" id="modalKpiRoas" style="font-size: 1.35rem; font-weight: 800;">0.00x</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Distribución del Precio de Venta (Image 3 bottom-middle) -->
+                            <div class="calc-breakdown-card" style="margin-bottom: 1.25rem;">
+                                <h4 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.65rem;">
+                                    Distribución del Precio de Venta
+                                </h4>
+                                <div class="calc-breakdown-bar" style="height: 14px; border-radius: 7px; overflow: hidden; display: flex; margin-bottom: 0.75rem;">
+                                    <div class="calc-bar-segment seg-landed" id="modalSegLanded" style="width: 25%; background: #3b82f6;" title="Costo Producto"></div>
+                                    <div class="calc-bar-segment seg-freight" id="modalSegFreight" style="width: 25%; background: #f59e0b;" title="Fletes y Logística"></div>
+                                    <div class="calc-bar-segment seg-ads" id="modalSegAds" style="width: 25%; background: #ec4899;" title="Marketing / Comisiones"></div>
+                                    <div class="calc-bar-segment seg-profit" id="modalSegProfit" style="width: 25%; background: #10b981;" title="Ganancia Neta"></div>
+                                </div>
+                                <div class="calc-bar-legend" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; font-size: 0.78rem;">
+                                    <div class="calc-legend-item">
+                                        <div class="calc-legend-label"><span class="calc-legend-dot" style="background: #3b82f6;"></span> Producto Landed</div>
+                                        <span class="calc-legend-value" id="modalLegLanded">$0 (0%)</span>
+                                    </div>
+                                    <div class="calc-legend-item">
+                                        <div class="calc-legend-label"><span class="calc-legend-dot" style="background: #f59e0b;"></span> Fletes / Logística</div>
+                                        <span class="calc-legend-value" id="modalLegFreight">$0 (0%)</span>
+                                    </div>
+                                    <div class="calc-legend-item">
+                                        <div class="calc-legend-label"><span class="calc-legend-dot" style="background: #ec4899;"></span> Ads / Comisión</div>
+                                        <span class="calc-legend-value" id="modalLegAds">$0 (0%)</span>
+                                    </div>
+                                    <div class="calc-legend-item">
+                                        <div class="calc-legend-label"><span class="calc-legend-dot" style="background: #10b981;"></span> Utilidad Neta</div>
+                                        <span class="calc-legend-value" id="modalLegProfit">$0 (0%)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Comparativa Instantánea de Canales (Image 3 bottom) -->
+                            <div class="calc-compare-card" style="margin-bottom: 0.5rem;">
+                                <h4 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">
+                                    Comparativa Instantánea de Canales
+                                </h4>
+                                <div class="calc-compare-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                                    <div class="calc-compare-col" id="modalColCod">
+                                        <h5>
+                                            <span>🚚 Contra Entrega</span>
+                                            <span class="badge" id="modalBadgeCodStatus">ACTIVO</span>
+                                        </h5>
+                                        <div class="calc-compare-metric">
+                                            <span>Ganancia:</span>
+                                            <span id="modalCompareCodProfit">$0.00</span>
+                                        </div>
+                                        <div class="calc-compare-metric">
+                                            <span>Margen:</span>
+                                            <span id="modalCompareCodMargin">0%</span>
+                                        </div>
+                                    </div>
+                                    <div class="calc-compare-col" id="modalColMp">
+                                        <h5>
+                                            <span>🛒 Marketplace</span>
+                                            <span class="badge" id="modalBadgeMpStatus">SIMULADO</span>
+                                        </h5>
+                                        <div class="calc-compare-metric">
+                                            <span>Ganancia:</span>
+                                            <span id="modalCompareMpProfit">$0.00</span>
+                                        </div>
+                                        <div class="calc-compare-metric">
+                                            <span>Margen:</span>
+                                            <span id="modalCompareMpMargin">0%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Modal Footer -->
+                        <div class="calc-modal-footer">
+                            <button type="button" class="btn btn-secondary" onclick="CalculatorModule.closeLiquidationDetail()">
+                                Cerrar
+                            </button>
+                            <div style="display: flex; gap: 0.6rem;">
+                                <button type="button" class="btn btn-secondary" id="btnModalExportPdf" title="Descargar PDF Comparativo">
+                                    📄 Descargar PDF
+                                </button>
+                                <button type="button" class="btn btn-primary" id="btnModalLoadCalculator" title="Cargar en la calculadora para editar">
+                                    ✏️ Cargar en Calculadora
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

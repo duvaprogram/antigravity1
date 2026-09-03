@@ -101,11 +101,12 @@ const CalculatorModule = (() => {
             });
         }
 
-        // Asistente de importación en USD
-        const btnApplyUsd = document.getElementById('btnApplyUsdHelper');
-        if (btnApplyUsd) {
-            btnApplyUsd.addEventListener('click', applyUsdHelper);
-        }
+        // Cerrar modal de detalles con tecla Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeLiquidationDetail();
+            }
+        });
 
         // Modo de costeo (unit vs batch)
         const costMode = document.getElementById('calcCostMode');
@@ -318,11 +319,6 @@ const CalculatorModule = (() => {
         const isBatch = getText('calcCostMode', 'unit') === 'batch';
         if (labelPurchase) {
             labelPurchase.textContent = isBatch ? `Costo Total Lote Compra ${symbol}` : `Costo de Compra ${symbol}`;
-        }
-
-        const btnApplyUsd = document.getElementById('btnApplyUsdHelper');
-        if (btnApplyUsd) {
-            btnApplyUsd.textContent = currentCurrency === 'COP' ? '⚡ Convertir a COP' : '⚡ Aplicar a Costos';
         }
 
         const labelTarget = document.getElementById('labelTargetMarginValue');
@@ -917,6 +913,27 @@ const CalculatorModule = (() => {
         const netMargin = resMarginEl ? parseFloat(resMarginEl.textContent) || 0 : 0;
         const salePrice = resPriceEl ? parseFloat(resPriceEl.textContent.replace(/[^0-9.-]+/g, '')) || 0 : 0;
 
+        // Extraer cálculos simultáneos para ambos canales
+        const resCodProfitEl = document.getElementById('compareCodProfit');
+        const resCodMarginEl = document.getElementById('compareCodMargin');
+        const resMpProfitEl = document.getElementById('compareMpProfit');
+        const resMpMarginEl = document.getElementById('compareMpMargin');
+
+        let codProfit = resCodProfitEl ? parseFloat(resCodProfitEl.textContent.replace(/[^0-9.-]+/g, '')) || 0 : 0;
+        let codMargin = resCodMarginEl ? parseFloat(resCodMarginEl.textContent) || 0 : 0;
+        let mpProfit = resMpProfitEl ? parseFloat(resMpProfitEl.textContent.replace(/[^0-9.-]+/g, '')) || 0 : 0;
+        let mpMargin = resMpMarginEl ? parseFloat(resMpMarginEl.textContent) || 0 : 0;
+
+        if (currentChannel === 'cod') {
+            codProfit = netProfit;
+            codMargin = netMargin;
+        } else {
+            mpProfit = netProfit;
+            mpMargin = netMargin;
+        }
+
+        const isCodBetter = codProfit >= mpProfit;
+
         const payload = {
             id: currentLiquidationId || ('liq_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4)),
             name,
@@ -935,7 +952,7 @@ const CalculatorModule = (() => {
             cost_other: other,
             total_landed_cost: landedCost,
 
-            // COD
+            // Parámetros Canal 1: Contra Entrega (COD)
             sale_cpa: getNum('calcCpa', 0),
             cancel_rate: getNum('calcCancelacion', 0),
             return_rate: getNum('calcDevolucion', 0),
@@ -944,20 +961,40 @@ const CalculatorModule = (() => {
             cod_fee_percent: getNum('calcRecaudoPercent', 0),
             cost_admin: getNum('calcAdmin', 0),
 
-            // Marketplace
+            // Parámetros Canal 2: Marketplace
             marketplace_name: getText('calcMpPreset', 'ml_clasica'),
             marketplace_fee_percent: getNum('calcMpFeePercent', 0),
             marketplace_fixed_fee: getNum('calcMpFixedFee', 0),
             marketplace_shipping_cost: getNum('calcMpShipping', 0),
             marketplace_tax_percent: getNum('calcMpTaxPercent', 0),
+            marketplace_ads_percent: getNum('calcMpAdsPercent', 0),
 
-            // Pricing
+            // Pricing Global / Canal Activo
             pricing_mode: pricingMode,
             target_margin_type: getText('calcTargetMarginType', 'margin_percent'),
             target_margin_value: getNum('calcTargetMarginValue', 25),
             sale_price: salePrice,
             net_profit: netProfit,
             net_margin_percent: netMargin,
+            total_batch_profit: netProfit * batchUnits,
+            total_batch_revenue: salePrice * batchUnits,
+
+            // Resultados Específicos Contra Entrega (COD)
+            cod_sale_price: salePrice,
+            cod_net_profit: codProfit,
+            cod_net_margin_percent: codMargin,
+            cod_total_batch_profit: codProfit * batchUnits,
+
+            // Resultados Específicos Marketplace
+            mp_sale_price: salePrice,
+            mp_net_profit: mpProfit,
+            mp_net_margin_percent: mpMargin,
+            mp_total_batch_profit: mpProfit * batchUnits,
+
+            // Comparativa de Canales
+            best_channel: isCodBetter ? 'cod' : 'marketplace',
+            profit_diff: Math.abs(codProfit - mpProfit),
+
             updated_at: new Date().toISOString()
         };
 
@@ -1033,9 +1070,12 @@ const CalculatorModule = (() => {
             const matchesSearch = !search ||
                 (item.name && item.name.toLowerCase().includes(search)) ||
                 (item.sku && item.sku.toLowerCase().includes(search));
-            const matchesChannel = filterChannel === 'all' || item.channel === filterChannel;
+            const best = item.best_channel || item.channel || 'cod';
+            const matchesChannel = filterChannel === 'all' || best === filterChannel || item.channel === filterChannel;
             return matchesSearch && matchesChannel;
         });
+
+        const kpiBestChannel = document.getElementById('kpiSavedBestChannel');
 
         if (kpiTotal) kpiTotal.textContent = savedLiquidations.length;
         if (kpiAvgMargin) {
@@ -1044,6 +1084,20 @@ const CalculatorModule = (() => {
                 kpiAvgMargin.textContent = `${avg.toFixed(1)}%`;
             } else {
                 kpiAvgMargin.textContent = '0%';
+            }
+        }
+
+        if (kpiBestChannel) {
+            if (savedLiquidations.length > 0) {
+                const codWins = savedLiquidations.filter(item => {
+                    const cod = item.cod_net_profit !== undefined ? item.cod_net_profit : (item.channel === 'cod' ? item.net_profit : 0);
+                    const mp = item.mp_net_profit !== undefined ? item.mp_net_profit : (item.channel === 'marketplace' ? item.net_profit : 0);
+                    return cod >= mp;
+                }).length;
+                const mpWins = savedLiquidations.length - codWins;
+                kpiBestChannel.textContent = codWins >= mpWins ? 'Contra Entrega' : 'Marketplace';
+            } else {
+                kpiBestChannel.textContent = '---';
             }
         }
 
@@ -1056,17 +1110,25 @@ const CalculatorModule = (() => {
         if (emptyState) emptyState.style.display = 'none';
 
         tbody.innerHTML = filtered.map(item => {
-            const channelBadge = item.channel === 'marketplace'
-                ? '<span class="calc-channel-pill marketplace">🛒 Marketplace</span>'
-                : '<span class="calc-channel-pill cod">🚚 Contra Entrega</span>';
-
             const itemCurr = item.currency || 'COP';
             const currBadge = itemCurr === 'USD'
                 ? '<span style="font-size: 0.72rem; padding: 2px 6px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-radius: 4px; font-weight: 700; margin-left: 4px;">USD</span>'
                 : '<span style="font-size: 0.72rem; padding: 2px 6px; background: rgba(16, 185, 129, 0.15); color: #34d399; border-radius: 4px; font-weight: 700; margin-left: 4px;">COP</span>';
 
-            const marginNum = parseFloat(item.net_margin_percent) || 0;
-            const marginBadgeClass = marginNum >= 22 ? 'badge-success' : (marginNum >= 10 ? 'badge-warning' : 'badge-danger');
+            const codProfit = item.cod_net_profit !== undefined ? item.cod_net_profit : (item.channel === 'cod' ? item.net_profit : 0);
+            const codMargin = item.cod_net_margin_percent !== undefined ? item.cod_net_margin_percent : (item.channel === 'cod' ? item.net_margin_percent : 0);
+            const codBatch = item.cod_total_batch_profit !== undefined ? item.cod_total_batch_profit : (codProfit * (item.batch_units || 100));
+
+            const mpProfit = item.mp_net_profit !== undefined ? item.mp_net_profit : (item.channel === 'marketplace' ? item.net_profit : 0);
+            const mpMargin = item.mp_net_margin_percent !== undefined ? item.mp_net_margin_percent : (item.channel === 'marketplace' ? item.net_margin_percent : 0);
+            const mpBatch = item.mp_total_batch_profit !== undefined ? item.mp_total_batch_profit : (mpProfit * (item.batch_units || 100));
+
+            const isCodBetter = codProfit >= mpProfit;
+            const diff = Math.abs(codProfit - mpProfit);
+            const bestBadge = isCodBetter
+                ? `<span class="calc-channel-pill cod" style="font-size: 0.75rem; padding: 3px 8px; white-space: nowrap;" title="Contra Entrega deja más ganancia">🚚 COD (+${formatMoney(diff, itemCurr)})</span>`
+                : `<span class="calc-channel-pill marketplace" style="font-size: 0.75rem; padding: 3px 8px; white-space: nowrap;" title="Marketplace deja más ganancia">🛒 MP (+${formatMoney(diff, itemCurr)})</span>`;
+
             const dateFormatted = item.updated_at ? Utils.formatDate(item.updated_at) : 'Reciente';
 
             return `
@@ -1078,21 +1140,34 @@ const CalculatorModule = (() => {
                         </div>
                         ${item.sku ? `<div style="font-size: 0.78rem; color: var(--text-muted); font-family: monospace;">SKU: ${Utils.escapeHtml(item.sku)}</div>` : ''}
                     </td>
-                    <td>${channelBadge}</td>
-                    <td><strong>${formatMoney(item.total_landed_cost || 0, itemCurr)}</strong></td>
-                    <td><strong style="color: #60a5fa;">${formatMoney(item.sale_price || 0, itemCurr)}</strong></td>
-                    <td><strong style="color: #10b981;">${formatMoney(item.net_profit || 0, itemCurr)}</strong></td>
-                    <td><span class="badge ${marginBadgeClass}">${marginNum.toFixed(1)}%</span></td>
+                    <td>
+                        <strong style="color: var(--text-primary);">${formatMoney(item.total_landed_cost || 0, itemCurr)}</strong>
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: ${codProfit > 0 ? '#10b981' : '#ef4444'}; font-size: 0.9rem;">
+                            ${formatMoney(codProfit, itemCurr)}
+                            <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);">(${codMargin.toFixed(1)}%)</span>
+                        </div>
+                        <div style="font-size: 0.74rem; color: var(--text-muted);">Lote: ${formatMoney(codBatch, itemCurr)}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 700; color: ${mpProfit > 0 ? '#60a5fa' : '#ef4444'}; font-size: 0.9rem;">
+                            ${formatMoney(mpProfit, itemCurr)}
+                            <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-muted);">(${mpMargin.toFixed(1)}%)</span>
+                        </div>
+                        <div style="font-size: 0.74rem; color: var(--text-muted);">Lote: ${formatMoney(mpBatch, itemCurr)}</div>
+                    </td>
+                    <td>${bestBadge}</td>
                     <td style="color: var(--text-muted); font-size: 0.85rem;">${dateFormatted}</td>
                     <td style="text-align: right;">
-                        <div class="calc-table-actions" style="justify-content: flex-end;">
+                        <div class="calc-table-actions" style="justify-content: flex-end; display: flex; gap: 0.4rem; align-items: center;">
+                            <button type="button" class="btn-detail-lupa" onclick="CalculatorModule.showLiquidationDetail('${item.id}')" title="Ver Gráficas y Análisis Detallado (Lupa)">
+                                🔍 Detalles
+                            </button>
                             <button type="button" class="btn btn-secondary btn-sm" onclick="CalculatorModule.loadLiquidation('${item.id}')" title="Cargar en la calculadora para editar">
                                 ✏️ Cargar
                             </button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="CalculatorModule.duplicateLiquidation('${item.id}')" title="Duplicar liquidación">
-                                📋 Clonar
-                            </button>
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="CalculatorModule.exportPdf('${item.id}')" title="Descargar PDF de Costos">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="CalculatorModule.exportPdf('${item.id}')" title="Descargar PDF Comparativo">
                                 📄 PDF
                             </button>
                             <button type="button" class="btn btn-danger btn-sm" onclick="CalculatorModule.deleteLiquidation('${item.id}')" title="Eliminar liquidación">
@@ -1103,6 +1178,286 @@ const CalculatorModule = (() => {
                 </tr>
             `;
         }).join('');
+    }
+
+    /**
+     * Abrir Modal con Gráficas y Detalle Completo de la Liquidación (Imagen 3)
+     */
+    function showLiquidationDetail(id) {
+        const item = savedLiquidations.find(l => l.id === id);
+        if (!item) return;
+
+        const modal = document.getElementById('modalLiquidationDetail');
+        if (!modal) return;
+
+        const itemCurr = item.currency || 'COP';
+        const itemRate = Math.max(1, item.exchange_rate || 4000);
+        const batchUnits = item.batch_units || 100;
+        const landedCost = item.total_landed_cost || 0;
+        const salePrice = item.sale_price || 0;
+        const netProfit = item.net_profit || 0;
+        const netMargin = item.net_margin_percent || (salePrice > 0 ? (netProfit / salePrice) * 100 : 0);
+
+        // Métricas Contra Entrega (COD)
+        const codProfit = item.cod_net_profit !== undefined ? item.cod_net_profit : (item.channel === 'cod' ? netProfit : 0);
+        const codMargin = item.cod_net_margin_percent !== undefined ? item.cod_net_margin_percent : (item.channel === 'cod' ? netMargin : 0);
+        const codBatch = item.cod_total_batch_profit !== undefined ? item.cod_total_batch_profit : (codProfit * batchUnits);
+
+        // Métricas Marketplace
+        const mpProfit = item.mp_net_profit !== undefined ? item.mp_net_profit : (item.channel === 'marketplace' ? netProfit : 0);
+        const mpMargin = item.mp_net_margin_percent !== undefined ? item.mp_net_margin_percent : (item.channel === 'marketplace' ? netMargin : 0);
+        const mpBatch = item.mp_total_batch_profit !== undefined ? item.mp_total_batch_profit : (mpProfit * batchUnits);
+
+        const isCodActive = item.channel !== 'marketplace';
+        const bestChannel = item.best_channel || (codProfit >= mpProfit ? 'cod' : 'marketplace');
+
+        // Textos del Encabezado
+        const titleEl = document.getElementById('modalDetailTitle');
+        const currBadgeEl = document.getElementById('modalDetailCurrencyBadge');
+        const channelBadgeEl = document.getElementById('modalDetailChannelBadge');
+        const subTitleEl = document.getElementById('modalDetailSubtitle');
+
+        if (titleEl) titleEl.textContent = item.name || 'Sin nombre';
+        if (currBadgeEl) {
+            currBadgeEl.textContent = itemCurr;
+            currBadgeEl.style.background = itemCurr === 'USD' ? 'rgba(59, 130, 246, 0.15)' : 'rgba(16, 185, 129, 0.15)';
+            currBadgeEl.style.color = itemCurr === 'USD' ? '#60a5fa' : '#34d399';
+        }
+        if (channelBadgeEl) {
+            channelBadgeEl.className = isCodActive ? 'calc-channel-pill cod' : 'calc-channel-pill marketplace';
+            channelBadgeEl.textContent = isCodActive ? '🚚 Contra Entrega' : '🛒 Marketplace';
+        }
+        if (subTitleEl) {
+            subTitleEl.textContent = `${item.sku ? `SKU: ${item.sku} | ` : ''}Liquidado el ${Utils.formatDate(item.updated_at || new Date().toISOString())} | Mejor canal: ${bestChannel === 'cod' ? '🚚 Contra Entrega' : '🛒 Marketplace'}`;
+        }
+
+        // Resultados Principales (Top de Imagen 3)
+        const resNetProfitEl = document.getElementById('modalResNetProfit');
+        const resMarginBadgeEl = document.getElementById('modalResNetMarginBadge');
+        const resPriceAmountEl = document.getElementById('modalResPriceAmount');
+        const resPriceLabelEl = document.getElementById('modalResPriceLabel');
+        const resPsychologicalEl = document.getElementById('modalResPsychological');
+        const resDualLabelEl = document.getElementById('modalResDualLabel');
+        const resDualValueEl = document.getElementById('modalResDualValue');
+
+        if (resNetProfitEl) {
+            resNetProfitEl.textContent = formatMoney(netProfit, itemCurr);
+            resNetProfitEl.style.color = netProfit >= 0 ? '#ffffff' : '#ef4444';
+        }
+        if (resMarginBadgeEl) {
+            resMarginBadgeEl.textContent = `${netMargin.toFixed(1)}%`;
+            resMarginBadgeEl.className = `result-badge ${netMargin >= 22 ? 'badge-success' : (netMargin >= 10 ? 'badge-warning' : 'badge-danger')}`;
+        }
+        if (resPriceAmountEl) resPriceAmountEl.textContent = formatMoney(salePrice, itemCurr);
+        if (resPriceLabelEl) resPriceLabelEl.textContent = item.pricing_mode === 'fixed_price' ? 'Precio de Venta Fijado' : 'Precio de Venta Sugerido';
+
+        // Sugerido Comercial / Psicológico
+        if (resPsychologicalEl) {
+            let psych = salePrice;
+            if (itemCurr === 'USD') {
+                psych = Math.ceil(salePrice) - 0.01;
+                if (psych <= 0) psych = salePrice;
+            } else {
+                psych = Math.ceil(salePrice / 1000) * 1000 - 100;
+                if (psych <= 0) psych = salePrice;
+            }
+            resPsychologicalEl.textContent = `Sugerido Comercial: ${formatMoney(psych, itemCurr)}`;
+        }
+
+        // Fila Bimoneda
+        if (resDualLabelEl && resDualValueEl) {
+            if (itemCurr === 'USD') {
+                const copPrice = Math.round(salePrice * itemRate);
+                const copProfit = Math.round(netProfit * itemRate);
+                resDualLabelEl.textContent = `Equivalente en Moneda Local (TRM ${formatMoney(itemRate, 'COP')}):`;
+                resDualValueEl.textContent = `P. Venta: ${formatMoney(copPrice, 'COP')} | Ganancia: ${formatMoney(copProfit, 'COP')}`;
+            } else {
+                const usdPrice = (salePrice / itemRate).toFixed(2);
+                const usdProfit = (netProfit / itemRate).toFixed(2);
+                resDualLabelEl.textContent = `Equivalente en Dólares (TRM ${formatMoney(itemRate, 'COP')}):`;
+                resDualValueEl.textContent = `P. Venta: $${usdPrice} USD | Ganancia: $${usdProfit} USD`;
+            }
+        }
+
+        // Proyección Total del Lote (Imagen 3)
+        const batchProfit = item.total_batch_profit || (netProfit * batchUnits);
+        const batchRevenue = item.total_batch_revenue || (salePrice * batchUnits);
+        const batchCost = landedCost * batchUnits;
+
+        const resBatchUnitsEl = document.getElementById('modalResBatchUnits');
+        const resBatchProfitEl = document.getElementById('modalResBatchProfit');
+        const resBatchRevenueEl = document.getElementById('modalResBatchRevenue');
+        const resBatchCostEl = document.getElementById('modalResBatchCost');
+
+        if (resBatchUnitsEl) resBatchUnitsEl.textContent = batchUnits;
+        if (resBatchProfitEl) {
+            resBatchProfitEl.textContent = formatMoney(batchProfit, itemCurr);
+            resBatchProfitEl.style.color = batchProfit >= 0 ? '#10b981' : '#ef4444';
+        }
+        if (resBatchRevenueEl) resBatchRevenueEl.textContent = formatMoney(batchRevenue, itemCurr);
+        if (resBatchCostEl) resBatchCostEl.textContent = formatMoney(batchCost, itemCurr);
+
+        // 6 KPIs (Imagen 3)
+        const kpiLandedEl = document.getElementById('modalKpiLanded');
+        const kpiChannelCostEl = document.getElementById('modalKpiChannelCost');
+        const kpiBreakEvenEl = document.getElementById('modalKpiBreakEven');
+        const kpiMaxCpaEl = document.getElementById('modalKpiMaxCpa');
+        const labelMaxCpaEl = document.getElementById('modalLabelMaxCpa');
+        const kpiRoiEl = document.getElementById('modalKpiRoi');
+        const kpiRoasEl = document.getElementById('modalKpiRoas');
+
+        if (kpiLandedEl) kpiLandedEl.textContent = formatMoney(landedCost, itemCurr);
+
+        // Costo Operativo
+        let operCost = 0;
+        if (isCodActive) {
+            const pCancel = Math.min(0.9, (item.cancel_rate || 0) / 100);
+            const pReturn = Math.min(0.9, (item.return_rate || 0) / 100);
+            const ineff = Math.min(0.92, pCancel + pReturn);
+            const realCpa = ineff < 1 ? (item.sale_cpa || 0) / (1 - ineff) : (item.sale_cpa || 0);
+            const realFreight = pReturn < 1 ? ((item.freight_out || 0) + (pReturn * (item.freight_return || item.freight_out || 0))) / (1 - pReturn) : (item.freight_out || 0);
+            const recaudo = salePrice * ((item.cod_fee_percent || 0) / 100);
+            operCost = realCpa + realFreight + (item.cost_admin || 0) + recaudo;
+        } else {
+            const mpFee = salePrice * ((item.marketplace_fee_percent || 0) / 100);
+            const mpTax = salePrice * ((item.marketplace_tax_percent || 0) / 100);
+            const mpAds = salePrice * ((item.marketplace_ads_percent || 0) / 100);
+            operCost = mpFee + mpTax + mpAds + (item.marketplace_fixed_fee || 0) + (item.marketplace_shipping_cost || 0);
+        }
+
+        if (kpiChannelCostEl) kpiChannelCostEl.textContent = formatMoney(operCost, itemCurr);
+        if (kpiBreakEvenEl) kpiBreakEvenEl.textContent = formatMoney(item.break_even_price || (landedCost + operCost), itemCurr);
+
+        if (isCodActive) {
+            if (labelMaxCpaEl) labelMaxCpaEl.textContent = 'CPA Máximo Permitido';
+            if (kpiMaxCpaEl) kpiMaxCpaEl.textContent = formatMoney(item.break_even_cpa || 0, itemCurr);
+            if (kpiRoasEl) {
+                const cpa = item.sale_cpa || 0;
+                kpiRoasEl.textContent = (cpa > 0 && salePrice > 0 ? (salePrice / cpa).toFixed(2) : '0.00') + 'x';
+            }
+        } else {
+            if (labelMaxCpaEl) labelMaxCpaEl.textContent = 'Comisión Total Plataforma';
+            const totalMpComm = salePrice * (((item.marketplace_fee_percent || 0) + (item.marketplace_tax_percent || 0) + (item.marketplace_ads_percent || 0)) / 100);
+            if (kpiMaxCpaEl) kpiMaxCpaEl.textContent = formatMoney(totalMpComm, itemCurr);
+            if (kpiRoasEl) kpiRoasEl.textContent = 'N/A (Orgánico)';
+        }
+
+        const roi = landedCost > 0 ? (netProfit / landedCost) * 100 : 0;
+        if (kpiRoiEl) {
+            kpiRoiEl.textContent = `${roi.toFixed(1)}%`;
+            kpiRoiEl.style.color = roi >= 0 ? '#10b981' : '#ef4444';
+        }
+
+        // Distribución del Precio de Venta (Barra segmentada de Imagen 3)
+        let freightCost = 0;
+        let adsCost = 0;
+        if (isCodActive) {
+            const pReturn = Math.min(0.9, (item.return_rate || 0) / 100);
+            freightCost = pReturn < 1 ? ((item.freight_out || 0) + (pReturn * (item.freight_return || item.freight_out || 0))) / (1 - pReturn) : (item.freight_out || 0);
+            const ineff = Math.min(0.92, ((item.cancel_rate || 0) + (item.return_rate || 0)) / 100);
+            adsCost = ineff < 1 ? (item.sale_cpa || 0) / (1 - ineff) : (item.sale_cpa || 0);
+        } else {
+            freightCost = (item.marketplace_shipping_cost || 0);
+            adsCost = (salePrice * (((item.marketplace_fee_percent || 0) + (item.marketplace_tax_percent || 0) + (item.marketplace_ads_percent || 0)) / 100)) + (item.marketplace_fixed_fee || 0);
+        }
+
+        const safePrice = Math.max(1, salePrice);
+        const pLanded = Math.max(0, Math.min(100, (landedCost / safePrice) * 100));
+        const pFreight = Math.max(0, Math.min(100, (freightCost / safePrice) * 100));
+        const pAds = Math.max(0, Math.min(100, (adsCost / safePrice) * 100));
+        const pProfit = Math.max(0, Math.min(100, (Math.max(0, netProfit) / safePrice) * 100));
+
+        const segLanded = document.getElementById('modalSegLanded');
+        const segFreight = document.getElementById('modalSegFreight');
+        const segAds = document.getElementById('modalSegAds');
+        const segProfit = document.getElementById('modalSegProfit');
+
+        if (segLanded) segLanded.style.width = `${pLanded}%`;
+        if (segFreight) segFreight.style.width = `${pFreight}%`;
+        if (segAds) segAds.style.width = `${pAds}%`;
+        if (segProfit) segProfit.style.width = `${pProfit}%`;
+
+        const legLanded = document.getElementById('modalLegLanded');
+        const legFreight = document.getElementById('modalLegFreight');
+        const legAds = document.getElementById('modalLegAds');
+        const legProfit = document.getElementById('modalLegProfit');
+
+        if (legLanded) legLanded.textContent = `${formatMoney(landedCost, itemCurr)} (${pLanded.toFixed(0)}%)`;
+        if (legFreight) legFreight.textContent = `${formatMoney(freightCost, itemCurr)} (${pFreight.toFixed(0)}%)`;
+        if (legAds) legAds.textContent = `${formatMoney(adsCost, itemCurr)} (${pAds.toFixed(0)}%)`;
+        if (legProfit) legProfit.textContent = `${formatMoney(netProfit, itemCurr)} (${pProfit.toFixed(0)}%)`;
+
+        // Comparativa Instantánea de Canales (Imagen 3)
+        const colCod = document.getElementById('modalColCod');
+        const colMp = document.getElementById('modalColMp');
+        const badgeCod = document.getElementById('modalBadgeCodStatus');
+        const badgeMp = document.getElementById('modalBadgeMpStatus');
+
+        if (colCod) colCod.className = `calc-compare-col ${isCodActive ? 'is-active' : ''}`;
+        if (colMp) colMp.className = `calc-compare-col ${!isCodActive ? 'is-active' : ''}`;
+
+        if (badgeCod) {
+            badgeCod.textContent = isCodActive ? 'ACTIVO' : (bestChannel === 'cod' ? 'MÁS RENTABLE' : 'SIMULADO');
+            badgeCod.className = `badge ${isCodActive ? 'badge-primary' : (bestChannel === 'cod' ? 'badge-success' : '')}`;
+        }
+        if (badgeMp) {
+            badgeMp.textContent = !isCodActive ? 'ACTIVO' : (bestChannel === 'marketplace' ? 'MÁS RENTABLE' : 'SIMULADO');
+            badgeMp.className = `badge ${!isCodActive ? 'badge-primary' : (bestChannel === 'marketplace' ? 'badge-success' : '')}`;
+        }
+
+        const cmpCodProfit = document.getElementById('modalCompareCodProfit');
+        const cmpCodMargin = document.getElementById('modalCompareCodMargin');
+        const cmpMpProfit = document.getElementById('modalCompareMpProfit');
+        const cmpMpMargin = document.getElementById('modalCompareMpMargin');
+
+        if (cmpCodProfit) {
+            cmpCodProfit.textContent = formatMoney(codProfit, itemCurr);
+            cmpCodProfit.style.color = codProfit >= 0 ? '#10b981' : '#ef4444';
+        }
+        if (cmpCodMargin) cmpCodMargin.textContent = `${codMargin.toFixed(1)}%`;
+
+        if (cmpMpProfit) {
+            cmpMpProfit.textContent = formatMoney(mpProfit, itemCurr);
+            cmpMpProfit.style.color = mpProfit >= 0 ? '#60a5fa' : '#ef4444';
+        }
+        if (cmpMpMargin) cmpMpMargin.textContent = `${mpMargin.toFixed(1)}%`;
+
+        // Acciones del Footer del Modal
+        const btnLoad = document.getElementById('btnModalLoadCalculator');
+        const btnPdf = document.getElementById('btnModalExportPdf');
+
+        if (btnLoad) {
+            btnLoad.onclick = () => {
+                closeLiquidationDetail();
+                loadLiquidation(item.id);
+            };
+        }
+        if (btnPdf) {
+            btnPdf.onclick = () => {
+                exportPdf(item.id);
+            };
+        }
+
+        // Mostrar modal con animación
+        modal.style.display = 'flex';
+        setTimeout(() => {
+            modal.classList.add('is-open');
+        }, 10);
+        document.body.style.overflow = 'hidden';
+    }
+
+    /**
+     * Cerrar Modal de Detalles
+     */
+    function closeLiquidationDetail() {
+        const modal = document.getElementById('modalLiquidationDetail');
+        if (!modal) return;
+
+        modal.classList.remove('is-open');
+        setTimeout(() => {
+            modal.style.display = 'none';
+            document.body.style.overflow = '';
+        }, 220);
     }
 
     /**
@@ -1292,82 +1647,104 @@ const CalculatorModule = (() => {
         doc.text(formatMoney(item.total_landed_cost || 0, itemCurr), 190, y + 2, { align: 'right' });
         y += 14;
 
-        // Variables del Canal
+        // Variables Canal 1: Contra Entrega (COD)
         doc.setFillColor(240, 240, 248);
         doc.rect(14, y - 5, 182, 8, 'F');
-        doc.text(`2. VARIABLES DE COMERCIALIZACIÓN (${item.channel === 'marketplace' ? 'MARKETPLACE' : 'CONTRA ENTREGA'})`, 16, y);
+        doc.text(`2. CANAL PAGO CONTRA ENTREGA (COD)`, 16, y);
         y += 8;
+
+        const codProfit = item.cod_net_profit !== undefined ? item.cod_net_profit : (item.channel === 'cod' ? item.net_profit : 0);
+        const codMargin = item.cod_net_margin_percent !== undefined ? item.cod_net_margin_percent : (item.channel === 'cod' ? item.net_margin_percent : 0);
+        const batchUnitsForPdf = item.batch_units || 100;
+        const codBatchProfit = item.cod_total_batch_profit !== undefined ? item.cod_total_batch_profit : (codProfit * batchUnitsForPdf);
 
         doc.setFont('helvetica', 'normal');
-        if (item.channel === 'cod') {
-            const codRows = [
-                ['Publicidad CPA (Meta / TikTok)', formatMoney(item.sale_cpa || 0, itemCurr)],
-                ['Tasa de Cancelación Previa', `${item.cancel_rate || 0}%`],
-                ['Tasa de Devolución Transportadora', `${item.return_rate || 0}%`],
-                ['Flete de Entrega / Despacho', formatMoney(item.freight_out || 0, itemCurr)],
-                ['Flete de Retorno / Devolución', formatMoney(item.freight_return || 0, itemCurr)],
-                ['Comisión Recaudo Transportadora', `${item.cod_fee_percent || 0}%`],
-                ['Costo de Confirmación / Call Center', formatMoney(item.cost_admin || 0, itemCurr)],
-            ];
-            codRows.forEach(([concept, val]) => {
-                doc.text(concept, 16, y);
-                doc.text(val, 190, y, { align: 'right' });
-                y += 6;
-            });
-        } else {
-            const mpRows = [
-                ['Plataforma Marketplace', item.marketplace_name || 'Estándar'],
-                ['Comisión Marketplace', `${item.marketplace_fee_percent || 0}%`],
-                ['Costo Fijo por Unidad', formatMoney(item.marketplace_fixed_fee || 0, itemCurr)],
-                ['Envío Gratis Asumido por Vendedor', formatMoney(item.marketplace_shipping_cost || 0, itemCurr)],
-                ['Retenciones Fiscales de Plataforma', `${item.marketplace_tax_percent || 0}%`],
-            ];
-            mpRows.forEach(([concept, val]) => {
-                doc.text(concept, 16, y);
-                doc.text(val, 190, y, { align: 'right' });
-                y += 6;
-            });
-        }
+        const codRows = [
+            ['Publicidad CPA (Meta / TikTok)', formatMoney(item.sale_cpa || 0, itemCurr)],
+            ['Tasa Cancelación / Devolución', `${item.cancel_rate || 0}% canc. / ${item.return_rate || 0}% dev.`],
+            ['Fletes (Entrega / Retorno)', `${formatMoney(item.freight_out || 0, itemCurr)} / ${formatMoney(item.freight_return || 0, itemCurr)}`],
+            ['Comisión Recaudo + Costo Operativo', `${item.cod_fee_percent || 0}% + ${formatMoney(item.cost_admin || 0, itemCurr)}`],
+            ['Utilidad Neta Unitaria COD', `${formatMoney(codProfit, itemCurr)} (${codMargin.toFixed(1)}% margen)`],
+            ['Ganancia Total Lote COD (' + batchUnitsForPdf + ' unid.)', formatMoney(codBatchProfit, itemCurr)]
+        ];
 
+        codRows.forEach(([concept, val]) => {
+            doc.text(concept, 16, y);
+            doc.text(val, 190, y, { align: 'right' });
+            y += 6;
+        });
+
+        y += 4;
+
+        // Variables Canal 2: Marketplace
+        doc.setFont('helvetica', 'bold');
+        doc.setFillColor(240, 240, 248);
+        doc.rect(14, y - 5, 182, 8, 'F');
+        doc.text(`3. CANAL MARKETPLACE (${item.marketplace_name || 'Estándar'})`, 16, y);
         y += 8;
 
-        // Resultados y Rentabilidad
+        const mpProfit = item.mp_net_profit !== undefined ? item.mp_net_profit : (item.channel === 'marketplace' ? item.net_profit : 0);
+        const mpMargin = item.mp_net_margin_percent !== undefined ? item.mp_net_margin_percent : (item.channel === 'marketplace' ? item.net_margin_percent : 0);
+        const mpBatchProfit = item.mp_total_batch_profit !== undefined ? item.mp_total_batch_profit : (mpProfit * batchUnitsForPdf);
+
+        doc.setFont('helvetica', 'normal');
+        const mpRows = [
+            ['Comisión Plataforma + Retenciones', `${item.marketplace_fee_percent || 0}% + ${item.marketplace_tax_percent || 0}% imp.`],
+            ['Cargo Fijo por Venta', formatMoney(item.marketplace_fixed_fee || 0, itemCurr)],
+            ['Envío Gratis Asumido Vendedor', formatMoney(item.marketplace_shipping_cost || 0, itemCurr)],
+            ['Utilidad Neta Unitaria Marketplace', `${formatMoney(mpProfit, itemCurr)} (${mpMargin.toFixed(1)}% margen)`],
+            ['Ganancia Total Lote Marketplace (' + batchUnitsForPdf + ' unid.)', formatMoney(mpBatchProfit, itemCurr)]
+        ];
+
+        mpRows.forEach(([concept, val]) => {
+            doc.text(concept, 16, y);
+            doc.text(val, 190, y, { align: 'right' });
+            y += 6;
+        });
+
+        y += 5;
+
+        // 4. Cuadro Comparativo & Canal Ganador
         doc.setFillColor(30, 30, 56);
         doc.rect(14, y - 5, 182, 8, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.text('3. RESULTADOS DE RENTABILIDAD Y PRECIO', 16, y);
+        doc.text('4. COMPARATIVA ENTRE CANALES Y CANAL RECOMENDADO', 16, y);
         y += 10;
         doc.setTextColor(30, 30, 30);
 
-        doc.setFontSize(11);
-        doc.text('Precio de Venta Final:', 16, y);
+        doc.setFontSize(10);
+        doc.text('Precio de Venta Base:', 16, y);
         doc.text(formatMoney(item.sale_price || 0, itemCurr), 190, y, { align: 'right' });
+        y += 6;
+
+        const isCodWin = codProfit >= mpProfit;
+        const profitDiff = Math.abs(codProfit - mpProfit);
+        const batchDiff = Math.abs(codBatchProfit - mpBatchProfit);
+
+        doc.text('Ganancia Unitaria: Contra Entrega vs Marketplace:', 16, y);
+        doc.text(`${formatMoney(codProfit, itemCurr)} vs ${formatMoney(mpProfit, itemCurr)}`, 190, y, { align: 'right' });
+        y += 6;
+
+        doc.text(`Ganancia Total Lote (${batchUnitsForPdf} unid.): COD vs MP:`, 16, y);
+        doc.text(`${formatMoney(codBatchProfit, itemCurr)} vs ${formatMoney(mpBatchProfit, itemCurr)}`, 190, y, { align: 'right' });
         y += 7;
 
-        doc.text('Utilidad Neta por Unidad:', 16, y);
-        doc.setTextColor(16, 185, 129);
-        doc.text(formatMoney(item.net_profit || 0, itemCurr), 190, y, { align: 'right' });
-        y += 7;
-        doc.setTextColor(30, 30, 30);
-
-        doc.text('Margen Neto sobre Venta:', 16, y);
-        doc.text(`${(item.net_margin_percent || 0).toFixed(1)}%`, 190, y, { align: 'right' });
-        y += 7;
-
-        const batchUnitsForPdf = item.batch_units || 100;
-        const totalBatchProfitPdf = (item.net_profit || 0) * batchUnitsForPdf;
         doc.setFont('helvetica', 'bold');
-        doc.text(`GANANCIA TOTAL DEL LOTE (${batchUnitsForPdf} unid.):`, 16, y);
+        doc.setFontSize(11);
+        doc.text('CANAL MÁS RENTABLE:', 16, y);
         doc.setTextColor(16, 185, 129);
-        doc.text(formatMoney(totalBatchProfitPdf, itemCurr), 190, y, { align: 'right' });
+        const winChannelText = isCodWin
+            ? `PAGO CONTRA ENTREGA (+${formatMoney(profitDiff, itemCurr)}/u | +${formatMoney(batchDiff, itemCurr)} en el lote)`
+            : `MARKETPLACE (+${formatMoney(profitDiff, itemCurr)}/u | +${formatMoney(batchDiff, itemCurr)} en el lote)`;
+        doc.text(winChannelText, 190, y, { align: 'right' });
         doc.setTextColor(30, 30, 30);
         doc.setFont('helvetica', 'normal');
 
         // Guardar archivo
         const safeName = (item.name || 'producto').replace(/[^a-zA-Z0-9_-]/g, '_');
-        doc.save(`Liquidacion_${safeName}_${itemCurr}.pdf`);
-        Utils.showToast('PDF generado correctamente', 'success');
+        doc.save(`Liquidacion_Comparativa_${safeName}_${itemCurr}.pdf`);
+        Utils.showToast('PDF comparativo de ambos canales generado con éxito', 'success');
     }
 
     function resetInit() {
@@ -1388,7 +1765,8 @@ const CalculatorModule = (() => {
         switchChannel,
         switchPricingMode,
         switchCurrency,
-        applyUsdHelper
+        showLiquidationDetail,
+        closeLiquidationDetail
     };
 })();
 
