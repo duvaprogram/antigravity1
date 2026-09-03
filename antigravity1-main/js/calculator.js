@@ -962,8 +962,9 @@ const CalculatorModule = (() => {
         };
 
         try {
+            let res;
             if (typeof Database !== 'undefined' && Database.saveProductLiquidation) {
-                await Database.saveProductLiquidation(payload);
+                res = await Database.saveProductLiquidation(payload);
             } else {
                 const localKey = 'antigravity_product_liquidations';
                 let local = [];
@@ -972,14 +973,23 @@ const CalculatorModule = (() => {
                 if (idx >= 0) local[idx] = payload;
                 else local.unshift(payload);
                 localStorage.setItem(localKey, JSON.stringify(local));
+                res = payload;
             }
 
             currentLiquidationId = payload.id;
-            Utils.showToast(`Liquidación "${name}" guardada en ${currentCurrency}`, 'success');
+
+            if (res && res._error && (res._error.code === 'PGRST205' || (res._error.message && res._error.message.includes('schema cache')))) {
+                Utils.showToast(`Guardada localmente. ⚠️ Falta crear la tabla en Supabase (ejecuta el script SQL)`, 'warning', 7000);
+            } else if (res && res._synced) {
+                Utils.showToast(`Liquidación "${name}" guardada en Supabase y localmente`, 'success');
+            } else {
+                Utils.showToast(`Liquidación "${name}" guardada correctamente`, 'success');
+            }
+
             await loadSavedLiquidations();
         } catch (err) {
             console.error('Error saving liquidation:', err);
-            Utils.showToast('Error al guardar la liquidación', 'error');
+            Utils.showToast('Error al guardar la liquidación: ' + (err.message || err), 'error');
         }
     }
 
@@ -1360,8 +1370,13 @@ const CalculatorModule = (() => {
         Utils.showToast('PDF generado correctamente', 'success');
     }
 
+    function resetInit() {
+        initialized = false;
+    }
+
     return {
         init,
+        resetInit,
         calculate,
         resetCalculator,
         saveCurrentLiquidation,

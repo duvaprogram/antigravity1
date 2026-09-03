@@ -2137,6 +2137,9 @@ const Database = {
         localStorage.setItem(LOCAL_KEY, JSON.stringify(localData));
 
         // Sincronizar en Supabase si está disponible
+        let syncedToSupabase = false;
+        let supabaseError = null;
+
         if (supabaseClient) {
             try {
                 const { data, error } = await supabaseClient
@@ -2145,15 +2148,20 @@ const Database = {
                     .select()
                     .single();
 
-                if (!error && data) {
-                    return data;
+                if (error) {
+                    supabaseError = error;
+                    console.error('❌ Error de Supabase al guardar en product_liquidations:', error);
+                } else if (data) {
+                    syncedToSupabase = true;
+                    return { ...data, _synced: true };
                 }
             } catch (err) {
-                console.warn('Could not sync liquidation to Supabase:', err);
+                supabaseError = err;
+                console.warn('Excepción al sincronizar en Supabase:', err);
             }
         }
 
-        return payload;
+        return { ...payload, _synced: syncedToSupabase, _error: supabaseError };
     },
 
     async deleteProductLiquidation(id) {

@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS public.product_liquidations (
     roi_percent NUMERIC DEFAULT 0,
     break_even_price NUMERIC DEFAULT 0,
     break_even_cpa NUMERIC DEFAULT 0,
+    total_batch_profit NUMERIC DEFAULT 0,
+    total_batch_revenue NUMERIC DEFAULT 0,
     
     -- Metadatos y notas
     notes TEXT,
