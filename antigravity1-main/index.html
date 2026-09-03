@@ -1882,28 +1882,44 @@
                                 </div>
                             </div>
 
-                            <!-- Card 3: Margen y Fijación de Precio -->
+                            <!-- Card 3: Fijación de Precio y Rentabilidad -->
                             <div class="card">
                                 <div class="card-header">
                                     <h3 style="display: flex; align-items: center; gap: 0.5rem;">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                                        3. Objetivo de Rentabilidad y Fijación de Precio
+                                        3. Fijación de Precio y Rentabilidad
                                     </h3>
                                 </div>
                                 <div class="card-body">
-                                    <!-- Toggle modo de fijación -->
+                                    <!-- Selector de modo de liquidación -->
                                     <div class="calc-mode-toggle">
-                                        <button type="button" class="calc-mode-btn active" id="btnModeTargetMargin">
-                                            🎯 Calcular Precio Sugerido a partir del Margen Deseado
+                                        <button type="button" class="calc-mode-btn active" id="btnModeFixedPrice">
+                                            🏷️ Liquidar con mi Precio de Venta (ej: Yo vendo a $50)
                                         </button>
-                                        <button type="button" class="calc-mode-btn" id="btnModeFixedPrice">
-                                            🏷️ Evaluar Margen según Precio de Venta Propuesto
+                                        <button type="button" class="calc-mode-btn" id="btnModeTargetMargin">
+                                            🎯 Sugerir Precio según Margen Objetivo
                                         </button>
                                     </div>
 
                                     <div class="calculator-form">
-                                        <!-- Submodo Margen Deseado -->
-                                        <div class="form-grid" id="groupTargetMargin">
+                                        <!-- Modo 1: Precio Fijado por el Usuario -->
+                                        <div class="form-grid" id="groupFixedPrice">
+                                            <div class="form-group" style="grid-column: 1 / -1;">
+                                                <label for="calcVenta" style="font-weight: 700; font-size: 0.95rem; color: #60a5fa; display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.35rem;">
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                                    ¿A qué precio vas a vender el producto? <span id="labelSalePriceCurrency">($ COP)</span>
+                                                </label>
+                                                <div style="position: relative;">
+                                                    <input type="number" id="calcVenta" value="50000" step="any" min="0" placeholder="Ej: 50 en USD o 50000 en COP" style="font-size: 1.4rem; font-weight: 800; padding: 0.75rem 1rem; color: #60a5fa; border: 2px solid rgba(96, 165, 250, 0.5); border-radius: var(--radius-md); background: rgba(96, 165, 250, 0.05);">
+                                                </div>
+                                                <small style="color: var(--text-muted); display: block; margin-top: 0.45rem; font-size: 0.8rem; line-height: 1.4;">
+                                                    💡 <strong>Coloca aquí tu precio de venta final</strong> (ejemplo: <strong>50</strong> si estás en dólares o <strong>50.000</strong> en pesos). La calculadora deducirá los costos del canal y te dirá exactamente cuánta ganancia neta te queda por unidad y por todo el lote.
+                                                </small>
+                                            </div>
+                                        </div>
+
+                                        <!-- Modo 2: Margen Deseado -->
+                                        <div class="form-grid" id="groupTargetMargin" style="display: none;">
                                             <div class="form-group">
                                                 <label for="calcTargetMarginType">Tipo de Margen Objetivo</label>
                                                 <select id="calcTargetMarginType">
@@ -1916,13 +1932,8 @@
                                                 <label for="calcTargetMarginValue" id="labelTargetMarginValue">Margen Objetivo (% o $)</label>
                                                 <input type="number" id="calcTargetMarginValue" value="25" step="0.5" min="1">
                                             </div>
-                                        </div>
-
-                                        <!-- Submodo Precio Fijado -->
-                                        <div class="form-grid" id="groupFixedPrice" style="display: none;">
-                                            <div class="form-group" style="grid-column: 1 / -1;">
-                                                <label for="calcVenta">Precio de Venta a Evaluar ($)</label>
-                                                <input type="number" id="calcVenta" value="89900" step="0.01" min="0">
+                                            <div style="grid-column: 1 / -1; font-size: 0.8rem; color: var(--text-muted);">
+                                                La calculadora calculará de forma automática el precio de venta recomendado para garantizar este porcentaje de ganancia neta.
                                             </div>
                                         </div>
                                     </div>

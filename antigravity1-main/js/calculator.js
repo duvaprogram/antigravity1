@@ -7,7 +7,7 @@
 const CalculatorModule = (() => {
     // Estado interno del módulo
     let currentChannel = 'cod'; // 'cod' | 'marketplace'
-    let pricingMode = 'target_margin'; // 'target_margin' | 'fixed_price'
+    let pricingMode = 'fixed_price'; // 'fixed_price' (por defecto: colocar precio de venta) | 'target_margin'
     let currentCurrency = 'COP'; // 'COP' | 'USD'
     let exchangeRate = 4000; // Tasa de cambio (TRM)
     let currentLiquidationId = null;
@@ -54,6 +54,7 @@ const CalculatorModule = (() => {
         await loadProductsCatalog();
         await loadSavedLiquidations();
         updateCurrencyUI();
+        switchPricingMode(pricingMode);
         calculate();
         initialized = true;
     }
@@ -328,6 +329,16 @@ const CalculatorModule = (() => {
         const marginType = getText('calcTargetMarginType', 'margin_percent');
         if (labelTarget && marginType === 'fixed_profit') {
             labelTarget.textContent = `Ganancia Neta Deseada ${symbol}`;
+        }
+
+        const labelSalePrice = document.getElementById('labelSalePriceCurrency');
+        if (labelSalePrice) {
+            labelSalePrice.textContent = symbol;
+        }
+
+        const inputVenta = document.getElementById('calcVenta');
+        if (inputVenta) {
+            inputVenta.placeholder = currentCurrency === 'USD' ? 'Ej: 50' : 'Ej: 50000';
         }
     }
 
@@ -866,10 +877,10 @@ const CalculatorModule = (() => {
 
         setVal('calcTargetMarginType', 'margin_percent');
         setVal('calcTargetMarginValue', 25);
-        setVal('calcVenta', isUsd ? 24.99 : 89900);
+        setVal('calcVenta', isUsd ? 50 : 50000);
 
         switchChannel('cod');
-        switchPricingMode('target_margin');
+        switchPricingMode('fixed_price');
         calculate();
 
         Utils.showToast('Calculadora lista para nueva liquidación', 'info');
