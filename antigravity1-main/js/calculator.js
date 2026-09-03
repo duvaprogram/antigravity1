@@ -1,12 +1,15 @@
 /* ========================================
    Calculadora de Liquidaciones y Precios
    Módulo Avanzado Multicanal (COD & Marketplace)
+   Con Soporte para Costeo en Dólares (USD) y Moneda Local (COP)
    ======================================== */
 
 const CalculatorModule = (() => {
     // Estado interno del módulo
     let currentChannel = 'cod'; // 'cod' | 'marketplace'
     let pricingMode = 'target_margin'; // 'target_margin' | 'fixed_price'
+    let currentCurrency = 'COP'; // 'COP' | 'USD'
+    let exchangeRate = 4000; // Tasa de cambio (TRM)
     let currentLiquidationId = null;
     let savedLiquidations = [];
     let productsCatalog = [];
@@ -22,13 +25,35 @@ const CalculatorModule = (() => {
     };
 
     /**
+     * Formateador de moneda adaptable (USD o COP)
+     */
+    function formatMoney(amount, currency = currentCurrency) {
+        const val = isNaN(amount) ? 0 : amount;
+        if (currency === 'USD') {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(val);
+        } else {
+            return new Intl.NumberFormat('es-CO', {
+                style: 'currency',
+                currency: 'COP',
+                maximumFractionDigits: 0
+            }).format(val);
+        }
+    }
+
+    /**
      * Inicializar módulo
      */
     async function init() {
-        console.log('Iniciando CalculatorModule avanzado...');
+        console.log('Iniciando CalculatorModule avanzado con costeo multimoneda...');
         bindEvents();
         await loadProductsCatalog();
         await loadSavedLiquidations();
+        updateCurrencyUI();
         calculate();
         initialized = true;
     }
@@ -58,6 +83,29 @@ const CalculatorModule = (() => {
             selectProduct.addEventListener('change', handleProductSelect);
         }
 
+        // Selector de moneda (COP vs USD)
+        const selectCurrency = document.getElementById('calcCurrency');
+        if (selectCurrency) {
+            selectCurrency.addEventListener('change', (e) => switchCurrency(e.target.value));
+        }
+
+        // Tasa de cambio (TRM)
+        const inputRate = document.getElementById('calcExchangeRate');
+        if (inputRate) {
+            inputRate.addEventListener('input', () => {
+                const trm = Math.max(1, getNum('calcExchangeRate', 4000));
+                exchangeRate = trm;
+                updateTrmBadge();
+                calculate();
+            });
+        }
+
+        // Asistente de importación en USD
+        const btnApplyUsd = document.getElementById('btnApplyUsdHelper');
+        if (btnApplyUsd) {
+            btnApplyUsd.addEventListener('click', applyUsdHelper);
+        }
+
         // Modo de costeo (unit vs batch)
         const costMode = document.getElementById('calcCostMode');
         if (costMode) {
@@ -84,8 +132,10 @@ const CalculatorModule = (() => {
                 const preset = MP_PRESETS[mpPreset.value];
                 if (preset) {
                     setVal('calcMpFeePercent', preset.fee);
-                    setVal('calcMpFixedFee', preset.fixed);
-                    setVal('calcMpShipping', preset.shipping);
+                    // Ajustar cargo fijo según moneda
+                    const fixedVal = currentCurrency === 'USD' ? (preset.fixed / exchangeRate).toFixed(2) : preset.fixed;
+                    setVal('calcMpFixedFee', fixedVal);
+                    setVal('calcMpShipping', 0);
                     setVal('calcMpTaxPercent', preset.tax);
                     setVal('calcMpAdsPercent', preset.ads);
                     calculate();
@@ -108,7 +158,7 @@ const CalculatorModule = (() => {
                 if (label) {
                     if (val === 'margin_percent') label.textContent = '% Margen Neto sobre Venta';
                     else if (val === 'markup_percent') label.textContent = '% Markup sobre Costo Landed';
-                    else label.textContent = 'Ganancia Neta Deseada ($)';
+                    else label.textContent = `Ganancia Neta Deseada ($ ${currentCurrency})`;
                 }
                 calculate();
             });
@@ -121,7 +171,7 @@ const CalculatorModule = (() => {
             'calcCostShippingLocal', 'calcCostPackaging', 'calcCostFulfillment', 'calcCostOther',
             'calcCpa', 'calcCancelacion', 'calcDevolucion', 'calcFlete', 'calcFleteRetorno', 'calcRecaudoPercent', 'calcAdmin',
             'calcMpFeePercent', 'calcMpFixedFee', 'calcMpShipping', 'calcMpTaxPercent', 'calcMpAdsPercent',
-            'calcTargetMarginValue', 'calcVenta'
+            'calcTargetMarginValue', 'calcVenta', 'calcBatchUnitsResult'
         ];
 
         allInputIds.forEach(id => {
@@ -130,6 +180,20 @@ const CalculatorModule = (() => {
                 el.addEventListener('input', Utils.debounce(calculate, 80));
             }
         });
+
+        // Sincronizar unidades del lote entre quickbar y tarjeta de proyección
+        const inputBatchQuick = document.getElementById('calcBatchUnits');
+        const inputBatchResult = document.getElementById('calcBatchUnitsResult');
+        if (inputBatchQuick && inputBatchResult) {
+            inputBatchQuick.addEventListener('input', () => {
+                inputBatchResult.value = inputBatchQuick.value;
+                calculate();
+            });
+            inputBatchResult.addEventListener('input', () => {
+                inputBatchQuick.value = inputBatchResult.value;
+                calculate();
+            });
+        }
 
         // Búsqueda y filtros de liquidaciones guardadas
         const searchSaved = document.getElementById('searchSavedLiquidations');
@@ -143,18 +207,144 @@ const CalculatorModule = (() => {
     }
 
     /**
+     * Aplica los valores ingresados en el Asistente en Dólares (USD)
+     */
+    function applyUsdHelper() {
+        const usdPurchase = getNum('calcUsdHelperPurchase', 0);
+        const usdShipping = getNum('calcUsdHelperShipping', 0);
+        const usdCustoms = getNum('calcUsdHelperCustoms', 0);
+
+        if (usdPurchase <= 0 && usdShipping <= 0 && usdCustoms <= 0) {
+            Utils.showToast('Ingresa al menos un costo en USD para convertir', 'warning');
+            return;
+        }
+
+        const rate = Math.max(1, getNum('calcExchangeRate', exchangeRate));
+
+        if (currentCurrency === 'COP') {
+            // Convertir de USD a COP
+            if (usdPurchase > 0) setVal('calcCostPurchase', Math.round(usdPurchase * rate));
+            if (usdShipping > 0) setVal('calcCostShippingMain', Math.round(usdShipping * rate));
+            if (usdCustoms > 0) setVal('calcCostCustoms', Math.round(usdCustoms * rate));
+            Utils.showToast(`Costos en USD convertidos a COP (TRM ${formatMoney(rate, 'COP')})`, 'success');
+        } else {
+            // Moneda ya es USD
+            if (usdPurchase > 0) setVal('calcCostPurchase', usdPurchase);
+            if (usdShipping > 0) setVal('calcCostShippingMain', usdShipping);
+            if (usdCustoms > 0) setVal('calcCostCustoms', usdCustoms);
+            Utils.showToast('Costos en USD aplicados directamente', 'success');
+        }
+
+        calculate();
+    }
+
+    /**
+     * Actualiza el badge de la TRM
+     */
+    function updateTrmBadge() {
+        const badge = document.getElementById('labelCurrentTrmBadge');
+        if (badge) {
+            badge.textContent = `1 USD = ${formatMoney(exchangeRate, 'COP')}`;
+        }
+    }
+
+    /**
+     * Alterna la moneda principal entre COP y USD
+     */
+    function switchCurrency(newCurrency) {
+        if (newCurrency === currentCurrency) return;
+        const oldCurrency = currentCurrency;
+        currentCurrency = newCurrency;
+        const rate = Math.max(1, getNum('calcExchangeRate', exchangeRate));
+
+        // Actualizar inputs monetarios para convertir los valores actuales a la nueva moneda
+        const moneyFields = [
+            'calcCostPurchase', 'calcCostShippingMain', 'calcCostCustoms',
+            'calcCostShippingLocal', 'calcCostPackaging', 'calcCostFulfillment', 'calcCostOther',
+            'calcCpa', 'calcFlete', 'calcFleteRetorno', 'calcAdmin',
+            'calcMpFixedFee', 'calcMpShipping', 'calcVenta'
+        ];
+
+        moneyFields.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                const currentVal = parseFloat(el.value) || 0;
+                if (currentVal > 0) {
+                    if (newCurrency === 'USD') {
+                        // De COP a USD: dividir por TRM
+                        el.value = (currentVal / rate).toFixed(2);
+                        el.step = '0.01';
+                    } else {
+                        // De USD a COP: multiplicar por TRM
+                        el.value = Math.round(currentVal * rate);
+                        el.step = '1';
+                    }
+                } else {
+                    el.step = newCurrency === 'USD' ? '0.01' : '1';
+                }
+            }
+        });
+
+        // Si el margen objetivo es fijo en dinero, convertirlo también
+        const marginType = getText('calcTargetMarginType', 'margin_percent');
+        if (marginType === 'fixed_profit') {
+            const elMargin = document.getElementById('calcTargetMarginValue');
+            if (elMargin) {
+                const cur = parseFloat(elMargin.value) || 0;
+                if (cur > 0) {
+                    elMargin.value = newCurrency === 'USD' ? (cur / rate).toFixed(2) : Math.round(cur * rate);
+                }
+            }
+        }
+
+        updateCurrencyUI();
+        calculate();
+        Utils.showToast(`Moneda cambiada a ${newCurrency === 'USD' ? 'Dólares (USD)' : 'Pesos (COP)'}`, 'info');
+    }
+
+    /**
+     * Actualiza textos de etiquetas e interfaz según la moneda activa
+     */
+    function updateCurrencyUI() {
+        const symbol = currentCurrency === 'USD' ? '($ USD)' : '($ COP)';
+        const currSelect = document.getElementById('calcCurrency');
+        if (currSelect) currSelect.value = currentCurrency;
+
+        updateTrmBadge();
+
+        // Actualizar labels con el símbolo de la moneda
+        const labelPurchase = document.getElementById('labelCostPurchase');
+        const isBatch = getText('calcCostMode', 'unit') === 'batch';
+        if (labelPurchase) {
+            labelPurchase.textContent = isBatch ? `Costo Total Lote Compra ${symbol}` : `Costo de Compra ${symbol}`;
+        }
+
+        const btnApplyUsd = document.getElementById('btnApplyUsdHelper');
+        if (btnApplyUsd) {
+            btnApplyUsd.textContent = currentCurrency === 'COP' ? '⚡ Convertir a COP' : '⚡ Aplicar a Costos';
+        }
+
+        const labelTarget = document.getElementById('labelTargetMarginValue');
+        const marginType = getText('calcTargetMarginType', 'margin_percent');
+        if (labelTarget && marginType === 'fixed_profit') {
+            labelTarget.textContent = `Ganancia Neta Deseada ${symbol}`;
+        }
+    }
+
+    /**
      * Actualiza etiquetas según modo unitario o por lote
      */
     function updateCostLabels(isBatch) {
+        const symbol = currentCurrency === 'USD' ? '($ USD)' : '($ COP)';
         const pLabel = document.getElementById('labelCostPurchase');
         const sLabel = document.getElementById('labelCostShippingMain');
         const cLabel = document.getElementById('labelCostCustoms');
         const lLabel = document.getElementById('labelCostShippingLocal');
 
-        if (pLabel) pLabel.textContent = isBatch ? 'Costo Total Lote Compra ($)' : 'Costo de Compra ($)';
-        if (sLabel) sLabel.textContent = isBatch ? 'Flete Total Principal Lote ($)' : 'Flete Principal / Int. ($)';
-        if (cLabel) cLabel.textContent = isBatch ? 'Aranceles / Aduana Total Lote ($)' : 'Arancel / Aduana ($)';
-        if (lLabel) lLabel.textContent = isBatch ? 'Acarreo Total Lote a Bodega ($)' : 'Acarreo / Flete Local ($)';
+        if (pLabel) pLabel.textContent = isBatch ? `Costo Total Lote Compra ${symbol}` : `Costo de Compra ${symbol}`;
+        if (sLabel) sLabel.textContent = isBatch ? `Flete Total Principal Lote ${symbol}` : `Flete Principal / Int. ${symbol}`;
+        if (cLabel) cLabel.textContent = isBatch ? `Aranceles Total Lote ${symbol}` : `Arancel / Aduana ${symbol}`;
+        if (lLabel) lLabel.textContent = isBatch ? `Acarreo Total Lote a Bodega ${symbol}` : `Acarreo / Flete Local ${symbol}`;
     }
 
     /**
@@ -273,7 +463,6 @@ const CalculatorModule = (() => {
         setVal('calcProductName', prod.name || '');
         setVal('calcProductSku', prod.sku || '');
 
-        // Obtener costo real si está codificado
         let cost = 0;
         if (typeof ProductsModule !== 'undefined' && ProductsModule.getRealCost) {
             cost = ProductsModule.getRealCost(prod);
@@ -281,12 +470,15 @@ const CalculatorModule = (() => {
             cost = parseFloat(prod.cost) || 0;
         }
 
+        const rate = Math.max(1, getNum('calcExchangeRate', exchangeRate));
         if (cost > 0) {
-            setVal('calcCostPurchase', cost);
+            const costVal = currentCurrency === 'USD' ? (cost / rate).toFixed(2) : cost;
+            setVal('calcCostPurchase', costVal);
         }
 
         if (prod.price && parseFloat(prod.price) > 0) {
-            setVal('calcVenta', parseFloat(prod.price));
+            const priceVal = currentCurrency === 'USD' ? (parseFloat(prod.price) / rate).toFixed(2) : parseFloat(prod.price);
+            setVal('calcVenta', priceVal);
         }
 
         calculate();
@@ -313,22 +505,24 @@ const CalculatorModule = (() => {
     }
 
     /**
-     * Calcula precio psicológico (ej: redondear a 900 o 990 o entero)
+     * Calcula precio psicológico comercial
      */
     function computePsychologicalPrice(price) {
         if (price <= 0) return 0;
-        if (price > 1000) {
-            // Moneda tipo COP o escala de miles (redondea a múltiplos de 900)
+        if (currentCurrency === 'USD') {
+            // En dólares: ej: 19.99, 24.90, 29.99
+            const intPart = Math.floor(price);
+            const decimal = price - intPart;
+            if (decimal < 0.5) return intPart + 0.49;
+            return intPart + 0.99;
+        } else {
+            // En pesos (COP): ej: redondeo a 900 o 990
             const base = Math.floor(price / 1000) * 1000;
             if (price <= base + 900) {
                 return base + 900;
             } else {
                 return base + 1900;
             }
-        } else {
-            // Moneda tipo USD con centavos (ej: 19.99 o 24.90)
-            const intPart = Math.floor(price);
-            return intPart + 0.99;
         }
     }
 
@@ -338,6 +532,8 @@ const CalculatorModule = (() => {
     function calculate() {
         const isBatch = getText('calcCostMode', 'unit') === 'batch';
         const batchUnits = Math.max(1, getNum('calcBatchUnits', 1));
+        const rate = Math.max(1, getNum('calcExchangeRate', exchangeRate));
+        exchangeRate = rate;
 
         // 1. Costeo Landed (Unitario)
         let purchaseRaw = getNum('calcCostPurchase', 0);
@@ -359,7 +555,7 @@ const CalculatorModule = (() => {
         // Actualizar Badge de Landed
         const badgeLanded = document.getElementById('badgeLandedCost');
         if (badgeLanded) {
-            badgeLanded.textContent = `Landed: ${Utils.formatCurrency(landedCost)}`;
+            badgeLanded.textContent = `Landed: ${formatMoney(landedCost)}`;
         }
 
         // 2. Variables de Canal
@@ -404,7 +600,6 @@ const CalculatorModule = (() => {
         const proposedPrice = getNum('calcVenta', 0);
 
         if (currentChannel === 'cod') {
-            // Calcular precio recomendado para COD
             if (targetMarginType === 'margin_percent') {
                 const targetM = Math.min(80, Math.max(1, targetMarginVal)) / 100;
                 const denominator = 1 - recaudoRate - targetM;
@@ -422,7 +617,6 @@ const CalculatorModule = (() => {
 
             finalSalePrice = pricingMode === 'target_margin' ? recommendedPrice : proposedPrice;
 
-            // Cálculos con finalSalePrice
             const codRecaudoCost = finalSalePrice * recaudoRate;
             channelOperationalCost = realCpa + realFreight + adminCost + codRecaudoCost;
             netProfit = finalSalePrice - codRecaudoCost - codFixedCosts;
@@ -459,18 +653,24 @@ const CalculatorModule = (() => {
             roiPercent = landedCost > 0 ? (netProfit / landedCost) * 100 : 0;
 
             breakEvenPrice = (1 - mpPercentTotal) > 0 ? mpFixedCosts / (1 - mpPercentTotal) : mpFixedCosts;
-            breakEvenCpa = 0; // Sin CPA en marketplace
+            breakEvenCpa = 0;
             minRoas = 0;
         }
 
-        // 4. Simulación comparativa simultánea de ambos canales al mismo precio
+        // 4. Simulación comparativa simultánea de ambos canales
         const simCodProfit = finalSalePrice - (finalSalePrice * recaudoRate) - codFixedCosts;
         const simCodMargin = finalSalePrice > 0 ? (simCodProfit / finalSalePrice) * 100 : 0;
 
         const simMpProfit = (finalSalePrice * (1 - mpPercentTotal)) - mpFixedCosts;
         const simMpMargin = finalSalePrice > 0 ? (simMpProfit / finalSalePrice) * 100 : 0;
 
-        // 5. Actualizar UI en vivo
+        // 5. Cálculos de Rentabilidad Total del Lote
+        const batchUnitsTotal = Math.max(1, getNum('calcBatchUnitsResult', getNum('calcBatchUnits', 100)));
+        const totalBatchProfit = netProfit * batchUnitsTotal;
+        const totalBatchRevenue = finalSalePrice * batchUnitsTotal;
+        const totalBatchCost = landedCost * batchUnitsTotal;
+
+        // 6. Actualizar UI en vivo
         updateUI({
             landedCost,
             finalSalePrice,
@@ -488,7 +688,12 @@ const CalculatorModule = (() => {
             simCodProfit,
             simCodMargin,
             simMpProfit,
-            simMpMargin
+            simMpMargin,
+            rate,
+            batchUnitsTotal,
+            totalBatchProfit,
+            totalBatchRevenue,
+            totalBatchCost
         });
     }
 
@@ -499,7 +704,7 @@ const CalculatorModule = (() => {
         // Utilidad Neta y Badge
         const resProfit = document.getElementById('resUtilidadNeta');
         const resMargin = document.getElementById('resUtilidadNetaPercent');
-        if (resProfit) resProfit.textContent = Utils.formatCurrency(data.netProfit);
+        if (resProfit) resProfit.textContent = formatMoney(data.netProfit);
         if (resMargin) {
             resMargin.textContent = `${data.netMarginPercent.toFixed(1)}%`;
             resMargin.className = 'result-badge';
@@ -520,11 +725,38 @@ const CalculatorModule = (() => {
             resPriceLabel.textContent = pricingMode === 'target_margin' ? 'Precio de Venta Recomendado' : 'Precio de Venta Fijado';
         }
         if (resPriceValue) {
-            resPriceValue.textContent = Utils.formatCurrency(data.finalSalePrice);
+            resPriceValue.textContent = formatMoney(data.finalSalePrice);
         }
         if (resPsych) {
-            resPsych.textContent = `Sugerido Comercial: ${Utils.formatCurrency(data.psychologicalPrice)}`;
+            resPsych.textContent = `Sugerido Comercial: ${formatMoney(data.psychologicalPrice)}`;
         }
+
+        // Fila de Conversión Dual de Moneda
+        const dualRow = document.getElementById('resDualCurrencyRow');
+        const dualLabel = document.getElementById('resDualCurrencyLabel');
+        const dualValue = document.getElementById('resDualCurrencyValue');
+        if (dualRow && dualLabel && dualValue) {
+            const rate = data.rate || exchangeRate;
+            if (currentCurrency === 'COP') {
+                const usdPrice = data.finalSalePrice / rate;
+                const usdProfit = data.netProfit / rate;
+                dualLabel.textContent = `Equivalente en USD (TRM ${formatMoney(rate, 'COP')}):`;
+                dualValue.textContent = `P. Venta: ${formatMoney(usdPrice, 'USD')} | Ganancia: ${formatMoney(usdProfit, 'USD')}`;
+            } else {
+                const copPrice = data.finalSalePrice * rate;
+                const copProfit = data.netProfit * rate;
+                dualLabel.textContent = `Equivalente en Moneda Local (TRM ${formatMoney(rate, 'COP')}):`;
+                dualValue.textContent = `P. Venta: ${formatMoney(copPrice, 'COP')} | Ganancia: ${formatMoney(copProfit, 'COP')}`;
+            }
+        }
+
+        // Proyección y Ganancia Total del Lote
+        const resBatchProfit = document.getElementById('resBatchTotalProfit');
+        const resBatchRevenue = document.getElementById('resBatchTotalRevenue');
+        const resBatchCost = document.getElementById('resBatchTotalCost');
+        if (resBatchProfit) resBatchProfit.textContent = formatMoney(data.totalBatchProfit);
+        if (resBatchRevenue) resBatchRevenue.textContent = formatMoney(data.totalBatchRevenue);
+        if (resBatchCost) resBatchCost.textContent = formatMoney(data.totalBatchCost);
 
         // KPIs
         const resLanded = document.getElementById('resLandedTotal');
@@ -535,15 +767,15 @@ const CalculatorModule = (() => {
         const resRoi = document.getElementById('resRoi');
         const resMinRoas = document.getElementById('resMinRoas');
 
-        if (resLanded) resLanded.textContent = Utils.formatCurrency(data.landedCost);
-        if (resChannelCost) resChannelCost.textContent = Utils.formatCurrency(data.channelOperationalCost);
-        if (resBePrice) resBePrice.textContent = Utils.formatCurrency(data.breakEvenPrice);
+        if (resLanded) resLanded.textContent = formatMoney(data.landedCost);
+        if (resChannelCost) resChannelCost.textContent = formatMoney(data.channelOperationalCost);
+        if (resBePrice) resBePrice.textContent = formatMoney(data.breakEvenPrice);
         if (resRoi) resRoi.textContent = `${data.roiPercent.toFixed(1)}%`;
 
         if (resBeCpa && labelBeCpa) {
             if (currentChannel === 'cod') {
                 labelBeCpa.textContent = 'CPA Máximo Permitido';
-                resBeCpa.textContent = Utils.formatCurrency(data.breakEvenCpa);
+                resBeCpa.textContent = formatMoney(data.breakEvenCpa);
             } else {
                 labelBeCpa.textContent = 'Ahorro s/ Publicidad';
                 resBeCpa.textContent = 'Sin CPA ext.';
@@ -555,7 +787,7 @@ const CalculatorModule = (() => {
         }
 
         // Segmented Breakdown Bar
-        const totalPrice = Math.max(1, data.finalSalePrice);
+        const totalPrice = Math.max(0.01, data.finalSalePrice);
         const pLanded = Math.max(0, Math.min(100, (data.landedCost / totalPrice) * 100));
         const pFreight = Math.max(0, Math.min(100, (currentChannel === 'cod' ? (data.realFreight / totalPrice) * 100 : 0)));
         const pAds = Math.max(0, Math.min(100, (currentChannel === 'cod' ? (data.realCpa / totalPrice) * 100 : (data.channelOperationalCost / totalPrice) * 100)));
@@ -577,10 +809,10 @@ const CalculatorModule = (() => {
         const legAds = document.getElementById('legAds');
         const legProfit = document.getElementById('legProfit');
 
-        if (legLanded) legLanded.textContent = `${Utils.formatCurrency(data.landedCost)} (${pLanded.toFixed(0)}%)`;
-        if (legFreight) legFreight.textContent = `${Utils.formatCurrency(currentChannel === 'cod' ? data.realFreight : 0)} (${pFreight.toFixed(0)}%)`;
-        if (legAds) legAds.textContent = `${Utils.formatCurrency(currentChannel === 'cod' ? data.realCpa : data.channelOperationalCost)} (${pAds.toFixed(0)}%)`;
-        if (legProfit) legProfit.textContent = `${Utils.formatCurrency(data.netProfit)} (${pProfit.toFixed(0)}%)`;
+        if (legLanded) legLanded.textContent = `${formatMoney(data.landedCost)} (${pLanded.toFixed(0)}%)`;
+        if (legFreight) legFreight.textContent = `${formatMoney(currentChannel === 'cod' ? data.realFreight : 0)} (${pFreight.toFixed(0)}%)`;
+        if (legAds) legAds.textContent = `${formatMoney(currentChannel === 'cod' ? data.realCpa : data.channelOperationalCost)} (${pAds.toFixed(0)}%)`;
+        if (legProfit) legProfit.textContent = `${formatMoney(data.netProfit)} (${pProfit.toFixed(0)}%)`;
 
         // Channel Comparison Card
         const colCod = document.getElementById('colCompareCod');
@@ -597,9 +829,9 @@ const CalculatorModule = (() => {
         if (bCod) bCod.textContent = currentChannel === 'cod' ? 'Activo' : 'Simulado';
         if (bMp) bMp.textContent = currentChannel === 'marketplace' ? 'Activo' : 'Simulado';
 
-        if (cCodProfit) cCodProfit.textContent = Utils.formatCurrency(data.simCodProfit);
+        if (cCodProfit) cCodProfit.textContent = formatMoney(data.simCodProfit);
         if (cCodMargin) cCodMargin.textContent = `${data.simCodMargin.toFixed(1)}%`;
-        if (cMpProfit) cMpProfit.textContent = Utils.formatCurrency(data.simMpProfit);
+        if (cMpProfit) cMpProfit.textContent = formatMoney(data.simMpProfit);
         if (cMpMargin) cMpMargin.textContent = `${data.simMpMargin.toFixed(1)}%`;
     }
 
@@ -615,25 +847,26 @@ const CalculatorModule = (() => {
         if (batchGroup) batchGroup.style.display = 'none';
         updateCostLabels(false);
 
-        setVal('calcCostPurchase', 20000);
-        setVal('calcCostShippingMain', 2000);
+        const isUsd = currentCurrency === 'USD';
+        setVal('calcCostPurchase', isUsd ? 5.00 : 20000);
+        setVal('calcCostShippingMain', isUsd ? 0.50 : 2000);
         setVal('calcCostCustoms', 0);
-        setVal('calcCostShippingLocal', 500);
-        setVal('calcCostPackaging', 1000);
-        setVal('calcCostFulfillment', 1500);
+        setVal('calcCostShippingLocal', isUsd ? 0.15 : 500);
+        setVal('calcCostPackaging', isUsd ? 0.25 : 1000);
+        setVal('calcCostFulfillment', isUsd ? 0.40 : 1500);
         setVal('calcCostOther', 0);
 
-        setVal('calcCpa', 15000);
+        setVal('calcCpa', isUsd ? 3.75 : 15000);
         setVal('calcCancelacion', 10);
         setVal('calcDevolucion', 20);
-        setVal('calcFlete', 16500);
-        setVal('calcFleteRetorno', 10000);
+        setVal('calcFlete', isUsd ? 4.00 : 16500);
+        setVal('calcFleteRetorno', isUsd ? 2.50 : 10000);
         setVal('calcRecaudoPercent', 3.5);
-        setVal('calcAdmin', 2000);
+        setVal('calcAdmin', isUsd ? 0.50 : 2000);
 
         setVal('calcTargetMarginType', 'margin_percent');
         setVal('calcTargetMarginValue', 25);
-        setVal('calcVenta', 89900);
+        setVal('calcVenta', isUsd ? 24.99 : 89900);
 
         switchChannel('cod');
         switchPricingMode('target_margin');
@@ -678,6 +911,8 @@ const CalculatorModule = (() => {
             name,
             sku,
             channel: currentChannel,
+            currency: currentCurrency,
+            exchange_rate: exchangeRate,
             cost_mode: isBatch ? 'batch' : 'unit',
             batch_units: batchUnits,
             cost_purchase: purchaseRaw,
@@ -719,7 +954,6 @@ const CalculatorModule = (() => {
             if (typeof Database !== 'undefined' && Database.saveProductLiquidation) {
                 await Database.saveProductLiquidation(payload);
             } else {
-                // Fallback directo a localStorage
                 const localKey = 'antigravity_product_liquidations';
                 let local = [];
                 try { local = JSON.parse(localStorage.getItem(localKey) || '[]'); } catch (e) {}
@@ -730,7 +964,7 @@ const CalculatorModule = (() => {
             }
 
             currentLiquidationId = payload.id;
-            Utils.showToast(`Liquidación "${name}" guardada correctamente`, 'success');
+            Utils.showToast(`Liquidación "${name}" guardada en ${currentCurrency}`, 'success');
             await loadSavedLiquidations();
         } catch (err) {
             console.error('Error saving liquidation:', err);
@@ -754,7 +988,6 @@ const CalculatorModule = (() => {
             savedLiquidations = [];
         }
 
-        // Actualizar contador del badge
         const badge = document.getElementById('calcSavedBadge');
         if (badge) badge.textContent = savedLiquidations.length;
 
@@ -806,21 +1039,28 @@ const CalculatorModule = (() => {
                 ? '<span class="calc-channel-pill marketplace">🛒 Marketplace</span>'
                 : '<span class="calc-channel-pill cod">🚚 Contra Entrega</span>';
 
+            const itemCurr = item.currency || 'COP';
+            const currBadge = itemCurr === 'USD'
+                ? '<span style="font-size: 0.72rem; padding: 2px 6px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-radius: 4px; font-weight: 700; margin-left: 4px;">USD</span>'
+                : '<span style="font-size: 0.72rem; padding: 2px 6px; background: rgba(16, 185, 129, 0.15); color: #34d399; border-radius: 4px; font-weight: 700; margin-left: 4px;">COP</span>';
+
             const marginNum = parseFloat(item.net_margin_percent) || 0;
             const marginBadgeClass = marginNum >= 22 ? 'badge-success' : (marginNum >= 10 ? 'badge-warning' : 'badge-danger');
-
             const dateFormatted = item.updated_at ? Utils.formatDate(item.updated_at) : 'Reciente';
 
             return `
                 <tr>
                     <td>
-                        <strong style="color: var(--text-primary); font-size: 0.95rem;">${Utils.escapeHtml(item.name || 'Sin nombre')}</strong>
+                        <div style="display: flex; align-items: center;">
+                            <strong style="color: var(--text-primary); font-size: 0.95rem;">${Utils.escapeHtml(item.name || 'Sin nombre')}</strong>
+                            ${currBadge}
+                        </div>
                         ${item.sku ? `<div style="font-size: 0.78rem; color: var(--text-muted); font-family: monospace;">SKU: ${Utils.escapeHtml(item.sku)}</div>` : ''}
                     </td>
                     <td>${channelBadge}</td>
-                    <td><strong>${Utils.formatCurrency(item.total_landed_cost || 0)}</strong></td>
-                    <td><strong style="color: #60a5fa;">${Utils.formatCurrency(item.sale_price || 0)}</strong></td>
-                    <td><strong style="color: #10b981;">${Utils.formatCurrency(item.net_profit || 0)}</strong></td>
+                    <td><strong>${formatMoney(item.total_landed_cost || 0, itemCurr)}</strong></td>
+                    <td><strong style="color: #60a5fa;">${formatMoney(item.sale_price || 0, itemCurr)}</strong></td>
+                    <td><strong style="color: #10b981;">${formatMoney(item.net_profit || 0, itemCurr)}</strong></td>
                     <td><span class="badge ${marginBadgeClass}">${marginNum.toFixed(1)}%</span></td>
                     <td style="color: var(--text-muted); font-size: 0.85rem;">${dateFormatted}</td>
                     <td style="text-align: right;">
@@ -852,8 +1092,13 @@ const CalculatorModule = (() => {
         if (!item) return;
 
         currentLiquidationId = item.id;
+        currentCurrency = item.currency || 'COP';
+        exchangeRate = item.exchange_rate || 4000;
+
         setVal('calcProductName', item.name || '');
         setVal('calcProductSku', item.sku || '');
+        setVal('calcCurrency', currentCurrency);
+        setVal('calcExchangeRate', exchangeRate);
 
         const isBatch = item.cost_mode === 'batch';
         setVal('calcCostMode', item.cost_mode || 'unit');
@@ -891,6 +1136,7 @@ const CalculatorModule = (() => {
         setVal('calcTargetMarginValue', item.target_margin_value || 25);
         setVal('calcVenta', item.sale_price || 0);
 
+        updateCurrencyUI();
         switchChannel(item.channel || 'cod');
         switchPricingMode(item.pricing_mode || 'target_margin');
 
@@ -898,7 +1144,7 @@ const CalculatorModule = (() => {
         switchMainTab('active');
         calculate();
 
-        Utils.showToast(`Liquidación "${item.name}" cargada en la calculadora`, 'success');
+        Utils.showToast(`Liquidación "${item.name}" cargada en ${currentCurrency}`, 'success');
     }
 
     /**
@@ -972,17 +1218,19 @@ const CalculatorModule = (() => {
 
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
+        const itemCurr = item.currency || 'COP';
+        const itemRate = item.exchange_rate || 4000;
 
         // Encabezado
         doc.setFillColor(30, 30, 56);
-        doc.rect(0, 0, 210, 32, 'F');
+        doc.rect(0, 0, 210, 34, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFontSize(18);
         doc.setFont('helvetica', 'bold');
         doc.text('HOJA DE LIQUIDACIÓN Y COSTEO', 14, 16);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Fecha: ${Utils.formatDate(item.updated_at || new Date().toISOString())} | Canal: ${item.channel === 'marketplace' ? 'Marketplace' : 'Pago Contra Entrega'}`, 14, 25);
+        doc.text(`Fecha: ${Utils.formatDate(item.updated_at || new Date().toISOString())} | Canal: ${item.channel === 'marketplace' ? 'Marketplace' : 'Pago Contra Entrega'} | Moneda: ${itemCurr} (TRM: ${formatMoney(itemRate, 'COP')})`, 14, 26);
 
         // Datos del Producto
         doc.setTextColor(30, 30, 30);
@@ -998,18 +1246,18 @@ const CalculatorModule = (() => {
         doc.setFont('helvetica', 'bold');
         doc.setFillColor(240, 240, 248);
         doc.rect(14, y - 5, 182, 8, 'F');
-        doc.text('1. DESGLOSE DE COSTO PUESTO EN BODEGA (LANDED COST)', 16, y);
+        doc.text(`1. DESGLOSE DE COSTO PUESTO EN BODEGA (${itemCurr})`, 16, y);
         y += 8;
 
         doc.setFont('helvetica', 'normal');
         const landedRows = [
-            ['Costo Base de Compra / Proveedor', Utils.formatCurrency(item.cost_purchase || 0)],
-            ['Transporte / Flete Principal', Utils.formatCurrency(item.cost_shipping_main || 0)],
-            ['Arancel / Aduana / Impuestos Importación', Utils.formatCurrency(item.cost_customs || 0)],
-            ['Transporte Local / Acarreo a Bodega', Utils.formatCurrency(item.cost_shipping_local || 0)],
-            ['Empaque y Embalaje de Despacho', Utils.formatCurrency(item.cost_packaging || 0)],
-            ['Picking, Packing y Almacenamiento', Utils.formatCurrency(item.cost_fulfillment || 0)],
-            ['Otros Gastos Directos', Utils.formatCurrency(item.cost_other || 0)],
+            ['Costo Base de Compra / Proveedor', formatMoney(item.cost_purchase || 0, itemCurr)],
+            ['Transporte / Flete Principal', formatMoney(item.cost_shipping_main || 0, itemCurr)],
+            ['Arancel / Aduana / Impuestos Importación', formatMoney(item.cost_customs || 0, itemCurr)],
+            ['Transporte Local / Acarreo a Bodega', formatMoney(item.cost_shipping_local || 0, itemCurr)],
+            ['Empaque y Embalaje de Despacho', formatMoney(item.cost_packaging || 0, itemCurr)],
+            ['Picking, Packing y Almacenamiento', formatMoney(item.cost_fulfillment || 0, itemCurr)],
+            ['Otros Gastos Directos', formatMoney(item.cost_other || 0, itemCurr)],
         ];
 
         landedRows.forEach(([concept, val]) => {
@@ -1020,7 +1268,7 @@ const CalculatorModule = (() => {
 
         doc.setFont('helvetica', 'bold');
         doc.text('TOTAL COSTO LANDED UNITARIO:', 16, y + 2);
-        doc.text(Utils.formatCurrency(item.total_landed_cost || 0), 190, y + 2, { align: 'right' });
+        doc.text(formatMoney(item.total_landed_cost || 0, itemCurr), 190, y + 2, { align: 'right' });
         y += 14;
 
         // Variables del Canal
@@ -1032,13 +1280,13 @@ const CalculatorModule = (() => {
         doc.setFont('helvetica', 'normal');
         if (item.channel === 'cod') {
             const codRows = [
-                ['Publicidad CPA (Meta / TikTok)', Utils.formatCurrency(item.sale_cpa || 0)],
+                ['Publicidad CPA (Meta / TikTok)', formatMoney(item.sale_cpa || 0, itemCurr)],
                 ['Tasa de Cancelación Previa', `${item.cancel_rate || 0}%`],
                 ['Tasa de Devolución Transportadora', `${item.return_rate || 0}%`],
-                ['Flete de Entrega / Despacho', Utils.formatCurrency(item.freight_out || 0)],
-                ['Flete de Retorno / Devolución', Utils.formatCurrency(item.freight_return || 0)],
+                ['Flete de Entrega / Despacho', formatMoney(item.freight_out || 0, itemCurr)],
+                ['Flete de Retorno / Devolución', formatMoney(item.freight_return || 0, itemCurr)],
                 ['Comisión Recaudo Transportadora', `${item.cod_fee_percent || 0}%`],
-                ['Costo de Confirmación / Call Center', Utils.formatCurrency(item.cost_admin || 0)],
+                ['Costo de Confirmación / Call Center', formatMoney(item.cost_admin || 0, itemCurr)],
             ];
             codRows.forEach(([concept, val]) => {
                 doc.text(concept, 16, y);
@@ -1049,8 +1297,8 @@ const CalculatorModule = (() => {
             const mpRows = [
                 ['Plataforma Marketplace', item.marketplace_name || 'Estándar'],
                 ['Comisión Marketplace', `${item.marketplace_fee_percent || 0}%`],
-                ['Costo Fijo por Unidad', Utils.formatCurrency(item.marketplace_fixed_fee || 0)],
-                ['Envío Gratis Asumido por Vendedor', Utils.formatCurrency(item.marketplace_shipping_cost || 0)],
+                ['Costo Fijo por Unidad', formatMoney(item.marketplace_fixed_fee || 0, itemCurr)],
+                ['Envío Gratis Asumido por Vendedor', formatMoney(item.marketplace_shipping_cost || 0, itemCurr)],
                 ['Retenciones Fiscales de Plataforma', `${item.marketplace_tax_percent || 0}%`],
             ];
             mpRows.forEach(([concept, val]) => {
@@ -1073,21 +1321,31 @@ const CalculatorModule = (() => {
 
         doc.setFontSize(11);
         doc.text('Precio de Venta Final:', 16, y);
-        doc.text(Utils.formatCurrency(item.sale_price || 0), 190, y, { align: 'right' });
+        doc.text(formatMoney(item.sale_price || 0, itemCurr), 190, y, { align: 'right' });
         y += 7;
 
         doc.text('Utilidad Neta por Unidad:', 16, y);
         doc.setTextColor(16, 185, 129);
-        doc.text(Utils.formatCurrency(item.net_profit || 0), 190, y, { align: 'right' });
+        doc.text(formatMoney(item.net_profit || 0, itemCurr), 190, y, { align: 'right' });
         y += 7;
         doc.setTextColor(30, 30, 30);
 
         doc.text('Margen Neto sobre Venta:', 16, y);
         doc.text(`${(item.net_margin_percent || 0).toFixed(1)}%`, 190, y, { align: 'right' });
+        y += 7;
+
+        const batchUnitsForPdf = item.batch_units || 100;
+        const totalBatchProfitPdf = (item.net_profit || 0) * batchUnitsForPdf;
+        doc.setFont('helvetica', 'bold');
+        doc.text(`GANANCIA TOTAL DEL LOTE (${batchUnitsForPdf} unid.):`, 16, y);
+        doc.setTextColor(16, 185, 129);
+        doc.text(formatMoney(totalBatchProfitPdf, itemCurr), 190, y, { align: 'right' });
+        doc.setTextColor(30, 30, 30);
+        doc.setFont('helvetica', 'normal');
 
         // Guardar archivo
         const safeName = (item.name || 'producto').replace(/[^a-zA-Z0-9_-]/g, '_');
-        doc.save(`Liquidacion_${safeName}.pdf`);
+        doc.save(`Liquidacion_${safeName}_${itemCurr}.pdf`);
         Utils.showToast('PDF generado correctamente', 'success');
     }
 
@@ -1102,7 +1360,9 @@ const CalculatorModule = (() => {
         exportPdf,
         switchMainTab,
         switchChannel,
-        switchPricingMode
+        switchPricingMode,
+        switchCurrency,
+        applyUsdHelper
     };
 })();
 

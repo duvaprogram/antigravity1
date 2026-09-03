@@ -1686,6 +1686,17 @@
                             <input type="text" id="calcProductSku" placeholder="Ej: RC-8461-BLK" value="RC-8461-BLK">
                         </div>
                         <div class="form-group">
+                            <label for="calcCurrency">Moneda de Costeo</label>
+                            <select id="calcCurrency">
+                                <option value="COP" selected>🇨🇴 Pesos (COP)</option>
+                                <option value="USD">💵 Dólares (USD)</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="groupExchangeRate">
+                            <label for="calcExchangeRate">Precio Dólar / TRM ($)</label>
+                            <input type="number" id="calcExchangeRate" value="4000" step="10" min="1" placeholder="Ej: 4000" title="Valor del dólar para conversiones entre USD y moneda local">
+                        </div>
+                        <div class="form-group">
                             <label for="calcCostMode">Tipo de Costeo</label>
                             <select id="calcCostMode">
                                 <option value="unit">Por Unidad</option>
@@ -1715,6 +1726,34 @@
                                     </div>
                                 </div>
                                 <div class="card-body">
+                                    <!-- Asistente de Importación en Dólares (USD) -->
+                                    <div class="calc-usd-helper" id="calcUsdHelperBox" style="background: rgba(99, 102, 241, 0.08); border: 1px dashed rgba(99, 102, 241, 0.3); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 1.25rem;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                                            <span style="font-size: 0.82rem; font-weight: 700; color: #818cf8; display: flex; align-items: center; gap: 0.4rem;">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                                Asistente de Importación en Dólares (USD)
+                                            </span>
+                                            <span style="font-size: 0.75rem; color: var(--text-muted);" id="labelCurrentTrmBadge">1 USD = $4.000 COP</span>
+                                        </div>
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)) auto; gap: 0.5rem; align-items: end;">
+                                            <div>
+                                                <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Compra ($ USD)</label>
+                                                <input type="number" id="calcUsdHelperPurchase" placeholder="Ej: 5.50" step="0.01" min="0" style="padding: 0.45rem 0.65rem; font-size: 0.82rem;">
+                                            </div>
+                                            <div>
+                                                <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Flete Int. ($ USD)</label>
+                                                <input type="number" id="calcUsdHelperShipping" placeholder="Ej: 1.20" step="0.01" min="0" style="padding: 0.45rem 0.65rem; font-size: 0.82rem;">
+                                            </div>
+                                            <div>
+                                                <label style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 2px;">Aduana / Arancel ($ USD)</label>
+                                                <input type="number" id="calcUsdHelperCustoms" placeholder="Ej: 0.30" step="0.01" min="0" style="padding: 0.45rem 0.65rem; font-size: 0.82rem;">
+                                            </div>
+                                            <button type="button" class="btn btn-primary btn-sm" id="btnApplyUsdHelper" style="height: 34px; font-size: 0.78rem; white-space: nowrap;">
+                                                ⚡ Convertir a Costo
+                                            </button>
+                                        </div>
+                                    </div>
+
                                     <form id="landedForm" class="calculator-form">
                                         <div class="form-grid">
                                             <div class="form-group">
@@ -1905,6 +1944,41 @@
                                         <div class="calc-psychological-price" id="resPsychologicalPrice">Comercial: $0</div>
                                     </div>
                                     <div class="price-amount" id="resPriceValue">$0.00</div>
+                                </div>
+
+                                <!-- Fila de Equivalencia en Otra Moneda -->
+                                <div id="resDualCurrencyRow" class="calc-dual-currency-row" style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px dashed rgba(255,255,255,0.18); font-size: 0.82rem; display: flex; justify-content: space-between; align-items: center;">
+                                    <span id="resDualCurrencyLabel" style="color: rgba(255,255,255,0.75);">Equivalente en USD (TRM $4.000):</span>
+                                    <strong id="resDualCurrencyValue" style="color: #34d399; font-size: 0.95rem;">$0.00 USD</strong>
+                                </div>
+                            </div>
+
+                            <!-- Card: Proyección y Ganancia Total del Lote -->
+                            <div class="card calc-batch-summary-card" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(59, 130, 246, 0.08) 100%); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-lg); padding: 1.15rem;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                                    <h4 style="font-size: 0.85rem; text-transform: uppercase; color: #10b981; font-weight: 700; display: flex; align-items: center; gap: 0.4rem; margin: 0;">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                        Proyección Total del Lote
+                                    </h4>
+                                    <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; color: var(--text-muted);">
+                                        <span>Lote:</span>
+                                        <input type="number" id="calcBatchUnitsResult" value="100" min="1" step="1" style="width: 75px; padding: 0.25rem 0.5rem; font-size: 0.8rem; text-align: center; border-radius: 4px; background: var(--surface); border: 1px solid var(--border); color: var(--text-primary);" title="Modifica la cantidad de unidades para calcular la ganancia del lote">
+                                        <span>unid.</span>
+                                    </div>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 0.5rem; align-items: stretch;">
+                                    <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: var(--radius-md); padding: 0.55rem 0.7rem;">
+                                        <div style="font-size: 0.68rem; text-transform: uppercase; color: #34d399; font-weight: 700;">Ganancia Total Lote</div>
+                                        <div id="resBatchTotalProfit" style="font-size: 1.35rem; font-weight: 800; color: #10b981; line-height: 1.2;">$0.00</div>
+                                    </div>
+                                    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.55rem 0.7rem;">
+                                        <div style="font-size: 0.68rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Venta Total Lote</div>
+                                        <div id="resBatchTotalRevenue" style="font-size: 1rem; font-weight: 700; color: #60a5fa; line-height: 1.2;">$0.00</div>
+                                    </div>
+                                    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.55rem 0.7rem;">
+                                        <div style="font-size: 0.68rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600;">Inversión Landed</div>
+                                        <div id="resBatchTotalCost" style="font-size: 1rem; font-weight: 700; color: var(--text-primary); line-height: 1.2;">$0.00</div>
+                                    </div>
                                 </div>
                             </div>
 

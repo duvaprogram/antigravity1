@@ -12,6 +12,8 @@ CREATE TABLE IF NOT EXISTS public.product_liquidations (
     marketplace_name TEXT,
     cost_mode TEXT DEFAULT 'unit', -- 'unit' o 'batch'
     batch_units NUMERIC DEFAULT 1,
+    currency TEXT DEFAULT 'COP', -- 'COP' o 'USD'
+    exchange_rate NUMERIC DEFAULT 4000, -- Tasa de cambio (TRM)
     
     -- Costeo Landed Puesto en Bodega (Unitario)
     cost_purchase NUMERIC DEFAULT 0,
