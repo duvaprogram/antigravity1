@@ -8,7 +8,7 @@
     <meta name="description" content="Sistema de gestión de domicilios para Quito y Guayaquil">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="css/styles.css?v=2.1.37">
+    <link rel="stylesheet" href="css/styles.css?v=2.2.0">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
@@ -194,7 +194,7 @@
                         <path d="M12 18h.01"></path>
                         <path d="M8 18h.01"></path>
                     </svg>
-                    <span>Calculadora</span>
+                    <span>Calculadora Liquidaciones</span>
                 </a>
                 <a href="#materials-calculator" class="nav-item" data-section="materials-calculator">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1602,106 +1602,482 @@
                 </div>
             </section>
 
-            <!-- Calculator Section -->
+            <!-- Calculator & Liquidation Section -->
             <section class="content-section" id="section-calculator">
-                <div class="section-header">
-                    <h2 style="display: flex; align-items: center; gap: 0.5rem;">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
-                            <line x1="8" y1="6" x2="16" y2="6"></line>
-                        </svg>
-                        Calculadora de Precios y Utilidad
-                    </h2>
+                <div class="calc-nav-header">
+                    <div>
+                        <h2 style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                                <line x1="8" y1="6" x2="16" y2="6"></line>
+                                <line x1="16" y1="14" x2="16" y2="18"></line>
+                                <path d="M16 10h.01"></path>
+                                <path d="M12 10h.01"></path>
+                                <path d="M8 10h.01"></path>
+                                <path d="M12 14h.01"></path>
+                                <path d="M8 14h.01"></path>
+                                <path d="M12 18h.01"></path>
+                                <path d="M8 18h.01"></path>
+                            </svg>
+                            Calculadora de Liquidaciones y Precios
+                        </h2>
+                        <p style="color: var(--text-muted); font-size: 0.88rem;">Costeo Landed unitario, márgenes reales y precio recomendado según canal de venta (Contra Entrega vs Marketplace)</p>
+                    </div>
+
+                    <div class="calc-header-actions">
+                        <div class="calc-main-tabs">
+                            <button type="button" class="calc-tab-btn active" id="calcTabBtnActive" data-tab="active">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                    <line x1="12" y1="8" x2="12" y2="16"></line>
+                                    <line x1="8" y1="12" x2="16" y2="12"></line>
+                                </svg>
+                                Calculadora Activa
+                            </button>
+                            <button type="button" class="calc-tab-btn" id="calcTabBtnSaved" data-tab="saved">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                    <polyline points="7 3 7 8 15 8"></polyline>
+                                </svg>
+                                Liquidaciones Guardadas
+                                <span class="calc-badge-count" id="calcSavedBadge">0</span>
+                            </button>
+                        </div>
+
+                        <button type="button" class="btn btn-secondary" id="btnCalcNew" title="Limpiar y empezar nueva liquidación">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Nueva
+                        </button>
+
+                        <button type="button" class="btn btn-primary" id="btnCalcSave">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                <polyline points="7 3 7 8 15 8"></polyline>
+                            </svg>
+                            Guardar Liquidación
+                        </button>
+                    </div>
                 </div>
 
-                <div class="calculator-grid">
-                    <!-- Inputs Card -->
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>Variables de Entrada</h3>
+                <!-- VIEW 1: CALCULADORA ACTIVA -->
+                <div id="calcViewActive">
+                    <!-- Quickbar de Selección y Datos Generales -->
+                    <div class="calc-quickbar">
+                        <div class="form-group">
+                            <label for="calcProductSelect">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                Cargar de Catálogo
+                            </label>
+                            <select id="calcProductSelect">
+                                <option value="">-- Producto Nuevo / Manual --</option>
+                            </select>
                         </div>
-                        <div class="card-body">
-                            <form id="calculatorForm" class="calculator-form">
-                                <div class="form-grid">
-                                    <div class="form-group">
-                                        <label for="calcCompra">Costo de Compra ($)</label>
-                                        <input type="number" id="calcCompra" value="16761" step="0.01">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="calcVenta">Precio de Venta ($)</label>
-                                        <input type="number" id="calcVenta" value="77297" step="0.01">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="calcCpa">CPA Inicial ($)</label>
-                                        <input type="number" id="calcCpa" value="15000" step="0.01">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="calcCancelacion">% De Cancelación</label>
-                                        <input type="number" id="calcCancelacion" value="10" step="0.1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="calcDevolucion">% De Devolución</label>
-                                        <input type="number" id="calcDevolucion" value="25" step="0.1">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="calcFullfilment">Fullfilment ($)</label>
-                                        <input type="number" id="calcFullfilment" value="2000" step="0.01">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="calcFlete">Flete ($)</label>
-                                        <input type="number" id="calcFlete" value="16500" step="0.01">
-                                    </div>
-                                    <div class="form-group">
-                                        <label for="calcAdmin">Costo Administrativo ($)</label>
-                                        <input type="number" id="calcAdmin" value="2000" step="0.01">
-                                    </div>
-                                </div>
-                            </form>
+                        <div class="form-group" style="flex: 1.5;">
+                            <label for="calcProductName">Nombre de la Liquidación / Producto</label>
+                            <input type="text" id="calcProductName" placeholder="Ej: Reloj Curren 8461 Negro" value="Reloj Curren 8461 Negro">
+                        </div>
+                        <div class="form-group">
+                            <label for="calcProductSku">SKU / Referencia</label>
+                            <input type="text" id="calcProductSku" placeholder="Ej: RC-8461-BLK" value="RC-8461-BLK">
+                        </div>
+                        <div class="form-group">
+                            <label for="calcCostMode">Tipo de Costeo</label>
+                            <select id="calcCostMode">
+                                <option value="unit">Por Unidad</option>
+                                <option value="batch">Por Lote de Compra</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="calcBatchGroup" style="display: none;">
+                            <label for="calcBatchUnits">Unidades en el Lote</label>
+                            <input type="number" id="calcBatchUnits" value="100" min="1" step="1">
                         </div>
                     </div>
 
-                    <!-- Results Card -->
-                    <div class="results-container">
-                        <div class="card result-card main-result">
-                            <div class="card-body">
-                                <span class="result-label">Utilidad Neta Estimada</span>
-                                <span class="result-value" id="resUtilidadNeta">$0.00</span>
-                                <div class="result-badge" id="resUtilidadNetaPercent">0%</div>
+                    <div class="calculator-grid">
+                        <!-- COLUMNA IZQUIERDA: COSTOS & CANALES -->
+                        <div class="calc-left-col">
+                            <!-- Card 1: Costeo Landed (Puesto en Bodega) -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <div class="calc-card-title">
+                                        <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                            1. Costeo Landed (Puesto en Bodega)
+                                        </h3>
+                                        <div class="calc-landed-badge" id="badgeLandedCost">
+                                            Costo Unitario: $0.00
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <form id="landedForm" class="calculator-form">
+                                        <div class="form-grid">
+                                            <div class="form-group">
+                                                <label for="calcCostPurchase" id="labelCostPurchase">Costo de Compra ($)</label>
+                                                <input type="number" id="calcCostPurchase" value="16761" step="0.01" min="0">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcCostShippingMain" id="labelCostShippingMain">Flete Principal / Int. ($)</label>
+                                                <input type="number" id="calcCostShippingMain" value="2000" step="0.01" min="0" title="Flete marítimo, aéreo o transporte mayorista a tu país">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcCostCustoms" id="labelCostCustoms">Arancel / Aduana ($)</label>
+                                                <input type="number" id="calcCostCustoms" value="0" step="0.01" min="0" title="Costos aduaneros, nacionalización e impuestos de importación">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcCostShippingLocal" id="labelCostShippingLocal">Acarreo / Flete Local ($)</label>
+                                                <input type="number" id="calcCostShippingLocal" value="500" step="0.01" min="0" title="Transporte del puerto/aduana a tu bodega local">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcCostPackaging">Empaque y Embalaje ($)</label>
+                                                <input type="number" id="calcCostPackaging" value="1000" step="0.01" min="0" title="Caja, bolsa de seguridad, plástico burbuja, etiquetas">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcCostFulfillment">Picking & Bodegaje ($)</label>
+                                                <input type="number" id="calcCostFulfillment" value="1500" step="0.01" min="0" title="Mano de obra de alistamiento y almacenamiento">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcCostOther">Otros Gastos Directos ($)</label>
+                                                <input type="number" id="calcCostOther" value="0" step="0.01" min="0" title="Garantías directas o costos adicionales">
+                                            </div>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <!-- Card 2: Canal de Comercialización -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                                        2. Canal de Venta y Variables Operativas
+                                    </h3>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Selector de Canal -->
+                                    <div class="calc-channel-tabs">
+                                        <button type="button" class="calc-channel-tab channel-cod active" id="tabChannelCod">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                            Pago Contra Entrega (COD)
+                                        </button>
+                                        <button type="button" class="calc-channel-tab channel-mp" id="tabChannelMarketplace">
+                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
+                                            Venta por Marketplace (ML / Amazon)
+                                        </button>
+                                    </div>
+
+                                    <!-- PANEL A: CONTRA ENTREGA (COD) -->
+                                    <div class="calc-channel-panel active" id="panelChannelCod">
+                                        <div class="form-grid calculator-form">
+                                            <div class="form-group">
+                                                <label for="calcCpa">Publicidad CPA Meta/TikTok ($)</label>
+                                                <input type="number" id="calcCpa" value="15000" step="0.01" min="0" title="Costo por compra generado en campañas publicitarias">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcCancelacion">% De Cancelación Previa</label>
+                                                <input type="number" id="calcCancelacion" value="10" step="0.1" min="0" max="90" title="Pedidos cancelados antes de despachar">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcDevolucion">% Devolución Transportadora</label>
+                                                <input type="number" id="calcDevolucion" value="22" step="0.1" min="0" max="90" title="Porcentaje de pedidos que no son recibidos por el cliente">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcFlete">Flete de Entrega ($)</label>
+                                                <input type="number" id="calcFlete" value="16500" step="0.01" min="0" title="Costo promedio de la guía de ida">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcFleteRetorno">Flete de Devolución / Retorno ($)</label>
+                                                <input type="number" id="calcFleteRetorno" value="10000" step="0.01" min="0" title="Costo cobrado por la transportadora al retornar paquete no entregado">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcRecaudoPercent">% Comisión Recaudo COD</label>
+                                                <input type="number" id="calcRecaudoPercent" value="3.5" step="0.1" min="0" max="20" title="Comisión que cobra la transportadora por recaudar el dinero">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcAdmin">Confirmación / Call Center ($)</label>
+                                                <input type="number" id="calcAdmin" value="2000" step="0.01" min="0" title="Costo del operador por confirmar pedido vía WhatsApp o llamada">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- PANEL B: MARKETPLACE -->
+                                    <div class="calc-channel-panel" id="panelChannelMarketplace">
+                                        <div class="form-grid calculator-form">
+                                            <div class="form-group" style="grid-column: 1 / -1;">
+                                                <label for="calcMpPreset">Plantilla Rápida de Marketplace</label>
+                                                <select id="calcMpPreset">
+                                                    <option value="ml_clasica">MercadoLibre - Publicación Clásica (14% com. + $2.000 fijo si &lt; $60.000)</option>
+                                                    <option value="ml_premium">MercadoLibre - Publicación Premium (18.5% com. + cuotas sin interés)</option>
+                                                    <option value="amazon">Amazon FBA / Vendedor (15% comisión estándar)</option>
+                                                    <option value="falabella">Falabella / Linio (15% comisión + fulfillment)</option>
+                                                    <option value="custom">Personalizado / Otro Marketplace</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcMpFeePercent">Comisión del Marketplace (%)</label>
+                                                <input type="number" id="calcMpFeePercent" value="14.0" step="0.1" min="0" max="50">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcMpFixedFee">Costo Fijo por Unidad ($)</label>
+                                                <input type="number" id="calcMpFixedFee" value="2000" step="0.01" min="0" title="Cargo fijo que cobran plataformas para ventas de bajo valor">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcMpShipping">Envío Gratis Asumido ($)</label>
+                                                <input type="number" id="calcMpShipping" value="0" step="0.01" min="0" title="Costo de envío co-financiado o gratis que paga el vendedor">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcMpTaxPercent">Retenciones Fiscales (%)</label>
+                                                <input type="number" id="calcMpTaxPercent" value="1.5" step="0.1" min="0" max="25" title="Retenciones de IVA / ReteFuente de la plataforma">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcMpAdsPercent">Publicidad Opcional (%)</label>
+                                                <input type="number" id="calcMpAdsPercent" value="0" step="0.1" min="0" max="30" title="% asignado a Mercado Ads o Amazon PPC (0% si es orgánico)">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Card 3: Margen y Fijación de Precio -->
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 style="display: flex; align-items: center; gap: 0.5rem;">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                                        3. Objetivo de Rentabilidad y Fijación de Precio
+                                    </h3>
+                                </div>
+                                <div class="card-body">
+                                    <!-- Toggle modo de fijación -->
+                                    <div class="calc-mode-toggle">
+                                        <button type="button" class="calc-mode-btn active" id="btnModeTargetMargin">
+                                            🎯 Calcular Precio Sugerido a partir del Margen Deseado
+                                        </button>
+                                        <button type="button" class="calc-mode-btn" id="btnModeFixedPrice">
+                                            🏷️ Evaluar Margen según Precio de Venta Propuesto
+                                        </button>
+                                    </div>
+
+                                    <div class="calculator-form">
+                                        <!-- Submodo Margen Deseado -->
+                                        <div class="form-grid" id="groupTargetMargin">
+                                            <div class="form-group">
+                                                <label for="calcTargetMarginType">Tipo de Margen Objetivo</label>
+                                                <select id="calcTargetMarginType">
+                                                    <option value="margin_percent">% Margen Neto sobre Venta</option>
+                                                    <option value="markup_percent">% Markup sobre Costo Landed</option>
+                                                    <option value="fixed_profit">Ganancia Neta Fija ($)</option>
+                                                </select>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="calcTargetMarginValue" id="labelTargetMarginValue">Margen Objetivo (% o $)</label>
+                                                <input type="number" id="calcTargetMarginValue" value="25" step="0.5" min="1">
+                                            </div>
+                                        </div>
+
+                                        <!-- Submodo Precio Fijado -->
+                                        <div class="form-grid" id="groupFixedPrice" style="display: none;">
+                                            <div class="form-group" style="grid-column: 1 / -1;">
+                                                <label for="calcVenta">Precio de Venta a Evaluar ($)</label>
+                                                <input type="number" id="calcVenta" value="89900" step="0.01" min="0">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-top: 1rem;">
-                            <div class="stat-card">
-                                <div class="stat-info">
-                                    <span class="stat-label">Costo Real Flete</span>
-                                    <span class="stat-value" id="resRealFlete">$0.00</span>
+                        <!-- COLUMNA DERECHA: RESULTADOS EN VIVO -->
+                        <div class="calc-right-col">
+                            <!-- Main Result Card -->
+                            <div class="result-card main-result">
+                                <span class="result-label">Utilidad Neta Estimada por Unidad</span>
+                                <span class="result-value" id="resUtilidadNeta">$0.00</span>
+                                <div class="result-badge badge-success" id="resUtilidadNetaPercent">0%</div>
+
+                                <div class="calc-price-display">
+                                    <div>
+                                        <div class="price-title" id="resPriceLabel">Precio Recomendado</div>
+                                        <div class="calc-psychological-price" id="resPsychologicalPrice">Comercial: $0</div>
+                                    </div>
+                                    <div class="price-amount" id="resPriceValue">$0.00</div>
                                 </div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-info">
-                                    <span class="stat-label">Costo Real Publicidad</span>
-                                    <span class="stat-value" id="resRealPublicidad">$0.00</span>
+
+                            <!-- KPI Grid -->
+                            <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
+                                <div class="stat-card">
+                                    <div class="stat-info">
+                                        <span class="stat-label">Costo Landed Bodega</span>
+                                        <span class="stat-value" id="resLandedTotal">$0.00</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-info">
+                                        <span class="stat-label">Costo Canal / Operación</span>
+                                        <span class="stat-value" id="resChannelTotalCost">$0.00</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-info">
+                                        <span class="stat-label">Precio Equilibrio (Break-even)</span>
+                                        <span class="stat-value" id="resBreakEvenPrice">$0.00</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-info">
+                                        <span class="stat-label" id="labelBreakEvenCpa">CPA Máximo Permitido</span>
+                                        <span class="stat-value" id="resBreakEvenCpa">$0.00</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-info">
+                                        <span class="stat-label">Retorno Inversión (ROI)</span>
+                                        <span class="stat-value" id="resRoi">0%</span>
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-info">
+                                        <span class="stat-label">ROAS Mínimo Necesario</span>
+                                        <span class="stat-value" id="resMinRoas">0.0x</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="stat-card">
-                                <div class="stat-info">
-                                    <span class="stat-label">Inefectividad Total</span>
-                                    <span class="stat-value" id="resInefectividad">0%</span>
+
+                            <!-- Barra de Composición del Precio -->
+                            <div class="calc-breakdown-card">
+                                <h4>Distribución del Precio de Venta</h4>
+                                <div class="calc-breakdown-bar">
+                                    <div class="calc-bar-segment seg-landed" id="segLanded" style="width: 25%;" title="Costo Producto"></div>
+                                    <div class="calc-bar-segment seg-freight" id="segFreight" style="width: 25%;" title="Fletes y Logística"></div>
+                                    <div class="calc-bar-segment seg-ads" id="segAds" style="width: 25%;" title="Marketing / Comisiones"></div>
+                                    <div class="calc-bar-segment seg-profit" id="segProfit" style="width: 25%;" title="Ganancia Neta"></div>
+                                </div>
+                                <div class="calc-bar-legend">
+                                    <div class="calc-legend-item">
+                                        <div class="calc-legend-label">
+                                            <span class="calc-legend-dot" style="background: #3b82f6;"></span> Producto Landed
+                                        </div>
+                                        <span class="calc-legend-value" id="legLanded">$0 (0%)</span>
+                                    </div>
+                                    <div class="calc-legend-item">
+                                        <div class="calc-legend-label">
+                                            <span class="calc-legend-dot" style="background: #f59e0b;"></span> Fletes / Logística
+                                        </div>
+                                        <span class="calc-legend-value" id="legFreight">$0 (0%)</span>
+                                    </div>
+                                    <div class="calc-legend-item">
+                                        <div class="calc-legend-label">
+                                            <span class="calc-legend-dot" style="background: #ec4899;"></span> Ads / Comisión
+                                        </div>
+                                        <span class="calc-legend-value" id="legAds">$0 (0%)</span>
+                                    </div>
+                                    <div class="calc-legend-item">
+                                        <div class="calc-legend-label">
+                                            <span class="calc-legend-dot" style="background: #10b981;"></span> Utilidad Neta
+                                        </div>
+                                        <span class="calc-legend-value" id="legProfit">$0 (0%)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Comparativa Rápida entre Canales -->
+                            <div class="calc-compare-card">
+                                <h4 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.5rem;">
+                                    Comparativa Instantánea de Canales
+                                </h4>
+                                <div class="calc-compare-grid">
+                                    <div class="calc-compare-col" id="colCompareCod">
+                                        <h5>
+                                            <span>🚚 Contra Entrega</span>
+                                            <span class="badge" id="badgeCompareCod">Activo</span>
+                                        </h5>
+                                        <div class="calc-compare-metric">
+                                            <span>Ganancia:</span>
+                                            <span id="compareCodProfit">$0</span>
+                                        </div>
+                                        <div class="calc-compare-metric">
+                                            <span>Margen:</span>
+                                            <span id="compareCodMargin">0%</span>
+                                        </div>
+                                    </div>
+                                    <div class="calc-compare-col" id="colCompareMp">
+                                        <h5>
+                                            <span>🛒 Marketplace</span>
+                                            <span class="badge" id="badgeCompareMp">Simulado</span>
+                                        </h5>
+                                        <div class="calc-compare-metric">
+                                            <span>Ganancia:</span>
+                                            <span id="compareMpProfit">$0</span>
+                                        </div>
+                                        <div class="calc-compare-metric">
+                                            <span>Margen:</span>
+                                            <span id="compareMpMargin">0%</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        
-                        <div class="card" style="margin-top: 1rem; border-style: dashed; background: var(--surface-hover);">
-                            <div class="card-body" style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.4;">
-                                <strong>Nota sobre las fórmulas:</strong><br>
-                                • Inefectividad = % Cancelación + % Devolución<br>
-                                • Costo Real Flete = Flete / (1 - % Devolución)<br>
-                                • Costo Real Publicidad = CPA / (1 - Inefectividad)
-                            </div>
+                    </div>
+                </div>
+
+                <!-- VIEW 2: HISTORIAL DE LIQUIDACIONES GUARDADAS -->
+                <div id="calcViewSaved" style="display: none;">
+                    <div class="calc-saved-toolbar">
+                        <div class="calc-saved-filters">
+                            <input type="text" id="searchSavedLiquidations" placeholder="🔍 Buscar por nombre o SKU..." style="min-width: 250px;">
+                            <select id="filterSavedChannel">
+                                <option value="all">Todos los Canales</option>
+                                <option value="cod">🚚 Contra Entrega (COD)</option>
+                                <option value="marketplace">🛒 Marketplace</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 1rem; align-items: center; color: var(--text-muted); font-size: 0.85rem;">
+                            <span>Total Guardadas: <strong id="kpiSavedTotal" style="color: var(--text-primary);">0</strong></span>
+                            <span>Margen Promedio: <strong id="kpiSavedAvgMargin" style="color: #10b981;">0%</strong></span>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="data-table" id="tableSavedLiquidations">
+                                <thead>
+                                    <tr>
+                                        <th>Producto / Referencia</th>
+                                        <th>Canal</th>
+                                        <th>Costo Landed</th>
+                                        <th>Precio Venta</th>
+                                        <th>Utilidad Neta</th>
+                                        <th>Margen Neto</th>
+                                        <th>Fecha</th>
+                                        <th style="text-align: right;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="savedLiquidationsTbody">
+                                    <!-- Dynamic rows loaded from Database / LocalStorage -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="savedEmptyState" class="calc-empty-state" style="display: none;">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                                <line x1="8" y1="6" x2="16" y2="6"></line>
+                                <line x1="16" y1="14" x2="16" y2="18"></line>
+                                <path d="M16 10h.01"></path>
+                                <path d="M12 10h.01"></path>
+                                <path d="M8 10h.01"></path>
+                            </svg>
+                            <h3>No hay liquidaciones guardadas todavía</h3>
+                            <p>Calcula los costos de un producto en la calculadora activa y haz clic en "Guardar Liquidación".</p>
                         </div>
                     </div>
                 </div>
             </section>
+
 
             <!-- Materials Calculator Section -->
             <section class="content-section" id="section-materials-calculator">
@@ -6682,7 +7058,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabase-config.js?v=2.1.37"></script>
     <script src="js/utils.js?v=2.1.37"></script>
-    <script src="js/database.js?v=2.1.37"></script>
+    <script src="js/database.js?v=2.2.0"></script>
     <script src="js/products.js?v=2.1.37"></script>
     <script src="js/inventory.js?v=2.1.37"></script>
     <script src="js/clients.js?v=2.1.37"></script>
@@ -6695,7 +7071,7 @@
     <script src="js/accounts.js?v=2.1.37"></script>
     <script src="js/users.js?v=2.1.37"></script>
     <script src="js/campaigns.js?v=2.1.37"></script>
-    <script src="js/calculator.js?v=2.1.37"></script>
+    <script src="js/calculator.js?v=2.2.0"></script>
     <script src="js/multimedia.js?v=2.1.37"></script>
     <script src="js/finance.js?v=2.1.37"></script>
     <script src="js/income-statement.js?v=2.1.37"></script>

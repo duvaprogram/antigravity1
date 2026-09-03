@@ -2072,8 +2072,114 @@ const Database = {
             console.warn('⚠️ Error obteniendo snapshot de campañas:', e);
         }
         return null;
+    },
+
+    // ==========================================
+    // Product Liquidations Storage
+    // ==========================================
+    async getProductLiquidations() {
+        const LOCAL_KEY = 'antigravity_product_liquidations';
+        let localData = [];
+        try {
+            const saved = localStorage.getItem(LOCAL_KEY);
+            if (saved) localData = JSON.parse(saved);
+        } catch (e) {
+            console.warn('Error reading local liquidations:', e);
+        }
+
+        if (!supabaseClient) return localData;
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('product_liquidations')
+                .select('*')
+                .order('updated_at', { ascending: false });
+
+            if (error) {
+                // Si la tabla no existe en Supabase todavía, usar local
+                return localData;
+            }
+
+            if (data && Array.isArray(data)) {
+                // Sincronizar hacia localStorage para disponibilidad offline
+                localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+                return data;
+            }
+        } catch (err) {
+            console.warn('Supabase liquidations fetch error, using local fallback:', err);
+        }
+        return localData;
+    },
+
+    async saveProductLiquidation(item) {
+        const LOCAL_KEY = 'antigravity_product_liquidations';
+        let localData = [];
+        try {
+            const saved = localStorage.getItem(LOCAL_KEY);
+            if (saved) localData = JSON.parse(saved);
+        } catch (e) {}
+
+        const now = new Date().toISOString();
+        const payload = {
+            ...item,
+            id: item.id || ('liq_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5)),
+            updated_at: now,
+            created_at: item.created_at || now
+        };
+
+        // Actualizar en localStorage de forma garantizada
+        const existingIndex = localData.findIndex(l => l.id === payload.id);
+        if (existingIndex >= 0) {
+            localData[existingIndex] = payload;
+        } else {
+            localData.unshift(payload);
+        }
+        localStorage.setItem(LOCAL_KEY, JSON.stringify(localData));
+
+        // Sincronizar en Supabase si está disponible
+        if (supabaseClient) {
+            try {
+                const { data, error } = await supabaseClient
+                    .from('product_liquidations')
+                    .upsert(payload, { onConflict: 'id' })
+                    .select()
+                    .single();
+
+                if (!error && data) {
+                    return data;
+                }
+            } catch (err) {
+                console.warn('Could not sync liquidation to Supabase:', err);
+            }
+        }
+
+        return payload;
+    },
+
+    async deleteProductLiquidation(id) {
+        const LOCAL_KEY = 'antigravity_product_liquidations';
+        let localData = [];
+        try {
+            const saved = localStorage.getItem(LOCAL_KEY);
+            if (saved) localData = JSON.parse(saved);
+            localData = localData.filter(l => l.id !== id);
+            localStorage.setItem(LOCAL_KEY, JSON.stringify(localData));
+        } catch (e) {}
+
+        if (supabaseClient) {
+            try {
+                await supabaseClient
+                    .from('product_liquidations')
+                    .delete()
+                    .eq('id', id);
+            } catch (err) {
+                console.warn('Could not delete liquidation from Supabase:', err);
+            }
+        }
+        return true;
     }
 };
 
 // Make Database available globally
 window.Database = Database;
+
