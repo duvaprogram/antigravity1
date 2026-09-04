@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS public.product_liquidations (
     marketplace_fixed_fee NUMERIC DEFAULT 0,
     marketplace_shipping_cost NUMERIC DEFAULT 0,
     marketplace_tax_percent NUMERIC DEFAULT 0,
+    marketplace_ads_percent NUMERIC DEFAULT 0,
     
     -- Fijación y Márgenes
     pricing_mode TEXT DEFAULT 'target_margin', -- 'target_margin' o 'fixed_price'
@@ -66,12 +67,17 @@ CREATE TABLE IF NOT EXISTS public.product_liquidations (
     mp_total_batch_profit NUMERIC DEFAULT 0,
     
     best_channel TEXT DEFAULT 'cod',
+    profit_diff NUMERIC DEFAULT 0,
     
     -- Metadatos y notas
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Asegurar columnas si la tabla ya existía previamente
+ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS marketplace_ads_percent NUMERIC DEFAULT 0;
+ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS profit_diff NUMERIC DEFAULT 0;
 
 -- Índices para optimizar búsquedas frecuentes
 CREATE INDEX IF NOT EXISTS idx_liquidations_name ON public.product_liquidations(name);

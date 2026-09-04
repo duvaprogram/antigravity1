@@ -78,6 +78,9 @@ const CalculatorModule = (() => {
         const btnSave = document.getElementById('btnCalcSave');
         if (btnSave) btnSave.addEventListener('click', saveCurrentLiquidation);
 
+        const btnSaveBottom = document.getElementById('btnCalcSaveBottom');
+        if (btnSaveBottom) btnSaveBottom.addEventListener('click', saveCurrentLiquidation);
+
         // Selector de catálogo de productos
         const selectProduct = document.getElementById('calcProductSelect');
         if (selectProduct) {
@@ -989,6 +992,14 @@ const CalculatorModule = (() => {
             updated_at: new Date().toISOString()
         };
 
+        const btnSaveTop = document.getElementById('btnCalcSave');
+        const btnSaveBottom = document.getElementById('btnCalcSaveBottom');
+        const origTopHtml = btnSaveTop ? btnSaveTop.innerHTML : '';
+        const origBottomHtml = btnSaveBottom ? btnSaveBottom.innerHTML : '';
+
+        if (btnSaveTop) btnSaveTop.innerHTML = '⏳ Guardando...';
+        if (btnSaveBottom) btnSaveBottom.innerHTML = '⏳ Guardando...';
+
         try {
             let res;
             if (typeof Database !== 'undefined' && Database.saveProductLiquidation) {
@@ -1006,17 +1017,24 @@ const CalculatorModule = (() => {
 
             currentLiquidationId = payload.id;
 
-            if (res && res._error && (res._error.code === 'PGRST205' || (res._error.message && res._error.message.includes('schema cache')))) {
-                Utils.showToast(`Guardada localmente. ⚠️ Falta crear la tabla en Supabase (ejecuta el script SQL)`, 'warning', 7000);
-            } else if (res && res._synced) {
-                Utils.showToast(`Liquidación "${name}" guardada en Supabase y localmente`, 'success');
+            if (btnSaveTop) btnSaveTop.innerHTML = '✅ ¡Guardada!';
+            if (btnSaveBottom) btnSaveBottom.innerHTML = '✅ ¡Liquidación Guardada!';
+            setTimeout(() => {
+                if (btnSaveTop && origTopHtml) btnSaveTop.innerHTML = origTopHtml;
+                if (btnSaveBottom && origBottomHtml) btnSaveBottom.innerHTML = origBottomHtml;
+            }, 2500);
+
+            if (res && res._synced) {
+                Utils.showToast(`Liquidación "${name}" guardada en la nube y localmente`, 'success');
             } else {
-                Utils.showToast(`Liquidación "${name}" guardada correctamente`, 'success');
+                Utils.showToast(`Liquidación "${name}" guardada con éxito`, 'success');
             }
 
             await loadSavedLiquidations();
         } catch (err) {
             console.error('Error saving liquidation:', err);
+            if (btnSaveTop && origTopHtml) btnSaveTop.innerHTML = origTopHtml;
+            if (btnSaveBottom && origBottomHtml) btnSaveBottom.innerHTML = origBottomHtml;
             Utils.showToast('Error al guardar la liquidación: ' + (err.message || err), 'error');
         }
     }

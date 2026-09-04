@@ -2096,14 +2096,35 @@ const Database = {
                 .order('updated_at', { ascending: false });
 
             if (error) {
-                // Si la tabla no existe en Supabase todavía, usar local
+                // Si la tabla no existe en Supabase todavía o falla la conexión, usar local
                 return localData;
             }
 
             if (data && Array.isArray(data)) {
-                // Sincronizar hacia localStorage para disponibilidad offline
-                localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
-                return data;
+                // Fusión inteligente: nunca destruir registros guardados localmente
+                const mergedMap = new Map();
+                // Primero agregar los datos de Supabase
+                data.forEach(item => mergedMap.set(item.id, item));
+                // Luego fusionar con los locales (si no están en Supabase o son más recientes)
+                localData.forEach(localItem => {
+                    const supaItem = mergedMap.get(localItem.id);
+                    if (!supaItem) {
+                        mergedMap.set(localItem.id, localItem);
+                    } else {
+                        const localTime = new Date(localItem.updated_at || localItem.created_at || 0).getTime();
+                        const supaTime = new Date(supaItem.updated_at || supaItem.created_at || 0).getTime();
+                        if (localTime >= supaTime) {
+                            mergedMap.set(localItem.id, { ...supaItem, ...localItem });
+                        }
+                    }
+                });
+                const mergedList = Array.from(mergedMap.values()).sort((a, b) => {
+                    const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
+                    const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
+                    return timeB - timeA;
+                });
+                localStorage.setItem(LOCAL_KEY, JSON.stringify(mergedList));
+                return mergedList;
             }
         } catch (err) {
             console.warn('Supabase liquidations fetch error, using local fallback:', err);
@@ -2127,7 +2148,7 @@ const Database = {
             created_at: item.created_at || now
         };
 
-        // Actualizar en localStorage de forma garantizada
+        // 1. Guardar siempre primero en localStorage de forma garantizada
         const existingIndex = localData.findIndex(l => l.id === payload.id);
         if (existingIndex >= 0) {
             localData[existingIndex] = payload;
@@ -2136,24 +2157,42 @@ const Database = {
         }
         localStorage.setItem(LOCAL_KEY, JSON.stringify(localData));
 
-        // Sincronizar en Supabase si está disponible
+        // 2. Sincronizar en Supabase si está disponible
         let syncedToSupabase = false;
         let supabaseError = null;
 
         if (supabaseClient) {
             try {
-                const { data, error } = await supabaseClient
+                const supaPayload = { ...payload };
+                delete supaPayload._synced;
+                delete supaPayload._error;
+
+                let { data, error } = await supabaseClient
                     .from('product_liquidations')
-                    .upsert(payload, { onConflict: 'id' })
+                    .upsert(supaPayload, { onConflict: 'id' })
                     .select()
                     .single();
+
+                // Si falló por columnas no existentes en el cache de Supabase, reintentar sin ellas
+                if (error && (error.code === 'PGRST204' || (error.message && error.message.includes('schema cache')))) {
+                    console.warn('Reintentando guardar en Supabase sin columnas adicionales:', error.message);
+                    delete supaPayload.marketplace_ads_percent;
+                    delete supaPayload.profit_diff;
+                    const retry = await supabaseClient
+                        .from('product_liquidations')
+                        .upsert(supaPayload, { onConflict: 'id' })
+                        .select()
+                        .single();
+                    data = retry.data;
+                    error = retry.error;
+                }
 
                 if (error) {
                     supabaseError = error;
                     console.error('❌ Error de Supabase al guardar en product_liquidations:', error);
                 } else if (data) {
                     syncedToSupabase = true;
-                    return { ...data, _synced: true };
+                    return { ...payload, ...data, _synced: true };
                 }
             } catch (err) {
                 supabaseError = err;
