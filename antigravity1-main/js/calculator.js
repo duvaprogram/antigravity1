@@ -678,7 +678,7 @@ const CalculatorModule = (() => {
         const totalBatchCost = landedCost * batchUnitsTotal;
 
         // 6. Actualizar UI en vivo
-        updateUI({
+        const calcResult = {
             landedCost,
             finalSalePrice,
             recommendedPrice,
@@ -701,7 +701,10 @@ const CalculatorModule = (() => {
             totalBatchProfit,
             totalBatchRevenue,
             totalBatchCost
-        });
+        };
+
+        updateUI(calcResult);
+        return calcResult;
     }
 
     /**
@@ -871,6 +874,13 @@ const CalculatorModule = (() => {
         setVal('calcRecaudoPercent', 3.5);
         setVal('calcAdmin', isUsd ? 0.50 : 2000);
 
+        setVal('calcMpPreset', 'ml_clasica');
+        setVal('calcMpFeePercent', 14.0);
+        setVal('calcMpFixedFee', isUsd ? 0.50 : 2000);
+        setVal('calcMpShipping', 0);
+        setVal('calcMpTaxPercent', 1.5);
+        setVal('calcMpAdsPercent', 0);
+
         setVal('calcTargetMarginType', 'margin_percent');
         setVal('calcTargetMarginValue', 25);
         setVal('calcVenta', isUsd ? 50 : 50000);
@@ -889,8 +899,8 @@ const CalculatorModule = (() => {
         const name = getText('calcProductName', 'Liquidación sin nombre');
         const sku = getText('calcProductSku', '');
 
-        // Recalcular para asegurar valores actuales
-        calculate();
+        // Recalcular para asegurar valores actuales exactos (números puros sin formateo)
+        const calcData = calculate();
 
         // Extraer valores para guardar
         const isBatch = getText('calcCostMode', 'unit') === 'batch';
@@ -903,34 +913,15 @@ const CalculatorModule = (() => {
         const fulfillment = getNum('calcCostFulfillment', 0);
         const other = getNum('calcCostOther', 0);
 
-        const landedCost = (isBatch ? (purchaseRaw + shippingMainRaw + customsRaw + shippingLocalRaw + other) / batchUnits : (purchaseRaw + shippingMainRaw + customsRaw + shippingLocalRaw + other)) + packaging + fulfillment;
+        const landedCost = calcData ? calcData.landedCost : ((isBatch ? (purchaseRaw + shippingMainRaw + customsRaw + shippingLocalRaw + other) / batchUnits : (purchaseRaw + shippingMainRaw + customsRaw + shippingLocalRaw + other)) + packaging + fulfillment);
 
-        const resProfitEl = document.getElementById('resUtilidadNeta');
-        const resMarginEl = document.getElementById('resUtilidadNetaPercent');
-        const resPriceEl = document.getElementById('resPriceValue');
-
-        const netProfit = resProfitEl ? parseFloat(resProfitEl.textContent.replace(/[^0-9.-]+/g, '')) || 0 : 0;
-        const netMargin = resMarginEl ? parseFloat(resMarginEl.textContent) || 0 : 0;
-        const salePrice = resPriceEl ? parseFloat(resPriceEl.textContent.replace(/[^0-9.-]+/g, '')) || 0 : 0;
-
-        // Extraer cálculos simultáneos para ambos canales
-        const resCodProfitEl = document.getElementById('compareCodProfit');
-        const resCodMarginEl = document.getElementById('compareCodMargin');
-        const resMpProfitEl = document.getElementById('compareMpProfit');
-        const resMpMarginEl = document.getElementById('compareMpMargin');
-
-        let codProfit = resCodProfitEl ? parseFloat(resCodProfitEl.textContent.replace(/[^0-9.-]+/g, '')) || 0 : 0;
-        let codMargin = resCodMarginEl ? parseFloat(resCodMarginEl.textContent) || 0 : 0;
-        let mpProfit = resMpProfitEl ? parseFloat(resMpProfitEl.textContent.replace(/[^0-9.-]+/g, '')) || 0 : 0;
-        let mpMargin = resMpMarginEl ? parseFloat(resMpMarginEl.textContent) || 0 : 0;
-
-        if (currentChannel === 'cod') {
-            codProfit = netProfit;
-            codMargin = netMargin;
-        } else {
-            mpProfit = netProfit;
-            mpMargin = netMargin;
-        }
+        const salePrice = calcData ? calcData.finalSalePrice : (pricingMode === 'fixed_price' ? getNum('calcVenta', 0) : 0);
+        const netProfit = calcData ? calcData.netProfit : 0;
+        const netMargin = calcData ? calcData.netMarginPercent : 0;
+        const codProfit = calcData ? calcData.simCodProfit : 0;
+        const codMargin = calcData ? calcData.simCodMargin : 0;
+        const mpProfit = calcData ? calcData.simMpProfit : 0;
+        const mpMargin = calcData ? calcData.simMpMargin : 0;
 
         const isCodBetter = codProfit >= mpProfit;
 
@@ -980,13 +971,13 @@ const CalculatorModule = (() => {
             total_batch_revenue: salePrice * batchUnits,
 
             // Resultados Específicos Contra Entrega (COD)
-            cod_sale_price: salePrice,
+            cod_sale_price: (currentChannel === 'cod' ? salePrice : (calcData ? calcData.recommendedPrice : salePrice)),
             cod_net_profit: codProfit,
             cod_net_margin_percent: codMargin,
             cod_total_batch_profit: codProfit * batchUnits,
 
             // Resultados Específicos Marketplace
-            mp_sale_price: salePrice,
+            mp_sale_price: (currentChannel === 'marketplace' ? salePrice : (calcData ? calcData.recommendedPrice : salePrice)),
             mp_net_profit: mpProfit,
             mp_net_margin_percent: mpMargin,
             mp_total_batch_profit: mpProfit * batchUnits,
@@ -1115,11 +1106,17 @@ const CalculatorModule = (() => {
                 ? '<span style="font-size: 0.72rem; padding: 2px 6px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border-radius: 4px; font-weight: 700; margin-left: 4px;">USD</span>'
                 : '<span style="font-size: 0.72rem; padding: 2px 6px; background: rgba(16, 185, 129, 0.15); color: #34d399; border-radius: 4px; font-weight: 700; margin-left: 4px;">COP</span>';
 
-            const codProfit = item.cod_net_profit !== undefined ? item.cod_net_profit : (item.channel === 'cod' ? item.net_profit : 0);
+            let codProfit = item.cod_net_profit !== undefined ? item.cod_net_profit : (item.channel === 'cod' ? item.net_profit : 0);
+            if (itemCurr === 'COP' && Math.abs(codProfit) > 0 && Math.abs(codProfit) < 1000 && ((item.cost_purchase && item.cost_purchase > 1000) || (item.total_landed_cost && item.total_landed_cost > 1000))) {
+                codProfit = codProfit * 1000;
+            }
             const codMargin = item.cod_net_margin_percent !== undefined ? item.cod_net_margin_percent : (item.channel === 'cod' ? item.net_margin_percent : 0);
             const codBatch = item.cod_total_batch_profit !== undefined ? item.cod_total_batch_profit : (codProfit * (item.batch_units || 100));
 
-            const mpProfit = item.mp_net_profit !== undefined ? item.mp_net_profit : (item.channel === 'marketplace' ? item.net_profit : 0);
+            let mpProfit = item.mp_net_profit !== undefined ? item.mp_net_profit : (item.channel === 'marketplace' ? item.net_profit : 0);
+            if (itemCurr === 'COP' && Math.abs(mpProfit) > 0 && Math.abs(mpProfit) < 1000 && ((item.cost_purchase && item.cost_purchase > 1000) || (item.total_landed_cost && item.total_landed_cost > 1000))) {
+                mpProfit = mpProfit * 1000;
+            }
             const mpMargin = item.mp_net_margin_percent !== undefined ? item.mp_net_margin_percent : (item.channel === 'marketplace' ? item.net_margin_percent : 0);
             const mpBatch = item.mp_total_batch_profit !== undefined ? item.mp_total_batch_profit : (mpProfit * (item.batch_units || 100));
 
@@ -1194,17 +1191,29 @@ const CalculatorModule = (() => {
         const itemRate = Math.max(1, item.exchange_rate || 4000);
         const batchUnits = item.batch_units || 100;
         const landedCost = item.total_landed_cost || 0;
-        const salePrice = item.sale_price || 0;
-        const netProfit = item.net_profit || 0;
+        let salePrice = item.sale_price || 0;
+        if (itemCurr === 'COP' && salePrice > 0 && salePrice < 1000 && ((item.cost_purchase && item.cost_purchase > 1000) || (landedCost > 1000))) {
+            salePrice = salePrice * 1000;
+        }
+        let netProfit = item.net_profit || 0;
+        if (itemCurr === 'COP' && Math.abs(netProfit) > 0 && Math.abs(netProfit) < 1000 && ((item.cost_purchase && item.cost_purchase > 1000) || (landedCost > 1000))) {
+            netProfit = netProfit * 1000;
+        }
         const netMargin = item.net_margin_percent || (salePrice > 0 ? (netProfit / salePrice) * 100 : 0);
 
         // Métricas Contra Entrega (COD)
-        const codProfit = item.cod_net_profit !== undefined ? item.cod_net_profit : (item.channel === 'cod' ? netProfit : 0);
+        let codProfit = item.cod_net_profit !== undefined ? item.cod_net_profit : (item.channel === 'cod' ? netProfit : 0);
+        if (itemCurr === 'COP' && Math.abs(codProfit) > 0 && Math.abs(codProfit) < 1000 && ((item.cost_purchase && item.cost_purchase > 1000) || (landedCost > 1000))) {
+            codProfit = codProfit * 1000;
+        }
         const codMargin = item.cod_net_margin_percent !== undefined ? item.cod_net_margin_percent : (item.channel === 'cod' ? netMargin : 0);
         const codBatch = item.cod_total_batch_profit !== undefined ? item.cod_total_batch_profit : (codProfit * batchUnits);
 
         // Métricas Marketplace
-        const mpProfit = item.mp_net_profit !== undefined ? item.mp_net_profit : (item.channel === 'marketplace' ? netProfit : 0);
+        let mpProfit = item.mp_net_profit !== undefined ? item.mp_net_profit : (item.channel === 'marketplace' ? netProfit : 0);
+        if (itemCurr === 'COP' && Math.abs(mpProfit) > 0 && Math.abs(mpProfit) < 1000 && ((item.cost_purchase && item.cost_purchase > 1000) || (landedCost > 1000))) {
+            mpProfit = mpProfit * 1000;
+        }
         const mpMargin = item.mp_net_margin_percent !== undefined ? item.mp_net_margin_percent : (item.channel === 'marketplace' ? netMargin : 0);
         const mpBatch = item.mp_total_batch_profit !== undefined ? item.mp_total_batch_profit : (mpProfit * batchUnits);
 
@@ -1469,7 +1478,7 @@ const CalculatorModule = (() => {
 
         currentLiquidationId = item.id;
         currentCurrency = item.currency || 'COP';
-        exchangeRate = item.exchange_rate || 4000;
+        exchangeRate = item.exchange_rate != null ? Number(item.exchange_rate) : 4000;
 
         setVal('calcProductName', item.name || '');
         setVal('calcProductSku', item.sku || '');
@@ -1478,43 +1487,52 @@ const CalculatorModule = (() => {
 
         const isBatch = item.cost_mode === 'batch';
         setVal('calcCostMode', item.cost_mode || 'unit');
-        setVal('calcBatchUnits', item.batch_units || 100);
+        const batchUnits = item.batch_units != null ? Number(item.batch_units) : 100;
+        setVal('calcBatchUnits', batchUnits);
+        setVal('calcBatchUnitsResult', batchUnits);
         const batchGroup = document.getElementById('calcBatchGroup');
         if (batchGroup) batchGroup.style.display = isBatch ? 'block' : 'none';
         updateCostLabels(isBatch);
 
-        setVal('calcCostPurchase', item.cost_purchase || 0);
-        setVal('calcCostShippingMain', item.cost_shipping_main || 0);
-        setVal('calcCostCustoms', item.cost_customs || 0);
-        setVal('calcCostShippingLocal', item.cost_shipping_local || 0);
-        setVal('calcCostPackaging', item.cost_packaging || 0);
-        setVal('calcCostFulfillment', item.cost_fulfillment || 0);
-        setVal('calcCostOther', item.cost_other || 0);
+        setVal('calcCostPurchase', item.cost_purchase != null ? item.cost_purchase : 0);
+        setVal('calcCostShippingMain', item.cost_shipping_main != null ? item.cost_shipping_main : 0);
+        setVal('calcCostCustoms', item.cost_customs != null ? item.cost_customs : 0);
+        setVal('calcCostShippingLocal', item.cost_shipping_local != null ? item.cost_shipping_local : 0);
+        setVal('calcCostPackaging', item.cost_packaging != null ? item.cost_packaging : 0);
+        setVal('calcCostFulfillment', item.cost_fulfillment != null ? item.cost_fulfillment : 0);
+        setVal('calcCostOther', item.cost_other != null ? item.cost_other : 0);
 
         // COD
-        setVal('calcCpa', item.sale_cpa || 0);
-        setVal('calcCancelacion', item.cancel_rate || 10);
-        setVal('calcDevolucion', item.return_rate || 20);
-        setVal('calcFlete', item.freight_out || 16500);
-        setVal('calcFleteRetorno', item.freight_return || 10000);
-        setVal('calcRecaudoPercent', item.cod_fee_percent || 3.5);
-        setVal('calcAdmin', item.cost_admin || 2000);
+        setVal('calcCpa', item.sale_cpa != null ? item.sale_cpa : 0);
+        setVal('calcCancelacion', item.cancel_rate != null ? item.cancel_rate : 0);
+        setVal('calcDevolucion', item.return_rate != null ? item.return_rate : 0);
+        setVal('calcFlete', item.freight_out != null ? item.freight_out : 0);
+        setVal('calcFleteRetorno', item.freight_return != null ? item.freight_return : 0);
+        setVal('calcRecaudoPercent', item.cod_fee_percent != null ? item.cod_fee_percent : 0);
+        setVal('calcAdmin', item.cost_admin != null ? item.cost_admin : 0);
 
         // Marketplace
         if (item.marketplace_name) setVal('calcMpPreset', item.marketplace_name);
-        setVal('calcMpFeePercent', item.marketplace_fee_percent || 14);
-        setVal('calcMpFixedFee', item.marketplace_fixed_fee || 0);
-        setVal('calcMpShipping', item.marketplace_shipping_cost || 0);
-        setVal('calcMpTaxPercent', item.marketplace_tax_percent || 0);
+        setVal('calcMpFeePercent', item.marketplace_fee_percent != null ? item.marketplace_fee_percent : 0);
+        setVal('calcMpFixedFee', item.marketplace_fixed_fee != null ? item.marketplace_fixed_fee : 0);
+        setVal('calcMpShipping', item.marketplace_shipping_cost != null ? item.marketplace_shipping_cost : 0);
+        setVal('calcMpTaxPercent', item.marketplace_tax_percent != null ? item.marketplace_tax_percent : 0);
+        setVal('calcMpAdsPercent', item.marketplace_ads_percent != null ? item.marketplace_ads_percent : 0);
 
         // Pricing
         setVal('calcTargetMarginType', item.target_margin_type || 'margin_percent');
-        setVal('calcTargetMarginValue', item.target_margin_value || 25);
-        setVal('calcVenta', item.sale_price || 0);
+        setVal('calcTargetMarginValue', item.target_margin_value != null ? item.target_margin_value : 25);
+
+        let salePrice = item.sale_price != null ? item.sale_price : 0;
+        // Auto-corrección si se guardó anteriormente truncado por el bug de formato de miles (ej: 50 en lugar de 50000)
+        if (currentCurrency === 'COP' && salePrice > 0 && salePrice < 1000 && ((item.cost_purchase && item.cost_purchase > 1000) || (item.total_landed_cost && item.total_landed_cost > 1000))) {
+            salePrice = salePrice * 1000;
+        }
+        setVal('calcVenta', salePrice);
 
         updateCurrencyUI();
         switchChannel(item.channel || 'cod');
-        switchPricingMode(item.pricing_mode || 'target_margin');
+        switchPricingMode(item.pricing_mode || 'fixed_price');
 
         // Ir a la pestaña de calculadora activa
         switchMainTab('active');
