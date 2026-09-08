@@ -5237,10 +5237,29 @@ form {
 /* ========================================
    Multi-Select Dropdown Checklist Component
    ======================================== */
+.card:has(.multiselect-container),
+.card.analytics-filters-card,
+.card.is-filters-card,
+.card-has-multiselect {
+    overflow: visible !important;
+    position: relative !important;
+    z-index: 50;
+}
+
+.card:has(.multiselect-container) .card-body,
+.analytics-filters-card .card-body,
+.is-filters-card .card-body {
+    overflow: visible !important;
+}
+
 .multiselect-container {
     position: relative;
     width: 100%;
     user-select: none;
+}
+
+.multiselect-container.open {
+    z-index: 1000 !important;
 }
 
 .multiselect-trigger {
@@ -5307,13 +5326,13 @@ form {
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
-    right: 0;
     min-width: 260px;
-    background: var(--surface);
+    width: 100%;
+    background: var(--surface-elevated, var(--surface, #1e1e2e));
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    z-index: 1050;
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65), 0 4px 12px rgba(0, 0, 0, 0.35);
+    z-index: 9999 !important;
     flex-direction: column;
     overflow: hidden;
 }

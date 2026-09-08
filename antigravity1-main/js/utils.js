@@ -368,6 +368,27 @@ class MultiSelectDropdown {
         const trigger = this.container.querySelector('.multiselect-trigger');
         if (trigger) trigger.classList.add('active');
 
+        // Elevate parent card to ensure it stays above all sibling elements
+        const parentCard = this.container.closest('.card');
+        if (parentCard) {
+            parentCard.style.overflow = 'visible';
+            parentCard.style.zIndex = '150';
+            parentCard.style.position = 'relative';
+        }
+
+        // Check if dropdown would overflow the right edge of viewport
+        const dropdown = this.container.querySelector('.multiselect-dropdown');
+        if (dropdown) {
+            const rect = this.container.getBoundingClientRect();
+            if (rect.left + 300 > window.innerWidth) {
+                dropdown.style.left = 'auto';
+                dropdown.style.right = '0';
+            } else {
+                dropdown.style.left = '0';
+                dropdown.style.right = 'auto';
+            }
+        }
+
         // Focus search input
         const searchInput = this.container.querySelector('.multiselect-search-input');
         if (searchInput) {
@@ -380,6 +401,15 @@ class MultiSelectDropdown {
         this.container.classList.remove('open');
         const trigger = this.container.querySelector('.multiselect-trigger');
         if (trigger) trigger.classList.remove('active');
+
+        // Restore card z-index if no other multiselect is open
+        const anyOpen = document.querySelectorAll('.multiselect-container.open').length > 0;
+        if (!anyOpen) {
+            const parentCard = this.container.closest('.card');
+            if (parentCard) {
+                parentCard.style.zIndex = '50';
+            }
+        }
     }
 
     updateCountInfo() {
