@@ -6,10 +6,13 @@ const AnalyticsModule = {
     currentFilters: {
         dateFrom: null,
         dateTo: null,
-        city: '',
+        cities: [],
         status: '',
-        productId: ''
+        productIds: []
     },
+    cityMultiSelect: null,
+    productMultiSelect: null,
+    guideItemsCache: {},
     filteredGuides: [],
     allProducts: [],
     COST_FACTOR: 40000,
@@ -19,110 +22,82 @@ const AnalyticsModule = {
     init() {
         if (this._initialized) return;
         this._initialized = true;
+        this.initMultiSelects();
         this.bindEvents();
         this.setDefaultFilters();
     },
 
+    initMultiSelects() {
+        // City / Country multi-select with checkboxes
+        const cityContainer = document.getElementById('analyticsCityMultiSelect');
+        if (cityContainer) {
+            this.cityMultiSelect = new MultiSelectDropdown({
+                container: cityContainer,
+                placeholder: 'Seleccionar país/ciudad...',
+                allSelectedText: 'Todos los países / ciudades',
+                noneSelectedText: 'Ninguna ciudad seleccionada',
+                searchable: true,
+                searchPlaceholder: 'Buscar país o ciudad...',
+                items: [
+                    { value: 'Quito', label: '🇪🇨 Ecuador - Quito' },
+                    { value: 'Guayaquil', label: '🇪🇨 Ecuador - Guayaquil' },
+                    { value: 'Caracas', label: '🇻🇪 Venezuela - Caracas' },
+                    { value: 'Medellin', label: '🇨🇴 Colombia - Medellín' },
+                    { value: 'Bogota', label: '🇨🇴 Colombia - Bogotá' }
+                ],
+                defaultAll: true,
+                onChange: (selected) => {
+                    this.currentFilters.cities = selected;
+                    this.refreshData();
+                }
+            });
+            this.currentFilters.cities = this.cityMultiSelect.getSelected();
+        }
+
+        // Product multi-select with search and checkboxes
+        const productContainer = document.getElementById('analyticsProductMultiSelect');
+        if (productContainer) {
+            this.productMultiSelect = new MultiSelectDropdown({
+                container: productContainer,
+                placeholder: 'Seleccionar productos...',
+                allSelectedText: 'Todos los productos',
+                noneSelectedText: 'Ningún producto seleccionado',
+                searchable: true,
+                searchPlaceholder: 'Buscar producto (ej: San Benito)...',
+                items: [],
+                defaultAll: true,
+                onChange: (selected) => {
+                    this.currentFilters.productIds = selected;
+                    this.refreshData();
+                }
+            });
+        }
+    },
+
     bindEvents() {
         // Date filters
-        document.getElementById('analyticsDateFrom').addEventListener('change', () => {
-            this.currentFilters.dateFrom = document.getElementById('analyticsDateFrom').value;
-            this.refreshData();
-        });
+        const dateFromEl = document.getElementById('analyticsDateFrom');
+        if (dateFromEl) {
+            dateFromEl.addEventListener('change', () => {
+                this.currentFilters.dateFrom = dateFromEl.value;
+                this.refreshData();
+            });
+        }
 
-        document.getElementById('analyticsDateTo').addEventListener('change', () => {
-            this.currentFilters.dateTo = document.getElementById('analyticsDateTo').value;
-            this.refreshData();
-        });
-
-        // City filter
-        document.getElementById('analyticsCity').addEventListener('change', () => {
-            this.currentFilters.city = document.getElementById('analyticsCity').value;
-            this.refreshData();
-        });
+        const dateToEl = document.getElementById('analyticsDateTo');
+        if (dateToEl) {
+            dateToEl.addEventListener('change', () => {
+                this.currentFilters.dateTo = dateToEl.value;
+                this.refreshData();
+            });
+        }
 
         // Status filter
-        document.getElementById('analyticsStatus').addEventListener('change', () => {
-            this.currentFilters.status = document.getElementById('analyticsStatus').value;
-            this.refreshData();
-        });
-
-        // Product predictive search
-        const productSearch = document.getElementById('analyticsProductSearch');
-        const productHidden = document.getElementById('analyticsProduct');
-        const suggestions = document.getElementById('analyticsProductSuggestions');
-
-        if (productSearch) {
-            productSearch.addEventListener('input', () => {
-                const query = productSearch.value.toLowerCase().trim();
-
-                if (query.length === 0) {
-                    // Clear filter if empty
-                    productHidden.value = '';
-                    this.currentFilters.productId = '';
-                    suggestions.style.display = 'none';
-                    this.refreshData();
-                    return;
-                }
-
-                // Filter products
-                const matches = this.allProducts
-                    .filter(p => p.active && p.name.toLowerCase().includes(query))
-                    .slice(0, 10);
-
-                if (matches.length > 0) {
-                    suggestions.innerHTML = matches.map(p => `
-                        <div class="suggestion-item" data-id="${p.id}" data-name="${Utils.escapeHtml(p.name)}"
-                            style="padding: 0.75rem 1rem; cursor: pointer; border-bottom: 1px solid var(--border);
-                            transition: background 0.2s;">
-                            <div style="font-weight: 500;">${Utils.escapeHtml(p.name)}</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted);">SKU: ${p.sku || 'N/A'}</div>
-                        </div>
-                    `).join('');
-                    suggestions.style.display = 'block';
-
-                    // Bind click events
-                    suggestions.querySelectorAll('.suggestion-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            productSearch.value = item.dataset.name;
-                            productHidden.value = item.dataset.id;
-                            this.currentFilters.productId = item.dataset.id;
-                            suggestions.style.display = 'none';
-                            this.refreshData();
-                        });
-                        item.addEventListener('mouseenter', () => {
-                            item.style.background = 'var(--surface-hover)';
-                        });
-                        item.addEventListener('mouseleave', () => {
-                            item.style.background = 'transparent';
-                        });
-                    });
-                } else {
-                    suggestions.innerHTML = `
-                        <div style="padding: 1rem; text-align: center; color: var(--text-muted);">
-                            No se encontraron productos
-                        </div>
-                    `;
-                    suggestions.style.display = 'block';
-                }
-            });
-
-            // Hide suggestions when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!productSearch.contains(e.target) && !suggestions.contains(e.target)) {
-                    suggestions.style.display = 'none';
-                }
-            });
-
-            // Clear product filter button functionality
-            productSearch.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    productSearch.value = '';
-                    productHidden.value = '';
-                    this.currentFilters.productId = '';
-                    suggestions.style.display = 'none';
-                    this.refreshData();
-                }
+        const statusEl = document.getElementById('analyticsStatus');
+        if (statusEl) {
+            statusEl.addEventListener('change', () => {
+                this.currentFilters.status = statusEl.value;
+                this.refreshData();
             });
         }
     },
@@ -144,22 +119,26 @@ const AnalyticsModule = {
         this.currentFilters = {
             dateFrom: null,
             dateTo: null,
-            city: '',
+            cities: [],
             status: '',
-            productId: ''
+            productIds: []
         };
 
         // Reset UI
-        document.getElementById('analyticsDateFrom').value = '';
-        document.getElementById('analyticsDateTo').value = '';
-        document.getElementById('analyticsCity').value = '';
-        document.getElementById('analyticsStatus').value = '';
-        document.getElementById('analyticsProduct').value = '';
+        const dateFromEl = document.getElementById('analyticsDateFrom');
+        if (dateFromEl) dateFromEl.value = '';
+        const dateToEl = document.getElementById('analyticsDateTo');
+        if (dateToEl) dateToEl.value = '';
+        const statusEl = document.getElementById('analyticsStatus');
+        if (statusEl) statusEl.value = '';
 
-        // Reset predictive search field
-        const productSearch = document.getElementById('analyticsProductSearch');
-        if (productSearch) {
-            productSearch.value = '';
+        if (this.cityMultiSelect) {
+            this.cityMultiSelect.selectAll(false);
+            this.currentFilters.cities = this.cityMultiSelect.getSelected();
+        }
+        if (this.productMultiSelect) {
+            this.productMultiSelect.selectAll(false);
+            this.currentFilters.productIds = this.productMultiSelect.getSelected();
         }
 
         // Clear month tag active states
@@ -227,19 +206,56 @@ const AnalyticsModule = {
 
     async loadProducts() {
         try {
-            // Load products for predictive search
             this.allProducts = await Database.getProducts();
+            if (this.productMultiSelect) {
+                const productItems = (this.allProducts || [])
+                    .filter(p => p.active !== false)
+                    .map(p => ({
+                        value: String(p.id),
+                        label: p.name,
+                        subtitle: p.sku ? `SKU: ${p.sku}` : ''
+                    }));
+                this.productMultiSelect.setItems(productItems, true);
+                this.currentFilters.productIds = this.productMultiSelect.getSelected();
+            }
         } catch (error) {
             console.error('Error loading products for filter:', error);
         }
+    },
+
+    async getGuideItemsCached(guideId) {
+        if (!this.guideItemsCache) this.guideItemsCache = {};
+        if (this.guideItemsCache[guideId]) return this.guideItemsCache[guideId];
+        const items = await Database.getGuideItems(guideId);
+        this.guideItemsCache[guideId] = items;
+        return items;
     },
 
     async refreshData() {
         try {
             const guides = await Database.getGuides();
 
-            // Apply filters
-            this.filteredGuides = this.applyFilters(guides);
+            // Apply date, city, and status filters
+            let filtered = this.applyFilters(guides);
+
+            // Apply product multi-select filter
+            if (this.productMultiSelect && !this.productMultiSelect.isAllSelected()) {
+                const selectedIds = new Set((this.currentFilters.productIds || []).map(String));
+                if (selectedIds.size === 0) {
+                    filtered = [];
+                } else {
+                    const matching = [];
+                    for (const guide of filtered) {
+                        const items = await this.getGuideItemsCached(guide.id);
+                        if (items.some(it => selectedIds.has(String(it.productId)))) {
+                            matching.push(guide);
+                        }
+                    }
+                    filtered = matching;
+                }
+            }
+
+            this.filteredGuides = filtered;
 
             // Update all stats
             this.updateSummaryStats();
@@ -279,8 +295,15 @@ const AnalyticsModule = {
             });
         }
 
-        // City filter
-        if (this.currentFilters.city) {
+        // City / Country multi-select filter
+        if (this.cityMultiSelect && !this.cityMultiSelect.isAllSelected()) {
+            const selectedCities = this.currentFilters.cities || [];
+            if (selectedCities.length > 0) {
+                filtered = filtered.filter(g => selectedCities.includes(g.city));
+            } else {
+                return [];
+            }
+        } else if (this.currentFilters.city) {
             filtered = filtered.filter(g => g.city === this.currentFilters.city);
         }
 
@@ -405,8 +428,8 @@ const AnalyticsModule = {
 
     updateCurrencyStats() {
         const guides = this.filteredGuides;
-        const cityFilter = this.currentFilters.city;
-        const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
+        const selectedCities = this.currentFilters.cities || [];
+        const isEcuador = selectedCities.length > 0 && selectedCities.every(c => c === 'Quito' || c === 'Guayaquil');
 
         // Guides with USD payment (only effective non-cancelled, non-devolucion)
         const usdGuides = guides.filter(g => g.amountUsd && parseFloat(g.amountUsd) > 0 && !this.isExcludedFromSales(g));
@@ -442,29 +465,28 @@ const AnalyticsModule = {
     },
 
     async updateGuideValueStats() {
-        let guides = this.filteredGuides;
-        const cityFilter = this.currentFilters.city;
-        const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
-        const productFilter = this.currentFilters.productId;
-
-        // If product filter is active, filter guides that contain that product
-        if (productFilter) {
-            const guidesWithProduct = [];
-            for (const guide of guides) {
-                const items = await Database.getGuideItems(guide.id);
-                const hasProduct = items.some(item => item.productId === productFilter);
-                if (hasProduct) {
-                    guidesWithProduct.push(guide);
-                }
-            }
-            guides = guidesWithProduct;
-        }
+        const guides = this.filteredGuides;
+        const selectedCities = this.currentFilters.cities || [];
+        const isEcuador = selectedCities.length > 0 && selectedCities.every(c => c === 'Quito' || c === 'Guayaquil');
 
         // Realized/Effective sales guides (Devolución and Cancelado do NOT sum sales)
         const effectiveSalesGuides = guides.filter(g => !this.isExcludedFromSales(g));
 
         // Calculate total value of guides (totalAmount) - Only effective sales
-        const totalGuideValue = effectiveSalesGuides.reduce((sum, g) => sum + (parseFloat(g.totalAmount) || 0), 0);
+        let totalGuideValue = 0;
+        if (this.productMultiSelect && !this.productMultiSelect.isAllSelected()) {
+            const selectedIds = new Set((this.currentFilters.productIds || []).map(String));
+            for (const g of effectiveSalesGuides) {
+                const items = await this.getGuideItemsCached(g.id);
+                for (const item of items) {
+                    if (selectedIds.has(String(item.productId))) {
+                        totalGuideValue += item.subtotal || (item.quantity * item.unitPrice) || 0;
+                    }
+                }
+            }
+        } else {
+            totalGuideValue = effectiveSalesGuides.reduce((sum, g) => sum + (parseFloat(g.totalAmount) || 0), 0);
+        }
 
         // Calculate total shipping costs (shippingCost) - Shipped guides generate shipping cost even if returned!
         const shippingGuides = guides.filter(g => !this.isCancelado(g));
@@ -475,19 +497,11 @@ const AnalyticsModule = {
         const shippingValueElement = document.getElementById('analyticsTotalShippingValue');
 
         if (totalValueElement) {
-            if (isEcuador) {
-                totalValueElement.textContent = `$${totalGuideValue.toFixed(2)}`;
-            } else {
-                totalValueElement.textContent = Utils.formatCurrency(totalGuideValue);
-            }
+            totalValueElement.textContent = isEcuador ? `$${totalGuideValue.toFixed(2)}` : Utils.formatCurrency(totalGuideValue);
         }
 
         if (shippingValueElement) {
-            if (isEcuador) {
-                shippingValueElement.textContent = `$${totalShippingValue.toFixed(2)}`;
-            } else {
-                shippingValueElement.textContent = Utils.formatCurrency(totalShippingValue);
-            }
+            shippingValueElement.textContent = isEcuador ? `$${totalShippingValue.toFixed(2)}` : Utils.formatCurrency(totalShippingValue);
         }
 
         // Update summary stats currency display
@@ -500,10 +514,9 @@ const AnalyticsModule = {
     },
 
     async updateCostStats() {
-        let guides = this.filteredGuides;
-        const cityFilter = this.currentFilters.city;
-        const isEcuador = cityFilter === 'Quito' || cityFilter === 'Guayaquil';
-        const productFilter = this.currentFilters.productId;
+        const guides = this.filteredGuides;
+        const selectedCities = this.currentFilters.cities || [];
+        const isEcuador = selectedCities.length > 0 && selectedCities.every(c => c === 'Quito' || c === 'Guayaquil');
 
         // Build a product cost lookup map
         const productCostMap = {};
@@ -514,28 +527,17 @@ const AnalyticsModule = {
         // Effective sales guides (Devolución and Cancelado do NOT sum sales revenue / sold product cost)
         const effectiveSalesGuides = guides.filter(g => !this.isExcludedFromSales(g));
 
-        // If product filter is active, filter guides that contain that product
-        let salesGuidesToProcess = effectiveSalesGuides;
-        if (productFilter) {
-            const guidesWithProduct = [];
-            for (const guide of effectiveSalesGuides) {
-                const items = await Database.getGuideItems(guide.id);
-                const hasProduct = items.some(item => item.productId === productFilter);
-                if (hasProduct) {
-                    guidesWithProduct.push(guide);
-                }
-            }
-            salesGuidesToProcess = guidesWithProduct;
-        }
+        const isFilteredByProduct = this.productMultiSelect && !this.productMultiSelect.isAllSelected();
+        const selectedIds = isFilteredByProduct ? new Set((this.currentFilters.productIds || []).map(String)) : null;
 
         // Calculate total product cost & revenue from effective sales
         let totalProductCost = 0;
         let totalRevenue = 0;
 
-        for (const guide of salesGuidesToProcess) {
-            const items = await Database.getGuideItems(guide.id);
+        for (const guide of effectiveSalesGuides) {
+            const items = await this.getGuideItemsCached(guide.id);
             for (const item of items) {
-                if (productFilter && item.productId !== productFilter) {
+                if (selectedIds && !selectedIds.has(String(item.productId))) {
                     continue;
                 }
                 const unitCost = productCostMap[item.productId] || 0;
@@ -571,12 +573,9 @@ const AnalyticsModule = {
 
         if (!isAdminUser) return;
 
-        if (costEl) {
-            costEl.textContent = isEcuador ? `$${totalProductCost.toFixed(2)}` : Utils.formatCurrency(totalProductCost);
-        }
+        if (costEl) costEl.textContent = Utils.formatCurrency(totalProductCost);
         if (profitEl) {
-            profitEl.textContent = isEcuador ? `$${netProfit.toFixed(2)}` : Utils.formatCurrency(netProfit);
-            // Color based on positive/negative
+            profitEl.textContent = Utils.formatCurrency(netProfit);
             profitEl.style.color = netProfit >= 0 ? '#10b981' : '#ef4444';
         }
         if (marginEl) {
@@ -589,7 +588,6 @@ const AnalyticsModule = {
         // Exclude cancelled and returned guides for product sales ranking
         const guides = this.filteredGuides.filter(g => !this.isExcludedFromSales(g));
         const productSales = {};
-        const productFilter = this.currentFilters.productId;
 
         // Build a product cost lookup map
         const productCostMap = {};
@@ -598,6 +596,8 @@ const AnalyticsModule = {
         }
 
         const isAdminUser = AuthModule.currentUser?.role === 'admin';
+        const isFilteredByProduct = this.productMultiSelect && !this.productMultiSelect.isAllSelected();
+        const selectedIds = isFilteredByProduct ? new Set((this.currentFilters.productIds || []).map(String)) : null;
 
         // Show/hide cost columns in top products table header
         const topProductsTable = document.getElementById('analyticsTopProducts')?.closest('table');
@@ -609,9 +609,9 @@ const AnalyticsModule = {
 
         // Collect all items from filtered guides
         for (const guide of guides) {
-            const items = await Database.getGuideItems(guide.id);
+            const items = await this.getGuideItemsCached(guide.id);
             for (const item of items) {
-                if (productFilter && item.productId !== productFilter) {
+                if (selectedIds && !selectedIds.has(String(item.productId))) {
                     continue;
                 }
 

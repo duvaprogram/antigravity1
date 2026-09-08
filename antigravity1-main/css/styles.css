@@ -5234,4 +5234,212 @@ form {
     background: rgba(255, 255, 255, 0.02);
 }
 
+/* ========================================
+   Multi-Select Dropdown Checklist Component
+   ======================================== */
+.multiselect-container {
+    position: relative;
+    width: 100%;
+    user-select: none;
+}
+
+.multiselect-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    min-height: 38px;
+    gap: 0.5rem;
+}
+
+.multiselect-trigger:hover {
+    border-color: var(--primary);
+    background: var(--surface-hover);
+}
+
+.multiselect-trigger.active {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+.multiselect-trigger-text {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+    font-weight: 500;
+}
+
+.multiselect-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.45rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    background: var(--primary);
+    color: white;
+    margin-left: 0.35rem;
+    white-space: nowrap;
+}
+
+.multiselect-chevron {
+    transition: transform var(--transition-fast);
+    color: var(--text-muted);
+    flex-shrink: 0;
+}
+
+.multiselect-container.open .multiselect-chevron {
+    transform: rotate(180deg);
+}
+
+.multiselect-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    min-width: 260px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 1050;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.multiselect-container.open .multiselect-dropdown {
+    display: flex;
+}
+
+.multiselect-search-box {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    background: var(--surface);
+}
+
+.multiselect-search-box input {
+    width: 100%;
+    padding: 0.4rem 0.5rem 0.4rem 1.85rem;
+    font-size: 0.8rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color var(--transition-fast);
+}
+
+.multiselect-search-box input:focus {
+    border-color: var(--primary);
+}
+
+.multiselect-search-icon {
+    position: absolute;
+    left: 1.15rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+}
+
+.multiselect-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-hover);
+    font-size: 0.75rem;
+}
+
+.multiselect-btn-action {
+    background: none;
+    border: none;
+    color: var(--primary);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.15rem 0.35rem;
+    border-radius: var(--radius-sm);
+    transition: background var(--transition-fast);
+}
+
+.multiselect-btn-action:hover {
+    background: var(--primary-light);
+    text-decoration: underline;
+}
+
+.multiselect-options-list {
+    max-height: 230px;
+    overflow-y: auto;
+    padding: 0.25rem 0;
+    margin: 0;
+    list-style: none;
+}
+
+.multiselect-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.45rem 0.75rem;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+}
+
+.multiselect-item:hover {
+    background: var(--surface-hover);
+}
+
+.multiselect-item input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: var(--primary);
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    margin: 0;
+}
+
+.multiselect-item-content {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: flex;
+    flex-direction: column;
+}
+
+.multiselect-item-title {
+    font-weight: 500;
+    line-height: 1.25;
+}
+
+.multiselect-item-subtitle {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    line-height: 1.2;
+}
+
+.multiselect-empty {
+    padding: 1rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+}
+
+
 

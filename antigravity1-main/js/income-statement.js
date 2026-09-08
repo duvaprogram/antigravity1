@@ -19,9 +19,13 @@ const IncomeStatementModule = {
     // Current filters
     filters: {
         country: '',
+        countries: [],
+        products: [],
         dateFrom: null,
         dateTo: null
     },
+    countryMultiSelect: null,
+    productMultiSelect: null,
     visualMergedGroups: [],
 
     // FB Import state
@@ -33,8 +37,54 @@ const IncomeStatementModule = {
     async init() {
         if (this.initialized) return;
         this.initialized = true;
+        this.initMultiSelects();
         this.bindEvents();
         this.setDefaultFilters();
+    },
+
+    initMultiSelects() {
+        // Country multi-select with checkboxes
+        const countryContainer = document.getElementById('isCountryMultiSelect');
+        if (countryContainer) {
+            this.countryMultiSelect = new MultiSelectDropdown({
+                container: countryContainer,
+                placeholder: 'Seleccionar país...',
+                allSelectedText: 'Todos los países',
+                noneSelectedText: 'Ningún país seleccionado',
+                searchable: false,
+                items: [
+                    { value: 'Ecuador', label: '🇪🇨 Ecuador' },
+                    { value: 'Venezuela', label: '🇻🇪 Venezuela' },
+                    { value: 'Colombia', label: '🇨🇴 Colombia' }
+                ],
+                defaultAll: true,
+                onChange: (selected) => {
+                    this.filters.countries = selected;
+                    this.filters.country = selected.length === 1 ? selected[0] : '';
+                    this.applyFilters();
+                }
+            });
+            this.filters.countries = this.countryMultiSelect.getSelected();
+        }
+
+        // Product multi-select with live search and checkboxes
+        const productContainer = document.getElementById('isProductMultiSelect');
+        if (productContainer) {
+            this.productMultiSelect = new MultiSelectDropdown({
+                container: productContainer,
+                placeholder: 'Seleccionar productos...',
+                allSelectedText: 'Todos los productos',
+                noneSelectedText: 'Ningún producto seleccionado',
+                searchable: true,
+                searchPlaceholder: 'Buscar producto (ej: San Benito)...',
+                items: [],
+                defaultAll: true,
+                onChange: (selected) => {
+                    this.filters.products = selected;
+                    this.applyFilters();
+                }
+            });
+        }
     },
 
     bindEvents() {
@@ -135,9 +185,41 @@ const IncomeStatementModule = {
     },
 
     applyFilters() {
-        this.filters.country = document.getElementById('isCountryFilter')?.value || '';
+        if (this.countryMultiSelect) {
+            this.filters.countries = this.countryMultiSelect.getSelected();
+            this.filters.country = this.filters.countries.length === 1 ? this.filters.countries[0] : '';
+        } else {
+            this.filters.country = document.getElementById('isCountryFilter')?.value || '';
+        }
+
+        if (this.productMultiSelect) {
+            this.filters.products = this.productMultiSelect.getSelected();
+        }
+
         this.filters.dateFrom = document.getElementById('isDateFrom')?.value || null;
         this.filters.dateTo = document.getElementById('isDateTo')?.value || null;
+        this.render();
+    },
+
+    clearFilters() {
+        this.filters.dateFrom = null;
+        this.filters.dateTo = null;
+        const fromEl = document.getElementById('isDateFrom');
+        const toEl = document.getElementById('isDateTo');
+        if (fromEl) fromEl.value = '';
+        if (toEl) toEl.value = '';
+
+        if (this.countryMultiSelect) {
+            this.countryMultiSelect.selectAll(false);
+            this.filters.countries = this.countryMultiSelect.getSelected();
+            this.filters.country = '';
+        }
+        if (this.productMultiSelect) {
+            this.productMultiSelect.selectAll(false);
+            this.filters.products = this.productMultiSelect.getSelected();
+        }
+
+        document.querySelectorAll('#section-income-statement .month-tag').forEach(el => el.classList.remove('active'));
         this.render();
     },
 
@@ -245,9 +327,42 @@ const IncomeStatementModule = {
                 this.freights = [];
             }
 
+            // Populate product multi-select list
+            this.populateProductFilter();
+
         } catch (error) {
             console.error('Error loading data:', error);
         }
+    },
+
+    populateProductFilter() {
+        if (!this.productMultiSelect) return;
+        const productNames = new Set();
+        (this.guides || []).forEach(g => {
+            const items = g.guide_items || g.products || g.items || [];
+            items.forEach(i => {
+                const prod = i.products || i;
+                const rawName = prod.name || i.name || i.product_name;
+                const name = (this.productMappings && this.productMappings[rawName]) || rawName;
+                if (name) productNames.add(name.trim());
+            });
+        });
+        (this.externalSales || []).forEach(s => {
+            const rawName = s.product_name || s.description;
+            const name = (this.productMappings && this.productMappings[rawName]) || rawName;
+            if (name) productNames.add(name.trim());
+        });
+
+        const items = Array.from(productNames)
+            .filter(Boolean)
+            .sort((a, b) => a.localeCompare(b))
+            .map(name => ({
+                value: name,
+                label: name
+            }));
+
+        this.productMultiSelect.setItems(items, true);
+        this.filters.products = this.productMultiSelect.getSelected();
     },
 
     isDevolucion(g) {
@@ -287,6 +402,37 @@ const IncomeStatementModule = {
         return cityData.country || 'Desconocido';
     },
 
+    matchesCountryFilter(country) {
+        if (this.countryMultiSelect && !this.countryMultiSelect.isAllSelected()) {
+            const selectedCountries = this.filters.countries || [];
+            if (selectedCountries.length > 0) {
+                return country ? selectedCountries.includes(country) : false;
+            }
+            return false;
+        }
+        if (this.filters.country) {
+            return country === this.filters.country;
+        }
+        return true;
+    },
+
+    matchesProductFilter(nameOrNames) {
+        if (!this.productMultiSelect || this.productMultiSelect.isAllSelected()) {
+            return true;
+        }
+        const selected = this.filters.products || [];
+        if (selected.length === 0) return false;
+        const selectedSet = new Set(selected.map(p => p.toLowerCase().trim()));
+
+        const names = Array.isArray(nameOrNames) ? nameOrNames : [nameOrNames];
+        return names.some(n => {
+            if (!n) return false;
+            const clean = n.toLowerCase().trim();
+            const mapped = ((this.productMappings && this.productMappings[n]) || n).toLowerCase().trim();
+            return selectedSet.has(clean) || selectedSet.has(mapped);
+        });
+    },
+
     filterByDateAndCountry(items, dateField = 'created_at', getCountry = null) {
         return items.filter(item => {
             let dateVal = item[dateField];
@@ -296,9 +442,9 @@ const IncomeStatementModule = {
             if (this.filters.dateFrom && itemDate < this.filters.dateFrom) return false;
             if (this.filters.dateTo && itemDate > this.filters.dateTo) return false;
 
-            if (this.filters.country && getCountry) {
+            if (getCountry) {
                 const country = getCountry(item);
-                if (country !== this.filters.country) return false;
+                if (!this.matchesCountryFilter(country)) return false;
             }
 
             return true;
@@ -309,11 +455,24 @@ const IncomeStatementModule = {
     // SALES DATA
     // ========================================
     getFilteredSales() {
-        return this.filterByDateAndCountry(
+        let sales = this.filterByDateAndCountry(
             this.guides,
             'created_at',
             (guide) => this.getCountryFromCity(guide.cities)
         );
+
+        if (this.productMultiSelect && !this.productMultiSelect.isAllSelected()) {
+            sales = sales.filter(g => {
+                const items = g.guide_items || g.products || g.items || [];
+                return items.some(item => {
+                    const prod = item.products || item;
+                    const rawName = prod.name || item.name || '';
+                    return this.matchesProductFilter(rawName);
+                });
+            });
+        }
+
+        return sales;
     },
 
     getSalesByCountry() {
@@ -347,6 +506,10 @@ const IncomeStatementModule = {
 
                 if (guide.guide_items) {
                     guide.guide_items.forEach(item => {
+                        const prod = item.products || item;
+                        const rawName = prod.name || item.name || '';
+                        if (!this.matchesProductFilter(rawName)) return;
+
                         const qty = parseInt(item.quantity || 0);
                         const rawCost = parseFloat(item.products?.cost || 0);
                         const cost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
@@ -366,12 +529,11 @@ const IncomeStatementModule = {
     getFreightDestinationCountry(route) {
         if (!route) return null;
         const r = route.toLowerCase();
-        const parts = route.split('->');
-        if (parts.length === 2) {
-            const dest = parts[1].trim();
-            if (dest === 'Colombia') return 'Colombia';
-            if (dest === 'Ecuador') return 'Ecuador';
-            if (dest === 'Venezuela') return 'Venezuela';
+        if (r.includes('cúcuta') || r.includes('cucuta') || r.includes('san antonio') || r.includes('tachira') || r.includes('táchira') || r.includes('caracas') || r.includes('valencia') || r.includes('maracay') || r.includes('maracaibo') || r.includes('barquisimeto')) {
+            return 'Venezuela';
+        }
+        if (r.includes('tulcán') || r.includes('tulcan') || r.includes('ipiales') || r.includes('quito') || r.includes('guayaquil') || r.includes('cuenca') || r.includes('ambato') || r.includes('manta') || r.includes('machala') || r.includes('santo domingo') || r.includes('loja')) {
+            return 'Ecuador';
         }
         if (r.includes('ecuador')) return 'Ecuador';
         if (r.includes('venezuela')) return 'Venezuela';
@@ -387,7 +549,11 @@ const IncomeStatementModule = {
             if (this.filters.dateFrom && freightDate < this.filters.dateFrom) return false;
             if (this.filters.dateTo && freightDate > this.filters.dateTo) return false;
 
-            if (this.filters.country) {
+            if (this.countryMultiSelect && !this.countryMultiSelect.isAllSelected()) {
+                const selectedCountries = this.filters.countries || [];
+                const destCountry = this.getFreightDestinationCountry(f.route);
+                if (!selectedCountries.includes(destCountry)) return false;
+            } else if (this.filters.country) {
                 const destCountry = this.getFreightDestinationCountry(f.route);
                 if (destCountry !== this.filters.country) return false;
             }
@@ -952,9 +1118,10 @@ const IncomeStatementModule = {
         const adSearch = (document.getElementById('adFilterSearch')?.value || '').toLowerCase().trim();
 
         // 1. Filtrar por Pais (Local override de Global)
-        const filterCountry = adCountry || this.filters.country;
-        if (filterCountry) {
-            expenses = expenses.filter(e => e.country === filterCountry);
+        if (adCountry) {
+            expenses = expenses.filter(e => e.country === adCountry);
+        } else {
+            expenses = expenses.filter(e => this.matchesCountryFilter(e.country));
         }
 
         // 2. Filtrar por Fecha (Local override de Global)
@@ -1229,11 +1396,20 @@ const IncomeStatementModule = {
     // EXTERNAL SALES
     // ========================================
     getFilteredExternalSales() {
-        return this.filterByDateAndCountry(
+        let sales = this.filterByDateAndCountry(
             this.externalSales,
             'sale_date',
             (sale) => sale.country === 'Todos' ? null : sale.country
         );
+
+        if (this.productMultiSelect && !this.productMultiSelect.isAllSelected()) {
+            sales = sales.filter(s => {
+                const rawName = s.product_name || s.description || '';
+                return this.matchesProductFilter(rawName);
+            });
+        }
+
+        return sales;
     },
 
     getExternalSalesSummary() {
@@ -2344,7 +2520,8 @@ const IncomeStatementModule = {
         const filteredGuides = this.guides || [];
         filteredGuides.forEach(g => {
             if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
-            if (this.filters.country && g.country !== this.filters.country) return;
+            const gCountry = g.country || this.getCountryFromCity(g.cities);
+            if (!this.matchesCountryFilter(gCountry)) return;
             const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
             if (this.filters.dateTo && gDate > this.filters.dateTo) return;
@@ -2363,6 +2540,8 @@ const IncomeStatementModule = {
                 const prod = item.products || item;
                 const rawName = prod.name || item.name || 'Producto Desconocido';
                 const name = this.productMappings[rawName] || rawName;
+                if (!this.matchesProductFilter([rawName, name])) return;
+
                 const qty = parseInt(item.quantity || 1);
                 const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
                 const realCost = isExcluded ? 0 : (unitCost * qty);
@@ -2388,6 +2567,8 @@ const IncomeStatementModule = {
         extSales.forEach(s => {
             const rawName = s.product_name || s.description || 'Venta Manual';
             const name = this.productMappings[rawName] || rawName;
+            if (!this.matchesProductFilter([rawName, name])) return;
+
             if (!productMap[name]) {
                 productMap[name] = {
                     name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0
@@ -2405,6 +2586,8 @@ const IncomeStatementModule = {
             const rawName = exp.product_name;
             if (!rawName) return;
             const name = this.productMappings[rawName] || rawName;
+            if (!this.matchesProductFilter([rawName, name])) return;
+
             if (productMap[name]) {
                 productMap[name].adSpend += parseFloat(exp.amount_spent || 0);
             } else {
@@ -3583,7 +3766,7 @@ const IncomeStatementModule = {
                 const itemDate = new Date(row.date_start).toISOString().split('T')[0];
                 if (this.filters.dateFrom && itemDate < this.filters.dateFrom) return false;
                 if (this.filters.dateTo && itemDate > this.filters.dateTo) return false;
-                if (this.filters.country && row.country !== this.filters.country) return false;
+                if (!this.matchesCountryFilter(row.country)) return false;
                 return true;
             });
 
@@ -4068,8 +4251,14 @@ const IncomeStatementModule = {
             Utils.showToast('Generando reporte Excel del Estado de Resultados...', 'info');
 
             // Sync current filter values from DOM if available
-            if (document.getElementById('isCountryFilter')) {
+            if (this.countryMultiSelect) {
+                this.filters.countries = this.countryMultiSelect.getSelected();
+                this.filters.country = this.filters.countries.length === 1 ? this.filters.countries[0] : '';
+            } else if (document.getElementById('isCountryFilter')) {
                 this.filters.country = document.getElementById('isCountryFilter').value || '';
+            }
+            if (this.productMultiSelect) {
+                this.filters.products = this.productMultiSelect.getSelected();
             }
             if (document.getElementById('isDateFrom')) {
                 this.filters.dateFrom = document.getElementById('isDateFrom').value || null;
@@ -4109,7 +4298,8 @@ const IncomeStatementModule = {
                 ['Generado el:', new Date().toLocaleString('es-ES')],
                 ['Período Desde:', this.filters.dateFrom || 'Inicio'],
                 ['Período Hasta:', this.filters.dateTo || 'Hoy'],
-                ['País Filtrado:', this.filters.country || 'Todos los Países'],
+                ['País Filtrado:', this.countryMultiSelect ? (this.countryMultiSelect.isAllSelected() ? 'Todos los Países' : this.countryMultiSelect.getSelected().join(', ')) : (this.filters.country || 'Todos los Países')],
+                ['Productos Filtrados:', this.productMultiSelect ? (this.productMultiSelect.isAllSelected() ? 'Todos los Productos' : `${this.productMultiSelect.getSelected().length} seleccionados`) : 'Todos los Productos'],
                 [''],
                 ['CONCEPTO FINANCIERO', 'MONTO ($ USD)', '% SOBRE VENTAS'],
                 ['1. VENTAS NETAS (INGRESOS TOTALES)', totalRevenue, '100.00%'],
@@ -4220,7 +4410,7 @@ const IncomeStatementModule = {
             filteredGuides.forEach(g => {
                 if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
                 const gCountry = g.country || this.getCountryFromCity(g.cities);
-                if (this.filters.country && gCountry !== this.filters.country) return;
+                if (!this.matchesCountryFilter(gCountry)) return;
                 const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
                 if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
                 if (this.filters.dateTo && gDate > this.filters.dateTo) return;
@@ -4239,6 +4429,8 @@ const IncomeStatementModule = {
                     const prod = item.products || item;
                     const rawName = prod.name || item.name || 'Producto Desconocido';
                     const name = this.productMappings[rawName] || rawName;
+                    if (!this.matchesProductFilter([rawName, name])) return;
+
                     const qty = parseInt(item.quantity || 1);
                     const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
                     const realCost = isExcluded ? 0 : (unitCost * qty);
@@ -4262,6 +4454,8 @@ const IncomeStatementModule = {
             extSales.forEach(s => {
                 const rawName = s.product_name || s.description || 'Venta Manual';
                 const name = this.productMappings[rawName] || rawName;
+                if (!this.matchesProductFilter([rawName, name])) return;
+
                 if (!productMap[name]) {
                     productMap[name] = { name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: 0 };
                 }
@@ -4279,6 +4473,8 @@ const IncomeStatementModule = {
                 const rawName = exp.product_name;
                 if (!rawName) return;
                 const name = this.productMappings[rawName] || rawName;
+                if (!this.matchesProductFilter([rawName, name])) return;
+
                 if (productMap[name]) {
                     productMap[name].adSpend += parseFloat(exp.amount_spent || 0);
                 } else {
@@ -4341,10 +4537,20 @@ const IncomeStatementModule = {
             const orderRows = [];
             filteredGuides.forEach(g => {
                 const gCountry = g.country || this.getCountryFromCity(g.cities);
-                if (this.filters.country && gCountry !== this.filters.country) return;
+                if (!this.matchesCountryFilter(gCountry)) return;
                 const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
                 if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
                 if (this.filters.dateTo && gDate > this.filters.dateTo) return;
+
+                const items = g.guide_items || g.products || g.items || [];
+                if (this.productMultiSelect && !this.productMultiSelect.isAllSelected()) {
+                    const hasMatch = items.some(it => {
+                        const prod = it.products || it;
+                        const rawName = prod.name || it.name || '';
+                        return this.matchesProductFilter(rawName);
+                    });
+                    if (!hasMatch) return;
+                }
 
                 const isDevol = this.isDevolucion(g);
                 const isCanc = this.isCancelado(g);
@@ -4355,7 +4561,6 @@ const IncomeStatementModule = {
 
                 let prodCost = 0;
                 let prodSummary = '';
-                const items = g.guide_items || g.products || g.items || [];
                 if (items.length > 0) {
                     prodSummary = items.map(it => `${it.quantity || 1}x ${(it.products?.name || it.name || 'Producto')}`).join(' | ');
                     if (!isExcluded) {
@@ -5187,7 +5392,8 @@ const IncomeStatementModule = {
         const filteredGuides = this.guides || [];
         filteredGuides.forEach(g => {
             if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
-            if (this.filters.country && g.country !== this.filters.country) return;
+            const gCountry = g.country || this.getCountryFromCity(g.cities);
+            if (!this.matchesCountryFilter(gCountry)) return;
             const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
             if (this.filters.dateTo && gDate > this.filters.dateTo) return;

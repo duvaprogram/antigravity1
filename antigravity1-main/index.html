@@ -8,7 +8,7 @@
     <meta name="description" content="Sistema de gestión de domicilios para Quito y Guayaquil">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="css/styles.css?v=2.2.0">
+    <link rel="stylesheet" href="css/styles.css?v=2.2.3">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
@@ -1130,19 +1130,11 @@
                                     style="font-size: 0.75rem; color: var(--text-muted);">Hasta</label>
                                 <input type="date" id="analyticsDateTo" class="form-control">
                             </div>
-                            <div class="form-group" style="flex: 1; min-width: 150px;">
-                                <label for="analyticsCity"
-                                    style="font-size: 0.75rem; color: var(--text-muted);">País/Ciudad</label>
-                                <select id="analyticsCity" class="form-control">
-                                    <option value="">Todos</option>
-                                    <option value="Quito">Ecuador - Quito</option>
-                                    <option value="Guayaquil">Ecuador - Guayaquil</option>
-                                    <option value="Caracas">Venezuela - Caracas</option>
-                                    <option value="Medellin">Colombia - Medellín</option>
-                                    <option value="Bogota">Colombia - Bogotá</option>
-                                </select>
+                            <div class="form-group" style="flex: 1; min-width: 170px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted);">País / Ciudad</label>
+                                <div id="analyticsCityMultiSelect"></div>
                             </div>
-                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                            <div class="form-group" style="flex: 1; min-width: 140px;">
                                 <label for="analyticsStatus"
                                     style="font-size: 0.75rem; color: var(--text-muted);">Estado</label>
                                 <select id="analyticsStatus" class="form-control">
@@ -1156,17 +1148,9 @@
                                     <option value="Cancelado">Cancelado</option>
                                 </select>
                             </div>
-                            <div class="form-group" style="flex: 1; min-width: 200px; position: relative;">
-                                <label for="analyticsProductSearch"
-                                    style="font-size: 0.75rem; color: var(--text-muted);">Producto</label>
-                                <input type="text" id="analyticsProductSearch" class="form-control"
-                                    placeholder="Buscar producto..." autocomplete="off">
-                                <input type="hidden" id="analyticsProduct" value="">
-                                <div id="analyticsProductSuggestions" class="product-suggestions" style="display: none; position: absolute; top: 100%; left: 0; right: 0; 
-                                    background: var(--surface); border: 1px solid var(--border); 
-                                    border-radius: var(--radius-md); max-height: 200px; overflow-y: auto; 
-                                    z-index: 1000; box-shadow: var(--shadow-lg);">
-                                </div>
+                            <div class="form-group" style="flex: 1.5; min-width: 240px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted);">Producto (Búsqueda y Selección)</label>
+                                <div id="analyticsProductMultiSelect"></div>
                             </div>
                         </div>
                         <div style="margin-top: 1rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
@@ -4034,14 +4018,13 @@
                     </div>
                     <div class="card-body">
                         <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
-                            <div class="form-group" style="flex: 1; min-width: 140px;">
+                            <div class="form-group" style="flex: 1; min-width: 160px;">
                                 <label style="font-size: 0.75rem; color: var(--text-muted);">País</label>
-                                <select id="isCountryFilter" class="form-control">
-                                    <option value="">Todos los países</option>
-                                    <option value="Ecuador">🇪🇨 Ecuador</option>
-                                    <option value="Venezuela">🇻🇪 Venezuela</option>
-                                    <option value="Colombia">🇨🇴 Colombia</option>
-                                </select>
+                                <div id="isCountryMultiSelect"></div>
+                            </div>
+                            <div class="form-group" style="flex: 1.5; min-width: 240px;">
+                                <label style="font-size: 0.75rem; color: var(--text-muted);">Producto (Búsqueda y Selección)</label>
+                                <div id="isProductMultiSelect"></div>
                             </div>
                             <div class="form-group" style="flex: 1; min-width: 140px;">
                                 <label style="font-size: 0.75rem; color: var(--text-muted);">Desde</label>
@@ -4052,7 +4035,7 @@
                                 <input type="date" id="isDateTo" class="form-control">
                             </div>
                         </div>
-                        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <div style="margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
                             <button class="btn btn-secondary btn-sm"
                                 onclick="IncomeStatementModule.setQuickFilter('today')">Hoy</button>
                             <button class="btn btn-secondary btn-sm"
@@ -4067,6 +4050,14 @@
                                 onclick="IncomeStatementModule.setQuickFilter('year')">Año</button>
                             <button class="btn btn-secondary btn-sm"
                                 onclick="IncomeStatementModule.setQuickFilter('all')">Todo</button>
+                            <button type="button" class="btn btn-outline btn-sm"
+                                onclick="IncomeStatementModule.clearFilters()" style="margin-left: auto;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                                Limpiar Filtros
+                            </button>
                         </div>
                         <div style="margin-top: 0.5rem; display: flex; gap: 0.35rem; flex-wrap: wrap;">
                             <button type="button" class="btn btn-sm month-tag" onclick="IncomeStatementModule.setMonthFilter(0, this)">Enero</button>
@@ -7354,13 +7345,13 @@
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabase-config.js?v=2.1.37"></script>
-    <script src="js/utils.js?v=2.1.37"></script>
+    <script src="js/utils.js?v=2.2.3"></script>
     <script src="js/database.js?v=2.2.2"></script>
     <script src="js/products.js?v=2.1.37"></script>
     <script src="js/inventory.js?v=2.1.37"></script>
     <script src="js/clients.js?v=2.1.37"></script>
     <script src="js/guides.js?v=2.1.37"></script>
-    <script src="js/analytics.js?v=2.1.37"></script>
+    <script src="js/analytics.js?v=2.2.3"></script>
     <script src="js/confirmation.js?v=2.1.37"></script>
     <script src="js/purchases.js?v=2.1.37"></script>
     <script src="js/freights.js?v=2.1.37"></script>
@@ -7371,7 +7362,7 @@
     <script src="js/calculator.js?v=2.2.2"></script>
     <script src="js/multimedia.js?v=2.1.37"></script>
     <script src="js/finance.js?v=2.1.37"></script>
-    <script src="js/income-statement.js?v=2.1.37"></script>
+    <script src="js/income-statement.js?v=2.2.3"></script>
     <script src="js/materials-calculator.js?v=2.1.37"></script>
     <script src="js/journal-data.js?v=2.1.37"></script>
     <script src="js/journal.js?v=2.1.37"></script>
