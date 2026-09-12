@@ -1991,7 +1991,10 @@
 
                             <!-- Barra de Composición del Precio -->
                             <div class="calc-breakdown-card">
-                                <h4>Distribución del Precio de Venta</h4>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                    <h4 style="margin: 0;">Distribución del Precio de Venta</h4>
+                                    <span id="legBatchBadge" style="font-size: 0.75rem; background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 2px 8px; border-radius: var(--radius-full); font-weight: 600;">Lote: 100 unid.</span>
+                                </div>
                                 <div class="calc-breakdown-bar">
                                     <div class="calc-bar-segment seg-landed" id="segLanded" style="width: 25%;" title="Costo Producto"></div>
                                     <div class="calc-bar-segment seg-freight" id="segFreight" style="width: 25%;" title="Fletes y Logística"></div>
@@ -2003,25 +2006,37 @@
                                         <div class="calc-legend-label">
                                             <span class="calc-legend-dot" style="background: #3b82f6;"></span> Producto Landed
                                         </div>
-                                        <span class="calc-legend-value" id="legLanded">$0 (0%)</span>
+                                        <div class="calc-legend-data">
+                                            <span class="calc-legend-value" id="legLanded">$0 (0%)</span>
+                                            <span class="calc-legend-batch" id="legLandedBatch">Lote: $0</span>
+                                        </div>
                                     </div>
                                     <div class="calc-legend-item">
                                         <div class="calc-legend-label">
                                             <span class="calc-legend-dot" style="background: #f59e0b;"></span> Fletes / Logística
                                         </div>
-                                        <span class="calc-legend-value" id="legFreight">$0 (0%)</span>
+                                        <div class="calc-legend-data">
+                                            <span class="calc-legend-value" id="legFreight">$0 (0%)</span>
+                                            <span class="calc-legend-batch" id="legFreightBatch">Lote: $0</span>
+                                        </div>
                                     </div>
                                     <div class="calc-legend-item">
                                         <div class="calc-legend-label">
                                             <span class="calc-legend-dot" style="background: #ec4899;"></span> Ads / Comisión
                                         </div>
-                                        <span class="calc-legend-value" id="legAds">$0 (0%)</span>
+                                        <div class="calc-legend-data">
+                                            <span class="calc-legend-value" id="legAds">$0 (0%)</span>
+                                            <span class="calc-legend-batch" id="legAdsBatch">Lote: $0</span>
+                                        </div>
                                     </div>
                                     <div class="calc-legend-item">
                                         <div class="calc-legend-label">
                                             <span class="calc-legend-dot" style="background: #10b981;"></span> Utilidad Neta
                                         </div>
-                                        <span class="calc-legend-value" id="legProfit">$0 (0%)</span>
+                                        <div class="calc-legend-data">
+                                            <span class="calc-legend-value" id="legProfit">$0 (0%)</span>
+                                            <span class="calc-legend-batch" id="legProfitBatch">Lote: $0</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -2274,9 +2289,12 @@
 
                             <!-- Distribución del Precio de Venta (Image 3 bottom-middle) -->
                             <div class="calc-breakdown-card" style="margin-bottom: 1.25rem;">
-                                <h4 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.65rem;">
-                                    Distribución del Precio de Venta
-                                </h4>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
+                                    <h4 style="font-size: 0.85rem; text-transform: uppercase; color: var(--text-muted); margin: 0;">
+                                        Distribución del Precio de Venta
+                                    </h4>
+                                    <span id="modalLegBatchBadge" style="font-size: 0.75rem; background: rgba(59, 130, 246, 0.12); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); padding: 2px 8px; border-radius: var(--radius-full); font-weight: 600;">Lote: 100 unid.</span>
+                                </div>
                                 <div class="calc-breakdown-bar" style="height: 14px; border-radius: 7px; overflow: hidden; display: flex; margin-bottom: 0.75rem;">
                                     <div class="calc-bar-segment seg-landed" id="modalSegLanded" style="width: 25%; background: #3b82f6;" title="Costo Producto"></div>
                                     <div class="calc-bar-segment seg-freight" id="modalSegFreight" style="width: 25%; background: #f59e0b;" title="Fletes y Logística"></div>
@@ -2286,19 +2304,31 @@
                                 <div class="calc-bar-legend" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; font-size: 0.78rem;">
                                     <div class="calc-legend-item">
                                         <div class="calc-legend-label"><span class="calc-legend-dot" style="background: #3b82f6;"></span> Producto Landed</div>
-                                        <span class="calc-legend-value" id="modalLegLanded">$0 (0%)</span>
+                                        <div class="calc-legend-data">
+                                            <span class="calc-legend-value" id="modalLegLanded">$0 (0%)</span>
+                                            <span class="calc-legend-batch" id="modalLegLandedBatch">Lote: $0</span>
+                                        </div>
                                     </div>
                                     <div class="calc-legend-item">
                                         <div class="calc-legend-label"><span class="calc-legend-dot" style="background: #f59e0b;"></span> Fletes / Logística</div>
-                                        <span class="calc-legend-value" id="modalLegFreight">$0 (0%)</span>
+                                        <div class="calc-legend-data">
+                                            <span class="calc-legend-value" id="modalLegFreight">$0 (0%)</span>
+                                            <span class="calc-legend-batch" id="modalLegFreightBatch">Lote: $0</span>
+                                        </div>
                                     </div>
                                     <div class="calc-legend-item">
                                         <div class="calc-legend-label"><span class="calc-legend-dot" style="background: #ec4899;"></span> Ads / Comisión</div>
-                                        <span class="calc-legend-value" id="modalLegAds">$0 (0%)</span>
+                                        <div class="calc-legend-data">
+                                            <span class="calc-legend-value" id="modalLegAds">$0 (0%)</span>
+                                            <span class="calc-legend-batch" id="modalLegAdsBatch">Lote: $0</span>
+                                        </div>
                                     </div>
                                     <div class="calc-legend-item">
                                         <div class="calc-legend-label"><span class="calc-legend-dot" style="background: #10b981;"></span> Utilidad Neta</div>
-                                        <span class="calc-legend-value" id="modalLegProfit">$0 (0%)</span>
+                                        <div class="calc-legend-data">
+                                            <span class="calc-legend-value" id="modalLegProfit">$0 (0%)</span>
+                                            <span class="calc-legend-batch" id="modalLegProfitBatch">Lote: $0</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

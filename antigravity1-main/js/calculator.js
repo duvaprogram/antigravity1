@@ -817,15 +817,39 @@ const CalculatorModule = (() => {
         if (segProfit) segProfit.style.width = `${pProfit}%`;
 
         // Legend
+        const landedUnit = data.landedCost;
+        const freightUnit = currentChannel === 'cod' ? data.realFreight : getNum('calcMpShipping', 0);
+        const adsUnit = currentChannel === 'cod' ? data.realCpa : data.channelOperationalCost;
+        const profitUnit = data.netProfit;
+
+        const batchUnits = data.batchUnitsTotal || 1;
+        const landedBatch = landedUnit * batchUnits;
+        const freightBatch = freightUnit * batchUnits;
+        const adsBatch = adsUnit * batchUnits;
+        const profitBatch = profitUnit * batchUnits;
+
         const legLanded = document.getElementById('legLanded');
         const legFreight = document.getElementById('legFreight');
         const legAds = document.getElementById('legAds');
         const legProfit = document.getElementById('legProfit');
 
-        if (legLanded) legLanded.textContent = `${formatMoney(data.landedCost)} (${pLanded.toFixed(0)}%)`;
-        if (legFreight) legFreight.textContent = `${formatMoney(currentChannel === 'cod' ? data.realFreight : 0)} (${pFreight.toFixed(0)}%)`;
-        if (legAds) legAds.textContent = `${formatMoney(currentChannel === 'cod' ? data.realCpa : data.channelOperationalCost)} (${pAds.toFixed(0)}%)`;
-        if (legProfit) legProfit.textContent = `${formatMoney(data.netProfit)} (${pProfit.toFixed(0)}%)`;
+        if (legLanded) legLanded.textContent = `${formatMoney(landedUnit)} (${pLanded.toFixed(0)}%)`;
+        if (legFreight) legFreight.textContent = `${formatMoney(freightUnit)} (${pFreight.toFixed(0)}%)`;
+        if (legAds) legAds.textContent = `${formatMoney(adsUnit)} (${pAds.toFixed(0)}%)`;
+        if (legProfit) legProfit.textContent = `${formatMoney(profitUnit)} (${pProfit.toFixed(0)}%)`;
+
+        const legLandedBatch = document.getElementById('legLandedBatch');
+        const legFreightBatch = document.getElementById('legFreightBatch');
+        const legAdsBatch = document.getElementById('legAdsBatch');
+        const legProfitBatch = document.getElementById('legProfitBatch');
+
+        if (legLandedBatch) legLandedBatch.textContent = `Lote: ${formatMoney(landedBatch)}`;
+        if (legFreightBatch) legFreightBatch.textContent = `Lote: ${formatMoney(freightBatch)}`;
+        if (legAdsBatch) legAdsBatch.textContent = `Lote: ${formatMoney(adsBatch)}`;
+        if (legProfitBatch) legProfitBatch.textContent = `Lote: ${formatMoney(profitBatch)}`;
+
+        const legBatchBadge = document.getElementById('legBatchBadge');
+        if (legBatchBadge) legBatchBadge.textContent = `Lote: ${batchUnits} unid.`;
 
         // Channel Comparison Card
         const colCod = document.getElementById('colCompareCod');
@@ -1404,6 +1428,11 @@ const CalculatorModule = (() => {
         if (segAds) segAds.style.width = `${pAds}%`;
         if (segProfit) segProfit.style.width = `${pProfit}%`;
 
+        const landedBatch = landedCost * batchUnits;
+        const freightBatch = freightCost * batchUnits;
+        const adsBatch = adsCost * batchUnits;
+        const profitBatch = netProfit * batchUnits;
+
         const legLanded = document.getElementById('modalLegLanded');
         const legFreight = document.getElementById('modalLegFreight');
         const legAds = document.getElementById('modalLegAds');
@@ -1413,6 +1442,19 @@ const CalculatorModule = (() => {
         if (legFreight) legFreight.textContent = `${formatMoney(freightCost, itemCurr)} (${pFreight.toFixed(0)}%)`;
         if (legAds) legAds.textContent = `${formatMoney(adsCost, itemCurr)} (${pAds.toFixed(0)}%)`;
         if (legProfit) legProfit.textContent = `${formatMoney(netProfit, itemCurr)} (${pProfit.toFixed(0)}%)`;
+
+        const modalLegLandedBatch = document.getElementById('modalLegLandedBatch');
+        const modalLegFreightBatch = document.getElementById('modalLegFreightBatch');
+        const modalLegAdsBatch = document.getElementById('modalLegAdsBatch');
+        const modalLegProfitBatch = document.getElementById('modalLegProfitBatch');
+
+        if (modalLegLandedBatch) modalLegLandedBatch.textContent = `Lote: ${formatMoney(landedBatch, itemCurr)}`;
+        if (modalLegFreightBatch) modalLegFreightBatch.textContent = `Lote: ${formatMoney(freightBatch, itemCurr)}`;
+        if (modalLegAdsBatch) modalLegAdsBatch.textContent = `Lote: ${formatMoney(adsBatch, itemCurr)}`;
+        if (modalLegProfitBatch) modalLegProfitBatch.textContent = `Lote: ${formatMoney(profitBatch, itemCurr)}`;
+
+        const modalLegBatchBadge = document.getElementById('modalLegBatchBadge');
+        if (modalLegBatchBadge) modalLegBatchBadge.textContent = `Lote: ${batchUnits} unid.`;
 
         // Comparativa Instantánea de Canales (Imagen 3)
         const colCod = document.getElementById('modalColCod');
