@@ -4106,6 +4106,68 @@
                     </div>
                 </div>
 
+                <!-- Apartado: Tasas de Cambio Mensuales (COP → USD) -->
+                <div class="card is-exchange-rates-card" id="isExchangeRatesCard" style="margin-bottom: 1.5rem; border: 1px solid rgba(99, 102, 241, 0.2); box-shadow: 0 4px 12px rgba(99, 102, 241, 0.05);">
+                    <div class="card-header" style="background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0; display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="IncomeStatementModule.toggleExchangeRatesSection()">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <div style="background: rgba(255, 255, 255, 0.2); border-radius: 8px; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem;">
+                                🇨🇴
+                            </div>
+                            <div>
+                                <h3 style="margin: 0; font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; color: white;">
+                                    Dólar Promedio por Mes (TRM Colombia COP → USD)
+                                    <span class="badge" id="isExchangeRateActiveBadge" style="background: rgba(255,255,255,0.25); color: #fff; font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 12px;">Activo</span>
+                                </h3>
+                                <div style="font-size: 0.78rem; opacity: 0.9; margin-top: 2px;">
+                                    Conversión automática de ventas y fletes de Colombia a dólares para consolidar las sumas con precisión.
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <button type="button" class="btn btn-sm" id="btnToggleExchangeRates" style="background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 6px; padding: 0.35rem 0.75rem; font-size: 0.8rem; display: flex; align-items: center; gap: 0.35rem;">
+                                <span id="toggleExchangeRatesText">Ocultar</span>
+                                <svg id="toggleExchangeRatesIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.2s;">
+                                    <polyline points="18 15 12 9 6 15"></polyline>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body" id="isExchangeRatesBody" style="padding: 1.25rem;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <label style="font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin: 0;">Año de Tasas:</label>
+                                <select id="isExchangeRateYear" class="form-control" style="width: 100px; padding: 0.35rem 0.6rem; font-weight: 600; font-size: 0.85rem;" onchange="IncomeStatementModule.onExchangeRateYearChange(this.value)">
+                                    <option value="2026">2026</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2027">2027</option>
+                                </select>
+                                <span style="font-size: 0.8rem; color: var(--text-muted);">(1 USD = X Pesos COP)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="IncomeStatementModule.resetExchangeRates()" style="font-size: 0.8rem;">
+                                    ↺ Restablecer Valores
+                                </button>
+                                <button type="button" class="btn btn-primary btn-sm" onclick="IncomeStatementModule.saveExchangeRates()" style="background: #4f46e5; border-color: #4f46e5; font-size: 0.8rem; display: flex; align-items: center; gap: 0.35rem;">
+                                    💾 Guardar Tasas y Recalcular
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 12 Months Grid -->
+                        <div id="isExchangeRatesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.75rem;">
+                            <!-- Generado dinámicamente por JS -->
+                        </div>
+
+                        <div id="isExchangeRateImpactNotice" style="margin-top: 1rem; padding: 0.65rem 0.9rem; background: rgba(99, 102, 241, 0.07); border: 1px solid rgba(99, 102, 241, 0.2); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text);">
+                                <span>💡</span>
+                                <span id="isExchangeRateImpactText">Calculando impacto en pedidos de Colombia...</span>
+                            </div>
+                            <span id="isExchangeRateAppliedSummary" style="font-weight: 600; color: #4f46e5;"></span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Summary KPI Cards -->
                 <div
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
