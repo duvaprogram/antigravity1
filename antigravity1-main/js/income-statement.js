@@ -82,43 +82,147 @@ const IncomeStatementModule = {
             }
         });
 
-        // Set year from current filter or system year
-        const currentYear = new Date().getFullYear().toString();
-        if (['2025', '2026', '2027'].includes(currentYear)) {
-            this.selectedRatesYear = currentYear;
-        } else {
-            this.selectedRatesYear = '2026';
-        }
-
-        const yearSelect = document.getElementById('isExchangeRateYear');
-        if (yearSelect) yearSelect.value = this.selectedRatesYear;
-
-        this.renderExchangeRatesGrid();
+        // Inicializar dropdown con el mes actual o mes del filtro
+        this.populateRateMonthDropdown();
     },
 
-    renderExchangeRatesGrid() {
-        const grid = document.getElementById('isExchangeRatesGrid');
-        if (!grid) return;
+    populateRateMonthDropdown(targetYm) {
+        const select = document.getElementById('isRateMonthSelect');
+        if (!select) return;
 
-        const months = [
-            { num: '01', name: 'Ene', full: 'Enero' },
-            { num: '02', name: 'Feb', full: 'Febrero' },
-            { num: '03', name: 'Mar', full: 'Marzo' },
-            { num: '04', name: 'Abr', full: 'Abril' },
-            { num: '05', name: 'May', full: 'Mayo' },
-            { num: '06', name: 'Jun', full: 'Junio' },
-            { num: '07', name: 'Jul', full: 'Julio' },
-            { num: '08', name: 'Ago', full: 'Agosto' },
-            { num: '09', name: 'Sep', full: 'Septiembre' },
-            { num: '10', name: 'Oct', full: 'Octubre' },
-            { num: '11', name: 'Nov', full: 'Noviembre' },
-            { num: '12', name: 'Dic', full: 'Diciembre' }
+        const monthNames = [
+            'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+            'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
         ];
 
-        const yr = this.selectedRatesYear || '2026';
+        // Determinar qué YYYY-MM seleccionar
+        let activeYm = targetYm;
+        if (!activeYm) {
+            if (this.filters.dateFrom) {
+                activeYm = this.filters.dateFrom.substring(0, 7);
+            } else {
+                const now = new Date();
+                activeYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            }
+        }
+
+        const years = ['2026', '2025', '2027'];
+        let optionsHtml = '';
+
+        years.forEach(yr => {
+            const yearRates = this.monthlyRates[yr] || this.defaultMonthlyRates[yr] || {};
+            optionsHtml += `<optgroup label="Año ${yr}">`;
+            for (let i = 1; i <= 12; i++) {
+                const moStr = String(i).padStart(2, '0');
+                const ym = `${yr}-${moStr}`;
+                const rate = yearRates[moStr] || 4100;
+                const rateFormatted = Number(rate).toLocaleString('es-CO');
+                const isSel = ym === activeYm ? 'selected' : '';
+                optionsHtml += `<option value="${ym}" ${isSel}>${monthNames[i - 1]} ${yr} (TRM: $${rateFormatted})</option>`;
+            }
+            optionsHtml += `</optgroup>`;
+        });
+
+        select.innerHTML = optionsHtml;
+        this.onRateMonthSelectChange(select.value);
+    },
+
+    onRateMonthSelectChange(ym) {
+        if (!ym) return;
+        const parts = ym.split('-');
+        const yr = parts[0];
+        const mo = parts[1];
+        const yearRates = this.monthlyRates[yr] || this.defaultMonthlyRates[yr] || {};
+        const rate = yearRates[mo] || 4100;
+
+        const input = document.getElementById('isSingleTrmInput');
+        if (input) {
+            input.value = rate;
+        }
+
+        const badge = document.getElementById('isExchangeRateActiveBadge');
+        if (badge) {
+            badge.textContent = `TRM: $${Number(rate).toLocaleString('es-CO')} COP`;
+        }
+    },
+
+    saveSingleMonthRate() {
+        const select = document.getElementById('isRateMonthSelect');
+        const input = document.getElementById('isSingleTrmInput');
+        if (!select || !input) return;
+
+        const ym = select.value;
+        if (!ym) return;
+        const [yr, mo] = ym.split('-');
+        const val = parseFloat(input.value);
+
+        if (isNaN(val) || val <= 0) {
+            Utils.showToast('Por favor ingrese un valor de TRM válido', 'warning');
+            return;
+        }
+
+        if (!this.monthlyRates[yr]) this.monthlyRates[yr] = {};
+        this.monthlyRates[yr][mo] = Math.round(val);
+
+        try {
+            localStorage.setItem('is_monthly_exchange_rates', JSON.stringify(this.monthlyRates));
+            const selectedText = select.options[select.selectedIndex]?.text.split(' (')[0] || `${mo}/${yr}`;
+            Utils.showToast(`TRM guardada para ${selectedText}: $${Math.round(val).toLocaleString('es-CO')} COP`, 'success');
+        } catch (e) {
+            console.warn('Error guardando en localStorage:', e);
+            Utils.showToast('Error al guardar tasa', 'error');
+        }
+
+        this.populateRateMonthDropdown(ym);
+        this.updateExchangeRateNotice();
+        this.render();
+    },
+
+    openAllRatesModal() {
+        const select = document.getElementById('isRateMonthSelect');
+        let currentYear = '2026';
+        if (select && select.value) {
+            currentYear = select.value.split('-')[0];
+        }
+        const modalYearSelect = document.getElementById('isModalRateYear');
+        if (modalYearSelect) modalYearSelect.value = currentYear;
+
+        this.renderModalRatesGrid(currentYear);
+        const modal = document.getElementById('modalAllExchangeRates');
+        if (modal) modal.classList.add('active');
+    },
+
+    closeAllRatesModal() {
+        const modal = document.getElementById('modalAllExchangeRates');
+        if (modal) modal.classList.remove('active');
+    },
+
+    onModalYearChange(year) {
+        this.renderModalRatesGrid(year);
+    },
+
+    renderModalRatesGrid(year) {
+        const grid = document.getElementById('isModalRatesGrid');
+        if (!grid) return;
+
+        const yr = year || '2026';
         const yearRates = this.monthlyRates[yr] || this.defaultMonthlyRates[yr] || {};
 
-        // Determine which month is active based on filter
+        const months = [
+            { num: '01', name: 'Enero' },
+            { num: '02', name: 'Febrero' },
+            { num: '03', name: 'Marzo' },
+            { num: '04', name: 'Abril' },
+            { num: '05', name: 'Mayo' },
+            { num: '06', name: 'Junio' },
+            { num: '07', name: 'Julio' },
+            { num: '08', name: 'Agosto' },
+            { num: '09', name: 'Septiembre' },
+            { num: '10', name: 'Octubre' },
+            { num: '11', name: 'Noviembre' },
+            { num: '12', name: 'Diciembre' }
+        ];
+
         let activeMonthStr = '';
         if (this.filters.dateFrom) {
             const fYear = this.filters.dateFrom.substring(0, 4);
@@ -130,62 +234,38 @@ const IncomeStatementModule = {
             const val = yearRates[m.num] || 4100;
             const isActive = activeMonthStr === m.num;
             return `
-                <div style="background: ${isActive ? 'rgba(99, 102, 241, 0.12)' : 'var(--surface-hover)'}; border: 1px solid ${isActive ? '#6366f1' : 'var(--border)'}; border-radius: var(--radius-sm); padding: 0.5rem 0.6rem; transition: all 0.2s;">
+                <div style="background: ${isActive ? 'rgba(99, 102, 241, 0.12)' : 'var(--surface-hover)'}; border: 1px solid ${isActive ? '#6366f1' : 'var(--border)'}; border-radius: var(--radius-md); padding: 0.6rem 0.75rem; transition: all 0.2s;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                        <span style="font-size: 0.78rem; font-weight: ${isActive ? '700' : '600'}; color: ${isActive ? '#4f46e5' : 'var(--text)'};">
-                            ${m.name} ${yr}
+                        <span style="font-size: 0.8rem; font-weight: ${isActive ? '700' : '600'}; color: ${isActive ? '#818cf8' : 'var(--text-primary)'};">
+                            ${m.name}
                         </span>
                         ${isActive ? '<span style="font-size: 0.65rem; background: #6366f1; color: white; padding: 1px 5px; border-radius: 4px; font-weight: 600;">Filtro</span>' : ''}
                     </div>
-                    <div style="display: flex; align-items: center; gap: 0.25rem;">
-                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 500;">$</span>
+                    <div style="display: flex; align-items: center; gap: 0.35rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.25rem 0.5rem;">
+                        <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: 600;">$</span>
                         <input type="number" 
-                               id="isTrmInput_${yr}_${m.num}" 
+                               id="isModalTrm_${yr}_${m.num}" 
                                data-year="${yr}" 
                                data-month="${m.num}" 
-                               class="form-control is-trm-input" 
+                               class="is-modal-trm-input" 
                                value="${val}" 
                                min="100" 
                                step="10" 
-                               style="padding: 0.25rem 0.4rem; font-size: 0.85rem; font-weight: 600; text-align: right; height: 30px;"
+                               style="background: transparent; color: var(--text-primary); border: none; outline: none; font-size: 0.85rem; font-weight: 600; width: 100%; text-align: right;"
                                placeholder="4100">
+                        <span style="font-size: 0.7rem; color: var(--text-muted);">COP</span>
                     </div>
-                    <div style="font-size: 0.68rem; color: var(--text-muted); text-align: right; margin-top: 2px;">COP/USD</div>
                 </div>
             `;
         }).join('');
-
-        this.updateExchangeRateNotice();
     },
 
-    onExchangeRateYearChange(year) {
-        this.selectedRatesYear = year;
-        this.renderExchangeRatesGrid();
-    },
-
-    toggleExchangeRatesSection() {
-        const body = document.getElementById('isExchangeRatesBody');
-        const text = document.getElementById('toggleExchangeRatesText');
-        const icon = document.getElementById('toggleExchangeRatesIcon');
-        if (!body) return;
-
-        this.exchangeRatesExpanded = !this.exchangeRatesExpanded;
-        if (this.exchangeRatesExpanded) {
-            body.style.display = 'block';
-            if (text) text.textContent = 'Ocultar';
-            if (icon) icon.style.transform = 'rotate(0deg)';
-        } else {
-            body.style.display = 'none';
-            if (text) text.textContent = 'Mostrar';
-            if (icon) icon.style.transform = 'rotate(180deg)';
-        }
-    },
-
-    saveExchangeRates() {
-        const yr = this.selectedRatesYear || '2026';
+    saveAllModalRates() {
+        const modalYearSelect = document.getElementById('isModalRateYear');
+        const yr = modalYearSelect ? modalYearSelect.value : '2026';
         if (!this.monthlyRates[yr]) this.monthlyRates[yr] = {};
 
-        const inputs = document.querySelectorAll(`.is-trm-input[data-year="${yr}"]`);
+        const inputs = document.querySelectorAll(`.is-modal-trm-input[data-year="${yr}"]`);
         inputs.forEach(inp => {
             const m = inp.dataset.month;
             const val = parseFloat(inp.value);
@@ -196,28 +276,41 @@ const IncomeStatementModule = {
 
         try {
             localStorage.setItem('is_monthly_exchange_rates', JSON.stringify(this.monthlyRates));
-            Utils.showToast(`Tasas de cambio para el año ${yr} guardadas con éxito`, 'success');
+            Utils.showToast(`Todas las tasas de ${yr} se han guardado exitosamente`, 'success');
         } catch (e) {
             console.warn('Error guardando en localStorage:', e);
             Utils.showToast('Error al guardar tasas', 'error');
         }
 
-        this.renderExchangeRatesGrid();
+        this.closeAllRatesModal();
+
+        const currentSelectVal = document.getElementById('isRateMonthSelect')?.value;
+        const targetYm = (currentSelectVal && currentSelectVal.startsWith(yr)) ? currentSelectVal : `${yr}-01`;
+        this.populateRateMonthDropdown(targetYm);
+        this.updateExchangeRateNotice();
         this.render();
     },
 
-    resetExchangeRates() {
-        const yr = this.selectedRatesYear || '2026';
+    resetModalRates() {
+        const modalYearSelect = document.getElementById('isModalRateYear');
+        const yr = modalYearSelect ? modalYearSelect.value : '2026';
         if (!confirm(`¿Restablecer las tasas del año ${yr} a los valores promedio por defecto?`)) return;
 
         this.monthlyRates[yr] = { ...this.defaultMonthlyRates[yr] };
         try {
             localStorage.setItem('is_monthly_exchange_rates', JSON.stringify(this.monthlyRates));
-            Utils.showToast(`Tasas del año ${yr} restablecidas`, 'info');
+            Utils.showToast(`Tasas del año ${yr} restablecidas a valores por defecto`, 'info');
         } catch (e) {}
 
-        this.renderExchangeRatesGrid();
+        this.renderModalRatesGrid(yr);
+        this.populateRateMonthDropdown();
+        this.updateExchangeRateNotice();
         this.render();
+    },
+
+    renderExchangeRatesGrid() {
+        // Compatibilidad hacia atrás si se invoca
+        this.updateExchangeRateNotice();
     },
 
     getExchangeRateForDate(dateStr) {
@@ -466,6 +559,14 @@ const IncomeStatementModule = {
 
         this.filters.dateFrom = firstDayOfMonth.toISOString().split('T')[0];
         this.filters.dateTo = lastDayOfMonth.toISOString().split('T')[0];
+
+        // Sincronizar dropdown de TRM con mes inicial
+        const currentYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const rateSelect = document.getElementById('isRateMonthSelect');
+        if (rateSelect) {
+            rateSelect.value = currentYm;
+            this.onRateMonthSelectChange(currentYm);
+        }
     },
 
     applyFilters() {
@@ -482,6 +583,17 @@ const IncomeStatementModule = {
 
         this.filters.dateFrom = document.getElementById('isDateFrom')?.value || null;
         this.filters.dateTo = document.getElementById('isDateTo')?.value || null;
+
+        // Sincronizar dropdown de TRM si se seleccionó una fecha válida
+        if (this.filters.dateFrom) {
+            const ym = this.filters.dateFrom.substring(0, 7);
+            const rateSelect = document.getElementById('isRateMonthSelect');
+            if (rateSelect && rateSelect.querySelector(`option[value="${ym}"]`)) {
+                rateSelect.value = ym;
+                this.onRateMonthSelectChange(ym);
+            }
+        }
+
         this.render();
     },
 
@@ -4579,6 +4691,14 @@ const IncomeStatementModule = {
 
         document.querySelectorAll('#section-income-statement .month-tag').forEach(el => el.classList.remove('active'));
         if (btn) btn.classList.add('active');
+
+        // Sincronizar dropdown de TRM con el mes seleccionado
+        const ym = `${year}-${mStr}`;
+        const rateSelect = document.getElementById('isRateMonthSelect');
+        if (rateSelect) {
+            rateSelect.value = ym;
+            this.onRateMonthSelectChange(ym);
+        }
 
         this.applyFilters();
     },
