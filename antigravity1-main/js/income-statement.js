@@ -3898,6 +3898,54 @@ const IncomeStatementModule = {
         this.updateSelectedUnifiedSalesCount();
     },
 
+    copyPLSummaryToClipboard() {
+        const salesData = this.getSalesByCountry();
+        const adExpData = this.getAdExpensesByCountry();
+        const opExpData = this.getOpExpensesByCountry();
+
+        const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
+        const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0);
+        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0);
+        const grossProfit = totalRevenue - totalCOGS - totalShipping;
+        const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
+        const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
+        const totalExpenses = totalAdSpend + totalOpExp;
+        const netProfit = grossProfit - totalExpenses;
+
+        const grossMargin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0.0';
+        const netMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
+        const pct = (val) => totalRevenue > 0 ? ((val / totalRevenue) * 100).toFixed(1) + '%' : '0.0%';
+        const fmt = (v) => '$' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        const dateRange = (this.filters.dateFrom && this.filters.dateTo)
+            ? `Período: ${this.filters.dateFrom} al ${this.filters.dateTo}`
+            : `Fecha: ${new Date().toISOString().split('T')[0]}`;
+
+        let text = `📊 ESTADO DE RESULTADOS (P&L)\n${dateRange}\n`;
+        text += `════════════════════════════════════\n`;
+        text += `💵 Total Ventas: ${fmt(totalRevenue)} (100%)\n`;
+        text += `📦 Costo Mercancía: -${fmt(totalCOGS)} (${pct(totalCOGS)})\n`;
+        text += `🚚 Fletes (Envíos & Devs): -${fmt(totalShipping)} (${pct(totalShipping)})\n`;
+        text += `────────────────────────────────────\n`;
+        text += `✨ UTILIDAD BRUTA: ${fmt(grossProfit)} (${grossMargin}%)\n`;
+        text += `────────────────────────────────────\n`;
+        text += `📢 Inversión Publicitaria (Ads): -${fmt(totalAdSpend)} (${pct(totalAdSpend)})\n`;
+        text += `👥 Gastos Operativos: -${fmt(totalOpExp)} (${pct(totalOpExp)})\n`;
+        text += `────────────────────────────────────\n`;
+        text += `🏆 UTILIDAD NETA: ${fmt(netProfit)} (${netMargin}%)\n`;
+        text += `════════════════════════════════════\n`;
+
+        if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                Utils.showToast('¡Resumen financiero copiado al portapapeles!', 'success');
+            }).catch(() => {
+                Utils.showToast('No se pudo copiar el texto automáticamente.', 'warning');
+            });
+        } else {
+            Utils.showToast('Portapapeles no soportado en este navegador.', 'info');
+        }
+    },
+
     renderPLStatement() {
         const container = document.getElementById('isPLStatement');
         if (!container) return;
@@ -3905,7 +3953,6 @@ const IncomeStatementModule = {
         const salesData = this.getSalesByCountry();
         const adExpData = this.getAdExpensesByCountry();
         const opExpData = this.getOpExpensesByCountry();
-        const extSalesSummary = this.getExternalSalesSummary();
 
         const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
         const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0);
@@ -3918,7 +3965,31 @@ const IncomeStatementModule = {
         const grossMargin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0.0';
         const netMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
 
-        // Build categories breakdown
+        const pct = (val) => totalRevenue > 0 ? ((val / totalRevenue) * 100).toFixed(1) + '%' : '0.0%';
+        const pctNum = (val) => totalRevenue > 0 ? Math.min(100, Math.max(0, (val / totalRevenue) * 100)).toFixed(1) : 0;
+        const fmt = (val) => '$' + Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        const totalOrders = salesData.reduce((s, c) => s + (c.orderCount || 0), 0);
+        const aov = totalOrders > 0 ? (totalRevenue / totalOrders) : 0;
+        const roas = totalAdSpend > 0 ? (totalRevenue / totalAdSpend).toFixed(2) + 'x' : 'N/A';
+        const costRatio = totalRevenue > 0 ? (((totalCOGS + totalShipping + totalExpenses) / totalRevenue) * 100).toFixed(1) + '%' : '0.0%';
+
+        // Helper to render mini progress bar and percentage
+        const renderPctCell = (val, color, isBold = false) => {
+            const pNum = pctNum(val);
+            const pStr = pct(val);
+            return `
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.6rem;">
+                    <div style="flex: 1; max-width: 55px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden;">
+                        <div style="width: ${pNum}%; height: 100%; background: ${color}; border-radius: 4px;"></div>
+                    </div>
+                    <span style="font-weight: ${isBold ? '800' : '600'}; font-size: 0.82rem; min-width: 48px; text-align: right; color: ${color}; font-variant-numeric: tabular-nums;">
+                        ${pStr}
+                    </span>
+                </div>`;
+        };
+
+        // Operational expenses breakdown
         let opCategoriesHTML = '';
         const allCategories = {};
         this.getFilteredOperationalExpenses().forEach(exp => {
@@ -3928,92 +3999,180 @@ const IncomeStatementModule = {
 
         for (const [cat, amount] of Object.entries(allCategories).sort((a, b) => b[1] - a[1])) {
             opCategoriesHTML += `
-                <div class="is-pl-detail-row">
-                    <span style="padding-left: 2rem; color: var(--text-muted);">${cat}</span>
-                    <span style="color: var(--danger);">${this.formatCurrency(amount)}</span>
+                <div style="display: grid; grid-template-columns: 1fr 160px 160px; align-items: center; padding: 0.55rem 1.5rem; font-size: 0.84rem; border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.15s;">
+                    <div style="padding-left: 2.25rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.4rem;">
+                        <span style="opacity: 0.5;">↳</span>
+                        <span>${cat}</span>
+                    </div>
+                    <div style="text-align: right; color: var(--danger); font-weight: 500; font-variant-numeric: tabular-nums;">${fmt(amount)}</div>
+                    <div style="text-align: right;">${renderPctCell(amount, 'var(--danger)')}</div>
                 </div>`;
         }
 
         container.innerHTML = `
-            <div class="is-pl-section">
-                <div class="is-pl-row is-pl-header-row">
-                    <span>INGRESOS</span>
-                    <span></span>
+            <!-- Executive KPI Highlights Ribbon -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1.25rem 1.5rem; background: rgba(255,255,255,0.02); border-bottom: 1px solid var(--border);">
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">💵 Total Ventas Netas</div>
+                    <div style="font-size: 1.35rem; font-weight: 800; color: var(--success); font-variant-numeric: tabular-nums;">${fmt(totalRevenue)}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted);">100% Base de Ventas</div>
                 </div>
-                <div class="is-pl-row">
-                    <span style="padding-left: 1rem;">Ventas Netas</span>
-                    <span style="color: var(--success); font-weight: 600;">${this.formatCurrency(totalRevenue)}</span>
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">📦 Margen Bruto</div>
+                    <div style="font-size: 1.35rem; font-weight: 800; color: #10b981; font-variant-numeric: tabular-nums;">${fmt(grossProfit)}</div>
+                    <div style="font-size: 0.72rem; color: #10b981; font-weight: 600;">${grossMargin}% de las ventas</div>
                 </div>
-                <div class="is-pl-row is-pl-subtotal">
-                    <span>Total Ingresos</span>
-                    <span style="font-weight: 700; color: var(--success);">${this.formatCurrency(totalRevenue)}</span>
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.25rem;">
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">📢 Marketing & Ads (MER)</div>
+                    <div style="font-size: 1.35rem; font-weight: 800; color: #f59e0b; font-variant-numeric: tabular-nums;">${fmt(totalAdSpend)}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted);">${pct(totalAdSpend)} de ventas • ROAS: <strong>${roas}</strong></div>
                 </div>
-            </div>
-
-            <div class="is-pl-section">
-                <div class="is-pl-row is-pl-header-row">
-                    <span>COSTO DE VENTAS</span>
-                    <span></span>
-                </div>
-                <div class="is-pl-row">
-                    <span style="padding-left: 1rem;">Costo de Mercancía Vendida</span>
-                    <span style="color: var(--danger);">${this.formatCurrency(totalCOGS)}</span>
-                </div>
-                <div class="is-pl-row">
-                    <span style="padding-left: 1rem;">Costo de Fletes (Envíos & Devs)</span>
-                    <span style="color: var(--danger);">${this.formatCurrency(totalShipping)}</span>
-                </div>
-                <div class="is-pl-row is-pl-subtotal highlight-green">
-                    <span>UTILIDAD BRUTA</span>
-                    <span style="font-weight: 700; color: ${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
-                        ${this.formatCurrency(grossProfit)}
-                        <small style="font-weight: 400; font-size: 0.75rem;"> (${grossMargin}%)</small>
-                    </span>
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.25rem; border-left: 3px solid ${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">🏆 Utilidad Neta Real</div>
+                    <div style="font-size: 1.35rem; font-weight: 800; color: ${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'}; font-variant-numeric: tabular-nums;">${fmt(netProfit)}</div>
+                    <div style="font-size: 0.72rem; font-weight: 600; color: ${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                        ${netMargin}% Margen Neto ${netProfit >= 0 ? '• 🟢 Rentable' : '• 🔴 Pérdida'}
+                    </div>
                 </div>
             </div>
 
-            <div class="is-pl-section">
-                <div class="is-pl-row is-pl-header-row">
-                    <span>GASTOS OPERATIVOS</span>
-                    <span></span>
-                </div>
-                <div class="is-pl-row">
-                    <span style="padding-left: 1rem;">📢 Inversión Publicitaria (Ads)</span>
-                    <span style="color: var(--danger); font-weight: 500;">${this.formatCurrency(totalAdSpend)}</span>
-                </div>
-                ${opCategoriesHTML}
-                <div class="is-pl-row is-pl-subtotal">
-                    <span>Total Gastos Operativos</span>
-                    <span style="font-weight: 700; color: var(--danger);">${this.formatCurrency(totalExpenses)}</span>
+            <!-- Financial Statement Table with 3 Columns -->
+            <div style="width: 100%; overflow-x: auto;">
+                <div style="min-width: 600px;">
+                    <!-- Table Header -->
+                    <div style="display: grid; grid-template-columns: 1fr 160px 160px; padding: 0.65rem 1.5rem; background: var(--surface-hover); border-bottom: 1.5px solid var(--border); font-weight: 700; font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">
+                        <div>Concepto Financiero</div>
+                        <div style="text-align: right;">Monto (USD)</div>
+                        <div style="text-align: right;">% de Ventas</div>
+                    </div>
+
+                    <!-- 1. INGRESOS -->
+                    <div style="border-bottom: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; padding: 0.45rem 1.5rem; background: rgba(255,255,255,0.02); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">
+                            <span>INGRESOS OPERACIONALES</span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; align-items: center; padding: 0.65rem 1.5rem; font-size: 0.88rem;">
+                            <div style="padding-left: 1.25rem; font-weight: 500; display: flex; align-items: center; gap: 0.5rem;">
+                                <span>📈</span>
+                                <span>Ventas Netas Realizadas</span>
+                            </div>
+                            <div style="text-align: right; color: var(--success); font-weight: 600; font-variant-numeric: tabular-nums;">${fmt(totalRevenue)}</div>
+                            <div style="text-align: right;">${renderPctCell(totalRevenue, 'var(--success)', true)}</div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; align-items: center; padding: 0.65rem 1.5rem; font-size: 0.88rem; background: rgba(16, 185, 129, 0.04); font-weight: 700; border-top: 1px solid var(--border);">
+                            <div style="padding-left: 0.5rem; color: var(--text-primary);">Total Ingresos</div>
+                            <div style="text-align: right; color: var(--success); font-size: 0.95rem; font-variant-numeric: tabular-nums;">${fmt(totalRevenue)}</div>
+                            <div style="text-align: right;">${renderPctCell(totalRevenue, 'var(--success)', true)}</div>
+                        </div>
+                    </div>
+
+                    <!-- 2. COSTO DE VENTAS (COGS) -->
+                    <div style="border-bottom: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; padding: 0.45rem 1.5rem; background: rgba(255,255,255,0.02); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">
+                            <span>COSTOS DIRECTOS DE VENTA (COGS)</span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; align-items: center; padding: 0.65rem 1.5rem; font-size: 0.88rem; border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <div style="padding-left: 1.25rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+                                <span>📦</span>
+                                <span>Costo de Mercancía Vendida (Productos)</span>
+                            </div>
+                            <div style="text-align: right; color: var(--danger); font-weight: 500; font-variant-numeric: tabular-nums;">${fmt(totalCOGS)}</div>
+                            <div style="text-align: right;">${renderPctCell(totalCOGS, 'var(--danger)')}</div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; align-items: center; padding: 0.65rem 1.5rem; font-size: 0.88rem; border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <div style="padding-left: 1.25rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+                                <span>🚚</span>
+                                <span>Costo de Fletes (Envíos & Devoluciones)</span>
+                            </div>
+                            <div style="text-align: right; color: var(--danger); font-weight: 500; font-variant-numeric: tabular-nums;">${fmt(totalShipping)}</div>
+                            <div style="text-align: right;">${renderPctCell(totalShipping, 'var(--danger)')}</div>
+                        </div>
+                        <!-- Subtotal Utilidad Bruta -->
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; align-items: center; padding: 0.75rem 1.5rem; font-size: 0.92rem; background: rgba(16, 185, 129, 0.08); font-weight: 800; border-top: 1px solid rgba(16, 185, 129, 0.3);">
+                            <div style="padding-left: 0.5rem; color: #10b981; display: flex; align-items: center; gap: 0.4rem;">
+                                <span>✨</span>
+                                <span>UTILIDAD BRUTA</span>
+                            </div>
+                            <div style="text-align: right; color: #10b981; font-size: 1.05rem; font-variant-numeric: tabular-nums;">${fmt(grossProfit)}</div>
+                            <div style="text-align: right;">${renderPctCell(grossProfit, '#10b981', true)}</div>
+                        </div>
+                    </div>
+
+                    <!-- 3. GASTOS OPERATIVOS (OPEX) -->
+                    <div style="border-bottom: 1px solid var(--border);">
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; padding: 0.45rem 1.5rem; background: rgba(255,255,255,0.02); font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted);">
+                            <span>GASTOS OPERATIVOS (OPEX & MARKETING)</span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; align-items: center; padding: 0.65rem 1.5rem; font-size: 0.88rem; border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <div style="padding-left: 1.25rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem;">
+                                <span>📢</span>
+                                <span style="font-weight: 600;">Inversión Publicitaria (Facebook / Ads)</span>
+                            </div>
+                            <div style="text-align: right; color: var(--warning); font-weight: 600; font-variant-numeric: tabular-nums;">${fmt(totalAdSpend)}</div>
+                            <div style="text-align: right;">${renderPctCell(totalAdSpend, 'var(--warning)')}</div>
+                        </div>
+                        ${opCategoriesHTML}
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; align-items: center; padding: 0.65rem 1.5rem; font-size: 0.88rem; background: rgba(239, 68, 68, 0.04); font-weight: 700; border-top: 1px solid var(--border);">
+                            <div style="padding-left: 0.5rem; color: var(--text-primary);">Total Gastos Operativos</div>
+                            <div style="text-align: right; color: var(--danger); font-size: 0.95rem; font-variant-numeric: tabular-nums;">${fmt(totalExpenses)}</div>
+                            <div style="text-align: right;">${renderPctCell(totalExpenses, 'var(--danger)', true)}</div>
+                        </div>
+                    </div>
+
+                    <!-- 4. UTILIDAD NETA FINAL -->
+                    <div style="padding: 1rem 1.5rem; background: ${netProfit >= 0 ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.02))' : 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.02))'}; border-top: 2px solid ${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
+                        <div style="display: grid; grid-template-columns: 1fr 160px 160px; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                <span style="font-size: 1.3rem;">🏆</span>
+                                <div>
+                                    <span style="font-size: 1.15rem; font-weight: 800; color: ${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'}; letter-spacing: 0.5px;">
+                                        UTILIDAD NETA (RESULTADO FINAL)
+                                    </span>
+                                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                                        Margen de ganancia líquida después de todos los costos, fletes, publicidad y gastos operativos.
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="text-align: right; font-size: 1.35rem; font-weight: 800; color: ${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'}; font-variant-numeric: tabular-nums;">
+                                ${fmt(netProfit)}
+                            </div>
+                            <div style="text-align: right;">
+                                <span style="display: inline-block; padding: 0.35rem 0.75rem; border-radius: 6px; font-weight: 800; font-size: 0.95rem; background: ${netProfit >= 0 ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)'}; color: ${netProfit >= 0 ? 'var(--success)' : 'var(--danger)'}; border: 1px solid ${netProfit >= 0 ? 'rgba(16, 185, 129, 0.4)' : 'rgba(239, 68, 68, 0.4)'};">
+                                    ${netMargin}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="is-pl-section">
-                <div class="is-pl-row is-pl-total ${netProfit >= 0 ? 'profit' : 'loss'}">
-                    <span>UTILIDAD NETA</span>
-                    <span>
-                        ${this.formatCurrency(netProfit)}
-                        <small style="font-weight: 400; font-size: 0.8rem;"> (${netMargin}%)</small>
-                    </span>
+            <!-- Financial KPI Footer -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; padding: 1rem 1.5rem; background: var(--surface-hover); border-top: 1px solid var(--border);">
+                <div style="text-align: center; padding: 0.6rem 0.5rem; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                    <div style="font-size: 1.15rem; font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums;">${totalOrders}</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.2rem;">Pedidos Totales</div>
                 </div>
-            </div>
-
-            <div class="is-pl-kpis">
-                <div class="is-kpi-card">
-                    <div class="is-kpi-value">${salesData.reduce((s, c) => s + c.orderCount, 0)}</div>
-                    <div class="is-kpi-label">Pedidos</div>
+                <div style="text-align: center; padding: 0.6rem 0.5rem; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                    <div style="font-size: 1.15rem; font-weight: 700; color: var(--success); font-variant-numeric: tabular-nums;">${fmt(aov)}</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.2rem;">Ticket Promedio (AOV)</div>
                 </div>
-                <div class="is-kpi-card">
-                    <div class="is-kpi-value">${totalRevenue > 0 && salesData.reduce((s, c) => s + c.orderCount, 0) > 0 ? this.formatCurrency(totalRevenue / salesData.reduce((s, c) => s + c.orderCount, 0)) : '$0'}</div>
-                    <div class="is-kpi-label">Ticket Promedio</div>
+                <div style="text-align: center; padding: 0.6rem 0.5rem; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                    <div style="font-size: 1.15rem; font-weight: 700; color: #8b5cf6; font-variant-numeric: tabular-nums;">${adExpData.reduce((s, c) => s + (c.totalPurchases || 0), 0)}</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.2rem;">Compras Vía Ads</div>
                 </div>
-                <div class="is-kpi-card">
-                    <div class="is-kpi-value">${adExpData.reduce((s, c) => s + c.totalPurchases, 0)}</div>
-                    <div class="is-kpi-label">Compras vía Ads</div>
+                <div style="text-align: center; padding: 0.6rem 0.5rem; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                    <div style="font-size: 1.15rem; font-weight: 700; color: #f59e0b; font-variant-numeric: tabular-nums;">${roas}</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.2rem;">ROAS Publicidad</div>
                 </div>
-                <div class="is-kpi-card">
-                    <div class="is-kpi-value">${totalAdSpend > 0 ? (totalRevenue / totalAdSpend).toFixed(2) + 'x' : 'N/A'}</div>
-                    <div class="is-kpi-label">ROAS</div>
+                <div style="text-align: center; padding: 0.6rem 0.5rem; background: var(--surface); border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                    <div style="font-size: 1.15rem; font-weight: 700; color: var(--danger); font-variant-numeric: tabular-nums;">${costRatio}</div>
+                    <div style="font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.2rem;">Costos Totales / Ventas</div>
                 </div>
             </div>
         `;
