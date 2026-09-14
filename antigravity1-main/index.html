@@ -116,7 +116,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.30</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.31</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -1102,12 +1102,7 @@
                             </svg>
                             Actualizar
                         </button>
-                        <button type="button" class="btn btn-secondary" onclick="IncomeStatementModule.expandAllCards()" style="display: flex; align-items: center; gap: 0.4rem; font-weight: 500; background: var(--surface-hover); border: 1px solid var(--border);">
-                            📂 Desplegar Todo
-                        </button>
-                        <button type="button" class="btn btn-secondary" onclick="IncomeStatementModule.collapseAllCards()" style="display: flex; align-items: center; gap: 0.4rem; font-weight: 500; background: var(--surface-hover); border: 1px solid var(--border);">
-                            📁 Plegar Todo
-                        </button>
+                        
                     </div>
                 </div>
 
@@ -4037,6 +4032,12 @@
                             </svg>
                             Actualizar
                         </button>
+                        <button type="button" class="btn btn-secondary" onclick="IncomeStatementModule.expandAllCards()" style="display: flex; align-items: center; gap: 0.4rem; font-weight: 500; background: var(--surface-hover); border: 1px solid var(--border);">
+                            📂 Desplegar Todo
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="IncomeStatementModule.collapseAllCards()" style="display: flex; align-items: center; gap: 0.4rem; font-weight: 500; background: var(--surface-hover); border: 1px solid var(--border);">
+                            📁 Plegar Todo
+                        </button>
                     </div>
                 </div>
 
@@ -4276,7 +4277,7 @@
 
                 <!-- Sales by Country -->
                 <div class="card" style="margin-bottom: 1.5rem;">
-                    <div class="card-header"
+                    <div class="card-header" onclick="IncomeStatementModule.toggleCardCollapse(this)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;"
                         style="background: linear-gradient(135deg, #22c55e, #16a34a); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
                         <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -4285,9 +4286,8 @@
                                 <polyline points="17 6 23 6 23 12"></polyline>
                             </svg>
                             Ventas por País
-                        </h3>
-                    </div>
-                    <div class="card-body">
+                        </h3><span class="card-toggle-badge" style="font-size: 0.8rem; padding: 0.2rem 0.6rem; background: rgba(255,255,255,0.15); border-radius: 4px; font-weight: 500;">🔽 Desplegar</span></div>
+                    <div class="card-body" style="display: none;">
                         <div class="table-container">
                             <table class="table">
                                 <thead>
@@ -4319,7 +4319,7 @@
 
                 <!-- Resumen Consolidado de Ventas (Guías + Otras Plataformas) -->
                 <div class="card" style="margin-bottom: 1.5rem;">
-                    <div class="card-header"
+                    <div class="card-header" onclick="IncomeStatementModule.toggleCardCollapse(this)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;"
                         style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
                         <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -4328,9 +4328,8 @@
                                 <line x1="12" y1="22.08" x2="12" y2="12"></line>
                             </svg>
                             Resumen Consolidado de Ventas (Guías + Otras Plataformas)
-                        </h3>
-                    </div>
-                    <div class="card-body">
+                        </h3><span class="card-toggle-badge" style="font-size: 0.8rem; padding: 0.2rem 0.6rem; background: rgba(255,255,255,0.15); border-radius: 4px; font-weight: 500;">🔽 Desplegar</span></div>
+                    <div class="card-body" style="display: none;">
                         <!-- Controls for Consolidated Countries -->
                         <div style="display: flex; gap: 1rem; margin-bottom: 0.75rem; align-items: center; flex-wrap: wrap;">
                             <div style="position: relative; flex: 1; min-width: 200px; max-width: 300px;">
@@ -4391,7 +4390,7 @@
 
                 <!-- Facebook Ads Import -->
                 <div class="card" style="margin-bottom: 1.5rem;">
-                    <div class="card-header"
+                    <div class="card-header" onclick="IncomeStatementModule.toggleCardCollapse(this)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #1877f2, #ff0050); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;"
                         style="background: linear-gradient(135deg, #1877f2, #ff0050); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
                         <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -4409,8 +4408,8 @@
                             </svg>
                             Gasto Manual
                         </button>
-                    </div>
-                    <div class="card-body">
+                    <span class="card-toggle-badge" style="font-size: 0.8rem; padding: 0.2rem 0.6rem; background: rgba(255,255,255,0.15); border-radius: 4px; font-weight: 500; margin-left: 0.5rem;">🔽 Desplegar</span></div>
+                    <div class="card-body" style="display: none;">
                         <!-- Import Area -->
                         <div class="is-import-area"
                             style="margin-bottom: 1.5rem; padding: 1.25rem; background: var(--surface-hover); border-radius: var(--radius-md); border: 2px dashed var(--border);">
@@ -4594,7 +4593,7 @@
 
                 <!-- Operational Expenses -->
                 <div class="card" style="margin-bottom: 1.5rem;">
-                    <div class="card-header"
+                    <div class="card-header" onclick="IncomeStatementModule.toggleCardCollapse(this)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #f97316, #ea580c); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;"
                         style="background: linear-gradient(135deg, #f97316, #ea580c); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
                         <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -4616,8 +4615,8 @@
                             </svg>
                             Nuevo Gasto
                         </button>
-                    </div>
-                    <div class="card-body">
+                    <span class="card-toggle-badge" style="font-size: 0.8rem; padding: 0.2rem 0.6rem; background: rgba(255,255,255,0.15); border-radius: 4px; font-weight: 500; margin-left: 0.5rem;">🔽 Desplegar</span></div>
+                    <div class="card-body" style="display: none;">
                         <!-- Operational Expenses KPIs -->
                         <div class="stats-grid" style="margin-bottom: 1.5rem;">
                             <div class="stat-card">
@@ -4687,7 +4686,7 @@
 
                 <!-- External Sales -->
                 <div class="card" style="margin-bottom: 1.5rem;">
-                    <div class="card-header"
+                    <div class="card-header" onclick="IncomeStatementModule.toggleCardCollapse(this)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0; flex-wrap: wrap; gap: 0.5rem;"
                         style="background: linear-gradient(135deg, #0ea5e9, #0284c7); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
                         <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -4723,8 +4722,8 @@
                         <button type="button" class="btn btn-danger-light btn-sm" id="btnDeleteAllExtSales" onclick="IncomeStatementModule.deleteAllExternalSales()" style="display:none;">
                             ⚠️ Vaciar Todo
                         </button>
-                    </div>
-                    <div class="card-body">
+                    <span class="card-toggle-badge" style="font-size: 0.8rem; padding: 0.2rem 0.6rem; background: rgba(255,255,255,0.15); border-radius: 4px; font-weight: 500; margin-left: 0.5rem;">🔽 Desplegar</span></div>
+                    <div class="card-body" style="display: none;">
                         <!-- Manual Grouping Toolbar for Main Table -->
                         <div id="extSalesGroupToolbar" style="display: none; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; padding: 0.65rem 0.75rem; background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.25); border-radius: var(--radius-md);">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2">
@@ -4777,7 +4776,7 @@
 
                 <!-- Utilidad Bruta por Producto (Consolidado) -->
                 <div class="card" style="margin-bottom: 1.5rem;">
-                    <div class="card-header"
+                    <div class="card-header" onclick="IncomeStatementModule.toggleCardCollapse(this)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #0ea5e9, #6366f1); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;"
                         style="background: linear-gradient(135deg, #0ea5e9, #6366f1); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
                         <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -4789,9 +4788,8 @@
                                 <line x1="12" y1="22.08" x2="12" y2="12"></line>
                             </svg>
                             Utilidad Bruta por Producto (Consolidado)
-                        </h3>
-                    </div>
-                    <div class="card-body">
+                        </h3><span class="card-toggle-badge" style="font-size: 0.8rem; padding: 0.2rem 0.6rem; background: rgba(255,255,255,0.15); border-radius: 4px; font-weight: 500;">🔽 Desplegar</span></div>
+                    <div class="card-body" style="display: none;">
                         <!-- Controls for Products -->
                         <div style="display: flex; gap: 1rem; margin-bottom: 0.75rem; align-items: center; flex-wrap: wrap;">
                             <div style="position: relative; flex: 1; min-width: 200px; max-width: 300px;">
@@ -4850,7 +4848,7 @@
 
                 <!-- P&L Statement -->
                 <div class="card is-pl-card" style="margin-bottom: 1.5rem;">
-                    <div class="card-header"
+                    <div class="card-header" onclick="IncomeStatementModule.toggleCardCollapse(this)" style="cursor: pointer; display: flex; justify-content: space-between; align-items: center; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;"
                         style="background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
                         <h3 style="display: flex; align-items: center; gap: 0.5rem; margin: 0;">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -4859,9 +4857,8 @@
                                 <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                             </svg>
                             Estado de Pérdidas y Ganancias (P&L)
-                        </h3>
-                    </div>
-                    <div class="card-body" id="isPLStatement">
+                        </h3><span class="card-toggle-badge" style="font-size: 0.8rem; padding: 0.2rem 0.6rem; background: rgba(255,255,255,0.15); border-radius: 4px; font-weight: 500;">🔽 Desplegar</span></div>
+                    <div class="card-body" id="isPLStatement" style="display: none;">
                         <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
                             Cargando estado de resultados...
                         </div>
@@ -5114,7 +5111,7 @@
                                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                                 </svg>
                                 Multimedia
-                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.1.37</span>
+                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.1.31</span>
                             </h2>
                             <p style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
                                 Biblioteca centralizada de imágenes y videos (Cloudflare & CDN) para anuncios y creativos
@@ -5196,7 +5193,7 @@
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <h4 style="margin: 0; color: #fbbf24; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem;">
                                     <span>🩺 Consola de Diagnóstico Multimedia</span>
-                                    <span style="font-size: 0.75rem; background: #fbbf24; color: #000; padding: 1px 6px; border-radius: 4px; font-weight: bold;">v2.1.37</span>
+                                    <span style="font-size: 0.75rem; background: #fbbf24; color: #000; padding: 1px 6px; border-radius: 4px; font-weight: bold;">v2.1.31</span>
                                 </h4>
                                 <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('multimediaInPageDiag').style.display='none'" style="font-size: 0.75rem; padding: 2px 8px;">Cerrar Consola</button>
                             </div>
@@ -7470,7 +7467,7 @@
                 <div>
                     <h2 style="margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem;">
                         <span>🩺 Diagnóstico del Módulo Multimedia</span>
-                        <span id="diagVersion" style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.2); color: #818cf8; padding: 2px 6px; border-radius: 4px;">v2.1.34</span>
+                        <span id="diagVersion" style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.2); color: #818cf8; padding: 2px 6px; border-radius: 4px;">v2.1.31</span>
                     </h2>
                     <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Estado del sistema, almacenamiento y registro de errores con identificadores</p>
                 </div>
