@@ -2029,15 +2029,19 @@ const IncomeStatementModule = {
         this.externalSales = this.externalSales.filter(s => !checked.includes(String(s.id)));
         this.saveExternalSalesToLocal();
 
-        // Delete from Supabase in background
+        // Delete from Supabase in background with batching (chunks of 50 to prevent URL length limits)
         try {
-            await supabaseClient.from('external_sales').delete().in('id', checked);
+            for (let i = 0; i < checked.length; i += 50) {
+                const batch = checked.slice(i, i + 50);
+                await supabaseClient.from('external_sales').delete().in('id', batch);
+            }
         } catch (err) {
             console.warn('Alerta al eliminar en Supabase:', err);
         }
 
         Utils.showToast(`Se eliminaron ${checked.length} registros`, 'success');
 
+        this.renderReportsManagerModal();
         this.renderSummaryCards();
         this.renderSalesTable();
         this.renderConsolidatedSalesTable();
@@ -2049,12 +2053,15 @@ const IncomeStatementModule = {
     },
 
     async deleteAllExternalSales() {
-        const count = this.externalSales.length;
-        if (count === 0) return;
+        const count = (this.externalSales || []).length;
+        if (count === 0) {
+            Utils.showToast('No hay registros de ventas externas para vaciar.', 'warning');
+            return;
+        }
 
         if (!confirm(`⚠️ ¿Estás seguro de ELIMINAR TODOS los ${count} registros de ventas externas? Esta acción no se puede deshacer.`)) return;
 
-        Utils.showToast('Vaclando todos los registros...', 'info');
+        Utils.showToast('Vaciando todos los registros...', 'info');
 
         const idsToDelete = this.externalSales.map(s => String(s.id));
 
@@ -2063,15 +2070,30 @@ const IncomeStatementModule = {
         this.saveExternalSalesToLocal();
         this.isExternalSalesExpanded = false;
 
-        // 2. Clear Supabase in background
+        // 2. Clear Supabase safely using neq or batching to prevent HTTP 400 URL length limit
         try {
-            await supabaseClient.from('external_sales').delete().in('id', idsToDelete);
+            const { error } = await supabaseClient.from('external_sales').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            if (error) {
+                for (let i = 0; i < idsToDelete.length; i += 50) {
+                    const chunk = idsToDelete.slice(i, i + 50);
+                    await supabaseClient.from('external_sales').delete().in('id', chunk);
+                }
+            }
         } catch (err) {
             console.warn('Alerta al vaciar en Supabase:', err);
+            try {
+                for (let i = 0; i < idsToDelete.length; i += 50) {
+                    const chunk = idsToDelete.slice(i, i + 50);
+                    await supabaseClient.from('external_sales').delete().in('id', chunk);
+                }
+            } catch (e2) {
+                console.warn('Error en fallback chunked delete:', e2);
+            }
         }
 
         Utils.showToast(`Se eliminaron todos los registros (${count})`, 'success');
 
+        this.renderReportsManagerModal();
         this.renderSummaryCards();
         this.renderSalesTable();
         this.renderConsolidatedSalesTable();
@@ -2080,6 +2102,183 @@ const IncomeStatementModule = {
         this.renderExternalSalesTable();
         this.renderProductProfitTable();
         this.renderPLStatement();
+    },
+
+    // --- GESTOR DE REPORTES SUBIDOS ---
+    openReportsManagerModal() {
+        const modal = document.getElementById('modalReportsManager');
+        if (!modal) return;
+        this.renderReportsManagerModal();
+        modal.classList.add('active');
+        modal.style.setProperty('display', 'flex', 'important');
+        modal.style.zIndex = '10005';
+        document.body.style.overflow = 'hidden';
+    },
+
+    closeReportsManagerModal() {
+        const modal = document.getElementById('modalReportsManager');
+        if (!modal) return;
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    },
+
+    renderReportsManagerModal() {
+        const listEl = document.getElementById('reportsManagerList');
+        if (!listEl) return;
+
+        const sales = this.externalSales || [];
+        if (sales.length === 0) {
+            listEl.innerHTML = `
+                <div style="text-align: center; padding: 2rem 1rem; background: rgba(255,255,255,0.02); border: 1px dashed var(--border); border-radius: var(--radius-md);">
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">📭</div>
+                    <div style="font-weight: 500; color: var(--text-muted);">No hay reportes subidos actualmente</div>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;">Los reportes que subas (ej: Ecuador Hoko, Ecuador Domi, Colombia Domi, Venezuela Domi) aparecerán aquí.</div>
+                </div>`;
+            return;
+        }
+
+        // Group sales by country/report name
+        const groups = {};
+        sales.forEach(s => {
+            const name = s.country || 'Sin Nombre';
+            if (!groups[name]) {
+                groups[name] = {
+                    name: name,
+                    count: 0,
+                    totalRevenue: 0,
+                    minDate: s.sale_date,
+                    maxDate: s.sale_date
+                };
+            }
+            groups[name].count++;
+            groups[name].totalRevenue += parseFloat(s.revenue || 0);
+            if (s.sale_date && s.sale_date < groups[name].minDate) groups[name].minDate = s.sale_date;
+            if (s.sale_date && s.sale_date > groups[name].maxDate) groups[name].maxDate = s.sale_date;
+        });
+
+        const reportNames = Object.keys(groups).sort();
+
+        listEl.innerHTML = reportNames.map(name => {
+            const r = groups[name];
+            const flag = this.getCountryFlag(name);
+            const dateRange = (r.minDate && r.maxDate)
+                ? (r.minDate === r.maxDate ? r.minDate : `${r.minDate} al ${r.maxDate}`)
+                : 'Sin fecha';
+            const escapedName = this.escapeHtml(name).replace(/'/g, "\\'");
+
+            return `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); gap: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0;">
+                        <span style="font-size: 1.5rem; line-height: 1;">${flag}</span>
+                        <div style="min-width: 0; flex: 1;">
+                            <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                ${this.escapeHtml(name)}
+                            </div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.2rem;">
+                                <span>📄 <strong>${r.count}</strong> registros</span>
+                                <span>💵 Total: <strong style="color: var(--success);">$${r.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                                <span>📅 ${dateRange}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-danger-light" style="white-space: nowrap; font-size: 0.8rem; padding: 0.4rem 0.75rem;" onclick="IncomeStatementModule.deleteReportByName('${escapedName}')">
+                        🗑️ Eliminar Reporte
+                    </button>
+                </div>`;
+        }).join('');
+    },
+
+    async deleteReportByName(reportName) {
+        const recordsToDelete = (this.externalSales || []).filter(s => s.country === reportName);
+        const count = recordsToDelete.length;
+        if (count === 0) {
+            Utils.showToast(`No se encontraron registros para el reporte "${reportName}"`, 'warning');
+            return;
+        }
+
+        if (!confirm(`⚠️ ¿Estás seguro de ELIMINAR todo el reporte "${reportName}"?\nSe eliminarán permanentemente los ${count} registros asociados.`)) {
+            return;
+        }
+
+        Utils.showToast(`Eliminando reporte "${reportName}" (${count} registros)...`, 'info');
+
+        // 1. Delete from memory immediately
+        this.externalSales = (this.externalSales || []).filter(s => s.country !== reportName);
+        this.saveExternalSalesToLocal();
+
+        // 2. Delete from Supabase cleanly by country/report name
+        try {
+            const { error } = await supabaseClient
+                .from('external_sales')
+                .delete()
+                .eq('country', reportName);
+            if (error) console.warn('Alerta Supabase al eliminar reporte por país:', error);
+        } catch (err) {
+            console.warn('Error al eliminar reporte de Supabase:', err);
+        }
+
+        Utils.showToast(`Se eliminó el reporte "${reportName}" (${count} registros)`, 'success');
+
+        // Re-render modal list and report UI
+        this.renderReportsManagerModal();
+        this.renderSummaryCards();
+        this.renderSalesTable();
+        this.renderConsolidatedSalesTable();
+        this.renderAdExpensesTable();
+        this.renderOperationalExpensesTable();
+        this.renderExternalSalesTable();
+        this.renderProductProfitTable();
+        this.renderPLStatement();
+    },
+
+    // --- PLEGADO / DESPLEGADO DE SECCIONES (CARDS) ---
+    toggleCardCollapse(headerEl) {
+        const card = headerEl.closest('.card');
+        if (!card) return;
+        const body = card.querySelector('.card-body');
+        const footer = card.querySelector('.card-footer');
+        const badge = headerEl.querySelector('.card-toggle-badge');
+        
+        if (!body) return;
+        const isHidden = window.getComputedStyle(body).display === 'none';
+        if (isHidden) {
+            body.style.display = 'block';
+            if (footer) footer.style.display = 'block';
+            if (badge) badge.innerHTML = '🔼 Plegar';
+        } else {
+            body.style.display = 'none';
+            if (footer) footer.style.display = 'none';
+            if (badge) badge.innerHTML = '🔽 Desplegar';
+        }
+    },
+
+    expandAllCards() {
+        const container = document.getElementById('section-income-statement');
+        if (!container) return;
+        const cards = container.querySelectorAll('.card');
+        cards.forEach(card => {
+            const body = card.querySelector('.card-body');
+            const footer = card.querySelector('.card-footer');
+            const badge = card.querySelector('.card-toggle-badge');
+            if (body) body.style.display = 'block';
+            if (footer) footer.style.display = 'block';
+            if (badge) badge.innerHTML = '🔼 Plegar';
+        });
+    },
+
+    collapseAllCards() {
+        const container = document.getElementById('section-income-statement');
+        if (!container) return;
+        const cards = container.querySelectorAll('.card');
+        cards.forEach(card => {
+            const body = card.querySelector('.card-body');
+            const footer = card.querySelector('.card-footer');
+            const badge = card.querySelector('.card-toggle-badge');
+            if (body) body.style.display = 'none';
+            if (footer) footer.style.display = 'none';
+            if (badge) badge.innerHTML = '🔽 Desplegar';
+        });
     },
 
     async manualGroupExternalSales() {
@@ -2351,6 +2550,7 @@ const IncomeStatementModule = {
             await supabaseClient.from('external_sales').delete().eq('id', id);
         } catch (e) {}
         Utils.showToast('Venta eliminada', 'success');
+        this.renderReportsManagerModal();
         await this.render();
     },
 

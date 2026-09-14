@@ -6749,6 +6749,30 @@
         </div>
     </div>
 
+    <!-- Modal: Gestor de Reportes Subidos -->
+    <div class="modal" id="modalReportsManager">
+        <div class="modal-content" style="max-width: 650px;">
+            <div class="modal-header">
+                <h2 style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span>📂</span> Gestor de Reportes Subidos
+                </h2>
+                <button type="button" class="modal-close" onclick="IncomeStatementModule.closeReportsManagerModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.25rem;">
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;">
+                    Aquí puedes visualizar todos los reportes de ventas subidos (ej: Ecuador Hoko, Ecuador Domi, Colombia Domi, Venezuela Domi) y eliminarlos individualmente de forma permanente.
+                </div>
+                <div id="reportsManagerList" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <!-- Generado dinámicamente por IncomeStatementModule.renderReportsManagerModal() -->
+                </div>
+            </div>
+            <div class="modal-footer" style="padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border);">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="IncomeStatementModule.closeReportsManagerModal()">Cerrar</button>
+                <button type="button" class="btn btn-danger-light btn-sm" onclick="IncomeStatementModule.deleteAllExternalSales()">⚠️ Vaciar Todos los Reportes</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Agrupar Referencias Manualmente -->
     <div class="modal" id="modalGroupReferences">
         <div class="modal-content" style="max-width: 600px;">
