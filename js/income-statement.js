@@ -2102,6 +2102,18 @@ const IncomeStatementModule = {
         this.renderExternalSalesTable();
         this.renderProductProfitTable();
         this.renderPLStatement();
+    },    // --- UTILIDAD ESCAPE HTML ---
+    escapeHtml(str) {
+        if (!str) return '';
+        if (typeof Utils !== 'undefined' && typeof Utils.escapeHtml === 'function') {
+            return Utils.escapeHtml(str);
+        }
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     },
 
     // --- GESTOR DE REPORTES SUBIDOS ---
@@ -2232,6 +2244,84 @@ const IncomeStatementModule = {
         this.renderPLStatement();
     },
 
+    // --- CONVERSIÓN DE MONEDA (COP -> USD CON TRM) PARA REPORTES EXTERNOS ---
+    onExtCurrencyChange() {
+        const sel = document.getElementById('extImportCurrency');
+        const trmBox = document.getElementById('extTrmInputContainer');
+        const info = document.getElementById('extConversionInfo');
+        const isCop = sel && sel.value === 'COP';
+        if (trmBox) trmBox.style.display = isCop ? 'inline-flex' : 'none';
+        if (info) info.style.display = isCop ? 'block' : 'none';
+    },
+
+    onModalPreviewCurrencyChange() {
+        const curr = document.getElementById('modalPreviewCurrency')?.value;
+        const isCop = curr === 'COP';
+        const box = document.getElementById('modalPreviewTrmBox');
+        const badge = document.getElementById('modalPreviewTrmBadge');
+        if (box) box.style.display = isCop ? 'inline-flex' : 'none';
+        if (badge) badge.style.display = isCop ? 'block' : 'none';
+        this.onModalPreviewTrmChange();
+    },
+
+    onModalPreviewTrmChange() {
+        if (!this.pendingImportRecords || this.pendingImportRecords.length === 0) return;
+        const curr = document.getElementById('modalPreviewCurrency')?.value || 'USD';
+        const isCop = curr === 'COP';
+        let trm = parseFloat(document.getElementById('modalPreviewTrmRate')?.value) || 4100;
+        if (trm <= 0) trm = 4100;
+        const divisor = isCop ? trm : 1;
+
+        this.pendingImportRecords.forEach(r => {
+            const rawRev = r.raw_revenue !== undefined ? r.raw_revenue : r.revenue;
+            const rawCost = r.raw_product_cost !== undefined ? r.raw_product_cost : r.product_cost;
+            const rawShip = r.raw_shipping_cost !== undefined ? r.raw_shipping_cost : r.shipping_cost;
+            const rawRetShip = r.raw_return_shipping_cost !== undefined ? r.raw_return_shipping_cost : r.return_shipping_cost;
+
+            r.revenue = rawRev / divisor;
+            r.product_cost = rawCost / divisor;
+            r.shipping_cost = rawShip / divisor;
+            r.return_shipping_cost = rawRetShip / divisor;
+        });
+
+        this.pendingImportRecords.currency = curr;
+        this.pendingImportRecords.trmRate = trm;
+
+        // Re-render summary cards & table
+        let totalRev = 0, totalCost = 0, totalShip = 0, totalReturnShip = 0, deliveredCount = 0, returnedCount = 0;
+        this.pendingImportRecords.forEach(r => {
+            totalRev += (r.revenue || 0);
+            totalCost += (r.product_cost || 0);
+            totalShip += (r.shipping_cost || 0);
+            totalReturnShip += (r.return_shipping_cost || 0);
+            deliveredCount += (r.delivered || 0);
+            returnedCount += (r.returned || 0);
+        });
+
+        const cardsEl = document.getElementById('importPreviewSummaryCards');
+        if (cardsEl) {
+            const currencySubtitle = isCop ? `<div style="font-size: 0.72rem; opacity: 0.85; margin-top: 2px; color: var(--primary);">Convertido a TRM: ${Math.round(trm).toLocaleString('es-CO')} COP</div>` : '';
+            cardsEl.innerHTML = `
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total Facturado (USD)</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: var(--success);">${totalRev.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    ${currencySubtitle}
+                </div>
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Fletes Totales (USD)</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: var(--primary);">${(totalShip + totalReturnShip).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Entrega: ${totalShip.toFixed(2)} | Dev: ${totalReturnShip.toFixed(2)}</div>
+                </div>
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Efectividad de Entrega</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: var(--text);">${((deliveredCount / (deliveredCount + returnedCount || 1)) * 100).toFixed(1)}%</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">${deliveredCount} entregados | ${returnedCount} devueltos</div>
+                </div>`;
+        }
+
+        this.renderImportPreviewTable(this.pendingImportRecords);
+    },
+
     // --- PLEGADO / DESPLEGADO DE SECCIONES (CARDS) ---
     toggleCardCollapse(headerEl) {
         const card = headerEl.closest('.card');
@@ -2359,6 +2449,16 @@ const IncomeStatementModule = {
 
         if (!tbody) return;
 
+        let tfoot = document.getElementById('isExternalSalesTableFoot');
+        if (!tfoot) {
+            const table = tbody.closest('table');
+            if (table) {
+                tfoot = document.createElement('tfoot');
+                tfoot.id = 'isExternalSalesTableFoot';
+                table.appendChild(tfoot);
+            }
+        }
+
         const sales = this.getFilteredExternalSales();
 
         if (btnDeleteAll) {
@@ -2373,23 +2473,53 @@ const IncomeStatementModule = {
         if (sales.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="13" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         No hay ventas manuales o importadas registradas en este período.
                     </td>
                 </tr>`;
+            if (tfoot) tfoot.innerHTML = '';
             if (expandContainer) expandContainer.innerHTML = '';
             return;
         }
 
+        const filteredAdExpenses = this.getFilteredAdExpenses();
+
+        // Calculate Totals for ALL filtered sales
+        let totalRevenue = 0;
+        let totalProductCost = 0;
+        let totalShippingCost = 0;
+        let totalReturnShippingCost = 0;
+        let totalAdSpend = 0;
+        let totalDelivered = 0;
+        let totalReturned = 0;
+
+        sales.forEach(sale => {
+            totalRevenue += parseFloat(sale.revenue || 0);
+            totalProductCost += parseFloat(sale.product_cost || 0);
+            totalShippingCost += parseFloat(sale.shipping_cost || 0);
+            totalReturnShippingCost += parseFloat(sale.return_shipping_cost || 0);
+            totalDelivered += parseInt(sale.delivered || 0);
+            totalReturned += parseInt(sale.returned || 0);
+
+            if (sale.description) {
+                const adSpend = filteredAdExpenses
+                    .filter(exp => exp.product_name === sale.description)
+                    .reduce((sum, exp) => sum + parseFloat(exp.amount_spent || 0), 0);
+                totalAdSpend += adSpend;
+            }
+        });
+
+        const totalOrders = totalDelivered + totalReturned;
+        const overallReturnRate = totalOrders > 0 ? ((totalReturned / totalOrders) * 100).toFixed(1) : '0.0';
+
         const limit = 5;
         const visibleSales = this.isExternalSalesExpanded ? sales : sales.slice(0, limit);
-        const filteredAdExpenses = this.getFilteredAdExpenses();
 
         tbody.innerHTML = visibleSales.map(sale => {
             const delivered = sale.delivered || 0;
             const returned = sale.returned || 0;
-            const totalOrders = delivered + returned;
-            const returnRate = totalOrders > 0 ? ((returned / totalOrders) * 100).toFixed(1) : '0.0';
+            const orders = delivered + returned;
+            const returnRate = orders > 0 ? ((returned / orders) * 100).toFixed(1) : '0.0';
             
             // Sum Ad Spend linked to this sale
             let adSpend = 0;
@@ -2440,6 +2570,44 @@ const IncomeStatementModule = {
                     </td>
                 </tr>`;
         }).join('');
+
+        // Render Summary Totals Row in tfoot
+        if (tfoot) {
+            tfoot.innerHTML = `
+                <tr style="background: rgba(14, 165, 233, 0.12); font-weight: 700; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border);">
+                    <td colspan="3" style="text-align: left; padding: 0.85rem 1rem; font-size: 0.88rem; color: var(--text);">
+                        <span style="display: flex; align-items: center; gap: 0.4rem;">
+                            <span style="font-size: 1.15rem;">📊</span>
+                            <span style="font-weight: 800; letter-spacing: 0.3px;">TOTALES (${sales.length} registros):</span>
+                        </span>
+                    </td>
+                    <td style="text-align: right; font-weight: 800; color: var(--success); font-size: 0.92rem; white-space: nowrap;">
+                        ${this.formatCurrency(totalRevenue)}
+                    </td>
+                    <td style="text-align: right; font-weight: 800; color: var(--danger); font-size: 0.92rem; white-space: nowrap;">
+                        ${this.formatCurrency(totalProductCost)}
+                    </td>
+                    <td style="text-align: right; font-weight: 800; color: var(--primary); font-size: 0.92rem; white-space: nowrap;">
+                        ${this.formatCurrency(totalShippingCost)}
+                    </td>
+                    <td style="text-align: right; font-weight: 800; color: var(--danger); font-size: 0.92rem; white-space: nowrap;">
+                        ${this.formatCurrency(totalReturnShippingCost)}
+                    </td>
+                    <td style="text-align: right; font-weight: 800; color: var(--warning); font-size: 0.92rem; white-space: nowrap;">
+                        ${this.formatCurrency(totalAdSpend)}
+                    </td>
+                    <td style="text-align: right; font-weight: 800; font-size: 0.92rem;">
+                        ${totalDelivered}
+                    </td>
+                    <td style="text-align: right; font-weight: 800; font-size: 0.92rem;">
+                        ${totalReturned}
+                    </td>
+                    <td style="text-align: center; font-weight: 800; font-size: 0.92rem; color: ${parseFloat(overallReturnRate) > 25 ? 'var(--danger)' : 'var(--text)'};">
+                        ${overallReturnRate}%
+                    </td>
+                    <td colspan="2"></td>
+                </tr>`;
+        }
 
         if (expandContainer) {
             if (sales.length > limit) {
@@ -2815,6 +2983,7 @@ const IncomeStatementModule = {
 
             let statusIdx = 2, productIdx = 12, stockIdx = 13, contentIdx = 15;
             let recaudoIdx = 25, costoIdx = 26, safeFleteEntregaIdx = 27, safeFleteDevIdx = 28;
+            let dateIdx = 16;
             let startRowIndex = 0;
 
             if (headerRowIndex !== -1) {
@@ -2826,20 +2995,36 @@ const IncomeStatementModule = {
                     return idx !== -1 ? idx : fallbackIdx;
                 };
                 statusIdx = findColExact(['estado', 'estado guia', 'estado del pedido'], 2);
-                productIdx = findColExact(['producto', 'nombre producto', 'articulo'], 12);
-                stockIdx = findColExact(['id del stock', 'stock id', 'sku', 'id stock'], 13);
-                contentIdx = findColExact(['contenido del producto', 'contenido', 'detalle'], 15);
-                recaudoIdx = findColExact(['recaudo', 'valor recaudo', 'monto recaudo'], 25);
-                costoIdx = findColExact(['costo del producto', 'costo producto', 'costo prod', 'costo'], 26);
+                productIdx = findColExact(['productos', 'producto', 'nombre producto', 'articulo'], 12);
+                stockIdx = findColExact(['id de stocks', 'id del stock', 'stock id', 'sku', 'id stock'], 13);
+                contentIdx = findColExact(['contenido', 'contenido del producto', 'detalle'], 15);
+                recaudoIdx = findColExact(['total recaudo', 'recaudo', 'valor recaudo', 'monto recaudo'], 25);
+                costoIdx = findColExact(['total dropshipping', 'costo del producto', 'costo producto', 'costo prod', 'costo'], 26);
+                
                 const fleteEntregaIdx = headers.findIndex(h => h.includes('flete') && !h.includes('devoluc'));
                 const fleteDevIdx = headers.findIndex(h => h.includes('devoluc') || h.includes('flete por dev'));
                 if (fleteEntregaIdx !== -1) safeFleteEntregaIdx = fleteEntregaIdx;
                 if (fleteDevIdx !== -1) safeFleteDevIdx = fleteDevIdx;
-                
-                // Forzar columnas Dropi Ecuador según indicaciones:
-                statusIdx = 2; // Columna C
-                safeFleteDevIdx = 28; // Columna AC
+
+                const dIdx = headers.findIndex(h => h.includes('fecha de creación') || h.includes('fecha creacion') || h.includes('fecha'));
+                if (dIdx !== -1) dateIdx = dIdx;
             }
+
+            // Currency & TRM Detection
+            const fLower = (file.name || '').toLowerCase();
+            let isCop = fLower.includes('colombia') || fLower.includes('col') || fLower.includes('cop') || fLower.includes('effi');
+            const extCurrencyEl = document.getElementById('extImportCurrency');
+            if (extCurrencyEl) {
+                if (isCop) {
+                    extCurrencyEl.value = 'COP';
+                    this.onExtCurrencyChange();
+                } else if (extCurrencyEl.value === 'COP') {
+                    isCop = true;
+                }
+            }
+
+            let trmRate = parseFloat(document.getElementById('extTrmRate')?.value) || 4100;
+            if (trmRate <= 0) trmRate = 4100;
 
             this.updateImportProgress(35, 'Columnas identificadas. Cargando productos del catálogo...');
             await new Promise(r => setTimeout(r, 30));
@@ -2882,22 +3067,28 @@ const IncomeStatementModule = {
 
                 totalScannedGuides++;
 
-                const recaudo = this.parseExcelNumber(row[recaudoIdx]);
-                const costoProd = this.parseExcelNumber(row[costoIdx]);
-                const fleteEntrega = this.parseExcelNumber(row[safeFleteEntregaIdx]);
-                const fleteDevolucion = this.parseExcelNumber(row[safeFleteDevIdx]);
+                const rawRecaudo = this.parseExcelNumber(row[recaudoIdx]);
+                const rawCostoProd = this.parseExcelNumber(row[costoIdx]);
+                const rawFleteEntrega = this.parseExcelNumber(row[safeFleteEntregaIdx]);
+                const rawFleteDevolucion = this.parseExcelNumber(row[safeFleteDevIdx]);
+
+                // Date detection
+                let rowDate = '';
+                if (dateIdx !== -1 && row[dateIdx]) {
+                    const rawD = String(row[dateIdx]).trim();
+                    if (/^\d{4}-\d{2}-\d{2}/.test(rawD)) {
+                        rowDate = rawD.substring(0, 10);
+                    } else if (/^\d{1,2}\/\d{1,2}\/\d{4}/.test(rawD)) {
+                        const parts = rawD.split('/');
+                        rowDate = `${parts[2]}-${String(parts[1]).padStart(2, '0')}-${String(parts[0]).padStart(2, '0')}`;
+                    }
+                }
 
                 const statusLower = status.toLowerCase();
                 const isReturned = statusLower.includes('devuelt') || statusLower.includes('devol') || statusLower.includes('cancel') || statusLower.includes('rechazad');
 
                 if (isReturned) totalReturnedGuides++;
                 else totalDeliveredGuides++;
-
-                let groupKey = '';
-                if (stockId) groupKey = stockId.toLowerCase();
-                else if (rawProduct) groupKey = rawProduct.toLowerCase();
-                else if (content) groupKey = content.toLowerCase();
-                else groupKey = 'sin_referencia';
 
                 let matchedProduct = null;
                 if (stockId) {
@@ -2910,15 +3101,21 @@ const IncomeStatementModule = {
                 }
 
                 let finalProductName = matchedProduct ? matchedProduct.name : (rawProduct || content || (stockId ? `Ref: ${stockId}` : 'Producto Externo'));
-                finalProductName = finalProductName.replace(/^\d+\s+/, '').trim();
+                finalProductName = finalProductName.replace(/^[\d\s\t]+/, '').trim().replace(/\s+/g, ' ');
                 if (!finalProductName) finalProductName = stockId || 'Producto Externo';
+
+                const groupKey = finalProductName.toLowerCase();
 
                 if (!productGroupMap[groupKey]) {
                     productGroupMap[groupKey] = {
-                        country: 'Ecuador',
-                        sale_date: this.filters.dateFrom || new Date().toISOString().split('T')[0],
+                        country: isCop ? 'Colombia Hoko' : 'Ecuador Hoko',
+                        sale_date: rowDate || this.filters.dateFrom || new Date().toISOString().split('T')[0],
                         description: finalProductName,
                         stock_id: stockId,
+                        raw_revenue: 0,
+                        raw_product_cost: 0,
+                        raw_shipping_cost: 0,
+                        raw_return_shipping_cost: 0,
                         revenue: 0,
                         product_cost: 0,
                         shipping_cost: 0,
@@ -2929,19 +3126,30 @@ const IncomeStatementModule = {
                 }
 
                 const grp = productGroupMap[groupKey];
+                if (rowDate && (!grp.sale_date || rowDate < grp.sale_date)) grp.sale_date = rowDate;
+
                 if (isReturned) {
                     grp.returned += 1;
-                    grp.return_shipping_cost += fleteDevolucion;
+                    grp.raw_return_shipping_cost += rawFleteDevolucion;
                 } else {
                     grp.delivered += 1;
-                    grp.revenue += recaudo;
-                    grp.product_cost += costoProd;
-                    grp.shipping_cost += fleteEntrega;
+                    grp.raw_revenue += rawRecaudo;
+                    grp.raw_product_cost += rawCostoProd;
+                    grp.raw_shipping_cost += rawFleteEntrega;
                 }
             }
 
-            this.updateImportProgress(92, 'Finalizando agrupación...');
+            this.updateImportProgress(92, 'Finalizando agrupación y conversión...');
             await new Promise(r => setTimeout(r, 50));
+
+            // Apply TRM conversion to USD
+            const divisor = isCop ? trmRate : 1;
+            Object.values(productGroupMap).forEach(grp => {
+                grp.revenue = grp.raw_revenue / divisor;
+                grp.product_cost = grp.raw_product_cost / divisor;
+                grp.shipping_cost = grp.raw_shipping_cost / divisor;
+                grp.return_shipping_cost = grp.raw_return_shipping_cost / divisor;
+            });
 
             const recordsToInsert = Object.values(productGroupMap);
 
@@ -2959,6 +3167,8 @@ const IncomeStatementModule = {
             recordsToInsert.totalScannedGuides = totalScannedGuides;
             recordsToInsert.totalDeliveredGuides = totalDeliveredGuides;
             recordsToInsert.totalReturnedGuides = totalReturnedGuides;
+            recordsToInsert.currency = isCop ? 'COP' : 'USD';
+            recordsToInsert.trmRate = trmRate;
 
             this.updateImportProgress(100, `¡Listo! ${recordsToInsert.length} referencias agrupadas.`);
             await new Promise(r => setTimeout(r, 400)); // brief pause to show 100%
@@ -2993,25 +3203,42 @@ const IncomeStatementModule = {
             deliveredCount += (r.delivered || 0);
             returnedCount += (r.returned || 0);
         });
-        const totalScanned = records.totalScannedGuides || (deliveredCount + returnedCount);
 
+        // Setup Currency and TRM inside modal
+        const modalCurr = document.getElementById('modalPreviewCurrency');
+        const modalTrmBox = document.getElementById('modalPreviewTrmBox');
+        const modalTrmInput = document.getElementById('modalPreviewTrmRate');
+        const modalTrmBadge = document.getElementById('modalPreviewTrmBadge');
+
+        const isCop = (records.currency === 'COP') || (fileName && (fileName.toLowerCase().includes('colombia') || fileName.toLowerCase().includes('cop')));
+        if (modalCurr) {
+            modalCurr.value = isCop ? 'COP' : 'USD';
+        }
+        if (modalTrmInput) {
+            modalTrmInput.value = records.trmRate || parseFloat(document.getElementById('extTrmRate')?.value) || 4100;
+        }
+        if (modalTrmBox) modalTrmBox.style.display = isCop ? 'inline-flex' : 'none';
+        if (modalTrmBadge) modalTrmBadge.style.display = isCop ? 'block' : 'none';
+
+        const trmRate = parseFloat(modalTrmInput?.value) || 4100;
         const cardsEl = document.getElementById('importPreviewSummaryCards');
         if (cardsEl) {
+            const currencySubtitle = isCop ? `<div style="font-size: 0.72rem; opacity: 0.85; margin-top: 2px; color: var(--primary);">Convertido a TRM: $${Math.round(trmRate).toLocaleString('es-CO')} COP</div>` : '';
             cardsEl.innerHTML = `
-                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">Pedidos Procesados</div>
-                    <div style="font-size: 1.4rem; font-weight: 700; color: #34d399;">${totalScanned}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${records.length} referencias agrupadas</div>
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total Facturado (USD)</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: var(--success);">$${totalRev.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    ${currencySubtitle}
                 </div>
-                <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">Total Recaudo (Col. Z)</div>
-                    <div style="font-size: 1.4rem; font-weight: 700; color: #60a5fa;">$${totalRev.toFixed(2)}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">${deliveredCount} entregados / ${returnedCount} devueltos</div>
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Fletes Totales (USD)</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: var(--primary);">$${(totalShip + totalReturnShip).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">Entrega: $${totalShip.toFixed(2)} | Dev: $${totalReturnShip.toFixed(2)}</div>
                 </div>
-                <div style="flex: 1; min-width: 150px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); padding: 0.85rem; border-radius: var(--radius-md); text-align: center;">
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">Costos & Fletes</div>
-                    <div style="font-size: 1.1rem; font-weight: 700; color: var(--danger);">$${(totalCost + totalShip + totalReturnShip).toFixed(2)}</div>
-                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem;">Prod: $${totalCost.toFixed(2)} | Envío: $${totalShip.toFixed(2)} | Dev: $${totalReturnShip.toFixed(2)}</div>
+                <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
+                    <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Efectividad de Entrega</div>
+                    <div style="font-size: 1.4rem; font-weight: 700; color: var(--text);">${((deliveredCount / (deliveredCount + returnedCount || 1)) * 100).toFixed(1)}%</div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); margin-top: 2px;">${deliveredCount} entregados | ${returnedCount} devueltos</div>
                 </div>`;
         }
 
@@ -3030,12 +3257,15 @@ const IncomeStatementModule = {
         if (nameInput) {
             let suggestedName = 'Ecuador Hoko';
             const fLower = (fileName || '').toLowerCase();
-            if (fLower.includes('colombia') || fLower.includes('col') || fLower.includes('effi')) {
-                suggestedName = 'Colombia Effi';
+            if (fLower.includes('colombia') || fLower.includes('col')) {
+                if (fLower.includes('hoko')) suggestedName = 'Colombia Hoko';
+                else if (fLower.includes('domi')) suggestedName = 'Colombia Domi';
+                else suggestedName = 'Colombia Effi';
             } else if (fLower.includes('venezuela') || fLower.includes('ven')) {
                 suggestedName = 'Venezuela Hoko';
             } else if (fLower.includes('ecuador') || fLower.includes('ecu') || fLower.includes('hoko')) {
-                suggestedName = 'Ecuador Hoko';
+                if (fLower.includes('domi')) suggestedName = 'Ecuador Domi';
+                else suggestedName = 'Ecuador Hoko';
             }
             nameInput.value = suggestedName;
             setTimeout(() => {
@@ -3056,7 +3286,13 @@ const IncomeStatementModule = {
     renderImportPreviewTable(records) {
         const tableBody = document.getElementById('importPreviewTableBody');
         if (!tableBody) return;
-        tableBody.innerHTML = records.map((r, idx) => `
+        const isCop = records.currency === 'COP' || document.getElementById('modalPreviewCurrency')?.value === 'COP';
+
+        tableBody.innerHTML = records.map((r, idx) => {
+            const rawRevSubtitle = (isCop && r.raw_revenue) ? `<div style="font-size: 0.68rem; color: var(--text-muted);">COP $${Math.round(r.raw_revenue).toLocaleString('es-CO')}</div>` : '';
+            const rawShipSubtitle = (isCop && r.raw_shipping_cost) ? `<div style="font-size: 0.68rem; color: var(--text-muted);">COP $${Math.round(r.raw_shipping_cost).toLocaleString('es-CO')}</div>` : '';
+
+            return `
             <tr data-import-idx="${idx}" style="cursor: pointer;" onclick="IncomeStatementModule.toggleImportRowCheck(${idx}, event)">
                 <td style="text-align: center;" onclick="event.stopPropagation();">
                     <input type="checkbox" class="import-row-check" data-idx="${idx}" onchange="IncomeStatementModule.updateManualGroupCount()" style="cursor: pointer;">
@@ -3066,12 +3302,23 @@ const IncomeStatementModule = {
                     ${r.stock_id ? `<div style="font-size:0.7rem; color:var(--text-muted);">Ref: ${r.stock_id}</div>` : ''}
                 </td>
                 <td style="text-align: center; color: var(--success); font-weight: 600;">${r.delivered}</td>
-                <td style="text-align: center; color: var(--danger);">${r.returned}</td>
-                <td style="text-align: right; color: var(--success); font-weight: 600;">$${(r.revenue || 0).toFixed(2)}</td>
-                <td style="text-align: right; color: var(--danger);">$${(r.product_cost || 0).toFixed(2)}</td>
-                <td style="text-align: right; color: var(--primary);">$${(r.shipping_cost || 0).toFixed(2)}</td>
-                <td style="text-align: right; color: var(--danger);">$${(r.return_shipping_cost || 0).toFixed(2)}</td>
-            </tr>`).join('');
+                <td style="text-align: center; color: var(--danger); font-weight: 600;">${r.returned}</td>
+                <td style="text-align: right; color: var(--success); font-weight: 600;">
+                    $${(r.revenue || 0).toFixed(2)}
+                    ${rawRevSubtitle}
+                </td>
+                <td style="text-align: right; color: var(--danger);">
+                    $${(r.product_cost || 0).toFixed(2)}
+                </td>
+                <td style="text-align: right; color: var(--primary);">
+                    $${(r.shipping_cost || 0).toFixed(2)}
+                    ${rawShipSubtitle}
+                </td>
+                <td style="text-align: right; color: var(--danger);">
+                    $${(r.return_shipping_cost || 0).toFixed(2)}
+                </td>
+            </tr>`;
+        }).join('');
     },
 
     toggleImportRowCheck(idx, event) {
@@ -3084,89 +3331,82 @@ const IncomeStatementModule = {
     },
 
     toggleSelectAllImport(checked) {
-        document.querySelectorAll('.import-row-check').forEach(cb => cb.checked = checked);
+        document.querySelectorAll('.import-row-check').forEach(cb => {
+            cb.checked = checked;
+        });
         this.updateManualGroupCount();
     },
 
     updateManualGroupCount() {
-        const checked = document.querySelectorAll('.import-row-check:checked').length;
-        const countEl = document.getElementById('manualGroupCount');
+        const checked = document.querySelectorAll('.import-row-check:checked');
+        const count = checked.length;
         const btn = document.getElementById('btnManualGroup');
-        if (countEl) countEl.textContent = checked;
-        if (btn) btn.disabled = (checked < 2);
+        const badge = document.getElementById('manualGroupCount');
+        if (badge) badge.innerText = count;
+        if (btn) btn.disabled = count < 2;
     },
 
     manualGroupSelected() {
-        const records = this.pendingImportRecords;
-        if (!records || records.length === 0) return;
+        const checkedBoxes = Array.from(document.querySelectorAll('.import-row-check:checked'));
+        if (checkedBoxes.length < 2) return;
 
-        const checkedBoxes = document.querySelectorAll('.import-row-check:checked');
-        if (checkedBoxes.length < 2) {
-            Utils.showToast('Selecciona al menos 2 productos para agrupar.', 'warning');
-            return;
-        }
+        const indices = checkedBoxes.map(cb => parseInt(cb.getAttribute('data-idx'))).sort((a, b) => a - b);
+        const selectedRecords = indices.map(idx => this.pendingImportRecords[idx]);
 
-        // Get the selected indices (sorted descending for safe splicing)
-        const selectedIdxs = Array.from(checkedBoxes).map(cb => parseInt(cb.dataset.idx)).sort((a, b) => a - b);
+        const defaultName = selectedRecords[0].description;
+        const newName = prompt('Ingrese el nombre para la referencia unificada:', defaultName);
+        if (!newName || !newName.trim()) return;
 
-        // The first selected becomes the merged record
-        const mergedIdx = selectedIdxs[0];
-        const merged = { ...records[mergedIdx] };
-        const mergedNames = [merged.description];
+        const merged = {
+            country: selectedRecords[0].country,
+            sale_date: selectedRecords[0].sale_date,
+            description: newName.trim(),
+            stock_id: selectedRecords.map(r => r.stock_id).filter(Boolean).join(' | '),
+            raw_revenue: 0,
+            raw_product_cost: 0,
+            raw_shipping_cost: 0,
+            raw_return_shipping_cost: 0,
+            revenue: 0,
+            product_cost: 0,
+            shipping_cost: 0,
+            return_shipping_cost: 0,
+            delivered: 0,
+            returned: 0
+        };
 
-        // Sum values from all other selected records into merged
-        for (let i = 1; i < selectedIdxs.length; i++) {
-            const src = records[selectedIdxs[i]];
-            merged.delivered += (src.delivered || 0);
-            merged.returned += (src.returned || 0);
+        selectedRecords.forEach(src => {
+            merged.raw_revenue += (src.raw_revenue || 0);
+            merged.raw_product_cost += (src.raw_product_cost || 0);
+            merged.raw_shipping_cost += (src.raw_shipping_cost || 0);
+            merged.raw_return_shipping_cost += (src.raw_return_shipping_cost || 0);
             merged.revenue += (src.revenue || 0);
             merged.product_cost += (src.product_cost || 0);
             merged.shipping_cost += (src.shipping_cost || 0);
             merged.return_shipping_cost += (src.return_shipping_cost || 0);
-            if (!mergedNames.includes(src.description)) mergedNames.push(src.description);
-        }
+            merged.delivered += (src.delivered || 0);
+            merged.returned += (src.returned || 0);
+        });
 
-        // Ask for group name
-        const defaultName = mergedNames.length <= 3 ? mergedNames.join(' + ') : `${mergedNames[0]} (+${mergedNames.length - 1} más)`;
-        const groupName = prompt('Nombre del grupo fusionado:', defaultName);
-        if (!groupName) return; // user cancelled
+        // Filter out merged items and insert merged record
+        const remaining = this.pendingImportRecords.filter((_, idx) => !indices.includes(idx));
+        remaining.unshift(merged);
+        remaining.totalScannedGuides = this.pendingImportRecords.totalScannedGuides;
+        remaining.currency = this.pendingImportRecords.currency;
+        remaining.trmRate = this.pendingImportRecords.trmRate;
 
-        merged.description = groupName.trim() || defaultName;
-
-        // Remove selected records (reverse order to maintain indices)
-        for (let i = selectedIdxs.length - 1; i >= 0; i--) {
-            records.splice(selectedIdxs[i], 1);
-        }
-
-        // Insert merged record at the beginning
-        records.unshift(merged);
-
-        // Re-render table and update summary cards
-        this.pendingImportRecords = records;
-        this.openImportPreviewModal(records, '');
-        Utils.showToast(`${selectedIdxs.length} productos agrupados en "${merged.description}"`, 'success');
+        this.pendingImportRecords = remaining;
+        this.openImportPreviewModal(remaining, document.getElementById('importReportCustomName')?.value);
+        Utils.showToast(`Se agruparon ${selectedRecords.length} referencias en "${newName.trim()}"`, 'success');
     },
 
     closeImportPreviewModal() {
         const modal = document.getElementById('modalImportExcelPreview');
-        if (modal) {
-            modal.classList.remove('active');
-            modal.style.display = 'none';
-        }
-        this.pendingImportRecords = [];
+        if (!modal) return;
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+        modal.style.opacity = '0';
+        modal.style.visibility = 'hidden';
     },
-
-
-    generateUUID() {
-        if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-            try { return crypto.randomUUID(); } catch (e) {}
-        }
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-        });
-    },
-
 
     async confirmImportExternalSales() {
         if (!this.pendingImportRecords || this.pendingImportRecords.length === 0) {
