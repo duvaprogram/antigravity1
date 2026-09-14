@@ -4286,7 +4286,7 @@
                             <table class="table">
                                 <thead>
                                     <tr>
-                                        <th>País</th>
+                                        <th>País / Plataforma</th>
                                         <th style="text-align: right;">Pedidos</th>
                                         <th style="text-align: right;">Unidades</th>
                                         <th style="text-align: right;">Ventas</th>
@@ -6681,6 +6681,24 @@
                 <button type="button" class="modal-close" style="color: white;" onclick="IncomeStatementModule.closeImportPreviewModal()">&times;</button>
             </div>
             <div class="modal-body" style="padding: 1.5rem;">
+                <!-- Nombre del Reporte / Plataforma -->
+                <div style="background: rgba(99, 102, 241, 0.1); border: 1.5px solid rgba(99, 102, 241, 0.4); border-radius: var(--radius-md); padding: 1rem 1.25rem; margin-bottom: 1.25rem;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+                        <label for="importReportCustomName" style="font-weight: 700; font-size: 0.95rem; color: var(--text); display: flex; align-items: center; gap: 0.5rem; margin: 0;">
+                            <span style="font-size: 1.2rem;">🏷️</span> ¿Cómo deseas llamar a este reporte en el resumen de ventas? *
+                        </label>
+                        <span style="font-size: 0.75rem; color: #a5b4fc; background: rgba(99, 102, 241, 0.25); padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">Aparecerá en Ventas por País</span>
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; align-items: center;">
+                        <input type="text" id="importReportCustomName" class="form-control" 
+                               placeholder="Ej: Ecuador Hoko, Colombia Effi, Chile Hoko..." 
+                               style="font-size: 0.95rem; font-weight: 600; padding: 0.6rem 0.85rem; border: 1.5px solid #6366f1; background: var(--surface); color: var(--text); border-radius: var(--radius-md); flex: 1;">
+                    </div>
+                    <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 0.35rem;">
+                        💡 Escribe el nombre con el que se identificará este reporte en la tabla principal (ejemplo: <strong>Ecuador Hoko</strong>).
+                    </div>
+                </div>
+
                 <div id="importPreviewSummaryCards" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
                 </div>
 

@@ -689,23 +689,43 @@ const IncomeStatementModule = {
             if (opError) throw opError;
             this.operationalExpenses = opExpenses || [];
 
-            // Load external sales (Supabase + LocalStorage Hybrid with Deduplication)
+            // Load external sales (Supabase + LocalStorage Hybrid with Deduplication & Pagination)
             let supabaseExtSales = [];
             try {
-                const { data: extSales, error: extError } = await supabaseClient
-                    .from('external_sales')
-                    .select('*')
-                    .order('sale_date', { ascending: false });
+                let from = 0;
+                const pageSize = 1000;
+                let hasMore = true;
+                while (hasMore) {
+                    const { data: extSales, error: extError } = await supabaseClient
+                        .from('external_sales')
+                        .select('*')
+                        .order('sale_date', { ascending: false })
+                        .range(from, from + pageSize - 1);
 
-                if (!extError && extSales) {
-                    supabaseExtSales = extSales;
+                    if (extError || !extSales || extSales.length === 0) {
+                        hasMore = false;
+                    } else {
+                        supabaseExtSales.push(...extSales);
+                        if (extSales.length < pageSize) {
+                            hasMore = false;
+                        } else {
+                            from += pageSize;
+                        }
+                    }
                 }
             } catch (e) {
                 console.warn('Alerta al cargar external_sales de Supabase:', e);
             }
 
             const localExtSales = this.loadExternalSalesFromLocal();
-            const combinedExtSales = [...supabaseExtSales, ...localExtSales];
+            // Normalizar registros locales heredados de Julio para Ecuador -> "Ecuador Hoko"
+            const normalizedLocal = (localExtSales || []).map(s => {
+                if ((s.sale_date || '').startsWith('2026-07') && s.country === 'Ecuador') {
+                    return { ...s, country: 'Ecuador Hoko' };
+                }
+                return s;
+            });
+            const combinedExtSales = [...supabaseExtSales, ...normalizedLocal];
 
             this.externalSales = this.deduplicateExternalSales(combinedExtSales);
             this.saveExternalSalesToLocal();
@@ -834,15 +854,22 @@ const IncomeStatementModule = {
     },
 
     matchesCountryFilter(country) {
+        if (!country) return true;
         if (this.countryMultiSelect && !this.countryMultiSelect.isAllSelected()) {
             const selectedCountries = this.filters.countries || [];
             if (selectedCountries.length > 0) {
-                return country ? selectedCountries.includes(country) : false;
+                return selectedCountries.some(sel => {
+                    const s = sel.toLowerCase().trim();
+                    const c = country.toLowerCase().trim();
+                    return c.includes(s) || s.includes(c);
+                });
             }
             return false;
         }
         if (this.filters.country) {
-            return country === this.filters.country;
+            const s = this.filters.country.toLowerCase().trim();
+            const c = country.toLowerCase().trim();
+            return c.includes(s) || s.includes(c);
         }
         return true;
     },
@@ -913,10 +940,14 @@ const IncomeStatementModule = {
         sales.forEach(guide => {
             if (this.isCancelado(guide)) return;
 
-            const country = this.getCountryFromCity(guide.cities);
+            const baseCountry = this.getCountryFromCity(guide.cities);
+            const country = `${baseCountry} Domi`;
             if (!byCountry[country]) {
                 byCountry[country] = {
                     country,
+                    baseCountry,
+                    platform: 'Domi',
+                    isExternal: false,
                     totalRevenue: 0,
                     totalRevenueCOP: 0,
                     totalCost: 0,
@@ -959,6 +990,52 @@ const IncomeStatementModule = {
                     });
                 }
             }
+        });
+
+        // 2. Process External Sales (Other Platforms like Ecuador Hoko)
+        const externalSales = this.getFilteredExternalSales();
+        externalSales.forEach(s => {
+            let countryName = (s.country || 'Otros').trim();
+            // Normalizar si quedó como solo Ecuador a Ecuador Hoko para Julio
+            if (countryName.toLowerCase() === 'ecuador') {
+                countryName = 'Ecuador Hoko';
+            }
+
+            let baseCountry = 'Otros';
+            const cLower = countryName.toLowerCase();
+            if (cLower.includes('ecuador')) baseCountry = 'Ecuador';
+            else if (cLower.includes('colombia')) baseCountry = 'Colombia';
+            else if (cLower.includes('venezuela')) baseCountry = 'Venezuela';
+            else if (cLower.includes('chile')) baseCountry = 'Chile';
+            else if (cLower.includes('panama') || cLower.includes('panamá')) baseCountry = 'Panamá';
+            else baseCountry = countryName;
+
+            if (!byCountry[countryName]) {
+                byCountry[countryName] = {
+                    country: countryName,
+                    baseCountry: baseCountry,
+                    platform: countryName.replace(baseCountry, '').trim() || 'Otras',
+                    isExternal: true,
+                    totalRevenue: 0,
+                    totalRevenueCOP: 0,
+                    totalCost: 0,
+                    totalShipping: 0,
+                    totalShippingCOP: 0,
+                    orderCount: 0,
+                    unitsSold: 0
+                };
+            }
+
+            const del = parseInt(s.delivered || 0);
+            const ret = parseInt(s.returned || 0);
+            const orders = (del + ret > 0) ? (del + ret) : (del > 0 ? del : 1);
+            const units = parseInt(s.units || del || orders);
+
+            byCountry[countryName].orderCount += orders;
+            byCountry[countryName].unitsSold += units;
+            byCountry[countryName].totalRevenue += parseFloat(s.revenue || 0);
+            byCountry[countryName].totalCost += parseFloat(s.product_cost || 0);
+            byCountry[countryName].totalShipping += parseFloat(s.shipping_cost || 0) + parseFloat(s.return_shipping_cost || 0);
         });
 
         return Object.values(byCountry);
@@ -1170,7 +1247,8 @@ const IncomeStatementModule = {
         };
 
         tbody.innerHTML = salesData.map(row => {
-            const countryFreight = freightsByCountry[row.country]?.totalFreight || 0;
+            const baseCountry = row.baseCountry || row.country.replace(' Domi', '');
+            const countryFreight = row.isExternal ? 0 : (freightsByCountry[row.country]?.totalFreight || freightsByCountry[baseCountry]?.totalFreight || 0);
             totalRow.totalRevenue += row.totalRevenue;
             totalRow.totalCost += row.totalCost;
             totalRow.totalShipping += row.totalShipping;
@@ -1188,11 +1266,11 @@ const IncomeStatementModule = {
             // Subtitle for Colombia to show original COP amount & average rate
             let revenueSubtitle = '';
             let shippingSubtitle = '';
-            if (row.country === 'Colombia' && row.totalRevenueCOP > 0) {
+            if (baseCountry === 'Colombia' && row.totalRevenueCOP > 0) {
                 const avgRate = (row.totalRevenueCOP / (row.totalRevenue || 1)).toFixed(0);
                 revenueSubtitle = `<div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 500;" title="Monto original en Pesos Colombianos y tasa aplicada">≈ COP $${Math.round(row.totalRevenueCOP).toLocaleString('es-CO')} <span style="font-size: 0.66rem; opacity: 0.85;">(TRM ~$${Number(avgRate).toLocaleString('es-CO')})</span></div>`;
             }
-            if (row.country === 'Colombia' && row.totalShippingCOP > 0) {
+            if (baseCountry === 'Colombia' && row.totalShippingCOP > 0) {
                 shippingSubtitle = `<div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;" title="Flete en Pesos Colombianos">≈ COP $${Math.round(row.totalShippingCOP).toLocaleString('es-CO')}</div>`;
             }
 
@@ -1204,8 +1282,8 @@ const IncomeStatementModule = {
                             <strong>${row.country}</strong>
                         </div>
                     </td>
-                    <td style="text-align: right; font-weight: 600;">${row.orderCount}</td>
-                    <td style="text-align: right;">${row.unitsSold}</td>
+                    <td style="text-align: right; font-weight: 600;">${row.orderCount.toLocaleString('es-CO')}</td>
+                    <td style="text-align: right;">${row.unitsSold.toLocaleString('es-CO')}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--success);">
                         <div>${this.formatCurrency(row.totalRevenue)}</div>
                         ${revenueSubtitle}
@@ -1227,7 +1305,7 @@ const IncomeStatementModule = {
                         <span class="is-margin-badge ${parseFloat(margin) >= 30 ? 'good' : parseFloat(margin) >= 15 ? 'warning' : 'bad'}">${margin}%</span>
                     </td>
                     <td style="text-align: center;">
-                        <button class="btn btn-icon btn-sm is-detail-btn" onclick="IncomeStatementModule.showOrdersDetail('${row.country}')" title="Ver detalle de pedidos de ${row.country}">
+                        <button class="btn btn-icon btn-sm is-detail-btn" onclick="IncomeStatementModule.showOrdersDetail('${row.country}')" title="Ver detalle de ${row.country}">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <circle cx="11" cy="11" r="8"></circle>
                                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -1246,8 +1324,8 @@ const IncomeStatementModule = {
         tbody.innerHTML += `
             <tr class="is-total-row">
                 <td><strong>TOTAL</strong></td>
-                <td style="text-align: right; font-weight: 700;">${totalRow.orderCount}</td>
-                <td style="text-align: right; font-weight: 700;">${totalRow.unitsSold}</td>
+                <td style="text-align: right; font-weight: 700;">${totalRow.orderCount.toLocaleString('es-CO')}</td>
+                <td style="text-align: right; font-weight: 700;">${totalRow.unitsSold.toLocaleString('es-CO')}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.totalRevenue)}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--danger);">
                     <div>${this.formatCurrency(totalRow.totalCost)}</div>
@@ -2747,6 +2825,27 @@ const IncomeStatementModule = {
         if (selectAll) selectAll.checked = false;
         this.updateManualGroupCount();
 
+        // Suggest report custom name
+        const nameInput = document.getElementById('importReportCustomName');
+        if (nameInput) {
+            let suggestedName = 'Ecuador Hoko';
+            const fLower = (fileName || '').toLowerCase();
+            if (fLower.includes('colombia') || fLower.includes('col') || fLower.includes('effi')) {
+                suggestedName = 'Colombia Effi';
+            } else if (fLower.includes('venezuela') || fLower.includes('ven')) {
+                suggestedName = 'Venezuela Hoko';
+            } else if (fLower.includes('ecuador') || fLower.includes('ecu') || fLower.includes('hoko')) {
+                suggestedName = 'Ecuador Hoko';
+            }
+            nameInput.value = suggestedName;
+            setTimeout(() => {
+                try {
+                    nameInput.focus();
+                    nameInput.select();
+                } catch(e) {}
+            }, 100);
+        }
+
         modal.style.display = 'flex';
         modal.style.opacity = '1';
         modal.style.visibility = 'visible';
@@ -2875,10 +2974,21 @@ const IncomeStatementModule = {
             return;
         }
 
+        const nameInput = document.getElementById('importReportCustomName');
+        let reportName = nameInput ? nameInput.value.trim() : '';
+        if (!reportName) {
+            reportName = prompt('¿Cómo deseas llamar a este reporte en el resumen de ventas? (Ej: Ecuador Hoko, Colombia Effi):', 'Ecuador Hoko');
+            if (!reportName || !reportName.trim()) {
+                Utils.showToast('Por favor escribe un nombre para identificar el reporte.', 'warning');
+                return;
+            }
+        }
+        reportName = reportName.trim();
+
         const recordsToSave = [...this.pendingImportRecords];
         this.closeImportPreviewModal();
 
-        this.showImportLoadingOverlay('Guardando Registros...', 'Preparando datos para almacenamiento local y en la nube...');
+        this.showImportLoadingOverlay('Guardando Registros...', `Guardando reporte "${reportName}" en almacenamiento local y en la nube...`);
         
         // Let overlay render
         await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -2889,7 +2999,7 @@ const IncomeStatementModule = {
         // Create objects with valid UUIDs for memory and local storage
         const preparedRecords = recordsToSave.map(r => ({
             id: this.generateUUID(),
-            country: r.country || 'Ecuador',
+            country: reportName || r.country || 'Ecuador Hoko',
             sale_date: r.sale_date || this.filters.dateFrom || new Date().toISOString().split('T')[0],
             description: r.description || 'Producto Externo',
             revenue: parseFloat(r.revenue) || 0,
@@ -3215,9 +3325,9 @@ const IncomeStatementModule = {
         const opExpData = this.getOpExpensesByCountry();
         const extSalesSummary = this.getExternalSalesSummary();
 
-        const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0) + extSalesSummary.totalRevenue;
-        const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0) + extSalesSummary.totalCost;
-        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0) + extSalesSummary.totalShipping + extSalesSummary.totalReturnShipping;
+        const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
+        const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0);
+        const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0);
         const grossProfit = totalRevenue - totalCOGS - totalShipping;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
@@ -5146,12 +5256,16 @@ const IncomeStatementModule = {
     },
 
     getCountryFlag(country) {
-        const flags = {
-            'Ecuador': '🇪🇨',
-            'Venezuela': '🇻🇪',
-            'Colombia': '🇨🇴'
-        };
-        return flags[country] || '🏳️';
+        if (!country) return '🏳️';
+        const c = country.toLowerCase();
+        if (c.includes('ecuador') || c.includes('ecu') || c === 'ec') return '🇪🇨';
+        if (c.includes('venezuela') || c.includes('ven') || c === 've') return '🇻🇪';
+        if (c.includes('colombia') || c.includes('col') || c === 'co') return '🇨🇴';
+        if (c.includes('chile') || c === 'cl') return '🇨🇱';
+        if (c.includes('mexico') || c.includes('méxico') || c === 'mx') return '🇲🇽';
+        if (c.includes('peru') || c.includes('perú') || c === 'pe') return '🇵🇪';
+        if (c.includes('panama') || c.includes('panamá') || c === 'pa') return '🇵🇦';
+        return '🏳️';
     },
 
     // ========================================
@@ -5191,42 +5305,136 @@ const IncomeStatementModule = {
 
     renderOrdersDetail() {
         const country = this.ordersDetailCurrentCountry;
-        const sales = this.getFilteredSales().filter(guide => {
-            return this.getCountryFromCity(guide.cities) === country;
-        });
+        const isExternal = !country.endsWith(' Domi');
 
         const summaryEl = document.getElementById('ordersDetailSummary');
         const tableBody = document.getElementById('ordersDetailTable');
         const tableHead = document.getElementById('ordersDetailThead');
+        const tabsContainer = document.querySelector('#modalOrdersDetail .nav-tabs');
         if (!tableBody || !tableHead) return;
 
-        // Calculate summary
-        let totalRevenue = 0, totalCost = 0, totalShipping = 0, totalUnits = 0, effectiveOrders = 0, returnedOrders = 0;
-        sales.forEach(g => {
-            if (this.isCancelado(g)) return;
-            const isExcluded = this.isExcludedFromSales(g);
-            totalShipping += this.getGuideShippingCostUSD(g);
+        if (isExternal) {
+            if (tabsContainer) tabsContainer.style.display = 'none';
+            let extSales = this.getFilteredExternalSales().filter(s => {
+                let sc = (s.country || '').trim();
+                if (sc.toLowerCase() === 'ecuador') sc = 'Ecuador Hoko';
+                return sc.toLowerCase() === country.toLowerCase();
+            });
 
-            if (!isExcluded) {
-                effectiveOrders++;
-                totalRevenue += this.getGuideRevenueUSD(g);
-                if (g.guide_items) {
-                    g.guide_items.forEach(item => {
-                        const qty = parseInt(item.quantity || 0);
-                        const rawCost = parseFloat(item.products?.cost || 0);
-                        const cost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
-                        totalCost += qty * cost;
-                        totalUnits += qty;
-                    });
-                }
-            } else {
-                returnedOrders++;
+            let totalRevenue = 0, totalCost = 0, totalShipping = 0, totalUnits = 0, effectiveOrders = 0, returnedOrders = 0;
+            extSales.forEach(item => {
+                const del = parseInt(item.delivered || 0);
+                const ret = parseInt(item.returned || 0);
+                effectiveOrders += del;
+                returnedOrders += ret;
+                totalUnits += parseInt(item.units || del || 1);
+                totalRevenue += parseFloat(item.revenue || 0);
+                totalCost += parseFloat(item.product_cost || 0);
+                totalShipping += parseFloat(item.shipping_cost || 0) + parseFloat(item.return_shipping_cost || 0);
+            });
+            if (effectiveOrders === 0 && returnedOrders === 0) {
+                effectiveOrders = extSales.length;
             }
+            const grossProfit = totalRevenue - totalCost - totalShipping;
+
+            if (summaryEl) {
+                summaryEl.innerHTML = `
+                    <div class="orders-detail-summary-grid">
+                        <div class="orders-summary-item">
+                            <span class="orders-summary-label">Pedidos Entregados</span>
+                            <span class="orders-summary-value">${effectiveOrders}${returnedOrders > 0 ? ` <small style="font-size:0.75rem; color: #f97316; font-weight: 500;">(+${returnedOrders} dev)</small>` : ''}</span>
+                        </div>
+                        <div class="orders-summary-item">
+                            <span class="orders-summary-label">Unidades Vendidas</span>
+                            <span class="orders-summary-value">${totalUnits}</span>
+                        </div>
+                        <div class="orders-summary-item">
+                            <span class="orders-summary-label">Ventas</span>
+                            <span class="orders-summary-value" style="color: var(--success);">${this.formatCurrency(totalRevenue)}</span>
+                        </div>
+                        <div class="orders-summary-item">
+                            <span class="orders-summary-label">Costo Prod.</span>
+                            <span class="orders-summary-value" style="color: var(--danger);">${this.formatCurrency(totalCost)}</span>
+                        </div>
+                        <div class="orders-summary-item">
+                            <span class="orders-summary-label">Envíos (Total)</span>
+                            <span class="orders-summary-value" style="color: var(--danger);">${this.formatCurrency(totalShipping)}</span>
+                        </div>
+                        <div class="orders-summary-item">
+                            <span class="orders-summary-label">Fletes</span>
+                            <span class="orders-summary-value" style="color: var(--warning);">$0.00</span>
+                        </div>
+                        <div class="orders-summary-item orders-summary-highlight">
+                            <span class="orders-summary-label">Utilidad Bruta</span>
+                            <span class="orders-summary-value" style="color: ${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'}; font-size: 1.1rem;">${this.formatCurrency(grossProfit)}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (extSales.length === 0) {
+                tableHead.innerHTML = '';
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                            No hay registros para ${country} en el período seleccionado.
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            tableHead.innerHTML = `
+                <tr>
+                    <th style="width: 40px;">#</th>
+                    <th>Referencia / Producto</th>
+                    <th>Fecha</th>
+                    <th style="text-align: center;">Entregados</th>
+                    <th style="text-align: center;">Devueltos</th>
+                    <th style="text-align: right;">Recaudo / Venta</th>
+                    <th style="text-align: right;">Costo Prod.</th>
+                    <th style="text-align: right;">Envíos / Fletes</th>
+                    <th style="text-align: right;">Utilidad</th>
+                </tr>
+            `;
+            tableBody.innerHTML = extSales.map((item, idx) => {
+                const del = parseInt(item.delivered || 0);
+                const ret = parseInt(item.returned || 0);
+                const rev = parseFloat(item.revenue || 0);
+                const cost = parseFloat(item.product_cost || 0);
+                const ship = parseFloat(item.shipping_cost || 0) + parseFloat(item.return_shipping_cost || 0);
+                const profit = rev - cost - ship;
+                const dateStr = item.sale_date ? this.formatDate(item.sale_date) : '-';
+
+                return `
+                    <tr>
+                        <td style="font-weight: 600; color: var(--text-muted); font-size: 0.8rem;">${idx + 1}</td>
+                        <td>
+                            <div style="font-weight: 600; font-size: 0.85rem;">${item.description || 'Producto Externo'}</div>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">${country}</div>
+                        </td>
+                        <td style="font-size: 0.8rem;">${dateStr}</td>
+                        <td style="text-align: center; font-weight: 600; color: var(--success);">${del}</td>
+                        <td style="text-align: center; color: ${ret > 0 ? '#f97316' : 'var(--text-muted)'};">${ret}</td>
+                        <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(rev)}</td>
+                        <td style="text-align: right; color: var(--danger);">${this.formatCurrency(cost)}</td>
+                        <td style="text-align: right; color: var(--danger);">${this.formatCurrency(ship)}</td>
+                        <td style="text-align: right; font-weight: 600; color: ${profit >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(profit)}</td>
+                    </tr>
+                `;
+            }).join('');
+            return;
+        }
+
+        // Domi guides
+        if (tabsContainer) tabsContainer.style.display = '';
+        const baseCountry = country.replace(' Domi', '').trim();
+        const sales = this.getFilteredSales().filter(guide => {
+            return this.getCountryFromCity(guide.cities) === baseCountry;
         });
 
         // Freight cost for this country
         const freightsByCountry = this.getFreightsByCountry();
-        const countryFreight = freightsByCountry[country]?.totalFreight || 0;
+        const countryFreight = freightsByCountry[baseCountry]?.totalFreight || freightsByCountry[country]?.totalFreight || 0;
         const grossProfit = totalRevenue - totalCost - totalShipping - countryFreight;
 
         if (summaryEl) {
