@@ -2116,6 +2116,19 @@ const IncomeStatementModule = {
             .replace(/'/g, '&#039;');
     },
 
+    generateUUID() {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            try {
+                return crypto.randomUUID();
+            } catch (e) {}
+        }
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            const r = Math.random() * 16 | 0;
+            const v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    },
+
     // --- GESTOR DE REPORTES SUBIDOS ---
     openReportsManagerModal() {
         const modal = document.getElementById('modalReportsManager');
@@ -3430,89 +3443,99 @@ const IncomeStatementModule = {
 
         this.showImportLoadingOverlay('Guardando Registros...', `Guardando reporte "${reportName}" en almacenamiento local y en la nube...`);
         
-        // Let overlay render
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-        this.updateImportProgress(10, 'Generando identificadores únicos...');
-        await new Promise(r => setTimeout(r, 50));
-
-        // Create objects with valid UUIDs for memory and local storage
-        const preparedRecords = recordsToSave.map(r => ({
-            id: this.generateUUID(),
-            country: reportName || r.country || 'Ecuador Hoko',
-            sale_date: r.sale_date || this.filters.dateFrom || new Date().toISOString().split('T')[0],
-            description: r.description || 'Producto Externo',
-            revenue: parseFloat(r.revenue) || 0,
-            product_cost: parseFloat(r.product_cost) || 0,
-            shipping_cost: parseFloat(r.shipping_cost) || 0,
-            return_shipping_cost: parseFloat(r.return_shipping_cost) || 0,
-            delivered: parseInt(r.delivered) || 0,
-            returned: parseInt(r.returned) || 0
-        }));
-
-        this.updateImportProgress(30, 'Actualizando datos locales...');
-        await new Promise(r => setTimeout(r, 50));
-
-        // 1. Update in-memory externalSales with fingerprint deduplication
-        this.externalSales = this.deduplicateExternalSales([...preparedRecords, ...this.externalSales]);
-
-        // 2. Save to LocalStorage immediately
-        this.saveExternalSalesToLocal();
-
-        this.updateImportProgress(50, 'Actualizando tablas e indicadores en la interfaz...');
-        await new Promise(r => setTimeout(r, 50));
-
-        // 3. Render UI components immediately
-        this.renderSummaryCards();
-        this.renderSalesTable();
-        this.renderConsolidatedSalesTable();
-        this.renderAdExpensesTable();
-        this.renderOperationalExpensesTable();
-        this.renderExternalSalesTable();
-        this.renderProductProfitTable();
-        this.renderPLStatement();
-
-        this.updateImportProgress(70, 'Sincronizando con la base de datos (Supabase)...');
-        await new Promise(r => setTimeout(r, 50));
-
-        // 4. Background sync with Supabase
         try {
-            const supabasePayload = preparedRecords.map(r => ({
-                id: r.id,
-                country: r.country,
-                sale_date: r.sale_date,
-                description: r.description,
-                revenue: r.revenue,
-                product_cost: r.product_cost,
-                shipping_cost: r.shipping_cost,
-                return_shipping_cost: r.return_shipping_cost,
-                delivered: r.delivered,
-                returned: r.returned
+            // Let overlay render
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+            this.updateImportProgress(10, 'Generando identificadores únicos...');
+            await new Promise(r => setTimeout(r, 50));
+
+            // Create objects with valid UUIDs for memory and local storage
+            const preparedRecords = recordsToSave.map(r => ({
+                id: this.generateUUID(),
+                country: reportName || r.country || 'Ecuador Hoko',
+                sale_date: r.sale_date || this.filters.dateFrom || new Date().toISOString().split('T')[0],
+                description: r.description || 'Producto Externo',
+                revenue: parseFloat(r.revenue) || 0,
+                product_cost: parseFloat(r.product_cost) || 0,
+                shipping_cost: parseFloat(r.shipping_cost) || 0,
+                return_shipping_cost: parseFloat(r.return_shipping_cost) || 0,
+                delivered: parseInt(r.delivered) || 0,
+                returned: parseInt(r.returned) || 0
             }));
 
-            const batchSize = 50;
-            const totalBatches = Math.ceil(supabasePayload.length / batchSize);
-            
-            for (let b = 0, i = 0; b < supabasePayload.length; b += batchSize, i++) {
-                const pct = 70 + (i / totalBatches) * 25;
-                this.updateImportProgress(pct, `Sincronizando lote ${i + 1} de ${totalBatches}...`);
+            this.updateImportProgress(30, 'Actualizando datos locales...');
+            await new Promise(r => setTimeout(r, 50));
+
+            // 1. Update in-memory externalSales with fingerprint deduplication
+            this.externalSales = this.deduplicateExternalSales([...preparedRecords, ...this.externalSales]);
+
+            // 2. Save to LocalStorage immediately
+            this.saveExternalSalesToLocal();
+
+            this.updateImportProgress(50, 'Actualizando tablas e indicadores en la interfaz...');
+            await new Promise(r => setTimeout(r, 50));
+
+            // 3. Render UI components immediately
+            this.renderSummaryCards();
+            this.renderSalesTable();
+            this.renderConsolidatedSalesTable();
+            this.renderAdExpensesTable();
+            this.renderOperationalExpensesTable();
+            this.renderExternalSalesTable();
+            this.renderProductProfitTable();
+            this.renderPLStatement();
+
+            this.updateImportProgress(70, 'Sincronizando con la base de datos (Supabase)...');
+            await new Promise(r => setTimeout(r, 50));
+
+            // 4. Background sync with Supabase
+            try {
+                const supabasePayload = preparedRecords.map(r => ({
+                    id: r.id,
+                    country: r.country,
+                    sale_date: r.sale_date,
+                    description: r.description,
+                    revenue: r.revenue,
+                    product_cost: r.product_cost,
+                    shipping_cost: r.shipping_cost,
+                    return_shipping_cost: r.return_shipping_cost,
+                    delivered: r.delivered,
+                    returned: r.returned
+                }));
+
+                const batchSize = 50;
+                const totalBatches = Math.ceil(supabasePayload.length / batchSize);
                 
-                const batch = supabasePayload.slice(b, b + batchSize);
-                const { error } = await supabaseClient.from('external_sales').insert(batch);
-                if (error) {
-                    const batchNoId = batch.map(({ id, ...rest }) => rest);
-                    await supabaseClient.from('external_sales').insert(batchNoId);
+                for (let b = 0, i = 0; b < supabasePayload.length; b += batchSize, i++) {
+                    const pct = 70 + (i / totalBatches) * 25;
+                    this.updateImportProgress(pct, `Sincronizando lote ${i + 1} de ${totalBatches}...`);
+                    
+                    const batch = supabasePayload.slice(b, b + batchSize);
+                    const { error } = await supabaseClient.from('external_sales').insert(batch);
+                    if (error) {
+                        const batchNoId = batch.map(({ id, ...rest }) => rest);
+                        await supabaseClient.from('external_sales').insert(batchNoId);
+                    }
                 }
+                
+                this.updateImportProgress(100, `¡Importación completada! ${preparedRecords.length} registros guardados.`);
+                await new Promise(r => setTimeout(r, 500));
+                this.hideImportLoadingOverlay();
+                Utils.showToast(`¡Importación completada! ${preparedRecords.length} registros guardados.`, 'success');
+            } catch (dbErr) {
+                console.warn('Nota: Guardado local activo. Supabase:', dbErr);
+                this.hideImportLoadingOverlay();
+                Utils.showToast(`Se guardaron ${preparedRecords.length} registros en almacenamiento local.`, 'success');
             }
-            
-            this.updateImportProgress(100, `¡Importación completada! ${preparedRecords.length} registros guardados.`);
-            await new Promise(r => setTimeout(r, 500));
+        } catch (fatalErr) {
+            console.error('Error fatal al guardar registros:', fatalErr);
             this.hideImportLoadingOverlay();
-            Utils.showToast(`¡Importación completada! ${preparedRecords.length} registros guardados.`, 'success');
-        } catch (dbErr) {
-            console.warn('Nota: Guardado local activo. Supabase:', dbErr);
-            this.hideImportLoadingOverlay();
-            Utils.showToast(`Se guardaron ${preparedRecords.length} registros en almacenamiento local. Error de sincronización.`, 'success');
+            this.showImportErrorModal(
+                'Error al Guardar',
+                'Ocurrió un error inesperado al guardar los registros.',
+                fatalErr.message || String(fatalErr)
+            );
         }
     },
 
