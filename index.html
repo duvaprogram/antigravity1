@@ -116,7 +116,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.29</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.30</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -1101,6 +1101,12 @@
                                 <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
                             </svg>
                             Actualizar
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="IncomeStatementModule.expandAllCards()" style="display: flex; align-items: center; gap: 0.4rem; font-weight: 500; background: var(--surface-hover); border: 1px solid var(--border);">
+                            📂 Desplegar Todo
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="IncomeStatementModule.collapseAllCards()" style="display: flex; align-items: center; gap: 0.4rem; font-weight: 500; background: var(--surface-hover); border: 1px solid var(--border);">
+                            📁 Plegar Todo
                         </button>
                     </div>
                 </div>
@@ -4692,6 +4698,9 @@
                             </svg>
                             Otras Plataformas (Ajustes Manuales)
                         </h3>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); IncomeStatementModule.openReportsManagerModal()" style="background: rgba(255, 255, 255, 0.2); color: white; border: 1px solid rgba(255, 255, 255, 0.3); font-weight: 500;">
+                            📂 Gestor de Reportes Subidos
+                        </button>
                         <input type="file" id="inputImportExternalSales" accept=".xlsx,.xls,.csv" style="display:none;">
                         <button type="button" id="btnImportExternalSales" class="btn btn-secondary btn-sm" style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
