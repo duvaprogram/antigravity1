@@ -28,6 +28,13 @@ const IncomeStatementModule = {
     productMultiSelect: null,
     visualMergedGroups: [],
 
+    // Filtros locales para la tabla de Otras Plataformas
+    extSalesFilters: {
+        country: '',
+        product: '',
+        search: ''
+    },
+
     // Monthly Exchange Rates (TRM Colombia COP -> USD)
     monthlyRates: {},
     selectedRatesYear: '2026',
@@ -2454,6 +2461,89 @@ const IncomeStatementModule = {
         }
     },
 
+    getFilteredExternalSalesForTable() {
+        let sales = this.getFilteredExternalSales();
+
+        // 1. Filtro local de País / Reporte
+        if (this.extSalesFilters.country) {
+            const cFilter = this.extSalesFilters.country.trim().toLowerCase();
+            sales = sales.filter(s => (s.country || '').trim().toLowerCase() === cFilter);
+        }
+
+        // 2. Filtro local de Producto / Referencia
+        if (this.extSalesFilters.product) {
+            const pFilter = this.extSalesFilters.product.trim().toLowerCase();
+            sales = sales.filter(s => {
+                const prod = (s.description || s.product_name || '').trim().toLowerCase();
+                return prod === pFilter;
+            });
+        }
+
+        // 3. Buscador de texto
+        if (this.extSalesFilters.search) {
+            const q = this.extSalesFilters.search.trim().toLowerCase();
+            sales = sales.filter(s => {
+                const desc = (s.description || s.product_name || '').toLowerCase();
+                const country = (s.country || '').toLowerCase();
+                const date = (s.sale_date || '').toLowerCase();
+                return desc.includes(q) || country.includes(q) || date.includes(q);
+            });
+        }
+
+        return sales;
+    },
+
+    applyExternalSalesLocalFilters() {
+        this.extSalesFilters.country = document.getElementById('extFilterCountry')?.value || '';
+        this.extSalesFilters.product = document.getElementById('extFilterProduct')?.value || '';
+        this.extSalesFilters.search = document.getElementById('extFilterSearch')?.value || '';
+        this.renderExternalSalesTable();
+    },
+
+    clearExternalSalesLocalFilters() {
+        this.extSalesFilters = { country: '', product: '', search: '' };
+        const cEl = document.getElementById('extFilterCountry');
+        const pEl = document.getElementById('extFilterProduct');
+        const sEl = document.getElementById('extFilterSearch');
+        if (cEl) cEl.value = '';
+        if (pEl) pEl.value = '';
+        if (sEl) sEl.value = '';
+        this.renderExternalSalesTable();
+    },
+
+    populateExternalSalesFilterDropdowns() {
+        const countrySelect = document.getElementById('extFilterCountry');
+        const productSelect = document.getElementById('extFilterProduct');
+        if (!countrySelect && !productSelect) return;
+
+        const allSales = this.externalSales || [];
+
+        if (countrySelect) {
+            const currentVal = (this.extSalesFilters.country || '').toLowerCase();
+            const uniqueCountries = [...new Set(allSales.map(s => (s.country || '').trim()).filter(Boolean))].sort();
+            
+            let optionsHtml = '<option value="">🌎 Todos los Reportes / Países</option>';
+            uniqueCountries.forEach(c => {
+                const flag = this.getCountryFlag(c);
+                const isSel = c.toLowerCase() === currentVal ? 'selected' : '';
+                optionsHtml += `<option value="${this.escapeHtml(c)}" ${isSel}>${flag} ${this.escapeHtml(c)}</option>`;
+            });
+            countrySelect.innerHTML = optionsHtml;
+        }
+
+        if (productSelect) {
+            const currentVal = (this.extSalesFilters.product || '').toLowerCase();
+            const uniqueProducts = [...new Set(allSales.map(s => (s.description || s.product_name || '').trim()).filter(Boolean))].sort();
+
+            let optionsHtml = '<option value="">📦 Todos los Productos</option>';
+            uniqueProducts.forEach(p => {
+                const isSel = p.toLowerCase() === currentVal ? 'selected' : '';
+                optionsHtml += `<option value="${this.escapeHtml(p)}" ${isSel}>${this.escapeHtml(p)}</option>`;
+            });
+            productSelect.innerHTML = optionsHtml;
+        }
+    },
+
     renderExternalSalesTable() {
         const tbody = document.getElementById('isExternalSalesTable');
         const expandContainer = document.getElementById('extSalesExpandContainer');
@@ -2461,6 +2551,9 @@ const IncomeStatementModule = {
         const btnDeleteSelected = document.getElementById('btnDeleteSelectedExtSales');
 
         if (!tbody) return;
+
+        // Synchronize local filter dropdown options if needed
+        this.populateExternalSalesFilterDropdowns();
 
         let tfoot = document.getElementById('isExternalSalesTableFoot');
         if (!tfoot) {
@@ -2472,10 +2565,12 @@ const IncomeStatementModule = {
             }
         }
 
-        const sales = this.getFilteredExternalSales();
+        const baseSales = this.getFilteredExternalSales();
+        const sales = this.getFilteredExternalSalesForTable();
+        const hasLocalFilters = !!(this.extSalesFilters.country || this.extSalesFilters.product || this.extSalesFilters.search);
 
         if (btnDeleteAll) {
-            btnDeleteAll.style.display = sales.length > 0 ? 'inline-flex' : 'none';
+            btnDeleteAll.style.display = baseSales.length > 0 ? 'inline-flex' : 'none';
         }
         if (btnDeleteSelected) {
             btnDeleteSelected.style.display = 'none';
@@ -2484,12 +2579,26 @@ const IncomeStatementModule = {
         if (selectAllCb) selectAllCb.checked = false;
 
         if (sales.length === 0) {
-            tbody.innerHTML = `
-                <tr>
-                    <td colspan="13" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                        No hay ventas manuales o importadas registradas en este período.
-                    </td>
-                </tr>`;
+            if (hasLocalFilters) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="13" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
+                            <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">🔍</div>
+                            <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 0.25rem;">No se encontraron registros con los filtros seleccionados</div>
+                            <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">Prueba cambiando el país, producto o término de búsqueda.</div>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="IncomeStatementModule.clearExternalSalesLocalFilters()" style="background: rgba(255,255,255,0.08); border: 1px solid var(--border);">
+                                🔄 Limpiar Filtros Locales
+                            </button>
+                        </td>
+                    </tr>`;
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="13" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                            No hay ventas manuales o importadas registradas en este período.
+                        </td>
+                    </tr>`;
+            }
             if (tfoot) tfoot.innerHTML = '';
             if (expandContainer) expandContainer.innerHTML = '';
             return;
@@ -2585,13 +2694,14 @@ const IncomeStatementModule = {
         }).join('');
 
         // Render Summary Totals Row in tfoot
+        const totalsLabel = hasLocalFilters ? `TOTALES (${sales.length} registros filtrados):` : `TOTALES (${sales.length} registros):`;
         if (tfoot) {
             tfoot.innerHTML = `
                 <tr style="background: rgba(14, 165, 233, 0.12); font-weight: 700; border-top: 2px solid var(--border); border-bottom: 2px solid var(--border);">
                     <td colspan="3" style="text-align: left; padding: 0.85rem 1rem; font-size: 0.88rem; color: var(--text);">
                         <span style="display: flex; align-items: center; gap: 0.4rem;">
                             <span style="font-size: 1.15rem;">📊</span>
-                            <span style="font-weight: 800; letter-spacing: 0.3px;">TOTALES (${sales.length} registros):</span>
+                            <span style="font-weight: 800; letter-spacing: 0.3px;">${totalsLabel}</span>
                         </span>
                     </td>
                     <td style="text-align: right; font-weight: 800; color: var(--success); font-size: 0.92rem; white-space: nowrap;">
@@ -2622,17 +2732,26 @@ const IncomeStatementModule = {
                 </tr>`;
         }
 
+        const filterBadge = hasLocalFilters ? `<span style="background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 7px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; margin-left: 0.4rem;">Filtros activos (${sales.length} de ${baseSales.length})</span>` : '';
+
         if (expandContainer) {
             if (sales.length > limit) {
                 expandContainer.innerHTML = `
-                    <span style="font-size: 0.82rem; color: var(--text-muted);">
-                        Mostrando ${visibleSales.length} de ${sales.length} registros cargados
-                    </span>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 0.82rem; color: var(--text-muted);">
+                            Mostrando ${visibleSales.length} de ${sales.length} registros cargados
+                        </span>
+                        ${filterBadge}
+                    </div>
                     <button type="button" class="btn btn-secondary btn-sm" onclick="IncomeStatementModule.toggleExpandExternalSales()" style="background: rgba(255,255,255,0.06); border: 1px solid var(--border); font-size: 0.82rem;">
                         ${this.isExternalSalesExpanded ? '🔼 Plegar Lista (Ver menos)' : '🔽 Desglosar Todos (' + sales.length + ' registros)'}
                     </button>`;
             } else {
-                expandContainer.innerHTML = `<span style="font-size: 0.82rem; color: var(--text-muted);">${sales.length} registros en total</span>`;
+                expandContainer.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 0.82rem; color: var(--text-muted);">${sales.length} registros en total</span>
+                        ${filterBadge}
+                    </div>`;
             }
         }
     },
