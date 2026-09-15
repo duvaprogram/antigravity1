@@ -965,7 +965,9 @@ const IncomeStatementModule = {
                     deliveredOrders: 0,
                     returnedOrders: 0,
                     shippedOrders: 0,
-                    unitsSold: 0
+                    unitsSold: 0,
+                    deliveredUnits: 0,
+                    returnedUnits: 0
                 };
             }
 
@@ -979,8 +981,17 @@ const IncomeStatementModule = {
                 byCountry[country].totalShippingCOP = (byCountry[country].totalShippingCOP || 0) + parseFloat(guide.shipping_cost || 0);
             }
 
+            // Count units for this guide
+            let guideUnits = 0;
+            if (guide.guide_items) {
+                guide.guide_items.forEach(item => {
+                    guideUnits += parseInt(item.quantity || 0);
+                });
+            }
+
             if (isExcluded) {
                 byCountry[country].returnedOrders++;
+                byCountry[country].returnedUnits += guideUnits;
             } else {
                 // Solo pedidos entregados/efectivos suman ventas y costo de producto
                 const revUSD = this.getGuideRevenueUSD(guide);
@@ -990,6 +1001,7 @@ const IncomeStatementModule = {
                 }
                 byCountry[country].orderCount++;
                 byCountry[country].deliveredOrders++;
+                byCountry[country].deliveredUnits += guideUnits;
 
                 if (guide.guide_items) {
                     guide.guide_items.forEach(item => {
@@ -1040,7 +1052,9 @@ const IncomeStatementModule = {
                     deliveredOrders: 0,
                     returnedOrders: 0,
                     shippedOrders: 0,
-                    unitsSold: 0
+                    unitsSold: 0,
+                    deliveredUnits: 0,
+                    returnedUnits: 0
                 };
             }
 
@@ -1048,10 +1062,14 @@ const IncomeStatementModule = {
             const ret = parseInt(s.returned || 0);
             const orders = (del + ret > 0) ? (del + ret) : (del > 0 ? del : 1);
             const units = parseInt(s.units || del || orders);
+            const deliveredUnits = parseInt(s.delivered_units || del || 0);
+            const returnedUnits = parseInt(s.returned_units || ret || 0);
 
             byCountry[countryName].orderCount += orders;
             byCountry[countryName].deliveredOrders += del;
             byCountry[countryName].returnedOrders += ret;
+            byCountry[countryName].deliveredUnits += deliveredUnits;
+            byCountry[countryName].returnedUnits += returnedUnits;
             byCountry[countryName].shippedOrders += orders;
             byCountry[countryName].unitsSold += units;
             byCountry[countryName].totalRevenue += parseFloat(s.revenue || 0);
@@ -1669,7 +1687,7 @@ const IncomeStatementModule = {
         }
 
         let totalRow = {
-            orderCount: 0, totalDelivered: 0, totalReturned: 0, unitsSold: 0, totalRevenue: 0,
+            orderCount: 0, totalDelivered: 0, totalReturned: 0, deliveredUnits: 0, unitsSold: 0, totalRevenue: 0,
             totalCost: 0, totalShipping: 0, returnShipping: 0, totalFreight: 0, totalAdSpend: 0
         };
 
@@ -1677,6 +1695,7 @@ const IncomeStatementModule = {
             totalRow.orderCount += row.orderCount;
             totalRow.totalDelivered += row.totalDelivered;
             totalRow.totalReturned += row.totalReturned;
+            totalRow.deliveredUnits += (row.deliveredUnits || 0);
             totalRow.unitsSold += row.unitsSold;
             totalRow.totalRevenue += row.totalRevenue;
             totalRow.totalCost += row.totalCost;
@@ -1749,6 +1768,7 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 600;">${row.orderCount}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${row.totalDelivered || 0}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--danger);">${row.totalReturned || 0}</td>
+                    <td style="text-align: right; font-weight: 600; color: var(--success);">${row.deliveredUnits || 0}</td>
                     <td style="text-align: center;">
                         <span class="badge" style="background: rgba(244, 63, 94, 0.1); color: #f43f5e; font-weight: 600;">${returnRate}%</span>
                     </td>
@@ -1794,6 +1814,7 @@ const IncomeStatementModule = {
                 <td style="text-align: right; font-weight: 600;">${totalRow.orderCount}</td>
                 <td style="text-align: right; font-weight: 600; color: var(--success);">${totalRow.totalDelivered}</td>
                 <td style="text-align: right; font-weight: 600; color: var(--danger);">${totalRow.totalReturned}</td>
+                <td style="text-align: right; font-weight: 600; color: var(--success);">${totalRow.deliveredUnits}</td>
                 <td style="text-align: center;">
                     <span class="badge" style="background: rgba(244, 63, 94, 0.15); color: #f43f5e; font-weight: 600;">${totalReturnRate}%</span>
                 </td>
