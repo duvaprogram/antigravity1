@@ -2,53 +2,53 @@
    Sistema de Domicilios - Design System
    ======================================== */
 
-/* CSS Variables - Design Tokens */
+/* CSS Variables - Design Tokens (Professional Slate Palette) */
 :root {
-    /* Colors */
-    --primary: #6366f1;
-    --primary-hover: #4f46e5;
-    --primary-light: rgba(99, 102, 241, 0.1);
-    --secondary: #8b5cf6;
-    --secondary-hover: #7c3aed;
+    /* Colors - refined corporate palette */
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --primary-light: rgba(59, 130, 246, 0.12);
+    --secondary: #64748b;
+    --secondary-hover: #475569;
 
     --success: #10b981;
-    --success-light: rgba(16, 185, 129, 0.1);
-    --warning: #f59e0b;
-    --warning-light: rgba(245, 158, 11, 0.1);
-    --danger: #ef4444;
-    --danger-light: rgba(239, 68, 68, 0.1);
-    --info: #3b82f6;
-    --info-light: rgba(59, 130, 246, 0.1);
+    --success-light: rgba(16, 185, 129, 0.12);
+    --warning: #d97706;
+    --warning-light: rgba(217, 119, 6, 0.12);
+    --danger: #e11d48;
+    --danger-light: rgba(225, 29, 72, 0.12);
+    --info: #0ea5e9;
+    --info-light: rgba(14, 165, 233, 0.12);
 
-    /* Background & Surface */
-    --bg-primary: #0a0a1a;
-    --bg-secondary: #0f0f23;
-    --surface: #1a1a2e;
-    --surface-hover: #252540;
-    --surface-elevated: #22223a;
+    /* Background & Surface - Slate tones */
+    --bg-primary: #0b1220;
+    --bg-secondary: #111827;
+    --surface: #1e293b;
+    --surface-hover: #273548;
+    --surface-elevated: #2a3a52;
 
     /* Text */
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
 
     /* Borders */
-    --border: #2d2d44;
-    --border-light: #3d3d5c;
+    --border: #334155;
+    --border-light: #475569;
 
-    /* Gradients */
-    --gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    /* Gradients (muted, corporate) */
+    --gradient-primary: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
     --gradient-success: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    --gradient-danger: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    --gradient-danger: linear-gradient(135deg, #e11d48 0%, #be123c 100%);
     --gradient-quito: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-    --gradient-guayaquil: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-    --gradient-caracas: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+    --gradient-guayaquil: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+    --gradient-caracas: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%);
 
     /* Shadows */
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
-    --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
+    --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.2);
 
     /* Spacing */
     --space-xs: 0.25rem;
@@ -2865,10 +2865,499 @@ form {
     padding-bottom: 0.75rem !important;
 }
 
-/* P&L Statement */
+/* ========================================
+   Income Statement & P&L - Modern Executive Suite
+   ======================================== */
+
+.is-collapsible-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 1.25rem;
+    overflow: hidden;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.is-collapsible-card:hover {
+    border-color: rgba(99, 102, 241, 0.35);
+}
+
+/* Master Header Container */
+.is-card-header {
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.85rem 1.25rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s ease, border-color 0.15s ease;
+    user-select: none;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.is-card-header:hover {
+    background: var(--surface-hover);
+}
+
+/* Header Left Group (Icon + Title) */
+.is-card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.is-card-header-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+}
+
+.is-card-header:hover .is-card-header-icon {
+    transform: scale(1.06);
+}
+
+.is-card-header-title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    letter-spacing: -0.01em;
+}
+
+/* Header Actions & Toggle Badge */
+.is-card-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.card-toggle-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.3rem 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.is-card-header:hover .card-toggle-badge {
+    background: rgba(99, 102, 241, 0.12);
+    border-color: rgba(99, 102, 241, 0.35);
+    color: #c7d2fe;
+}
+
+/* Header Sub-Action Buttons */
+.is-header-btn {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    font-size: 0.78rem;
+    font-weight: 500;
+    padding: 0.3rem 0.7rem;
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.15s ease;
+    cursor: pointer;
+}
+.is-header-btn:hover {
+    background: var(--surface-hover);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+.is-header-btn.is-header-btn-primary {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.35);
+    color: #a5b4fc;
+}
+.is-header-btn.is-header-btn-primary:hover {
+    background: #4f46e5;
+    border-color: #4f46e5;
+    color: #fff;
+}
+.is-header-btn.is-header-btn-success {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.35);
+    color: #6ee7b7;
+}
+.is-header-btn.is-header-btn-success:hover {
+    background: #10b981;
+    border-color: #10b981;
+    color: #fff;
+}
+
+/* Card Themes (Professional Accent Palette) */
+/* 1. Ventas por País - Emerald */
+.is-theme-sales {
+    border-left: 3.5px solid #10b981;
+}
+.is-theme-sales .is-card-header-icon {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+/* 2. Resumen Consolidado - Indigo */
+.is-theme-consolidated {
+    border-left: 3.5px solid #6366f1;
+}
+.is-theme-consolidated .is-card-header-icon {
+    background: rgba(99, 102, 241, 0.12);
+    color: #818cf8;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+/* 3. Gastos Publicitarios - Tech Blue */
+.is-theme-ads {
+    border-left: 3.5px solid #3b82f6;
+}
+.is-theme-ads .is-card-header-icon {
+    background: rgba(59, 130, 246, 0.12);
+    color: #60a5fa;
+    border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+/* 4. Gastos Operativos - Warm Amber */
+.is-theme-opex {
+    border-left: 3.5px solid #f59e0b;
+}
+.is-theme-opex .is-card-header-icon {
+    background: rgba(245, 158, 11, 0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+/* 5. Otras Plataformas - Electric Sky */
+.is-theme-external {
+    border-left: 3.5px solid #0ea5e9;
+}
+.is-theme-external .is-card-header-icon {
+    background: rgba(14, 165, 233, 0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(14, 165, 233, 0.25);
+}
+
+/* 6. Utilidad Bruta por Producto - Teal */
+.is-theme-products {
+    border-left: 3.5px solid #14b8a6;
+}
+.is-theme-products .is-card-header-icon {
+    background: rgba(20, 184, 166, 0.12);
+    color: #2dd4bf;
+    border: 1px solid rgba(20, 184, 166, 0.25);
+}
+
+/* 7. Estado de Pérdidas y Ganancias (P&L Master) */
+.is-theme-master-pl {
+    border-left: 4px solid #10b981;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.is-theme-master-pl .is-card-header {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(16, 185, 129, 0.04) 100%), var(--surface);
+}
+.is-theme-master-pl:hover .is-card-header {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(16, 185, 129, 0.07) 100%), var(--surface-hover);
+}
+.is-theme-master-pl .is-card-header-icon {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* 8. Filtros del Período */
+.is-theme-filters {
+    border-left: 3.5px solid #6366f1;
+}
+.is-theme-filters .is-card-header-icon {
+    background: rgba(99, 102, 241, 0.12);
+    color: #818cf8;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+/* ============================================
+   P&L Statement (Professional Executive View)
+   ============================================ */
 .is-pl-card .card-body {
     padding: 0;
 }
+
+/* Executive KPI Ribbon */
+.is-pl-ribbon {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.85rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+}
+.is-pl-kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 0.9rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    box-shadow: var(--shadow-sm);
+}
+.is-pl-kpi.is-accent-success   { border-left: 3px solid var(--success); }
+.is-pl-kpi.is-accent-warning   { border-left: 3px solid var(--warning); }
+.is-pl-kpi.is-profit           { border-left: 3px solid var(--success); }
+.is-pl-kpi.is-loss             { border-left: 3px solid var(--danger); }
+.is-pl-kpi-label {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+.is-pl-kpi-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+.is-pl-kpi-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+.is-success { color: var(--success) !important; }
+.is-danger  { color: var(--danger)  !important; }
+.is-warning { color: var(--warning) !important; }
+
+/* Table Wrap */
+.is-pl-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    background: var(--surface);
+}
+.is-pl-table {
+    min-width: 560px;
+}
+
+/* Table Header */
+.is-pl-thead {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) 150px 170px;
+    padding: 0.7rem 1.5rem;
+    background: var(--surface-hover);
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+}
+.is-align-right { text-align: right; }
+
+/* Section Titles */
+.is-pl-section-title {
+    padding: 0.6rem 1.5rem;
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+/* Rows */
+.is-pl-line {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) 150px 170px;
+    align-items: center;
+    padding: 0.65rem 1.5rem;
+    font-size: 0.87rem;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    transition: background 0.15s ease;
+}
+.is-pl-line:hover { background: rgba(255,255,255,0.02); }
+
+.is-pl-concept {
+    color: var(--text-primary);
+    font-weight: 500;
+    padding-left: 0.5rem;
+}
+.is-pl-sub-concept {
+    color: var(--text-muted);
+    padding-left: 1.75rem;
+    font-weight: 400;
+    position: relative;
+}
+.is-pl-sub-concept::before {
+    content: '';
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    width: 0.5rem;
+    height: 1px;
+    background: var(--border-light);
+}
+.is-pl-sub { font-size: 0.83rem; }
+
+.is-pl-amount {
+    text-align: right;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+.is-pl-amount.is-neg { color: var(--danger); }
+.is-pl-amount.is-success { color: var(--success); }
+.is-pl-amount.is-warning { color: var(--warning); }
+
+/* Percentage cell with mini bar */
+.is-pl-pct-cell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.6rem;
+}
+.is-pl-pct-bar {
+    flex: 1;
+    max-width: 65px;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.is-pl-pct-bar > div {
+    height: 100%;
+    border-radius: 3px;
+}
+.is-pl-pct-val {
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-width: 52px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+.is-pl-pct-val.is-bold { font-weight: 700; }
+
+/* Subtotal / Highlight rows */
+.is-pl-subtotal {
+    font-weight: 700;
+    background: var(--surface-hover);
+    border-top: 1px solid var(--border);
+}
+.is-pl-subtotal .is-pl-concept {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+.is-highlight-success { background: rgba(16, 185, 129, 0.08); }
+.is-highlight-success .is-pl-concept { color: var(--success); }
+.is-highlight-danger  { background: rgba(225, 29, 72, 0.08); }
+.is-highlight-danger  .is-pl-concept { color: var(--text-primary); }
+
+/* Final Net Profit row */
+.is-pl-final {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) 150px 170px;
+    align-items: center;
+    padding: 1.1rem 1.5rem;
+    border-top: 2px solid var(--border);
+}
+.is-pl-final.is-profit {
+    background: linear-gradient(90deg, rgba(16,185,129,0.10), rgba(16,185,129,0.02));
+    border-top-color: var(--success);
+}
+.is-pl-final.is-loss {
+    background: linear-gradient(90deg, rgba(225,29,72,0.10), rgba(225,29,72,0.02));
+    border-top-color: var(--danger);
+}
+.is-pl-final-label { padding-left: 0.5rem; }
+.is-pl-final-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+}
+.is-pl-final-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 3px;
+    font-weight: 400;
+}
+.is-pl-final-amount {
+    text-align: right;
+    font-size: 1.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+.is-pl-final-margin { text-align: right; }
+.is-pl-margin-chip {
+    display: inline-block;
+    padding: 0.35rem 0.75rem;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    font-variant-numeric: tabular-nums;
+}
+.is-pl-margin-chip.is-success {
+    background: rgba(16,185,129,0.15);
+    border: 1px solid rgba(16,185,129,0.35);
+}
+.is-pl-margin-chip.is-danger {
+    background: rgba(225,29,72,0.15);
+    border: 1px solid rgba(225,29,72,0.35);
+}
+
+/* Footer KPI Tiles */
+.is-pl-footer {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+}
+.is-pl-kpi-tile {
+    text-align: center;
+    padding: 0.7rem 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+}
+.is-pl-kpi-tile-val {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+.is-pl-kpi-tile-lbl {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+    font-weight: 500;
+}
+
+/* Legacy P&L layout classes (kept for compatibility) */
 
 .is-pl-section {
     border-bottom: 1px solid var(--border);
