@@ -1193,7 +1193,6 @@ const IncomeStatementModule = {
 
     getOpExpensesByCountry() {
         const expenses = this.getFilteredOperationalExpenses();
-        const salesData = this.getSalesByCountry();
         const byCountry = {};
 
         // Separar gastos locales y globales
@@ -1221,26 +1220,42 @@ const IncomeStatementModule = {
             byCountry[country].byCategory[cat] = (byCountry[country].byCategory[cat] || 0) + amount;
         });
 
-        // Calcular participación de cada país en ventas para distribuir gastos globales
-        const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
-        const revenueByCountry = {};
-        salesData.forEach(sale => {
-            revenueByCountry[sale.country] = parseFloat(sale.totalRevenue || 0);
+        // IMPORTANTE: el % de cada país para repartir un gasto global debe calcularse
+        // sobre las ventas REALES de TODOS los países (solo respetando fecha/producto),
+        // nunca sobre el subconjunto que deja pasar el filtro de país activo. De lo
+        // contrario, al filtrar un solo país este terminaría absorbiendo el 100% de
+        // cualquier gasto global (porque sería "el único país visible"), inflando sus
+        // gastos muy por encima de lo que le corresponde según su peso real en ventas.
+        const savedCountry = this.filters.country;
+        const savedCountries = this.filters.countries;
+        this.filters.country = '';
+        this.filters.countries = [];
+        const allSalesData = this.getSalesByCountry();
+        this.filters.country = savedCountry;
+        this.filters.countries = savedCountries;
+
+        const totalRevenueAll = allSalesData.reduce((s, c) => s + c.totalRevenue, 0);
+        const revenueByCountryAll = {};
+        allSalesData.forEach(sale => {
+            revenueByCountryAll[sale.country] = parseFloat(sale.totalRevenue || 0);
         });
 
-        // Distribuir gastos globales según % de ventas
+        // Solo agregamos al resultado los países que el filtro de país actual deja ver
+        const visibleCountries = new Set(this.getSalesByCountry().map(s => s.country));
+
+        // Distribuir gastos globales según el % REAL de ventas de cada país
         globalExpenses.forEach(gexp => {
             const globalAmount = parseFloat(gexp.amount || 0);
             const category = gexp.category || 'Gasto Global';
 
-            // Distribuir a cada país según su % de ventas
-            Object.entries(revenueByCountry).forEach(([country, revenue]) => {
+            Object.entries(revenueByCountryAll).forEach(([country, revenue]) => {
+                if (!visibleCountries.has(country)) return;
                 if (!byCountry[country]) {
                     byCountry[country] = { country, total: 0, localExpenses: 0, distributedGlobalExpenses: 0, byCategory: {} };
                 }
 
-                if (totalRevenue > 0) {
-                    const sharePercentage = revenue / totalRevenue;
+                if (totalRevenueAll > 0) {
+                    const sharePercentage = revenue / totalRevenueAll;
                     const distributedAmount = globalAmount * sharePercentage;
 
                     byCountry[country].total += distributedAmount;
@@ -4108,12 +4123,15 @@ const IncomeStatementModule = {
                 </div>`;
         };
 
-        // Operational expenses breakdown
+        // Operational expenses breakdown (usa los montos ya prorrateados por país,
+        // no el monto crudo del gasto, para que un gasto global no aparezca al 100%
+        // en la vista de un solo país)
         let opCategoriesHTML = '';
         const allCategories = {};
-        this.getFilteredOperationalExpenses().forEach(exp => {
-            const cat = exp.category || 'Otro';
-            allCategories[cat] = (allCategories[cat] || 0) + parseFloat(exp.amount || 0);
+        opExpData.forEach(countryData => {
+            Object.entries(countryData.byCategory || {}).forEach(([cat, amount]) => {
+                allCategories[cat] = (allCategories[cat] || 0) + amount;
+            });
         });
 
         for (const [cat, amount] of Object.entries(allCategories).sort((a, b) => b[1] - a[1])) {
