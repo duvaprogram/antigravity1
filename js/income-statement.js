@@ -3856,11 +3856,17 @@ const IncomeStatementModule = {
 
                 if (!productMap[name]) {
                     productMap[name] = {
-                        name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0
+                        name, orders: 0, deliveredOrders: 0, returnedOrders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0
                     };
                 }
                 if (!isExcluded) {
                     productMap[name].orders += 1;
+                    const guideStatus = g.status || g.delivery_status || '';
+                    if (guideStatus === 'ENTREGADO' || guideStatus === 'DELIVERED') {
+                        productMap[name].deliveredOrders += 1;
+                    } else if (guideStatus === 'RETURNED' || guideStatus === 'DEVUELTO') {
+                        productMap[name].returnedOrders += 1;
+                    }
                     productMap[name].units += qty;
                     productMap[name].revenue += revProp;
                     productMap[name].cost += realCost;
@@ -3878,10 +3884,14 @@ const IncomeStatementModule = {
 
             if (!productMap[name]) {
                 productMap[name] = {
-                    name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0
+                    name, orders: 0, deliveredOrders: 0, returnedOrders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0
                 };
             }
-            productMap[name].orders += (parseInt(s.delivered || 0) + parseInt(s.returned || 0));
+            const delivered = parseInt(s.delivered || 0);
+            const returned = parseInt(s.returned || 0);
+            productMap[name].orders += (delivered + returned);
+            productMap[name].deliveredOrders += delivered;
+            productMap[name].returnedOrders += returned;
             productMap[name].revenue += parseFloat(s.revenue || 0);
             productMap[name].cost += parseFloat(s.product_cost || 0);
             productMap[name].shipping += (parseFloat(s.shipping_cost || 0) + parseFloat(s.return_shipping_cost || 0));
@@ -3909,15 +3919,17 @@ const IncomeStatementModule = {
         // Apply Visual Groups
         (this.visualMergedGroups || []).forEach((group, index) => {
             const mergedProduct = {
-                name: group.name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0,
+                name: group.name, orders: 0, deliveredOrders: 0, returnedOrders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, freight: 0, adSpend: 0,
                 isVisualGroup: true,
                 groupId: index
             };
-            
+
             let foundAny = false;
             productList = productList.filter(p => {
                 if (group.products.includes(p.name)) {
                     mergedProduct.orders += p.orders;
+                    mergedProduct.deliveredOrders += (p.deliveredOrders || 0);
+                    mergedProduct.returnedOrders += (p.returnedOrders || 0);
                     mergedProduct.units += p.units;
                     mergedProduct.revenue += p.revenue;
                     mergedProduct.cost += p.cost;
@@ -3949,7 +3961,7 @@ const IncomeStatementModule = {
         }
 
         const totalRow = {
-            orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: 0
+            orders: 0, deliveredOrders: 0, returnedOrders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: 0
         };
 
         tbody.innerHTML = productList.map(p => {
@@ -3960,6 +3972,8 @@ const IncomeStatementModule = {
             const adPct = p.revenue > 0 ? ((p.adSpend / p.revenue) * 100).toFixed(1) : '0.0';
 
             totalRow.orders += p.orders;
+            totalRow.deliveredOrders += (p.deliveredOrders || 0);
+            totalRow.returnedOrders += (p.returnedOrders || 0);
             totalRow.units += p.units;
             totalRow.revenue += p.revenue;
             totalRow.cost += p.cost;
@@ -4005,6 +4019,7 @@ const IncomeStatementModule = {
                         ${p.isVisualGroup ? `<span style="margin-left: 0.5rem; font-size: 0.65rem; padding: 2px 6px; background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border-radius: 12px; font-weight: 600; border: 1px solid rgba(14, 165, 233, 0.3);">Grupo Visual</span>` : ''}
                     </td>
                     <td style="text-align: right; font-weight: 600;">${p.orders}</td>
+                    <td style="text-align: right; font-weight: 600; color: var(--success);">${p.deliveredOrders || 0}</td>
                     <td style="text-align: right;">${p.units || '-'}</td>
                     <td style="text-align: right; font-weight: 600; color: var(--success);">${this.formatCurrency(p.revenue)}</td>
                     <td style="text-align: right; color: var(--danger);">
@@ -4040,6 +4055,7 @@ const IncomeStatementModule = {
             <tr class="is-total-row">
                 <td colspan="2"><strong>TOTAL PRODUCTOS</strong></td>
                 <td style="text-align: right; font-weight: 700;">${totalRow.orders}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--success);">${totalRow.deliveredOrders}</td>
                 <td style="text-align: right; font-weight: 700;">${totalRow.units}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.revenue)}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--danger);">
