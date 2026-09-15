@@ -1195,6 +1195,13 @@ const IncomeStatementModule = {
         const expenses = this.getFilteredOperationalExpenses();
         const byCountry = {};
 
+        const initEntry = (country) => {
+            if (!byCountry[country]) {
+                byCountry[country] = { country, total: 0, localExpenses: 0, distributedGlobalExpenses: 0, byCategory: {} };
+            }
+            return byCountry[country];
+        };
+
         // Separar gastos locales y globales
         const localExpenses = [];
         const globalExpenses = [];
@@ -1207,25 +1214,12 @@ const IncomeStatementModule = {
             }
         });
 
-        // Procesar gastos locales (asignados a país específico)
-        localExpenses.forEach(exp => {
-            const country = exp.country;
-            if (!byCountry[country]) {
-                byCountry[country] = { country, total: 0, localExpenses: 0, distributedGlobalExpenses: 0, byCategory: {} };
-            }
-            const amount = parseFloat(exp.amount || 0);
-            byCountry[country].total += amount;
-            byCountry[country].localExpenses += amount;
-            const cat = exp.category || 'Otro';
-            byCountry[country].byCategory[cat] = (byCountry[country].byCategory[cat] || 0) + amount;
-        });
-
-        // IMPORTANTE: el % de cada país para repartir un gasto global debe calcularse
-        // sobre las ventas REALES de TODOS los países (solo respetando fecha/producto),
-        // nunca sobre el subconjunto que deja pasar el filtro de país activo. De lo
-        // contrario, al filtrar un solo país este terminaría absorbiendo el 100% de
-        // cualquier gasto global (porque sería "el único país visible"), inflando sus
-        // gastos muy por encima de lo que le corresponde según su peso real en ventas.
+        // Los % de reparto (tanto de gastos globales como locales por país base)
+        // deben calcularse sobre las ventas REALES de TODOS los países/plataformas
+        // (solo respetando fecha/producto), nunca sobre el subconjunto que deja
+        // pasar el filtro de país activo. De lo contrario, al filtrar un solo país
+        // este terminaría absorbiendo el 100% de cualquier gasto (inflando sus
+        // costos muy por encima de lo que le corresponde según su peso real).
         const savedCountry = this.filters.country;
         const savedCountries = this.filters.countries;
         this.filters.country = '';
@@ -1234,34 +1228,75 @@ const IncomeStatementModule = {
         this.filters.country = savedCountry;
         this.filters.countries = savedCountries;
 
-        const totalRevenueAll = allSalesData.reduce((s, c) => s + c.totalRevenue, 0);
-        const revenueByCountryAll = {};
-        allSalesData.forEach(sale => {
-            revenueByCountryAll[sale.country] = parseFloat(sale.totalRevenue || 0);
-        });
-
-        // Solo agregamos al resultado los países que el filtro de país actual deja ver
+        // Solo agregamos al resultado las filas de venta (país/plataforma) que el
+        // filtro de país actual deja ver
         const visibleCountries = new Set(this.getSalesByCountry().map(s => s.country));
 
-        // Distribuir gastos globales según el % REAL de ventas de cada país
+        // --- Gastos GLOBALES: se distribuyen entre TODAS las filas de venta
+        // (país + plataforma, ej. "Colombia Domi", "Colombia Hoko") según su % de
+        // participación sobre el total general de ventas.
+        const totalRevenueAll = allSalesData.reduce((s, c) => s + c.totalRevenue, 0);
         globalExpenses.forEach(gexp => {
             const globalAmount = parseFloat(gexp.amount || 0);
             const category = gexp.category || 'Gasto Global';
 
-            Object.entries(revenueByCountryAll).forEach(([country, revenue]) => {
-                if (!visibleCountries.has(country)) return;
-                if (!byCountry[country]) {
-                    byCountry[country] = { country, total: 0, localExpenses: 0, distributedGlobalExpenses: 0, byCategory: {} };
-                }
+            allSalesData.forEach(sale => {
+                if (!visibleCountries.has(sale.country)) return;
+                if (totalRevenueAll <= 0) return;
 
-                if (totalRevenueAll > 0) {
-                    const sharePercentage = revenue / totalRevenueAll;
-                    const distributedAmount = globalAmount * sharePercentage;
+                const sharePercentage = sale.totalRevenue / totalRevenueAll;
+                const distributedAmount = globalAmount * sharePercentage;
 
-                    byCountry[country].total += distributedAmount;
-                    byCountry[country].distributedGlobalExpenses += distributedAmount;
-                    byCountry[country].byCategory[category] = (byCountry[country].byCategory[category] || 0) + distributedAmount;
+                const entry = initEntry(sale.country);
+                entry.total += distributedAmount;
+                entry.distributedGlobalExpenses += distributedAmount;
+                entry.byCategory[category] = (entry.byCategory[category] || 0) + distributedAmount;
+            });
+        });
+
+        // --- Gastos LOCALES: se registran a nivel de país BASE (Ecuador,
+        // Venezuela, Colombia), pero las ventas pueden tener varias plataformas
+        // bajo ese mismo país (ej. "Colombia Domi" y "Colombia Hoko"). Por eso
+        // el gasto se reparte entre las filas de venta de ESE país base, según
+        // su % de participación dentro de ese país (no se le asigna el 100% a
+        // cada plataforma, para no duplicar el gasto).
+        localExpenses.forEach(exp => {
+            const expCountry = (exp.country || '').trim();
+            const amount = parseFloat(exp.amount || 0);
+            const category = exp.category || 'Otro';
+            const expCountryLower = expCountry.toLowerCase();
+
+            const matchingSales = allSalesData.filter(s =>
+                (s.baseCountry && s.baseCountry.toLowerCase() === expCountryLower) ||
+                (s.country && s.country.toLowerCase() === expCountryLower)
+            );
+
+            if (matchingSales.length === 0) {
+                // No hay ventas registradas para ese país en el período: mantener
+                // el gasto visible bajo su propio nombre para no perderlo del total.
+                if (visibleCountries.size === 0 || visibleCountries.has(expCountry)) {
+                    const entry = initEntry(expCountry);
+                    entry.total += amount;
+                    entry.localExpenses += amount;
+                    entry.byCategory[category] = (entry.byCategory[category] || 0) + amount;
                 }
+                return;
+            }
+
+            const totalMatchingRevenue = matchingSales.reduce((s, c) => s + c.totalRevenue, 0);
+
+            matchingSales.forEach(sale => {
+                if (!visibleCountries.has(sale.country)) return;
+
+                const share = totalMatchingRevenue > 0
+                    ? (sale.totalRevenue / totalMatchingRevenue)
+                    : (1 / matchingSales.length);
+                const distributedAmount = amount * share;
+
+                const entry = initEntry(sale.country);
+                entry.total += distributedAmount;
+                entry.localExpenses += distributedAmount;
+                entry.byCategory[category] = (entry.byCategory[category] || 0) + distributedAmount;
             });
         });
 
