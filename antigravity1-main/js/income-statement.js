@@ -1590,6 +1590,7 @@ const IncomeStatementModule = {
                 orderCount: 1,
                 totalDelivered: isExcluded ? 0 : 1,
                 totalReturned: isDevol ? 1 : 0,
+                deliveredUnits: isExcluded ? 0 : unitsSold,
                 unitsSold: unitsSold,
                 totalRevenue: isExcluded ? 0 : this.getGuideRevenueUSD(guide),
                 totalCost: totalCost,
@@ -1620,6 +1621,7 @@ const IncomeStatementModule = {
                 orderCount: parseInt(s.delivered || 0) + parseInt(s.returned || 0),
                 totalDelivered: parseInt(s.delivered || 0),
                 totalReturned: parseInt(s.returned || 0),
+                deliveredUnits: parseInt(s.delivered || 0),
                 unitsSold: parseInt(s.delivered || 0) + parseInt(s.returned || 0),
                 totalRevenue: parseFloat(s.revenue || 0),
                 totalCost: parseFloat(s.product_cost || 0),
@@ -1635,8 +1637,8 @@ const IncomeStatementModule = {
         (this.visualMergedGroupsCountry || []).forEach((group, index) => {
             const mergedItem = {
                 id: `Group_${index}`,
-                name: group.name, 
-                orderCount: 0, totalDelivered: 0, totalReturned: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0, returnShipping: 0, freight: 0, adSpend: 0,
+                name: group.name,
+                orderCount: 0, totalDelivered: 0, totalReturned: 0, deliveredUnits: 0, unitsSold: 0, totalRevenue: 0, totalCost: 0, totalShipping: 0, returnShipping: 0, freight: 0, adSpend: 0,
                 isVisualGroup: true,
                 groupId: index
             };
@@ -1655,6 +1657,7 @@ const IncomeStatementModule = {
                     mergedItem.orderCount += c.orderCount;
                     mergedItem.totalDelivered += c.totalDelivered;
                     mergedItem.totalReturned += c.totalReturned;
+                    mergedItem.deliveredUnits += (c.deliveredUnits || 0);
                     mergedItem.unitsSold += c.unitsSold;
                     mergedItem.totalRevenue += c.totalRevenue;
                     mergedItem.totalCost += c.totalCost;
