@@ -6980,35 +6980,45 @@ const IncomeStatementModule = {
                     const itemCost = window.ProductsModule ? window.ProductsModule.getRealCost(item.products || {}) : rawCost * 40000;
                     return s + (itemCost * (item.quantity || 1));
                 }, 0);
-                
+                const totalQty = items.reduce((s, item) => s + parseInt(item.quantity || 0), 0);
+                const productLabel = items.length > 0
+                    ? [...new Set(items.map(item => `${item.products?.name || 'Producto Desconocido'} (x${item.quantity || 1})`))].join(', ')
+                    : 'Producto Desconocido';
+                const isMixedCart = new Set(items.map(item => item.products?.name || '')).size > 1;
+
                 if (!isExcluded) {
                     orderCount++;
                     totalRev += rev;
                     totalCost += cost;
                 }
                 totalShip += ship;
-                
+
                 const date = o.created_at ? o.created_at.split('T')[0] : (o.date || '');
-                const statusBadge = isDevol 
-                    ? '<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #f97316;">Devolución</span>' 
+                const statusBadge = isDevol
+                    ? '<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #f97316;">Devolución</span>'
                     : `<span class="badge ${o.status === 'DELIVERED' || o.guide_statuses?.name === 'Pagado' ? 'bg-success' : 'bg-secondary'}">${o.guide_statuses?.name || o.status}</span>`;
-                
+
                 const isCol = this.isColombiaOrder(o);
                 const copRev = parseFloat(o.total_amount || 0);
                 const copShip = parseFloat(o.shipping_cost || 0);
-                const revText = isExcluded 
-                    ? `<span style="text-decoration: line-through; opacity: 0.6;">${isCol ? 'COP $' + Math.round(copRev).toLocaleString('es-CO') : this.formatCurrency(copRev)}</span> <span style="color: #f97316; font-size: 0.75rem;">$0.00</span>` 
+                const revText = isExcluded
+                    ? `<span style="text-decoration: line-through; opacity: 0.6;">${isCol ? 'COP $' + Math.round(copRev).toLocaleString('es-CO') : this.formatCurrency(copRev)}</span> <span style="color: #f97316; font-size: 0.75rem;">$0.00</span>`
                     : `<div>${this.formatCurrency(rev)}</div>${isCol ? '<div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">COP $' + Math.round(copRev).toLocaleString('es-CO') + '</div>' : ''}`;
 
                 html += `
-                    <tr style="${isDevol ? 'background: rgba(249, 115, 22, 0.05);' : ''}">
+                    <tr style="${isDevol ? 'background: rgba(249, 115, 22, 0.05);' : ''} ${isMixedCart ? 'background: rgba(245, 158, 11, 0.08);' : ''}">
                         <td style="font-size: 0.8rem; color: var(--text-muted);">${date}</td>
                         <td>
                             <div style="font-weight: 500;">${o.id || o.guide_number || 'N/A'}</div>
                             <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">Dropi</span>
                         </td>
-                        <td>${o.client_name || o.customer_name || 'Desconocido'}</td>
+                        <td><div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;" title="${this.getCountryFromCity(o.cities)}">${this.getCountryFromCity(o.cities)}</div></td>
                         <td>${statusBadge}</td>
+                        <td>
+                            <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="${productLabel.replace(/"/g, '&quot;')}">${productLabel}</div>
+                            ${isMixedCart ? '<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; font-size: 0.65rem;">⚠ Carrito Mixto</span>' : ''}
+                        </td>
+                        <td style="text-align: right; font-weight: 600;">${totalQty}</td>
                         <td style="text-align: right; color: var(--success); font-weight: 600;">${revText}</td>
                         <td style="text-align: right;">${this.formatCurrency(cost)}</td>
                         <td style="text-align: right;">
@@ -7022,23 +7032,24 @@ const IncomeStatementModule = {
                 const rev = parseFloat(o.revenue || 0);
                 const cost = parseFloat(o.product_cost || 0);
                 const ship = parseFloat(o.shipping_cost || 0) + parseFloat(o.return_shipping_cost || 0);
-                
+
                 totalRev += rev;
                 totalCost += cost;
                 totalShip += ship;
-                
+
                 html += `
                     <tr>
                         <td style="font-size: 0.8rem; color: var(--text-muted);">${o.date || 'N/A'}</td>
                         <td>
-                            <div style="font-weight: 500;">${o.country}</div>
                             <span class="badge" style="background: rgba(168, 85, 247, 0.1); color: #a855f7;">Excel</span>
                         </td>
-                        <td>${o.product_name || o.description || 'N/A'}</td>
+                        <td><div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;" title="${o.country || ''}">${o.country || 'N/A'}</div></td>
                         <td>
                             <span class="badge bg-success">Entregados: ${o.delivered || 0}</span>
                             ${o.returned > 0 ? `<br><span class="badge bg-danger mt-1">Devueltos: ${o.returned}</span>` : ''}
                         </td>
+                        <td><div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px;" title="${o.product_name || o.description || ''}">${o.product_name || o.description || 'N/A'}</div></td>
+                        <td style="text-align: right; font-weight: 600;">${qty}</td>
                         <td style="text-align: right; color: var(--success); font-weight: 600;">${this.formatCurrency(rev)}</td>
                         <td style="text-align: right;">${this.formatCurrency(cost)}</td>
                         <td style="text-align: right;">${this.formatCurrency(ship)}</td>
