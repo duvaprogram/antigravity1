@@ -1251,7 +1251,7 @@ const IncomeStatementModule = {
         if (salesData.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 0.5rem; opacity: 0.3;">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14 2 14 8 20 8"></polyline>
@@ -1266,6 +1266,12 @@ const IncomeStatementModule = {
             totalRevenue: 0, totalCost: 0, totalShipping: 0, totalFreight: 0, orderCount: 0, unitsSold: 0
         };
 
+        // Calcular total de ventas primero para los porcentajes
+        let totalSalesRevenue = 0;
+        salesData.forEach(row => {
+            totalSalesRevenue += row.totalRevenue;
+        });
+
         tbody.innerHTML = salesData.map(row => {
             const baseCountry = row.baseCountry || row.country.replace(' Domi', '');
             const countryFreight = row.isExternal ? 0 : (freightsByCountry[row.country]?.totalFreight || freightsByCountry[baseCountry]?.totalFreight || 0);
@@ -1279,7 +1285,8 @@ const IncomeStatementModule = {
             const grossProfit = row.totalRevenue - row.totalCost - row.totalShipping - countryFreight;
             const margin = row.totalRevenue > 0 ? ((grossProfit / row.totalRevenue) * 100).toFixed(1) : '0.0';
 
-            // Porcentajes sobre las ventas
+            // Porcentajes sobre las ventas del mercado
+            const marketSharePct = totalSalesRevenue > 0 ? ((row.totalRevenue / totalSalesRevenue) * 100).toFixed(1) : '0.0';
             const costPct = row.totalRevenue > 0 ? ((row.totalCost / row.totalRevenue) * 100).toFixed(1) : '0.0';
             const shippingPct = row.totalRevenue > 0 ? ((row.totalShipping / row.totalRevenue) * 100).toFixed(1) : '0.0';
 
@@ -1307,6 +1314,10 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 600; color: var(--success);">
                         <div>${this.formatCurrency(row.totalRevenue)}</div>
                         ${revenueSubtitle}
+                    </td>
+                    <td style="text-align: center; font-weight: 600; color: var(--primary);">
+                        <div style="font-size: 1rem; font-variant-numeric: tabular-nums;">${marketSharePct}%</div>
+                        <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: 500;">del total</div>
                     </td>
                     <td style="text-align: right; color: var(--danger);">
                         <div>${this.formatCurrency(row.totalCost)}</div>
@@ -1347,6 +1358,7 @@ const IncomeStatementModule = {
                 <td style="text-align: right; font-weight: 700;">${totalRow.orderCount.toLocaleString('es-CO')}</td>
                 <td style="text-align: right; font-weight: 700;">${totalRow.unitsSold.toLocaleString('es-CO')}</td>
                 <td style="text-align: right; font-weight: 700; color: var(--success);">${this.formatCurrency(totalRow.totalRevenue)}</td>
+                <td style="text-align: center; font-weight: 700; color: var(--primary); font-size: 1rem;">100%</td>
                 <td style="text-align: right; font-weight: 700; color: var(--danger);">
                     <div>${this.formatCurrency(totalRow.totalCost)}</div>
                     <div style="font-size: 0.72rem; opacity: 0.9;">${totalCostPct}%</div>
