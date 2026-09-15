@@ -1747,6 +1747,8 @@ const IncomeStatementModule = {
                         </div>
                     </td>
                     <td style="text-align: right; font-weight: 600;">${row.orderCount}</td>
+                    <td style="text-align: right; font-weight: 600; color: var(--success);">${row.totalDelivered || 0}</td>
+                    <td style="text-align: right; font-weight: 600; color: var(--danger);">${row.totalReturned || 0}</td>
                     <td style="text-align: center;">
                         <span class="badge" style="background: rgba(244, 63, 94, 0.1); color: #f43f5e; font-weight: 600;">${returnRate}%</span>
                     </td>
@@ -1790,6 +1792,8 @@ const IncomeStatementModule = {
                 <td></td>
                 <td style="font-weight: 600;">TOTAL GENERAL</td>
                 <td style="text-align: right; font-weight: 600;">${totalRow.orderCount}</td>
+                <td style="text-align: right; font-weight: 600; color: var(--success);">${totalRow.totalDelivered}</td>
+                <td style="text-align: right; font-weight: 600; color: var(--danger);">${totalRow.totalReturned}</td>
                 <td style="text-align: center;">
                     <span class="badge" style="background: rgba(244, 63, 94, 0.15); color: #f43f5e; font-weight: 600;">${totalReturnRate}%</span>
                 </td>
