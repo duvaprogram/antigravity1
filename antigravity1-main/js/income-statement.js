@@ -1187,7 +1187,7 @@ const IncomeStatementModule = {
         const globalExpenses = [];
 
         expenses.forEach(exp => {
-            if (exp.country && exp.country.toLowerCase() === 'global') {
+            if (exp.country && (exp.country.toLowerCase() === 'global' || exp.country === 'Global_Expense')) {
                 globalExpenses.push(exp);
             } else {
                 localExpenses.push(exp);
@@ -5237,7 +5237,8 @@ const IncomeStatementModule = {
         if (!exp) return;
 
         document.getElementById('opExpenseId').value = exp.id;
-        document.getElementById('opExpenseCountry').value = exp.country || 'Ecuador';
+        const countryValue = exp.country === 'Global_Expense' ? 'Global' : (exp.country || 'Ecuador');
+        document.getElementById('opExpenseCountry').value = countryValue;
         document.getElementById('opExpenseCategory').value = exp.category || 'Envío';
         document.getElementById('opExpenseDescription').value = exp.description || '';
         document.getElementById('opExpenseAmount').value = exp.amount || 0;
@@ -5253,8 +5254,11 @@ const IncomeStatementModule = {
 
     async saveOperationalExpense() {
         const id = document.getElementById('opExpenseId')?.value;
+        const countryValue = document.getElementById('opExpenseCountry').value;
+        const isGlobal = countryValue === 'Global';
+
         const data = {
-            country: document.getElementById('opExpenseCountry').value,
+            country: isGlobal ? 'Global_Expense' : countryValue,
             category: document.getElementById('opExpenseCategory').value,
             description: document.getElementById('opExpenseDescription').value,
             amount: parseFloat(document.getElementById('opExpenseAmount').value) || 0,
@@ -5263,18 +5267,26 @@ const IncomeStatementModule = {
             notes: document.getElementById('opExpenseNotes')?.value || ''
         };
 
+        console.log('Saving operational expense:', data);
+
         try {
             if (id) {
                 const { error } = await supabaseClient
                     .from('operational_expenses')
                     .update(data)
                     .eq('id', id);
-                if (error) throw error;
+                if (error) {
+                    console.error('Supabase error (update):', error);
+                    throw error;
+                }
             } else {
                 const { error } = await supabaseClient
                     .from('operational_expenses')
                     .insert(data);
-                if (error) throw error;
+                if (error) {
+                    console.error('Supabase error (insert):', error);
+                    throw error;
+                }
             }
 
             Utils.showToast('Gasto operativo guardado', 'success');
@@ -5282,7 +5294,8 @@ const IncomeStatementModule = {
             this.render();
         } catch (error) {
             console.error('Error saving operational expense:', error);
-            Utils.showToast('Error al guardar: ' + error.message, 'error');
+            const errorMsg = error?.message || error?.error_description || 'Error desconocido';
+            Utils.showToast('Error al guardar: ' + errorMsg, 'error');
         }
     },
 
