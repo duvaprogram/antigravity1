@@ -1711,6 +1711,12 @@ const IncomeStatementModule = {
                 </button>`;
 
             if (row.isVisualGroup) {
+                actionHtml += `<button class="btn btn-icon btn-sm" style="color: #f59e0b; background: rgba(245, 158, 11, 0.1); border: none;" onclick="IncomeStatementModule.editVisualGroupNameCountry(${row.groupId})" title="Editar nombre del grupo">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>`;
                 actionHtml += `
                 <button class="btn btn-icon btn-sm btn-danger-light" onclick="IncomeStatementModule.ungroupVisualGroupCountry(${row.groupId})" title="Desagrupar">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -3976,6 +3982,12 @@ const IncomeStatementModule = {
                 </button>`;
                 
             if (p.isVisualGroup) {
+                actionHtml += `<button class="btn btn-icon btn-sm" style="color: #f59e0b; background: rgba(245, 158, 11, 0.1); border: none;" onclick="IncomeStatementModule.editVisualGroupName(${p.groupId})" title="Editar nombre del grupo">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </button>`;
                 actionHtml += `<button class="btn btn-sm" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); font-size: 0.75rem; padding: 0.25rem 0.5rem;" onclick="IncomeStatementModule.ungroupVisualGroup(${p.groupId})">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     Desagrupar
@@ -6716,11 +6728,24 @@ const IncomeStatementModule = {
 
     ungroupVisualGroup(groupId) {
         if (!confirm('¿Deshacer este grupo visual?')) return;
-        
+
         this.visualMergedGroups.splice(groupId, 1);
         Utils.showToast('Grupo visual desagrupado.', 'success');
         this.renderProductProfitTable();
         this.updateSelectedUnifiedSalesCount();
+    },
+
+    editVisualGroupName(groupId) {
+        const group = this.visualMergedGroups[groupId];
+        if (!group) return;
+
+        const newName = prompt('Editar nombre del grupo:', group.name);
+        if (!newName || newName.trim() === '') return;
+        if (newName.trim() === group.name) return;
+
+        this.visualMergedGroups[groupId].name = newName.trim();
+        Utils.showToast(`Grupo renombrado a "${newName.trim()}".`, 'success');
+        this.renderProductProfitTable();
     },
 
     toggleSelectAllUnifiedCountries(checked) {
@@ -6781,13 +6806,27 @@ const IncomeStatementModule = {
 
     ungroupVisualGroupCountry(groupId) {
         if (!confirm('¿Deshacer este grupo visual?')) return;
-        
+
         this.visualMergedGroupsCountry.splice(groupId, 1);
         localStorage.setItem('is_visual_merged_groups_country', JSON.stringify(this.visualMergedGroupsCountry));
-        
+
         Utils.showToast('Grupo visual desagrupado.', 'success');
         this.renderConsolidatedSalesTable();
         this.updateSelectedUnifiedCountriesCount();
+    },
+
+    editVisualGroupNameCountry(groupId) {
+        const group = this.visualMergedGroupsCountry[groupId];
+        if (!group) return;
+
+        const newName = prompt('Editar nombre del grupo:', group.name);
+        if (!newName || newName.trim() === '') return;
+        if (newName.trim() === group.name) return;
+
+        this.visualMergedGroupsCountry[groupId].name = newName.trim();
+        localStorage.setItem('is_visual_merged_groups_country', JSON.stringify(this.visualMergedGroupsCountry));
+        Utils.showToast(`Grupo renombrado a "${newName.trim()}".`, 'success');
+        this.renderConsolidatedSalesTable();
     },
 
     filterConsolidatedCountries() {
