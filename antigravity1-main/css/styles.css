@@ -3326,14 +3326,26 @@ form {
     border: 1px solid rgba(225,29,72,0.35);
 }
 
+/* Footer KPI Groups */
+.is-pl-footer-group {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    padding: 0.75rem 1.5rem 1rem;
+}
+.is-pl-footer-label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 0.6rem;
+}
+
 /* Footer KPI Tiles */
 .is-pl-footer {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 0.75rem;
-    padding: 1rem 1.5rem;
-    background: var(--bg-secondary);
-    border-top: 1px solid var(--border);
 }
 .is-pl-kpi-tile {
     text-align: center;

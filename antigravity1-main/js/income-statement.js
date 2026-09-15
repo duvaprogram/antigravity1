@@ -961,6 +961,9 @@ const IncomeStatementModule = {
                     totalShipping: 0,
                     totalShippingCOP: 0,
                     orderCount: 0,
+                    deliveredOrders: 0,
+                    returnedOrders: 0,
+                    shippedOrders: 0,
                     unitsSold: 0
                 };
             }
@@ -970,11 +973,14 @@ const IncomeStatementModule = {
             // Flete se genera siempre que el pedido fue despachado (incluyendo Devolución)
             const shippingUSD = this.getGuideShippingCostUSD(guide);
             byCountry[country].totalShipping += shippingUSD;
+            if (shippingUSD > 0) byCountry[country].shippedOrders++;
             if (this.isColombiaOrder(guide)) {
                 byCountry[country].totalShippingCOP = (byCountry[country].totalShippingCOP || 0) + parseFloat(guide.shipping_cost || 0);
             }
 
-            if (!isExcluded) {
+            if (isExcluded) {
+                byCountry[country].returnedOrders++;
+            } else {
                 // Solo pedidos entregados/efectivos suman ventas y costo de producto
                 const revUSD = this.getGuideRevenueUSD(guide);
                 byCountry[country].totalRevenue += revUSD;
@@ -982,6 +988,7 @@ const IncomeStatementModule = {
                     byCountry[country].totalRevenueCOP = (byCountry[country].totalRevenueCOP || 0) + parseFloat(guide.total_amount || 0);
                 }
                 byCountry[country].orderCount++;
+                byCountry[country].deliveredOrders++;
 
                 if (guide.guide_items) {
                     guide.guide_items.forEach(item => {
@@ -1029,6 +1036,9 @@ const IncomeStatementModule = {
                     totalShipping: 0,
                     totalShippingCOP: 0,
                     orderCount: 0,
+                    deliveredOrders: 0,
+                    returnedOrders: 0,
+                    shippedOrders: 0,
                     unitsSold: 0
                 };
             }
@@ -1039,6 +1049,9 @@ const IncomeStatementModule = {
             const units = parseInt(s.units || del || orders);
 
             byCountry[countryName].orderCount += orders;
+            byCountry[countryName].deliveredOrders += del;
+            byCountry[countryName].returnedOrders += ret;
+            byCountry[countryName].shippedOrders += orders;
             byCountry[countryName].unitsSold += units;
             byCountry[countryName].totalRevenue += parseFloat(s.revenue || 0);
             byCountry[countryName].totalCost += parseFloat(s.product_cost || 0);
@@ -3969,9 +3982,35 @@ const IncomeStatementModule = {
         const pctNum = (val) => totalRevenue > 0 ? Math.min(100, Math.max(0, (val / totalRevenue) * 100)).toFixed(1) : 0;
         const fmt = (val) => '$' + Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-        const totalOrders = salesData.reduce((s, c) => s + (c.orderCount || 0), 0);
-        const aov = totalOrders > 0 ? (totalRevenue / totalOrders) : 0;
+        const totalDelivered = salesData.reduce((s, c) => s + (c.deliveredOrders || 0), 0);
+        const totalReturned = salesData.reduce((s, c) => s + (c.returnedOrders || 0), 0);
+        const totalShipped = salesData.reduce((s, c) => s + (c.shippedOrders || 0), 0);
+        const totalUnits = salesData.reduce((s, c) => s + (c.unitsSold || 0), 0);
+        const totalOrders = totalDelivered + totalReturned;
+
+        // AOV real: solo pedidos entregados (que sí generaron ingreso)
+        const aov = totalDelivered > 0 ? (totalRevenue / totalDelivered) : 0;
+        // Costo promedio de envío por pedido despachado (incluye devoluciones)
+        const avgShippingCost = totalShipped > 0 ? (totalShipping / totalShipped) : 0;
+        // Costo promedio de producto por unidad vendida
+        const avgProductCost = totalUnits > 0 ? (totalCOGS / totalUnits) : 0;
+        // Margen de contribución por pedido entregado
+        const contributionPerOrder = totalDelivered > 0 ? (grossProfit / totalDelivered) : 0;
+        // Utilidad neta por pedido entregado
+        const netPerOrder = totalDelivered > 0 ? (netProfit / totalDelivered) : 0;
+        // Tasa de devolución
+        const returnRate = (totalDelivered + totalReturned) > 0
+            ? ((totalReturned / (totalDelivered + totalReturned)) * 100).toFixed(1) + '%'
+            : '0.0%';
+        // Tasa de entrega efectiva
+        const deliveryRate = (totalDelivered + totalReturned) > 0
+            ? ((totalDelivered / (totalDelivered + totalReturned)) * 100).toFixed(1) + '%'
+            : '0.0%';
+        // ROAS, CAC y break-even
         const roas = totalAdSpend > 0 ? (totalRevenue / totalAdSpend).toFixed(2) + 'x' : 'N/A';
+        const cac = totalDelivered > 0 ? (totalAdSpend / totalDelivered) : 0;
+        const grossMarginRatio = totalRevenue > 0 ? (grossProfit / totalRevenue) : 0;
+        const breakEvenRoas = grossMarginRatio > 0 ? (1 / grossMarginRatio).toFixed(2) + 'x' : 'N/A';
         const costRatio = totalRevenue > 0 ? (((totalCOGS + totalShipping + totalExpenses) / totalRevenue) * 100).toFixed(1) + '%' : '0.0%';
 
         // Helper to render mini progress bar and percentage
@@ -4097,27 +4136,82 @@ const IncomeStatementModule = {
                 </div>
             </div>
 
-            <!-- KPI Footer -->
-            <div class="is-pl-footer">
-                <div class="is-pl-kpi-tile">
-                    <div class="is-pl-kpi-tile-val" style="color: var(--primary);">${totalOrders}</div>
-                    <div class="is-pl-kpi-tile-lbl">Pedidos Totales</div>
+            <!-- E-commerce KPI Footer (grouped by category) -->
+            <div class="is-pl-footer-group">
+                <div class="is-pl-footer-label">Operación</div>
+                <div class="is-pl-footer">
+                    <div class="is-pl-kpi-tile" title="Pedidos que fueron entregados y sí generaron ingresos.">
+                        <div class="is-pl-kpi-tile-val is-success">${totalDelivered}</div>
+                        <div class="is-pl-kpi-tile-lbl">Pedidos Entregados</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Pedidos rechazados o devueltos que sí generaron costo de flete.">
+                        <div class="is-pl-kpi-tile-val is-danger">${totalReturned}</div>
+                        <div class="is-pl-kpi-tile-lbl">Pedidos Devueltos</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Porcentaje de pedidos entregados con éxito sobre el total despachado.">
+                        <div class="is-pl-kpi-tile-val is-success">${deliveryRate}</div>
+                        <div class="is-pl-kpi-tile-lbl">Tasa de Entrega</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Porcentaje de pedidos devueltos sobre el total despachado. Mientras más bajo, mejor.">
+                        <div class="is-pl-kpi-tile-val is-danger">${returnRate}</div>
+                        <div class="is-pl-kpi-tile-lbl">Tasa de Devolución</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Unidades totales vendidas (solo pedidos entregados).">
+                        <div class="is-pl-kpi-tile-val" style="color: var(--info);">${totalUnits}</div>
+                        <div class="is-pl-kpi-tile-lbl">Unidades Vendidas</div>
+                    </div>
                 </div>
-                <div class="is-pl-kpi-tile">
-                    <div class="is-pl-kpi-tile-val is-success">${fmt(aov)}</div>
-                    <div class="is-pl-kpi-tile-lbl">Ticket Promedio (AOV)</div>
+            </div>
+
+            <div class="is-pl-footer-group">
+                <div class="is-pl-footer-label">Ingreso &amp; Costo por Pedido</div>
+                <div class="is-pl-footer">
+                    <div class="is-pl-kpi-tile" title="Ticket promedio real: ingresos totales / pedidos entregados. Excluye devoluciones.">
+                        <div class="is-pl-kpi-tile-val is-success">${fmt(aov)}</div>
+                        <div class="is-pl-kpi-tile-lbl">Ticket Prom. Real (AOV)</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Costo promedio de flete por cada pedido despachado (incluye devoluciones).">
+                        <div class="is-pl-kpi-tile-val is-warning">${fmt(avgShippingCost)}</div>
+                        <div class="is-pl-kpi-tile-lbl">Costo Envío Prom.</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Costo de mercancía promedio por unidad vendida.">
+                        <div class="is-pl-kpi-tile-val is-warning">${fmt(avgProductCost)}</div>
+                        <div class="is-pl-kpi-tile-lbl">Costo Producto / Unidad</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Utilidad bruta promedio (después de COGS y fletes) por pedido entregado.">
+                        <div class="is-pl-kpi-tile-val is-success">${fmt(contributionPerOrder)}</div>
+                        <div class="is-pl-kpi-tile-lbl">Margen Bruto / Pedido</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Utilidad neta final por cada pedido entregado, después de TODOS los gastos.">
+                        <div class="is-pl-kpi-tile-val ${netPerOrder >= 0 ? 'is-success' : 'is-danger'}">${fmt(netPerOrder)}</div>
+                        <div class="is-pl-kpi-tile-lbl">Utilidad Neta / Pedido</div>
+                    </div>
                 </div>
-                <div class="is-pl-kpi-tile">
-                    <div class="is-pl-kpi-tile-val" style="color: var(--info);">${adExpData.reduce((s, c) => s + (c.totalPurchases || 0), 0)}</div>
-                    <div class="is-pl-kpi-tile-lbl">Compras vía Ads</div>
-                </div>
-                <div class="is-pl-kpi-tile">
-                    <div class="is-pl-kpi-tile-val is-warning">${roas}</div>
-                    <div class="is-pl-kpi-tile-lbl">ROAS Publicidad</div>
-                </div>
-                <div class="is-pl-kpi-tile">
-                    <div class="is-pl-kpi-tile-val is-danger">${costRatio}</div>
-                    <div class="is-pl-kpi-tile-lbl">Costos / Ventas</div>
+            </div>
+
+            <div class="is-pl-footer-group">
+                <div class="is-pl-footer-label">Marketing &amp; Adquisición</div>
+                <div class="is-pl-footer">
+                    <div class="is-pl-kpi-tile" title="Compras registradas directamente desde Facebook Ads.">
+                        <div class="is-pl-kpi-tile-val" style="color: var(--info);">${adExpData.reduce((s, c) => s + (c.totalPurchases || 0), 0)}</div>
+                        <div class="is-pl-kpi-tile-lbl">Compras vía Ads</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Return On Ad Spend: ingresos / inversión publicitaria. Mayor es mejor.">
+                        <div class="is-pl-kpi-tile-val is-warning">${roas}</div>
+                        <div class="is-pl-kpi-tile-lbl">ROAS</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="ROAS mínimo para no perder plata dado tu margen bruto. Si tu ROAS actual está por debajo de este número, estás perdiendo.">
+                        <div class="is-pl-kpi-tile-val" style="color: var(--primary);">${breakEvenRoas}</div>
+                        <div class="is-pl-kpi-tile-lbl">ROAS Break-Even</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Costo de Adquisición de Cliente: inversión publicitaria / pedidos entregados.">
+                        <div class="is-pl-kpi-tile-val is-warning">${fmt(cac)}</div>
+                        <div class="is-pl-kpi-tile-lbl">CAC (Costo x Pedido)</div>
+                    </div>
+                    <div class="is-pl-kpi-tile" title="Suma de COGS + fletes + gastos operativos como porcentaje de las ventas.">
+                        <div class="is-pl-kpi-tile-val is-danger">${costRatio}</div>
+                        <div class="is-pl-kpi-tile-lbl">Costos / Ventas</div>
+                    </div>
                 </div>
             </div>
         `;
