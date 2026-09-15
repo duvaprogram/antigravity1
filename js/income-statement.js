@@ -1166,11 +1166,25 @@ const IncomeStatementModule = {
     // OPERATIONAL EXPENSES DATA
     // ========================================
     getFilteredOperationalExpenses() {
-        return this.filterByDateAndCountry(
-            this.operationalExpenses,
+        // Los gastos "Global_Expense" solo deben respetar el filtro de FECHA,
+        // nunca el de país (se distribuyen proporcionalmente entre países después,
+        // según las ventas de los países que el filtro de país sí deje pasar).
+        // Si aplicáramos el filtro de país aquí, un gasto global desaparecería
+        // al filtrar por un país específico, causando que la utilidad de cada
+        // país individual salga inflada respecto a la vista consolidada.
+        const globalExpenses = this.filterByDateAndCountry(
+            this.operationalExpenses.filter(e => e.country === 'Global_Expense' || (e.country && e.country.toLowerCase() === 'global')),
+            'expense_date',
+            null
+        );
+
+        const localExpenses = this.filterByDateAndCountry(
+            this.operationalExpenses.filter(e => e.country !== 'Global_Expense' && !(e.country && e.country.toLowerCase() === 'global')),
             'expense_date',
             (expense) => expense.country
         );
+
+        return [...localExpenses, ...globalExpenses];
     },
 
     getFilteredOpExpenses() {
