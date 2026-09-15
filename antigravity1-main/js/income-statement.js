@@ -862,6 +862,7 @@ const IncomeStatementModule = {
 
     matchesCountryFilter(country) {
         if (!country) return true;
+        if (this._ignoreCountryFilter) return true;
         if (this.countryMultiSelect && !this.countryMultiSelect.isAllSelected()) {
             const selectedCountries = this.filters.countries || [];
             if (selectedCountries.length > 0) {
@@ -1220,13 +1221,17 @@ const IncomeStatementModule = {
         // pasar el filtro de país activo. De lo contrario, al filtrar un solo país
         // este terminaría absorbiendo el 100% de cualquier gasto (inflando sus
         // costos muy por encima de lo que le corresponde según su peso real).
-        const savedCountry = this.filters.country;
-        const savedCountries = this.filters.countries;
-        this.filters.country = '';
-        this.filters.countries = [];
-        const allSalesData = this.getSalesByCountry();
-        this.filters.country = savedCountry;
-        this.filters.countries = savedCountries;
+        // NOTA: no basta con vaciar this.filters.countries — el selector visual
+        // (countryMultiSelect) mantiene su propio estado interno de selección, y
+        // matchesCountryFilter() lo consulta directamente. Por eso usamos una
+        // bandera explícita que matchesCountryFilter() respeta antes que nada.
+        let allSalesData;
+        try {
+            this._ignoreCountryFilter = true;
+            allSalesData = this.getSalesByCountry();
+        } finally {
+            this._ignoreCountryFilter = false;
+        }
 
         // Solo agregamos al resultado las filas de venta (país/plataforma) que el
         // filtro de país actual deja ver
