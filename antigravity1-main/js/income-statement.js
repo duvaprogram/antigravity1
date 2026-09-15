@@ -1179,16 +1179,61 @@ const IncomeStatementModule = {
 
     getOpExpensesByCountry() {
         const expenses = this.getFilteredOperationalExpenses();
+        const salesData = this.getSalesByCountry();
         const byCountry = {};
 
+        // Separar gastos locales y globales
+        const localExpenses = [];
+        const globalExpenses = [];
+
         expenses.forEach(exp => {
+            if (exp.country && exp.country.toLowerCase() === 'global') {
+                globalExpenses.push(exp);
+            } else {
+                localExpenses.push(exp);
+            }
+        });
+
+        // Procesar gastos locales (asignados a país específico)
+        localExpenses.forEach(exp => {
             const country = exp.country;
             if (!byCountry[country]) {
-                byCountry[country] = { country, total: 0, byCategory: {} };
+                byCountry[country] = { country, total: 0, localExpenses: 0, distributedGlobalExpenses: 0, byCategory: {} };
             }
-            byCountry[country].total += parseFloat(exp.amount || 0);
+            const amount = parseFloat(exp.amount || 0);
+            byCountry[country].total += amount;
+            byCountry[country].localExpenses += amount;
             const cat = exp.category || 'Otro';
-            byCountry[country].byCategory[cat] = (byCountry[country].byCategory[cat] || 0) + parseFloat(exp.amount || 0);
+            byCountry[country].byCategory[cat] = (byCountry[country].byCategory[cat] || 0) + amount;
+        });
+
+        // Calcular participación de cada país en ventas para distribuir gastos globales
+        const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
+        const revenueByCountry = {};
+        salesData.forEach(sale => {
+            revenueByCountry[sale.country] = parseFloat(sale.totalRevenue || 0);
+        });
+
+        // Distribuir gastos globales según % de ventas
+        globalExpenses.forEach(gexp => {
+            const globalAmount = parseFloat(gexp.amount || 0);
+            const category = gexp.category || 'Gasto Global';
+
+            // Distribuir a cada país según su % de ventas
+            Object.entries(revenueByCountry).forEach(([country, revenue]) => {
+                if (!byCountry[country]) {
+                    byCountry[country] = { country, total: 0, localExpenses: 0, distributedGlobalExpenses: 0, byCategory: {} };
+                }
+
+                if (totalRevenue > 0) {
+                    const sharePercentage = revenue / totalRevenue;
+                    const distributedAmount = globalAmount * sharePercentage;
+
+                    byCountry[country].total += distributedAmount;
+                    byCountry[country].distributedGlobalExpenses += distributedAmount;
+                    byCountry[country].byCategory[category] = (byCountry[country].byCategory[category] || 0) + distributedAmount;
+                }
+            });
         });
 
         return Object.values(byCountry);
@@ -1247,11 +1292,16 @@ const IncomeStatementModule = {
 
         const salesData = this.getSalesByCountry();
         const freightsByCountry = this.getFreightsByCountry();
+        const opExpData = this.getOpExpensesByCountry();
+        const opExpByCountry = {};
+        opExpData.forEach(exp => {
+            opExpByCountry[exp.country] = exp;
+        });
 
         if (salesData.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="11" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                    <td colspan="12" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="margin-bottom: 0.5rem; opacity: 0.3;">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                             <polyline points="14 2 14 8 20 8"></polyline>
@@ -1263,7 +1313,7 @@ const IncomeStatementModule = {
         }
 
         const totalRow = {
-            totalRevenue: 0, totalCost: 0, totalShipping: 0, totalFreight: 0, orderCount: 0, unitsSold: 0
+            totalRevenue: 0, totalCost: 0, totalShipping: 0, totalFreight: 0, totalOpExp: 0, orderCount: 0, unitsSold: 0
         };
 
         // Calcular total de ventas primero para los porcentajes
@@ -1275,14 +1325,18 @@ const IncomeStatementModule = {
         tbody.innerHTML = salesData.map(row => {
             const baseCountry = row.baseCountry || row.country.replace(' Domi', '');
             const countryFreight = row.isExternal ? 0 : (freightsByCountry[row.country]?.totalFreight || freightsByCountry[baseCountry]?.totalFreight || 0);
+            const countryOpExp = opExpByCountry[row.country]?.total || 0;
+
             totalRow.totalRevenue += row.totalRevenue;
             totalRow.totalCost += row.totalCost;
             totalRow.totalShipping += row.totalShipping;
             totalRow.totalFreight += countryFreight;
+            totalRow.totalOpExp += countryOpExp;
             totalRow.orderCount += row.orderCount;
             totalRow.unitsSold += row.unitsSold;
 
-            const grossProfit = row.totalRevenue - row.totalCost - row.totalShipping - countryFreight;
+            const grossProfitBeforeOpEx = row.totalRevenue - row.totalCost - row.totalShipping - countryFreight;
+            const grossProfit = grossProfitBeforeOpEx - countryOpExp;
             const margin = row.totalRevenue > 0 ? ((grossProfit / row.totalRevenue) * 100).toFixed(1) : '0.0';
 
             // Porcentajes sobre las ventas del mercado
@@ -1329,6 +1383,9 @@ const IncomeStatementModule = {
                         ${shippingSubtitle}
                     </td>
                     <td style="text-align: right; color: var(--warning);">${this.formatCurrency(countryFreight)}</td>
+                    <td style="text-align: right; color: var(--danger);" title="Gastos operativos distribuidos según % de ventas">
+                        <div>${this.formatCurrency(countryOpExp)}</div>
+                    </td>
                     <td style="text-align: right; font-weight: 600; color: ${grossProfit >= 0 ? 'var(--success)' : 'var(--danger)'};">
                         ${this.formatCurrency(grossProfit)}
                     </td>
@@ -1347,7 +1404,7 @@ const IncomeStatementModule = {
         }).join('');
 
         // Total row
-        const totalGross = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalFreight;
+        const totalGross = totalRow.totalRevenue - totalRow.totalCost - totalRow.totalShipping - totalRow.totalFreight - totalRow.totalOpExp;
         const totalMargin = totalRow.totalRevenue > 0 ? ((totalGross / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
         const totalCostPct = totalRow.totalRevenue > 0 ? ((totalRow.totalCost / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
         const totalShippingPct = totalRow.totalRevenue > 0 ? ((totalRow.totalShipping / totalRow.totalRevenue) * 100).toFixed(1) : '0.0';
@@ -1368,6 +1425,7 @@ const IncomeStatementModule = {
                     <div style="font-size: 0.72rem; opacity: 0.9;">${totalShippingPct}%</div>
                 </td>
                 <td style="text-align: right; font-weight: 700; color: var(--warning);">${this.formatCurrency(totalRow.totalFreight)}</td>
+                <td style="text-align: right; font-weight: 700; color: var(--danger);">${this.formatCurrency(totalRow.totalOpExp)}</td>
                 <td style="text-align: right; font-weight: 700; color: ${totalGross >= 0 ? 'var(--success)' : 'var(--danger)'};">${this.formatCurrency(totalGross)}</td>
                 <td style="text-align: center;"><span class="is-margin-badge ${parseFloat(totalMargin) >= 30 ? 'good' : parseFloat(totalMargin) >= 15 ? 'warning' : 'bad'}">${totalMargin}%</span></td>
                 <td></td>
