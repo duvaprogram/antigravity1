@@ -3471,8 +3471,17 @@ const IncomeStatementModule = {
                 const grp = productGroupMap[groupKey];
                 if (rowDate && (!grp.sale_date || rowDate < grp.sale_date)) grp.sale_date = rowDate;
 
-                const rawQty = this.parseExcelNumber(row[quantityIdx]);
-                const rowUnits = rawQty > 0 ? Math.round(rawQty) : 1;
+                // La cantidad real viene embebida como texto en "Contenido", ej: "8993 x 1, 8992 x 2"
+                // (no como numero suelto en una columna dedicada), asi que se extrae por regex.
+                let rowUnits = 0;
+                const contentQtyMatches = content.match(/x\s*(\d+)/gi);
+                if (contentQtyMatches) {
+                    rowUnits = contentQtyMatches.reduce((sum, m) => sum + (parseInt(m.replace(/[^\d]/g, '')) || 0), 0);
+                }
+                if (rowUnits === 0) {
+                    const rawQty = this.parseExcelNumber(row[quantityIdx]);
+                    rowUnits = rawQty > 0 ? Math.round(rawQty) : 1;
+                }
 
                 if (isReturned) {
                     grp.returned += 1;
