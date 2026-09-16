@@ -2608,7 +2608,9 @@ const IncomeStatementModule = {
             shipping_cost: 0,
             return_shipping_cost: 0,
             delivered: 0,
-            returned: 0
+            returned: 0,
+            delivered_units: 0,
+            returned_units: 0
         };
 
         for (const src of recordsToMerge) {
@@ -2618,6 +2620,8 @@ const IncomeStatementModule = {
             merged.return_shipping_cost += (parseFloat(src.return_shipping_cost) || 0);
             merged.delivered += (parseInt(src.delivered) || 0);
             merged.returned += (parseInt(src.returned) || 0);
+            merged.delivered_units += parseInt(src.delivered_units !== undefined && src.delivered_units !== null ? src.delivered_units : (src.delivered || 0));
+            merged.returned_units += parseInt(src.returned_units !== undefined && src.returned_units !== null ? src.returned_units : (src.returned || 0));
         }
 
         // Show loading toast
@@ -3317,7 +3321,7 @@ const IncomeStatementModule = {
                 }
             }
 
-            let statusIdx = 2, productIdx = 12, stockIdx = 13, contentIdx = 15;
+            let statusIdx = 2, productIdx = 12, stockIdx = 13, contentIdx = 15, quantityIdx = 14;
             let recaudoIdx = 25, costoIdx = 26, safeFleteEntregaIdx = 27, safeFleteDevIdx = 28;
             let dateIdx = 16;
             let startRowIndex = 0;
@@ -3333,6 +3337,7 @@ const IncomeStatementModule = {
                 statusIdx = findColExact(['estado', 'estado guia', 'estado del pedido'], 2);
                 productIdx = findColExact(['productos', 'producto', 'nombre producto', 'articulo'], 12);
                 stockIdx = findColExact(['id de stocks', 'id del stock', 'stock id', 'sku', 'id stock'], 13);
+                quantityIdx = findColExact(['cantidad', 'unidades', 'unidad', 'qty', 'cant'], 14);
                 contentIdx = findColExact(['contenido', 'contenido del producto', 'detalle'], 15);
                 recaudoIdx = findColExact(['total recaudo', 'recaudo', 'valor recaudo', 'monto recaudo'], 25);
                 costoIdx = findColExact(['total dropshipping', 'costo del producto', 'costo producto', 'costo prod', 'costo'], 26);
@@ -3457,18 +3462,25 @@ const IncomeStatementModule = {
                         shipping_cost: 0,
                         return_shipping_cost: 0,
                         delivered: 0,
-                        returned: 0
+                        returned: 0,
+                        deliveredUnits: 0,
+                        returnedUnits: 0
                     };
                 }
 
                 const grp = productGroupMap[groupKey];
                 if (rowDate && (!grp.sale_date || rowDate < grp.sale_date)) grp.sale_date = rowDate;
 
+                const rawQty = this.parseExcelNumber(row[quantityIdx]);
+                const rowUnits = rawQty > 0 ? Math.round(rawQty) : 1;
+
                 if (isReturned) {
                     grp.returned += 1;
+                    grp.returnedUnits += rowUnits;
                     grp.raw_return_shipping_cost += rawFleteDevolucion;
                 } else {
                     grp.delivered += 1;
+                    grp.deliveredUnits += rowUnits;
                     grp.raw_revenue += rawRecaudo;
                     grp.raw_product_cost += rawCostoProd;
                     grp.raw_shipping_cost += rawFleteEntrega;
@@ -3637,8 +3649,14 @@ const IncomeStatementModule = {
                     ${r.description}
                     ${r.stock_id ? `<div style="font-size:0.7rem; color:var(--text-muted);">Ref: ${r.stock_id}</div>` : ''}
                 </td>
-                <td style="text-align: center; color: var(--success); font-weight: 600;">${r.delivered}</td>
-                <td style="text-align: center; color: var(--danger); font-weight: 600;">${r.returned}</td>
+                <td style="text-align: center; color: var(--success); font-weight: 600;">
+                    ${r.delivered}
+                    ${r.deliveredUnits !== undefined && r.deliveredUnits !== r.delivered ? `<div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 500;">${r.deliveredUnits} unid.</div>` : ''}
+                </td>
+                <td style="text-align: center; color: var(--danger); font-weight: 600;">
+                    ${r.returned}
+                    ${r.returnedUnits !== undefined && r.returnedUnits !== r.returned ? `<div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 500;">${r.returnedUnits} unid.</div>` : ''}
+                </td>
                 <td style="text-align: right; color: var(--success); font-weight: 600;">
                     $${(r.revenue || 0).toFixed(2)}
                     ${rawRevSubtitle}
@@ -3707,7 +3725,9 @@ const IncomeStatementModule = {
             shipping_cost: 0,
             return_shipping_cost: 0,
             delivered: 0,
-            returned: 0
+            returned: 0,
+            deliveredUnits: 0,
+            returnedUnits: 0
         };
 
         selectedRecords.forEach(src => {
@@ -3721,6 +3741,8 @@ const IncomeStatementModule = {
             merged.return_shipping_cost += (src.return_shipping_cost || 0);
             merged.delivered += (src.delivered || 0);
             merged.returned += (src.returned || 0);
+            merged.deliveredUnits += (src.deliveredUnits || src.delivered || 0);
+            merged.returnedUnits += (src.returnedUnits || src.returned || 0);
         });
 
         // Filter out merged items and insert merged record
@@ -3784,7 +3806,9 @@ const IncomeStatementModule = {
                 shipping_cost: parseFloat(r.shipping_cost) || 0,
                 return_shipping_cost: parseFloat(r.return_shipping_cost) || 0,
                 delivered: parseInt(r.delivered) || 0,
-                returned: parseInt(r.returned) || 0
+                returned: parseInt(r.returned) || 0,
+                delivered_units: parseInt(r.deliveredUnits) || parseInt(r.delivered) || 0,
+                returned_units: parseInt(r.returnedUnits) || parseInt(r.returned) || 0
             }));
 
             this.updateImportProgress(30, 'Actualizando datos locales...');
@@ -3824,7 +3848,9 @@ const IncomeStatementModule = {
                     shipping_cost: r.shipping_cost,
                     return_shipping_cost: r.return_shipping_cost,
                     delivered: r.delivered,
-                    returned: r.returned
+                    returned: r.returned,
+                    delivered_units: r.delivered_units,
+                    returned_units: r.returned_units
                 }));
 
                 const batchSize = 50;
