@@ -1613,6 +1613,8 @@ const IncomeStatementModule = {
                 }
             });
             
+            const extDeliveredUnits = parseInt(s.delivered_units !== undefined && s.delivered_units !== null ? s.delivered_units : (s.delivered || 0));
+            const extReturnedUnits = parseInt(s.returned_units !== undefined && s.returned_units !== null ? s.returned_units : (s.returned || 0));
             countryList.push({
                 id: id,
                 name: name,
@@ -1621,8 +1623,8 @@ const IncomeStatementModule = {
                 orderCount: parseInt(s.delivered || 0) + parseInt(s.returned || 0),
                 totalDelivered: parseInt(s.delivered || 0),
                 totalReturned: parseInt(s.returned || 0),
-                deliveredUnits: parseInt(s.delivered || 0),
-                unitsSold: parseInt(s.delivered || 0) + parseInt(s.returned || 0),
+                deliveredUnits: extDeliveredUnits,
+                unitsSold: extDeliveredUnits + extReturnedUnits,
                 totalRevenue: parseFloat(s.revenue || 0),
                 totalCost: parseFloat(s.product_cost || 0),
                 totalShipping: parseFloat(s.shipping_cost || 0),
@@ -2768,7 +2770,7 @@ const IncomeStatementModule = {
             if (hasLocalFilters) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="13" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
+                        <td colspan="14" style="text-align: center; color: var(--text-muted); padding: 2.5rem 1rem;">
                             <div style="font-size: 1.5rem; margin-bottom: 0.4rem;">🔍</div>
                             <div style="font-weight: 600; font-size: 0.95rem; color: var(--text-primary); margin-bottom: 0.25rem;">No se encontraron registros con los filtros seleccionados</div>
                             <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 0.75rem;">Prueba cambiando el país, producto o término de búsqueda.</div>
@@ -2780,7 +2782,7 @@ const IncomeStatementModule = {
             } else {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="13" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        <td colspan="14" style="text-align: center; color: var(--text-muted); padding: 2rem;">
                             No hay ventas manuales o importadas registradas en este período.
                         </td>
                     </tr>`;
@@ -2800,6 +2802,7 @@ const IncomeStatementModule = {
         let totalAdSpend = 0;
         let totalDelivered = 0;
         let totalReturned = 0;
+        let totalDeliveredUnits = 0;
 
         sales.forEach(sale => {
             totalRevenue += parseFloat(sale.revenue || 0);
@@ -2808,6 +2811,7 @@ const IncomeStatementModule = {
             totalReturnShippingCost += parseFloat(sale.return_shipping_cost || 0);
             totalDelivered += parseInt(sale.delivered || 0);
             totalReturned += parseInt(sale.returned || 0);
+            totalDeliveredUnits += parseInt(sale.delivered_units !== undefined && sale.delivered_units !== null ? sale.delivered_units : sale.delivered || 0);
 
             if (sale.description) {
                 const adSpend = filteredAdExpenses
@@ -2854,6 +2858,7 @@ const IncomeStatementModule = {
                     <td style="text-align: right; color: var(--warning);">${this.formatCurrency(adSpend)}</td>
                     <td style="text-align: right;">${delivered}</td>
                     <td style="text-align: right;">${returned}</td>
+                    <td style="text-align: right; font-weight: 600; color: var(--success);">${sale.delivered_units !== undefined && sale.delivered_units !== null ? sale.delivered_units : delivered}</td>
                     <td style="text-align: center;">${returnRate}%</td>
                     <td style="font-size: 0.85rem;">${this.formatDate(sale.sale_date)}</td>
                     <td style="white-space: nowrap;">
@@ -2911,6 +2916,9 @@ const IncomeStatementModule = {
                     <td style="text-align: right; font-weight: 800; font-size: 0.92rem;">
                         ${totalReturned}
                     </td>
+                    <td style="text-align: right; font-weight: 800; font-size: 0.92rem; color: var(--success);">
+                        ${totalDeliveredUnits}
+                    </td>
                     <td style="text-align: center; font-weight: 800; font-size: 0.92rem; color: ${parseFloat(overallReturnRate) > 25 ? 'var(--danger)' : 'var(--text)'};">
                         ${overallReturnRate}%
                     </td>
@@ -2949,6 +2957,10 @@ const IncomeStatementModule = {
         document.getElementById('extSaleDate').value = new Date().toISOString().split('T')[0];
         document.getElementById('extSaleDelivered').value = '0';
         document.getElementById('extSaleReturned').value = '0';
+        const delUnitsEl = document.getElementById('extSaleDeliveredUnits');
+        if (delUnitsEl) delUnitsEl.value = '0';
+        const retUnitsEl = document.getElementById('extSaleReturnedUnits');
+        if (retUnitsEl) retUnitsEl.value = '0';
         document.getElementById('modalExternalSale').classList.add('active');
     },
 
@@ -2967,6 +2979,10 @@ const IncomeStatementModule = {
         if (returnShipEl) returnShipEl.value = sale.return_shipping_cost || 0;
         document.getElementById('extSaleDelivered').value = sale.delivered || 0;
         document.getElementById('extSaleReturned').value = sale.returned || 0;
+        const delUnitsEl = document.getElementById('extSaleDeliveredUnits');
+        if (delUnitsEl) delUnitsEl.value = sale.delivered_units || sale.delivered || 0;
+        const retUnitsEl = document.getElementById('extSaleReturnedUnits');
+        if (retUnitsEl) retUnitsEl.value = sale.returned_units || sale.returned || 0;
 
         const modal = document.getElementById('modalExternalSale');
         if (modal) modal.classList.add('active');
@@ -3000,7 +3016,9 @@ const IncomeStatementModule = {
             shipping_cost: parseFloat(document.getElementById('extSaleShippingCost').value) || 0,
             return_shipping_cost: parseFloat(document.getElementById('extSaleReturnShippingCost') ? document.getElementById('extSaleReturnShippingCost').value : 0) || 0,
             delivered: parseInt(document.getElementById('extSaleDelivered').value) || 0,
-            returned: parseInt(document.getElementById('extSaleReturned').value) || 0
+            returned: parseInt(document.getElementById('extSaleReturned').value) || 0,
+            delivered_units: parseInt(document.getElementById('extSaleDeliveredUnits')?.value) || parseInt(document.getElementById('extSaleDelivered').value) || 0,
+            returned_units: parseInt(document.getElementById('extSaleReturnedUnits')?.value) || parseInt(document.getElementById('extSaleReturned').value) || 0
         };
 
         if (id) {
@@ -7030,7 +7048,9 @@ const IncomeStatementModule = {
                         </td>
                     </tr>`;
             } else if (o.__source === 'Excel') {
-                const qty = parseInt(o.delivered || 0) + parseInt(o.returned || 0);
+                const delUnits = parseInt(o.delivered_units !== undefined && o.delivered_units !== null ? o.delivered_units : (o.delivered || 0));
+                const retUnits = parseInt(o.returned_units !== undefined && o.returned_units !== null ? o.returned_units : (o.returned || 0));
+                const qty = delUnits + retUnits;
                 orderCount += qty;
                 const rev = parseFloat(o.revenue || 0);
                 const cost = parseFloat(o.product_cost || 0);
