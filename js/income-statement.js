@@ -690,18 +690,31 @@ const IncomeStatementModule = {
 
     async loadAllData() {
         try {
-            // Load guides with items (all dispatched guides for accurate freight & sales attribution)
-            const { data: guides, error: guidesError } = await supabaseClient
-                .from('guides')
-                .select(`
-                    *,
-                    cities!guides_city_id_fkey(name, country),
-                    guide_statuses!guides_status_id_fkey(name),
-                    guide_items(*, products!guide_items_product_id_fkey(name, cost, price, sku))
-                `);
+            // Load guides with items (all dispatched guides for accurate freight & sales attribution).
+            // Se pagina porque Supabase corta en 1000 filas por petición y la tabla ya las supera.
+            const allGuides = [];
+            const guidesPageSize = 1000;
+            let guidesFrom = 0;
+            while (true) {
+                const { data: page, error: guidesError } = await supabaseClient
+                    .from('guides')
+                    .select(`
+                        *,
+                        cities!guides_city_id_fkey(name, country),
+                        guide_statuses!guides_status_id_fkey(name),
+                        guide_items(*, products!guide_items_product_id_fkey(name, cost, price, sku))
+                    `)
+                    .order('created_at', { ascending: true })
+                    .range(guidesFrom, guidesFrom + guidesPageSize - 1);
 
-            if (guidesError) throw guidesError;
-            this.guides = guides || [];
+                if (guidesError) throw guidesError;
+                if (!page || page.length === 0) break;
+
+                allGuides.push(...page);
+                if (page.length < guidesPageSize) break;
+                guidesFrom += guidesPageSize;
+            }
+            this.guides = allGuides;
 
             // Load ad expenses
             const { data: adExpenses, error: adError } = await supabaseClient
@@ -958,18 +971,6 @@ const IncomeStatementModule = {
     // SALES DATA
     // ========================================
     getFilteredSales() {
-        // DEBUG TEMPORAL - remover después de diagnóstico
-        console.group('[IS Debug] getFilteredSales');
-        console.log('Total guías cargadas:', this.guides.length);
-        console.log('Filtros activos:', JSON.stringify({ dateFrom: this.filters.dateFrom, dateTo: this.filters.dateTo, countries: this.filters.countries, country: this.filters.country }));
-        const sample = this.guides.slice(0, 3).map(g => ({
-            id: g.id, created_at: g.created_at, delivered_at: g.delivered_at,
-            cities: g.cities, country: g.country, total_amount: g.total_amount,
-            status: g.guide_statuses?.name || g.status
-        }));
-        console.log('Muestra de primeras 3 guías:', sample);
-        console.groupEnd();
-
         let sales = this.filterByDateAndCountry(
             this.guides,
             (guide) => {
@@ -990,11 +991,6 @@ const IncomeStatementModule = {
                 return guide.country || 'Desconocido';
             }
         );
-
-        console.log('[IS Debug] Guías tras filtro fecha+país:', sales.length, '| países detectados:', [...new Set(sales.map(g => {
-            const cc = this.getCountryFromCity(g.cities, g.city);
-            return (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
-        }))]);
 
         if (this.productMultiSelect && !this.productMultiSelect.isAllSelected()) {
             sales = sales.filter(g => {
