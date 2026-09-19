@@ -116,7 +116,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.64</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.65</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -250,11 +250,20 @@
                     </svg>
                     <span>Cuentas</span>
                 </a>
-                <a href="#finance" class="nav-item" data-section="finance" style="display: none;">
+                <a href="#finance" class="nav-item" data-section="finance">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
                     </svg>
-                    <span>Finanzas Personales</span>
+                    <span>💼 Patrimonio</span>
+                </a>
+                <a href="#expenses" class="nav-item" data-section="expenses">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                    <span>🧾 Gastos Mensuales</span>
                 </a>
                 <!-- Admin only: Users management -->
                 <a href="#users" class="nav-item nav-admin-only" data-section="users" style="display: none;">
@@ -4968,16 +4977,16 @@
                 </div>
             </section>
 
-            <!-- Finance Section -->
+            <!-- Finance Section (Patrimonio Neto) -->
             <section class="content-section" id="section-finance">
                 <div class="section-header">
-                    <h2>Finanzas Personales</h2>
+                    <h2>Patrimonio Personal y Cuentas</h2>
                     <div class="header-buttons">
                         <button class="btn btn-secondary" id="btnManagePFCategories">
-                            ⚙️ Categorías
+                            ⚙️ Categorías Patrimoniales
                         </button>
                         <button class="btn btn-secondary" id="btnSavePFSnapshot">
-                            💾 Guardar Reporte Hoy
+                            💾 Guardar Corte Hoy
                         </button>
                         <button class="btn btn-primary" id="btnNewPFAccount">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -4988,19 +4997,6 @@
                         </button>
                     </div>
                 </div>
-
-                <!-- Sub-pestañas de Finanzas Personales -->
-                <div class="pf-subtabs" style="display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.75rem; flex-wrap: wrap;">
-                    <button type="button" class="pf-subtab-btn active" data-pftab="patrimonio" onclick="FinanceModule.switchTab('patrimonio')">
-                        <span style="font-size: 1rem;">💼</span> Patrimonio
-                    </button>
-                    <button type="button" class="pf-subtab-btn" data-pftab="gastos" onclick="FinanceModule.switchTab('gastos')">
-                        <span style="font-size: 1rem;">🧾</span> Gastos Mensuales
-                    </button>
-                </div>
-
-                <!-- ============ PANEL: PATRIMONIO ============ -->
-                <div class="pf-tab-pane" id="pf-tab-patrimonio">
 
                 <div class="stats-grid" style="margin-bottom: 2rem;">
                     <div class="stat-card">
@@ -7642,6 +7638,28 @@
                     <button type="button" class="btn btn-primary" onclick="ExpensesModule.copySQLToClipboard()" style="background: #6366f1; border-color: #6366f1;">📋 Copiar SQL</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal: Presupuesto del Mes (Estimación Específica por Mes) -->
+    <div class="modal" id="modalExpMonthBudget">
+        <div class="modal-content" style="max-width: 620px;">
+            <div class="modal-header">
+                <div>
+                    <h2 id="modalExpMonthBudgetTitle">Presupuesto Estimado del Mes</h2>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">Configura tu presupuesto estimado por categoría para el mes seleccionado</span>
+                </div>
+                <button class="modal-close" data-close="modalExpMonthBudget">&times;</button>
+            </div>
+            <form id="formExpMonthBudget">
+                <div class="modal-body" style="padding: 1rem 0; max-height: 400px; overflow-y: auto;" id="expMonthBudgetFormBody">
+                    <!-- Dinámico por categorías -->
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalExpMonthBudget">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Presupuesto del Mes</button>
+                </div>
+            </form>
         </div>
     </div>
 

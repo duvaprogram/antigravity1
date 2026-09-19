@@ -28,20 +28,7 @@ const FinanceModule = {
     },
 
     switchTab(tab) {
-        this.activeTab = tab;
-
-        document.querySelectorAll('.pf-subtab-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.pftab === tab);
-        });
-        document.querySelectorAll('.pf-tab-pane').forEach(pane => {
-            pane.style.display = pane.id === `pf-tab-${tab}` ? '' : 'none';
-        });
-
-        // Los gráficos de Chart.js miden mal si se crean dentro de un contenedor
-        // oculto, por eso el panel de gastos se renderiza al mostrarse.
-        if (tab === 'gastos' && typeof ExpensesModule !== 'undefined') {
-            ExpensesModule.render();
-        }
+        this.activeTab = 'patrimonio';
     },
 
     bindEvents() {

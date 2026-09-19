@@ -1,11 +1,12 @@
 // ========================================
-// Gastos Mensuales (Finanzas Personales)
-// Versión Mejorada v2.1.64
+// Gastos Mensuales & Presupuesto (Finanzas Personales)
+// Módulo Totalmente Independiente v2.1.64
 // ========================================
 
 const ExpensesModule = {
     expenses: [],
     categories: [],
+    monthlyBudgets: {},
     currentMonth: null,
     initialized: false,
     editingExpenseId: null,
@@ -28,6 +29,7 @@ const ExpensesModule = {
     // ========================================
     init() {
         if (!this.currentMonth) this.currentMonth = this.todayMonth();
+        this.loadMonthlyBudgets();
         if (!this.initialized) {
             this.bindEvents();
             this.initialized = true;
@@ -55,6 +57,7 @@ const ExpensesModule = {
 
         on('formExpense', 'submit', (e) => this.handleSaveExpense(e));
         on('formExpCategory', 'submit', (e) => this.handleSaveCategory(e));
+        on('formExpMonthBudget', 'submit', (e) => this.handleSaveMonthBudget(e));
 
         on('expFilterCategory', 'change', (e) => {
             this.filters.categoryId = e.target.value;
@@ -109,14 +112,12 @@ const ExpensesModule = {
         }
     },
 
-    // Aviso visible cuando aún no se ha ejecutado supabase_expenses_schema.sql
     toggleSetupNotice(show) {
         const notice = document.getElementById('expSetupNotice');
         if (notice) notice.style.display = show ? '' : 'none';
     },
 
     async loadData() {
-        // Se cargan 12 meses hacia atrás para poder graficar tendencia y comparar.
         const from = this.addMonths(this.currentMonth, -11) + '-01';
         const to = this.monthEnd(this.currentMonth);
 
@@ -127,6 +128,92 @@ const ExpensesModule = {
 
         this.categories = categories || [];
         this.expenses = expenses || [];
+    },
+
+    // ========================================
+    // PRESUPUESTO POR MES ESPECÍFICO (E.g. Sept, Oct, Nov)
+    // ========================================
+    loadMonthlyBudgets() {
+        try {
+            const saved = localStorage.getItem('pf_monthly_budgets_data');
+            this.monthlyBudgets = saved ? JSON.parse(saved) : {};
+        } catch (e) {
+            this.monthlyBudgets = {};
+        }
+    },
+
+    saveMonthlyBudgets() {
+        try {
+            localStorage.setItem('pf_monthly_budgets_data', JSON.stringify(this.monthlyBudgets));
+        } catch (e) {}
+    },
+
+    getCategoryBudget(catId, monthYm = null) {
+        const ym = monthYm || this.currentMonth;
+        if (this.monthlyBudgets[ym] && typeof this.monthlyBudgets[ym][catId] !== 'undefined') {
+            return parseFloat(this.monthlyBudgets[ym][catId]) || 0;
+        }
+        const cat = this.categories.find(c => c.id === catId);
+        return cat ? parseFloat(cat.monthly_budget || 0) : 0;
+    },
+
+    getTotalBudgetForMonth(monthYm = null) {
+        const ym = monthYm || this.currentMonth;
+        return this.categories.reduce((s, c) => s + this.getCategoryBudget(c.id, ym), 0);
+    },
+
+    openMonthBudgetModal() {
+        const title = document.getElementById('modalExpMonthBudgetTitle');
+        if (title) title.textContent = `Presupuesto Estimado - ${this.monthLabel(this.currentMonth)}`;
+
+        const body = document.getElementById('expMonthBudgetFormBody');
+        if (!body) return;
+
+        if (this.categories.length === 0) {
+            Utils.showToast('Primero crea al menos una categoría de gasto', 'warning');
+            this.openCategoriesModal();
+            return;
+        }
+
+        body.innerHTML = this.categories.map(c => {
+            const currentVal = this.getCategoryBudget(c.id, this.currentMonth);
+            return `
+                <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.65rem 0; border-bottom: 1px solid var(--border);">
+                    <span style="font-size: 1.2rem; width: 32px; text-align: center;">${c.icon || '📦'}</span>
+                    <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 600; color: var(--text-primary); font-size: 0.9rem;">${this.escape(c.name)}</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.3rem;">
+                        <span style="font-size: 0.85rem; color: var(--text-muted);">$</span>
+                        <input type="number" step="0.01" min="0" class="exp-month-budget-input" data-catid="${c.id}" value="${currentVal || ''}" placeholder="0.00" style="width: 110px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.35rem 0.6rem; border-radius: 6px; font-weight: 600;">
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        Utils.openModal('modalExpMonthBudget');
+    },
+
+    handleSaveMonthBudget(e) {
+        e.preventDefault();
+        const inputs = document.querySelectorAll('.exp-month-budget-input');
+        if (!this.monthlyBudgets[this.currentMonth]) {
+            this.monthlyBudgets[this.currentMonth] = {};
+        }
+
+        inputs.forEach(inp => {
+            const catId = inp.dataset.catid;
+            const val = parseFloat(inp.value) || 0;
+            this.monthlyBudgets[this.currentMonth][catId] = val;
+        });
+
+        this.saveMonthlyBudgets();
+        Utils.closeModal('modalExpMonthBudget');
+        Utils.showToast(`Presupuesto estimado para ${this.monthLabel(this.currentMonth)} guardado`, 'success');
+
+        this.renderKPIs();
+        this.renderBudgets();
+        this.renderCharts();
     },
 
     // ========================================
@@ -189,9 +276,9 @@ const ExpensesModule = {
         const badge = document.getElementById('expMonthBadge');
         if (badge) {
             const isCurrent = this.currentMonth === this.todayMonth();
-            badge.textContent = isCurrent ? 'Mes en curso' : 'Mes cerrado';
-            badge.style.background = isCurrent ? 'rgba(34, 197, 94, 0.15)' : 'rgba(100, 116, 139, 0.15)';
-            badge.style.color = isCurrent ? '#22c55e' : '#94a3b8';
+            badge.textContent = isCurrent ? 'Mes en curso' : 'Mes presupuestado';
+            badge.style.background = isCurrent ? 'rgba(34, 197, 94, 0.15)' : 'rgba(99, 102, 241, 0.15)';
+            badge.style.color = isCurrent ? '#22c55e' : '#818cf8';
         }
     },
 
@@ -222,7 +309,7 @@ const ExpensesModule = {
         const fixed = monthExpenses.filter(e => e.is_recurring)
             .reduce((s, e) => s + parseFloat(e.amount || 0), 0);
 
-        const budget = this.categories.reduce((s, c) => s + parseFloat(c.monthly_budget || 0), 0);
+        const budget = this.getTotalBudgetForMonth(this.currentMonth);
 
         const totalDays = this.daysInMonth(this.currentMonth);
         const isCurrent = this.currentMonth === this.todayMonth();
@@ -244,9 +331,6 @@ const ExpensesModule = {
         };
     },
 
-    // ========================================
-    // HIGHLIGHTS Y RESUMEN RÁPIDO
-    // ========================================
     renderHighlights() {
         const container = document.getElementById('expHighlightsContainer');
         if (!container) return;
@@ -257,7 +341,6 @@ const ExpensesModule = {
             return;
         }
 
-        // Mayor gasto
         let biggest = monthExpenses[0];
         monthExpenses.forEach(e => {
             if (parseFloat(e.amount || 0) > parseFloat(biggest.amount || 0)) {
@@ -265,7 +348,6 @@ const ExpensesModule = {
             }
         });
 
-        // Día de mayor consumo
         const dayTotals = {};
         monthExpenses.forEach(e => {
             const day = (e.date || '').split('-')[2] || '01';
@@ -281,7 +363,6 @@ const ExpensesModule = {
             }
         });
 
-        // Top Categoría
         const catTotals = {};
         monthExpenses.forEach(e => {
             const cat = this.categoryOf(e);
@@ -331,9 +412,6 @@ const ExpensesModule = {
         `;
     },
 
-    // ========================================
-    // KPIs
-    // ========================================
     renderKPIs() {
         const k = this.computeKPIs();
         const set = (id, val, color) => {
@@ -346,7 +424,6 @@ const ExpensesModule = {
         set('expKpiTotal', Utils.formatCurrency(k.total));
         set('expKpiCount', `${k.count} ${k.count === 1 ? 'movimiento' : 'movimientos'} · Ticket ${Utils.formatCurrency(k.avgTicket)}`);
 
-        // Presupuesto
         if (k.budget > 0) {
             set('expKpiBudget', Utils.formatCurrency(k.budget));
             const pct = k.budgetUsed;
@@ -356,16 +433,14 @@ const ExpensesModule = {
                 over ? 'var(--danger)' : (pct > 85 ? '#f59e0b' : 'var(--success)'));
         } else {
             set('expKpiBudget', '—');
-            set('expKpiBudgetSub', 'Define presupuestos en Categorías', 'var(--text-muted)');
+            set('expKpiBudgetSub', 'Configura presupuesto estimado para este mes', 'var(--text-muted)');
         }
 
-        // Promedio diario y proyección
         set('expKpiDaily', Utils.formatCurrency(k.dailyAvg));
         set('expKpiDailySub', k.isCurrent
             ? `Proyección del mes: ${Utils.formatCurrency(k.projection)}`
             : `Sobre ${k.totalDays} días del mes`);
 
-        // Variación
         if (k.variation === null) {
             set('expKpiVariation', '—');
             set('expKpiVariationSub', 'Sin gastos el mes anterior', 'var(--text-muted)');
@@ -377,15 +452,11 @@ const ExpensesModule = {
                 `Mes anterior: ${Utils.formatCurrency(k.prevTotal)}`, 'var(--text-muted)');
         }
 
-        // Fijos vs variables
         const fixedPct = k.total > 0 ? (k.fixed / k.total) * 100 : 0;
         set('expKpiFixed', Utils.formatCurrency(k.fixed));
         set('expKpiFixedSub', `${fixedPct.toFixed(0)}% del total · Variables ${Utils.formatCurrency(k.variable)}`);
     },
 
-    // ========================================
-    // PRESUPUESTO POR CATEGORÍA
-    // ========================================
     renderBudgets() {
         const container = document.getElementById('expBudgetList');
         if (!container) return;
@@ -401,7 +472,7 @@ const ExpensesModule = {
             .map(c => ({
                 cat: c,
                 spent: spentByCat[c.id] || 0,
-                budget: parseFloat(c.monthly_budget || 0)
+                budget: this.getCategoryBudget(c.id, this.currentMonth)
             }))
             .filter(r => r.spent > 0 || r.budget > 0)
             .sort((a, b) => b.spent - a.spent);
@@ -410,7 +481,8 @@ const ExpensesModule = {
             container.innerHTML = `
                 <div style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
                     <div style="font-size: 2rem; margin-bottom: 0.5rem;">📊</div>
-                    <p style="margin: 0;">Aún no hay gastos ni presupuestos en ${this.monthLabel(this.currentMonth)}.</p>
+                    <p style="margin: 0;">Aún no hay gastos ni presupuestos definidos para ${this.monthLabel(this.currentMonth)}.</p>
+                    <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.openMonthBudgetModal()" style="margin-top: 0.75rem;">🎯 Definir Presupuesto ${this.monthLabel(this.currentMonth)}</button>
                 </div>`;
             return;
         }
@@ -427,7 +499,7 @@ const ExpensesModule = {
                 ? (over
                     ? `Excedido por ${Utils.formatCurrency(r.spent - r.budget)}`
                     : `Quedan ${Utils.formatCurrency(r.budget - r.spent)}`)
-                : 'Sin presupuesto definido';
+                : 'Sin presupuesto en este mes';
 
             return `
                 <div style="padding: 0.85rem 0; border-bottom: 1px solid var(--border);">
@@ -453,9 +525,6 @@ const ExpensesModule = {
         }).join('');
     },
 
-    // ========================================
-    // DESGLOSE POR MÉTODO DE PAGO
-    // ========================================
     renderPaymentBreakdown() {
         const container = document.getElementById('expPaymentBreakdownList');
         if (!container) return;
@@ -503,9 +572,6 @@ const ExpensesModule = {
         `).join('');
     },
 
-    // ========================================
-    // TABLA Y ACCIONES
-    // ========================================
     getFilteredExpenses() {
         let list = this.expensesOfMonth(this.currentMonth);
 
@@ -571,7 +637,7 @@ const ExpensesModule = {
             tbody.innerHTML = `
                 <tr><td colspan="7" style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
                     <div style="font-size: 2rem; margin-bottom: 0.5rem;">🧾</div>
-                    No hay gastos que coincidan con los filtros en ${this.monthLabel(this.currentMonth)}.
+                    No hay gastos registrados en ${this.monthLabel(this.currentMonth)}.
                 </td></tr>`;
             return;
         }
@@ -730,7 +796,7 @@ const ExpensesModule = {
 
         const totals = months.map(m =>
             this.expensesOfMonth(m).reduce((s, e) => s + parseFloat(e.amount || 0), 0));
-        const budget = this.categories.reduce((s, c) => s + parseFloat(c.monthly_budget || 0), 0);
+        const budget = this.getTotalBudgetForMonth(this.currentMonth);
 
         if (this.charts.trend) this.charts.trend.destroy();
 
@@ -744,8 +810,8 @@ const ExpensesModule = {
 
         if (budget > 0) {
             datasets.push({
-                label: 'Presupuesto',
-                data: months.map(() => budget),
+                label: 'Presupuesto Estimado',
+                data: months.map(m => this.getTotalBudgetForMonth(m)),
                 type: 'line',
                 borderColor: '#f59e0b',
                 borderDash: [6, 4],
@@ -806,7 +872,7 @@ const ExpensesModule = {
             return i < lastDay ? running : null;
         });
 
-        const budget = this.categories.reduce((s, c) => s + parseFloat(c.monthly_budget || 0), 0);
+        const budget = this.getTotalBudgetForMonth(this.currentMonth);
 
         if (this.charts.pace) this.charts.pace.destroy();
 
@@ -824,7 +890,7 @@ const ExpensesModule = {
 
         if (budget > 0) {
             datasets.push({
-                label: 'Ritmo ideal',
+                label: 'Ritmo ideal estimado',
                 data: perDay.map((_, i) => (budget / days) * (i + 1)),
                 borderColor: '#22c55e',
                 borderDash: [5, 4],
@@ -865,9 +931,6 @@ const ExpensesModule = {
         });
     },
 
-    // ========================================
-    // REGISTRO RÁPIDO & PRESETS
-    // ========================================
     quickAddPreset(description, amount, defaultCatName) {
         if (this.categories.length === 0) {
             Utils.showToast('Primero crea al menos una categoría de gasto', 'warning');
@@ -954,9 +1017,6 @@ const ExpensesModule = {
         setTimeout(() => document.getElementById('expAmount')?.focus(), 80);
     },
 
-    // ========================================
-    // MODAL DE GASTO
-    // ========================================
     openExpenseModal(id = null) {
         if (this.categories.length === 0) {
             Utils.showToast('Primero crea al menos una categoría de gasto', 'warning');
@@ -1069,9 +1129,6 @@ const ExpensesModule = {
         }
     },
 
-    // ========================================
-    // CATEGORÍAS
-    // ========================================
     openCategoriesModal() {
         this.editingCategoryId = null;
         this.renderCategoriesList();
@@ -1145,7 +1202,7 @@ const ExpensesModule = {
                     <div style="flex: 1; min-width: 0;">
                         <div style="font-weight: 600; color: var(--text-primary);">${this.escape(c.name)}</div>
                         <div style="font-size: 0.75rem; color: var(--text-muted);">
-                            ${budget > 0 ? `Presupuesto ${Utils.formatCurrency(budget)}/mes` : 'Sin presupuesto'}
+                            ${budget > 0 ? `Presupuesto base ${Utils.formatCurrency(budget)}/mes` : 'Sin presupuesto base'}
                             ${count > 0 ? ` · ${count} ${count === 1 ? 'gasto' : 'gastos'}` : ''}
                         </div>
                     </div>
@@ -1242,7 +1299,6 @@ const ExpensesModule = {
 -- Ejecuta este script completo en el SQL Editor de tu proyecto de Supabase.
 -- Es idempotente: puedes correrlo varias veces sin romper nada.
 
--- 1. Categorías de gasto (con presupuesto mensual por categoría)
 CREATE TABLE IF NOT EXISTS public.pf_expense_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
@@ -1256,7 +1312,6 @@ CREATE TABLE IF NOT EXISTS public.pf_expense_categories (
     CONSTRAINT pf_expense_categories_name_key UNIQUE (name)
 );
 
--- 2. Gastos
 CREATE TABLE IF NOT EXISTS public.pf_expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     date DATE NOT NULL DEFAULT CURRENT_DATE,
@@ -1270,7 +1325,6 @@ CREATE TABLE IF NOT EXISTS public.pf_expenses (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Columnas añadidas por seguridad
 ALTER TABLE public.pf_expenses ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'cash';
 ALTER TABLE public.pf_expenses ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT FALSE;
 ALTER TABLE public.pf_expenses ADD COLUMN IF NOT EXISTS notes TEXT;
@@ -1278,11 +1332,9 @@ ALTER TABLE public.pf_expenses ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ D
 ALTER TABLE public.pf_expense_categories ADD COLUMN IF NOT EXISTS monthly_budget NUMERIC(14,2) DEFAULT 0;
 ALTER TABLE public.pf_expense_categories ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
 
--- 3. Índices para consultas por mes y por categoría
 CREATE INDEX IF NOT EXISTS idx_pf_expenses_date ON public.pf_expenses (date DESC);
 CREATE INDEX IF NOT EXISTS idx_pf_expenses_category ON public.pf_expenses (category_id);
 
--- 4. Seguridad a nivel de fila (RLS)
 ALTER TABLE public.pf_expense_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pf_expenses ENABLE ROW LEVEL SECURITY;
 
@@ -1294,7 +1346,6 @@ DROP POLICY IF EXISTS "Allow all operations for authenticated users" ON public.p
 CREATE POLICY "Allow all operations for authenticated users"
 ON public.pf_expenses FOR ALL USING (true) WITH CHECK (true);
 
--- 5. Categorías iniciales sugeridas
 INSERT INTO public.pf_expense_categories (name, icon, color, monthly_budget, sort_order) VALUES
     ('Vivienda',        '🏠', '#6366f1', 0, 1),
     ('Alimentación',    '🍽️', '#22c55e', 0, 2),
@@ -1327,9 +1378,6 @@ ON CONFLICT (name) DO NOTHING;`;
         Utils.openModal('modalExpSQL');
     },
 
-    // ========================================
-    // EXPORTAR
-    // ========================================
     exportToExcel() {
         if (typeof XLSX === 'undefined') {
             Utils.showToast('La librería de Excel no está disponible', 'error');
@@ -1345,7 +1393,6 @@ ON CONFLICT (name) DO NOTHING;`;
         const k = this.computeKPIs();
         const wb = XLSX.utils.book_new();
 
-        // Hoja 1: resumen
         const resumen = [
             ['REPORTE DE GASTOS MENSUALES'],
             ['Período:', this.monthLabel(this.currentMonth)],
@@ -1353,7 +1400,7 @@ ON CONFLICT (name) DO NOTHING;`;
             [],
             ['INDICADOR', 'VALOR'],
             ['Total gastado', k.total],
-            ['Presupuesto mensual', k.budget],
+            ['Presupuesto mensual estimado', k.budget],
             ['Disponible / Excedido', k.remaining],
             ['% de presupuesto usado', k.budgetUsed !== null ? `${k.budgetUsed.toFixed(1)}%` : 'N/A'],
             ['Gastos fijos', k.fixed],
@@ -1369,7 +1416,6 @@ ON CONFLICT (name) DO NOTHING;`;
         wsResumen['!cols'] = [{ wch: 30 }, { wch: 22 }];
         XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
 
-        // Hoja 2: detalle
         const detalle = [['Fecha', 'Categoría', 'Descripción', 'Método de Pago', 'Tipo', 'Monto ($)', 'Notas']];
         list.forEach(e => {
             const cat = this.categoryOf(e);
@@ -1387,16 +1433,16 @@ ON CONFLICT (name) DO NOTHING;`;
         wsDetalle['!cols'] = [{ wch: 12 }, { wch: 18 }, { wch: 38 }, { wch: 16 }, { wch: 10 }, { wch: 12 }, { wch: 30 }];
         XLSX.utils.book_append_sheet(wb, wsDetalle, 'Detalle');
 
-        // Hoja 3: por categoría
         const byCat = {};
         list.forEach(e => {
             const cat = this.categoryOf(e);
             const key = cat?.name || 'Sin categoría';
-            if (!byCat[key]) byCat[key] = { total: 0, count: 0, budget: parseFloat(cat?.monthly_budget || 0) };
+            const catBudget = cat ? this.getCategoryBudget(cat.id, this.currentMonth) : 0;
+            if (!byCat[key]) byCat[key] = { total: 0, count: 0, budget: catBudget };
             byCat[key].total += parseFloat(e.amount || 0);
             byCat[key].count++;
         });
-        const porCat = [['Categoría', 'Nº Gastos', 'Total ($)', 'Presupuesto ($)', 'Diferencia ($)', '% del Total']];
+        const porCat = [['Categoría', 'Nº Gastos', 'Total ($)', 'Presupuesto Est. ($)', 'Diferencia ($)', '% del Total']];
         Object.entries(byCat)
             .sort((a, b) => b[1].total - a[1].total)
             .forEach(([name, v]) => {

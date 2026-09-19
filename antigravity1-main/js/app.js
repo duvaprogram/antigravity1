@@ -163,7 +163,8 @@ const App = {
             'income-statement': 'Estado de Resultados',
             'calculator': 'Calculadora de Utilidad',
             'materials-calculator': 'Calculadora de Materiales',
-            'finance': 'Finanzas Personales',
+            'finance': 'Patrimonio y Finanzas Personales',
+            'expenses': 'Gastos Mensuales y Presupuesto',
             'multimedia': 'Multimedia (Imágenes y Videos)',
             'images': 'Multimedia (Imágenes y Videos)',
             'journal': 'Diario y Metas'
@@ -255,6 +256,11 @@ const App = {
                     await FinanceModule.render();
                 } else {
                     FinanceModule.init();
+                }
+                break;
+            case 'expenses':
+                if (typeof ExpensesModule !== 'undefined' && typeof ExpensesModule.render === 'function') {
+                    await ExpensesModule.render();
                 }
                 break;
             case 'multimedia':
