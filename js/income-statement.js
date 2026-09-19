@@ -965,7 +965,7 @@ const IncomeStatementModule = {
 
         let sales = this.filterByDateAndCountry(
             this.guides,
-            (guide) => guide.delivered_at || guide.created_at,
+            (guide) => guide.delivered_at || guide.created_at || guide.date || guide.createdAt,
             (guide) => {
                 const cityCountry = this.getCountryFromCity(guide.cities, guide.city);
                 if (cityCountry && cityCountry !== 'Desconocido') return cityCountry;
@@ -3961,7 +3961,8 @@ const IncomeStatementModule = {
         const filteredGuides = this.guides || [];
         filteredGuides.forEach(g => {
             if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
-            const gCountry = g.country || this.getCountryFromCity(g.cities, g.city);
+            const cc = this.getCountryFromCity(g.cities, g.city);
+            const gCountry = (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
             if (!this.matchesCountryFilter(gCountry)) return;
             const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
@@ -6082,7 +6083,8 @@ const IncomeStatementModule = {
             const filteredGuides = this.guides || [];
             filteredGuides.forEach(g => {
                 if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
-                const gCountry = g.country || this.getCountryFromCity(g.cities, g.city);
+                const cc = this.getCountryFromCity(g.cities, g.city);
+                const gCountry = (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
                 if (!this.matchesCountryFilter(gCountry)) return;
                 const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
                 if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
@@ -6210,7 +6212,8 @@ const IncomeStatementModule = {
 
             const orderRows = [];
             filteredGuides.forEach(g => {
-                const gCountry = g.country || this.getCountryFromCity(g.cities, g.city);
+                const cc = this.getCountryFromCity(g.cities, g.city);
+                const gCountry = (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
                 if (!this.matchesCountryFilter(gCountry)) return;
                 const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
                 if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
@@ -7220,7 +7223,8 @@ const IncomeStatementModule = {
         const filteredGuides = this.guides || [];
         filteredGuides.forEach(g => {
             if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
-            const gCountry = g.country || this.getCountryFromCity(g.cities, g.city);
+            const cc = this.getCountryFromCity(g.cities, g.city);
+            const gCountry = (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
             if (!this.matchesCountryFilter(gCountry)) return;
             const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
