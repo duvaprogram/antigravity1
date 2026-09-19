@@ -116,7 +116,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.66</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.67</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -5213,23 +5213,28 @@
 
             <!-- Expenses Section (Gastos Mensuales y Presupuestación Independiente) -->
             <section class="content-section" id="section-expenses">
-                <div class="section-header">
-                    <h2>Gastos Mensuales y Presupuestación</h2>
-                    <div class="header-buttons">
-                        <button class="btn btn-secondary" onclick="ExpensesModule.openMonthBudgetModal()" style="border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; font-weight: 600;">
+                <div class="section-header" style="margin-bottom: 1.25rem;">
+                    <div>
+                        <h2 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                            💳 Gastos Mensuales y Presupuestación
+                            <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.67</span>
+                        </h2>
+                        <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--text-muted);">
+                            Planificación mensual estimada, registro de consumos y control de presupuesto independiente.
+                        </p>
+                    </div>
+                    <div class="header-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.openMonthBudgetModal()" style="border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; font-weight: 600;">
                             🎯 Presupuesto del Mes
                         </button>
-                        <button class="btn btn-secondary" onclick="ExpensesModule.openSQLModal()" style="border: 1px solid rgba(245, 158, 11, 0.4); color: #f59e0b;">
-                            ⚡ SQL Supabase
-                        </button>
-                        <button class="btn btn-secondary" id="btnExpCategories">
+                        <button class="btn btn-secondary btn-sm" id="btnExpCategories">
                             ⚙️ Categorías
                         </button>
-                        <button class="btn btn-secondary" id="btnExpExport">
+                        <button class="btn btn-secondary btn-sm" id="btnExpExport">
                             📊 Exportar Excel
                         </button>
-                        <button class="btn btn-primary" id="btnNewExpense">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <button class="btn btn-primary btn-sm" id="btnNewExpense">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                             </svg>
@@ -5238,254 +5243,195 @@
                     </div>
                 </div>
 
-                <!-- Aviso de configuración pendiente -->
-                <div class="card" id="expSetupNotice" style="display: none; margin-bottom: 1.5rem; border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.07);">
-                    <div class="card-body" style="display: flex; gap: 1rem; align-items: flex-start; padding: 1.1rem 1.25rem;">
-                        <div style="font-size: 1.6rem; line-height: 1;">⚙️</div>
-                        <div>
-                            <h4 style="margin: 0 0 0.35rem; color: #f59e0b;">Falta crear las tablas de gastos en Supabase</h4>
-                            <p style="margin: 0 0 0.5rem; color: var(--text-muted); font-size: 0.88rem; line-height: 1.5;">
-                                Para activar este módulo, abre tu proyecto de Supabase → <strong>SQL Editor</strong> y ejecuta
-                                el script <code style="background: var(--bg-secondary); padding: 1px 6px; border-radius: 4px;">supabase_expenses_schema.sql</code>.
-                            </p>
-                            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
-                                <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.render()">Ya lo ejecuté, reintentar</button>
-                                <button class="btn btn-primary btn-sm" onclick="ExpensesModule.copySQLToClipboard()" style="background: #f59e0b; border-color: #f59e0b; color: #000; font-weight: 600;">📋 Copiar SQL al Portapapeles</button>
-                                <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.openSQLModal()">👁️ Ver SQL Completo</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>y: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
-                                    <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.render()">Ya lo ejecuté, reintentar</button>
-                                    <button class="btn btn-primary btn-sm" onclick="ExpensesModule.copySQLToClipboard()" style="background: #f59e0b; border-color: #f59e0b; color: #000; font-weight: 600;">📋 Copiar SQL al Portapapeles</button>
-                                    <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.openSQLModal()">👁️ Ver SQL Completo</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Barra de Gastos Rápidos Presets -->
-                    <div class="card" style="margin-bottom: 1.5rem; background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(6, 182, 212, 0.05)); border: 1px solid rgba(99, 102, 241, 0.25);">
-                        <div class="card-body" style="padding: 0.85rem 1.25rem;">
-                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
-                                <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">
-                                    <span style="font-size: 1.1rem;">⚡</span> Registro Rápido:
-                                </div>
-                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" id="expQuickPresetsList">
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Almuerzo', 5, 'Alimentación')" style="border-radius: 20px; font-size: 0.8rem;">🍱 Almuerzo ($5)</button>
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Gasolina', 15, 'Transporte')" style="border-radius: 20px; font-size: 0.8rem;">⛽ Gasolina ($15)</button>
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Café / Snack', 3, 'Alimentación')" style="border-radius: 20px; font-size: 0.8rem;">☕ Café ($3)</button>
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Supermercado', 30, 'Alimentación')" style="border-radius: 20px; font-size: 0.8rem;">🛒 Supermercado ($30)</button>
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Taxi / Uber', 5, 'Transporte')" style="border-radius: 20px; font-size: 0.8rem;">🚕 Taxi ($5)</button>
-                                    <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Servicios Básicos', 20, 'Servicios')" style="border-radius: 20px; font-size: 0.8rem;">💡 Servicios ($20)</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Barra de navegación por mes -->
-                    <div class="card" style="margin-bottom: 1.5rem;">
-                        <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 1rem 1.25rem;">
-                            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
-                                <button class="btn btn-secondary btn-sm" id="btnExpPrevMonth" title="Mes anterior" style="padding: 0.4rem 0.7rem;">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                        <polyline points="15 18 9 12 15 6"></polyline>
-                                    </svg>
-                                </button>
-                                <div style="min-width: 190px; text-align: center;">
-                                    <div style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary);" id="expMonthLabel">—</div>
-                                    <span style="font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; font-weight: 700; letter-spacing: 0.4px;" id="expMonthBadge">—</span>
-                                </div>
-                                <button class="btn btn-secondary btn-sm" id="btnExpNextMonth" title="Mes siguiente" style="padding: 0.4rem 0.7rem;">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                        <polyline points="9 18 15 12 9 6"></polyline>
-                                    </svg>
-                                </button>
-                                <input type="month" id="expMonthPicker" title="Ir a un mes específico"
-                                    style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.42rem 0.7rem; border-radius: 6px; font-size: 0.85rem;">
-                            </div>
-
-                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.openSQLModal()" style="border: 1px solid rgba(245, 158, 11, 0.4); color: #f59e0b;">⚡ SQL Supabase</button>
-                                <button class="btn btn-secondary btn-sm" id="btnExpCategories">⚙️ Categorías y Presupuestos</button>
-                                <button class="btn btn-secondary btn-sm" id="btnExpExport">📊 Exportar Excel</button>
-                                <button class="btn btn-primary btn-sm" id="btnNewExpense">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                                    </svg>
-                                    Registrar Gasto
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Highlights Banner -->
-                    <div id="expHighlightsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;"></div>
-
-                    <!-- KPIs -->
-                    <div class="stats-grid" style="margin-bottom: 1.75rem;">
-                        <div class="stat-card">
-                            <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="12" y1="1" x2="12" y2="23"></line>
-                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                <!-- Barra Integrada de Navegación Mensual y Presets Rápidos -->
+                <div class="card" style="margin-bottom: 1.25rem; background: var(--bg-card); border: 1px solid var(--border);">
+                    <div class="card-body" style="padding: 0.75rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+                        <!-- Selector de Mes -->
+                        <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                            <button class="btn btn-secondary btn-sm" id="btnExpPrevMonth" title="Mes anterior" style="padding: 0.35rem 0.65rem;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
                                 </svg>
+                            </button>
+                            <div style="min-width: 170px; text-align: center;">
+                                <div style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);" id="expMonthLabel">—</div>
+                                <span style="font-size: 0.65rem; padding: 1px 7px; border-radius: 10px; font-weight: 700; letter-spacing: 0.4px;" id="expMonthBadge">—</span>
                             </div>
-                            <div class="stat-info">
-                                <span class="stat-value" id="expKpiTotal">$0.00</span>
-                                <span class="stat-label">Total Gastado</span>
-                                <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiCount">0 movimientos</span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M20 6L9 17l-5-5"></path>
+                            <button class="btn btn-secondary btn-sm" id="btnExpNextMonth" title="Mes siguiente" style="padding: 0.35rem 0.65rem;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
                                 </svg>
-                            </div>
-                            <div class="stat-info">
-                                <span class="stat-value" id="expKpiBudget">$0.00</span>
-                                <span class="stat-label">Presupuesto del Mes</span>
-                                <span style="font-size: 0.72rem; display: block; margin-top: 2px;" id="expKpiBudgetSub">—</span>
-                            </div>
+                            </button>
+                            <input type="month" id="expMonthPicker" title="Ir a un mes específico"
+                                style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.35rem 0.6rem; border-radius: 6px; font-size: 0.82rem;">
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-icon" style="background: rgba(6, 182, 212, 0.1); color: #06b6d4;">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <polyline points="12 6 12 12 16 14"></polyline>
-                                </svg>
-                            </div>
-                            <div class="stat-info">
-                                <span class="stat-value" id="expKpiDaily">$0.00</span>
-                                <span class="stat-label">Promedio Diario</span>
-                                <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiDailySub">—</span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                                    <polyline points="17 6 23 6 23 12"></polyline>
-                                </svg>
-                            </div>
-                            <div class="stat-info">
-                                <span class="stat-value" id="expKpiVariation">—</span>
-                                <span class="stat-label">vs. Mes Anterior</span>
-                                <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiVariationSub">—</span>
-                            </div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
-                                    <line x1="3" y1="9" x2="21" y2="9"></line>
-                                </svg>
-                            </div>
-                            <div class="stat-info">
-                                <span class="stat-value" id="expKpiFixed">$0.00</span>
-                                <span class="stat-label">Gastos Fijos</span>
-                                <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiFixedSub">—</span>
-                            </div>
+
+                        <!-- Presets Rápidos en línea -->
+                        <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;" id="expQuickPresetsList">
+                            <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-right: 0.2rem;">⚡ Rápidos:</span>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Almuerzo', 5, 'Alimentación')" style="border-radius: 16px; font-size: 0.78rem; padding: 3px 10px;">🍱 Almuerzo ($5)</button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Gasolina', 15, 'Transporte')" style="border-radius: 16px; font-size: 0.78rem; padding: 3px 10px;">⛽ Gasolina ($15)</button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Café / Snack', 3, 'Alimentación')" style="border-radius: 16px; font-size: 0.78rem; padding: 3px 10px;">☕ Café ($3)</button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Supermercado', 30, 'Alimentación')" style="border-radius: 16px; font-size: 0.78rem; padding: 3px 10px;">🛒 Supermercado ($30)</button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Taxi / Uber', 5, 'Transporte')" style="border-radius: 16px; font-size: 0.78rem; padding: 3px 10px;">🚕 Taxi ($5)</button>
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="ExpensesModule.quickAddPreset('Servicios Básicos', 20, 'Servicios')" style="border-radius: 16px; font-size: 0.78rem; padding: 3px 10px;">💡 Servicios ($20)</button>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Gráficos -->
-                    <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); margin-bottom: 1.75rem;">
-                        <div class="card">
-                            <div class="card-header"><h3>Distribución por Categoría</h3></div>
-                            <div class="card-body" style="position: relative; height: 280px;">
-                                <canvas id="expCategoryChart"></canvas>
-                                <div id="expCategoryChartEmpty" style="display: none; text-align: center; color: var(--text-muted); padding-top: 5rem;">
-                                    <div style="font-size: 2rem;">🍩</div>
-                                    <p style="margin: 0.5rem 0 0;">Sin gastos este mes</p>
-                                </div>
-                            </div>
+                <!-- Highlights Banner -->
+                <div id="expHighlightsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.75rem; margin-bottom: 1.25rem;"></div>
+
+                <!-- KPIs Cards Grid -->
+                <div class="stats-grid" style="margin-bottom: 1.25rem;">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="1" x2="12" y2="23"></line>
+                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                            </svg>
                         </div>
-                        <div class="card">
-                            <div class="card-header"><h3>Tendencia (últimos 6 meses)</h3></div>
-                            <div class="card-body" style="position: relative; height: 280px;">
-                                <canvas id="expTrendChart"></canvas>
-                            </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="expKpiTotal">$0.00</span>
+                            <span class="stat-label">Total Gastado</span>
+                            <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiCount">0 movimientos</span>
                         </div>
                     </div>
-
-                    <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-bottom: 1.75rem;">
-                        <div class="card">
-                            <div class="card-header"><h3>Ritmo de Gasto Acumulado</h3></div>
-                            <div class="card-body" style="position: relative; height: 280px;">
-                                <canvas id="expPaceChart"></canvas>
-                            </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 6L9 17l-5-5"></path>
+                            </svg>
                         </div>
-                        <div class="card">
-                            <div class="card-header"><h3>Presupuesto por Categoría</h3></div>
-                            <div class="card-body" style="max-height: 280px; overflow-y: auto; padding-top: 0.25rem;">
-                                <div id="expBudgetList"></div>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header"><h3>Métodos de Pago</h3></div>
-                            <div class="card-body" style="max-height: 280px; overflow-y: auto; padding-top: 0.25rem;">
-                                <div id="expPaymentBreakdownList"></div>
-                            </div>
-                        </div>
-                    </div>           <div class="card">
-                            <div class="card-header"><h3>Ritmo de Gasto Acumulado</h3></div>
-                            <div class="card-body" style="position: relative; height: 280px;">
-                                <canvas id="expPaceChart"></canvas>
-                            </div>
-                        </div>
-                        <div class="card">
-                            <div class="card-header"><h3>Presupuesto por Categoría</h3></div>
-                            <div class="card-body" style="max-height: 280px; overflow-y: auto; padding-top: 0.25rem;">
-                                <div id="expBudgetList"></div>
-                            </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="expKpiBudget">$0.00</span>
+                            <span class="stat-label">Presupuesto del Mes</span>
+                            <span style="font-size: 0.72rem; display: block; margin-top: 2px;" id="expKpiBudgetSub">—</span>
                         </div>
                     </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(6, 182, 212, 0.1); color: #06b6d4;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="expKpiDaily">$0.00</span>
+                            <span class="stat-label">Promedio Diario</span>
+                            <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiDailySub">—</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                <polyline points="17 6 23 6 23 12"></polyline>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="expKpiVariation">—</span>
+                            <span class="stat-label">vs. Mes Anterior</span>
+                            <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiVariationSub">—</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                                <line x1="3" y1="9" x2="21" y2="9"></line>
+                            </svg>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="expKpiFixed">$0.00</span>
+                            <span class="stat-label">Gastos Fijos</span>
+                            <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiFixedSub">—</span>
+                        </div>
+                    </div>
+                </div>
 
-                    <!-- Tabla de gastos -->
+                <!-- Gráficos Row 1 -->
+                <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); margin-bottom: 1.25rem;">
                     <div class="card">
-                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
-                            <h3>Detalle de Gastos</h3>
-                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                <select id="expFilterCategory" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.85rem;">
-                                    <option value="">Todas las categorías</option>
-                                </select>
-                                <select id="expFilterPayment" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.85rem;">
-                                    <option value="">Todos los métodos</option>
-                                </select>
-                                <select id="expFilterType" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.85rem;">
-                                    <option value="">Fijos y variables</option>
-                                    <option value="fixed">Solo fijos</option>
-                                    <option value="variable">Solo variables</option>
-                                </select>
-                                <input type="text" id="expSearch" placeholder="Buscar gasto..."
-                                    style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.85rem;">
+                        <div class="card-header" style="padding: 0.85rem 1.25rem;"><h3>Distribución por Categoría</h3></div>
+                        <div class="card-body" style="position: relative; height: 230px; padding: 0.75rem 1.25rem;">
+                            <canvas id="expCategoryChart"></canvas>
+                            <div id="expCategoryChartEmpty" style="display: none; text-align: center; color: var(--text-muted); padding-top: 3.5rem;">
+                                <div style="font-size: 1.8rem;">🍩</div>
+                                <p style="margin: 0.4rem 0 0; font-size: 0.85rem;">Sin gastos este mes</p>
                             </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-container">
-                                <table class="data-table">
-                                    <thead id="expTableHead">
-                                        <tr>
-                                            <th data-sort="date" style="cursor: pointer; user-select: none;">Fecha</th>
-                                            <th data-sort="category" style="cursor: pointer; user-select: none;">Categoría</th>
-                                            <th data-sort="description" style="cursor: pointer; user-select: none;">Descripción</th>
-                                            <th>Método</th>
-                                            <th style="text-align: center;">Tipo</th>
-                                            <th data-sort="amount" style="cursor: pointer; user-select: none; text-align: right;">Monto</th>
-                                            <th style="text-align: right;">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="expTableBody"></tbody>
-                                </table>
-                            </div>
-                            <div style="padding: 0.85rem 0.25rem 0; border-top: 1px solid var(--border); margin-top: 0.5rem; text-align: right; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);" id="expTableFooter"></div>
                         </div>
                     </div>
+                    <div class="card">
+                        <div class="card-header" style="padding: 0.85rem 1.25rem;"><h3>Tendencia (últimos 6 meses)</h3></div>
+                        <div class="card-body" style="position: relative; height: 230px; padding: 0.75rem 1.25rem;">
+                            <canvas id="expTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
 
-                </div><!-- /pf-tab-gastos -->
+                <!-- Gráficos Row 2 -->
+                <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-bottom: 1.25rem;">
+                    <div class="card">
+                        <div class="card-header" style="padding: 0.85rem 1.25rem;"><h3>Ritmo de Gasto Acumulado</h3></div>
+                        <div class="card-body" style="position: relative; height: 230px; padding: 0.75rem 1.25rem;">
+                            <canvas id="expPaceChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header" style="padding: 0.85rem 1.25rem;"><h3>Presupuesto por Categoría</h3></div>
+                        <div class="card-body" style="max-height: 230px; overflow-y: auto; padding: 0.5rem 1.25rem;">
+                            <div id="expBudgetList"></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header" style="padding: 0.85rem 1.25rem;"><h3>Métodos de Pago</h3></div>
+                        <div class="card-body" style="max-height: 230px; overflow-y: auto; padding: 0.5rem 1.25rem;">
+                            <div id="expPaymentBreakdownList"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tabla de gastos -->
+                <div class="card">
+                    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; padding: 0.85rem 1.25rem;">
+                        <h3>Detalle de Gastos</h3>
+                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                            <select id="expFilterCategory" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.82rem;">
+                                <option value="">Todas las categorías</option>
+                            </select>
+                            <select id="expFilterPayment" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.82rem;">
+                                <option value="">Todos los métodos</option>
+                            </select>
+                            <select id="expFilterType" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.82rem;">
+                                <option value="">Fijos y variables</option>
+                                <option value="fixed">Solo fijos</option>
+                                <option value="variable">Solo variables</option>
+                            </select>
+                            <input type="text" id="expSearch" placeholder="Buscar gasto..."
+                                style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.35rem 0.65rem; border-radius: 6px; font-size: 0.82rem;">
+                        </div>
+                    </div>
+                    <div class="card-body" style="padding: 0.5rem 1.25rem 1rem;">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead id="expTableHead">
+                                    <tr>
+                                        <th data-sort="date" style="cursor: pointer; user-select: none;">Fecha</th>
+                                        <th data-sort="category" style="cursor: pointer; user-select: none;">Categoría</th>
+                                        <th data-sort="description" style="cursor: pointer; user-select: none;">Descripción</th>
+                                        <th>Método</th>
+                                        <th style="text-align: center;">Tipo</th>
+                                        <th data-sort="amount" style="cursor: pointer; user-select: none; text-align: right;">Monto</th>
+                                        <th style="text-align: right;">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expTableBody"></tbody>
+                            </table>
+                        </div>
+                        <div style="padding: 0.75rem 0.25rem 0; border-top: 1px solid var(--border); margin-top: 0.5rem; text-align: right; font-size: 0.82rem; font-weight: 600; color: var(--text-primary);" id="expTableFooter"></div>
+                    </div>
+                </div>
             </section>
 
             <!-- Multimedia Section (Imágenes y Videos) -->
