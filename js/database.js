@@ -1608,6 +1608,173 @@ const Database = {
     },
 
     // ========================================
+    // GASTOS MENSUALES (Finanzas Personales)
+    // ========================================
+
+    // Queda en true si las tablas de gastos aún no existen, para que la UI
+    // pueda pedir que se ejecute supabase_expenses_schema.sql.
+    expensesTablesMissing: false,
+
+    // PostgREST responde PGRST205 ("no está en el schema cache"); PostgreSQL crudo, 42P01.
+    _isMissingTable(error) {
+        if (!error) return false;
+        if (error.code === '42P01' || error.code === 'PGRST205') return true;
+        return /does not exist|could not find the table/i.test(error.message || '');
+    },
+
+    async getExpenseCategories() {
+        try {
+            const { data, error } = await supabaseClient
+                .from('pf_expense_categories')
+                .select('*')
+                .order('sort_order', { ascending: true })
+                .order('name', { ascending: true });
+            if (error) throw error;
+            this.expensesTablesMissing = false;
+            return data || [];
+        } catch (error) {
+            if (this._isMissingTable(error)) {
+                this.expensesTablesMissing = true;
+                console.warn('pf_expense_categories no existe. Ejecuta supabase_expenses_schema.sql');
+                return [];
+            }
+            console.error('Error fetching expense categories:', error);
+            throw error;
+        }
+    },
+
+    async saveExpenseCategory(category) {
+        try {
+            const payload = {
+                name: category.name,
+                icon: category.icon || '📦',
+                color: category.color || '#6366f1',
+                monthly_budget: parseFloat(category.monthlyBudget) || 0,
+                sort_order: parseInt(category.sortOrder) || 0,
+                updated_at: new Date().toISOString()
+            };
+
+            const query = category.id
+                ? supabaseClient.from('pf_expense_categories').update(payload).eq('id', category.id)
+                : supabaseClient.from('pf_expense_categories').insert(payload);
+
+            const { data, error } = await query.select().single();
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error saving expense category:', error);
+            throw error;
+        }
+    },
+
+    async deleteExpenseCategory(id) {
+        try {
+            const { error } = await supabaseClient
+                .from('pf_expense_categories')
+                .delete()
+                .eq('id', id);
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting expense category:', error);
+            throw error;
+        }
+    },
+
+    // Trae los gastos de un rango. Se pagina porque Supabase corta en 1000 filas.
+    async getExpenses(dateFrom = null, dateTo = null) {
+        try {
+            const all = [];
+            const pageSize = 1000;
+            let from = 0;
+
+            while (true) {
+                let query = supabaseClient
+                    .from('pf_expenses')
+                    .select('*, pf_expense_categories(name, icon, color)')
+                    .order('date', { ascending: false })
+                    .order('created_at', { ascending: false })
+                    .range(from, from + pageSize - 1);
+
+                if (dateFrom) query = query.gte('date', dateFrom);
+                if (dateTo) query = query.lte('date', dateTo);
+
+                const { data, error } = await query;
+                if (error) throw error;
+                if (!data || data.length === 0) break;
+
+                all.push(...data);
+                if (data.length < pageSize) break;
+                from += pageSize;
+            }
+            return all;
+        } catch (error) {
+            if (this._isMissingTable(error)) {
+                this.expensesTablesMissing = true;
+                console.warn('pf_expenses no existe. Ejecuta supabase_expenses_schema.sql');
+                return [];
+            }
+            console.error('Error fetching expenses:', error);
+            throw error;
+        }
+    },
+
+    async saveExpense(expense) {
+        try {
+            const payload = {
+                date: this._formatDateStr(expense.date),
+                amount: parseFloat(expense.amount) || 0,
+                category_id: expense.categoryId || null,
+                description: expense.description,
+                payment_method: expense.paymentMethod || 'cash',
+                is_recurring: !!expense.isRecurring,
+                notes: expense.notes || null,
+                updated_at: new Date().toISOString()
+            };
+
+            const query = expense.id
+                ? supabaseClient.from('pf_expenses').update(payload).eq('id', expense.id)
+                : supabaseClient.from('pf_expenses').insert(payload);
+
+            const { data, error } = await query.select().single();
+            if (error) throw error;
+            return data;
+        } catch (error) {
+            console.error('Error saving expense:', error);
+            throw error;
+        }
+    },
+
+    async deleteExpense(id) {
+        try {
+            const { error } = await supabaseClient.from('pf_expenses').delete().eq('id', id);
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error deleting expense:', error);
+            throw error;
+        }
+    },
+
+    async saveExpensesBulk(expenses) {
+        try {
+            const rows = expenses.map(e => ({
+                date: this._formatDateStr(e.date),
+                amount: parseFloat(e.amount) || 0,
+                category_id: e.categoryId || null,
+                description: e.description,
+                payment_method: e.paymentMethod || 'cash',
+                is_recurring: !!e.isRecurring,
+                notes: e.notes || null
+            }));
+            const { data, error } = await supabaseClient.from('pf_expenses').insert(rows).select();
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Error saving expenses in bulk:', error);
+            throw error;
+        }
+    },
+
+    // ========================================
     // CAMPAIGNS & PERFORMANCE (HYBRID CLOUD PERSISTENCE)
     // ========================================
 
