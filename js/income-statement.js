@@ -901,7 +901,7 @@ const IncomeStatementModule = {
 
     filterByDateAndCountry(items, dateField = 'created_at', getCountry = null) {
         return items.filter(item => {
-            let dateVal = item[dateField];
+            let dateVal = typeof dateField === 'function' ? dateField(item) : item[dateField];
             if (!dateVal) return false;
             const itemDate = new Date(dateVal).toISOString().split('T')[0];
 
@@ -923,7 +923,7 @@ const IncomeStatementModule = {
     getFilteredSales() {
         let sales = this.filterByDateAndCountry(
             this.guides,
-            'created_at',
+            (guide) => guide.delivered_at || guide.created_at,
             (guide) => this.getCountryFromCity(guide.cities)
         );
 
