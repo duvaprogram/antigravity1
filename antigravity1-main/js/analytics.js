@@ -447,7 +447,7 @@ const AnalyticsModule = {
 
         if (isEcuador) {
             if (bsCurrencyCard) bsCurrencyCard.style.display = 'none';
-            if (usdCurrencyCard) usdCurrencyCard.style.display = 'block';
+            if (usdCurrencyCard) usdCurrencyCard.style.display = 'none';
         } else {
             if (bsCurrencyCard) bsCurrencyCard.style.display = 'block';
             if (usdCurrencyCard) usdCurrencyCard.style.display = 'block';
@@ -506,10 +506,14 @@ const AnalyticsModule = {
 
         // Update summary stats currency display
         const totalBsCard = document.getElementById('analyticsTotalBsCard');
+        const totalUsdCard = document.getElementById('analyticsTotalUsdCard');
+        
         if (isEcuador) {
             if (totalBsCard) totalBsCard.style.display = 'none';
+            if (totalUsdCard) totalUsdCard.style.display = 'none';
         } else {
             if (totalBsCard) totalBsCard.style.display = 'flex';
+            if (totalUsdCard) totalUsdCard.style.display = 'flex';
         }
     },
 
@@ -521,7 +525,8 @@ const AnalyticsModule = {
         // Build a product cost lookup map
         const productCostMap = {};
         for (const p of this.allProducts) {
-            productCostMap[p.id] = (parseFloat(p.cost) || 0) * this.COST_FACTOR;
+            const costMultiplier = isEcuador ? 1 : this.COST_FACTOR;
+            productCostMap[p.id] = (parseFloat(p.cost) || 0) * costMultiplier;
         }
 
         // Effective sales guides (Devolución and Cancelado do NOT sum sales revenue / sold product cost)
@@ -573,9 +578,9 @@ const AnalyticsModule = {
 
         if (!isAdminUser) return;
 
-        if (costEl) costEl.textContent = Utils.formatCurrency(totalProductCost);
+        if (costEl) costEl.textContent = isEcuador ? `$${totalProductCost.toFixed(2)}` : Utils.formatCurrency(totalProductCost);
         if (profitEl) {
-            profitEl.textContent = Utils.formatCurrency(netProfit);
+            profitEl.textContent = isEcuador ? `$${netProfit.toFixed(2)}` : Utils.formatCurrency(netProfit);
             profitEl.style.color = netProfit >= 0 ? '#10b981' : '#ef4444';
         }
         if (marginEl) {
@@ -585,6 +590,9 @@ const AnalyticsModule = {
     },
 
     async updateTopProducts() {
+        const selectedCities = this.currentFilters.cities || [];
+        const isEcuador = selectedCities.length > 0 && selectedCities.every(c => c === 'Quito' || c === 'Guayaquil');
+
         // Exclude cancelled and returned guides for product sales ranking
         const guides = this.filteredGuides.filter(g => !this.isExcludedFromSales(g));
         const productSales = {};
@@ -592,7 +600,8 @@ const AnalyticsModule = {
         // Build a product cost lookup map
         const productCostMap = {};
         for (const p of this.allProducts) {
-            productCostMap[p.id] = (parseFloat(p.cost) || 0) * this.COST_FACTOR;
+            const costMultiplier = isEcuador ? 1 : this.COST_FACTOR;
+            productCostMap[p.id] = (parseFloat(p.cost) || 0) * costMultiplier;
         }
 
         const isAdminUser = AuthModule.currentUser?.role === 'admin';
@@ -661,8 +670,8 @@ const AnalyticsModule = {
             const profitColor = profit >= 0 ? '#10b981' : '#ef4444';
 
             const costCols = isAdminUser ? `
-                    <td style="color: var(--warning); font-weight: 500;">${Utils.formatCurrency(data.cost)}</td>
-                    <td style="color: ${profitColor}; font-weight: 600;">${Utils.formatCurrency(profit)}</td>
+                    <td style="color: var(--warning); font-weight: 500;">${isEcuador ? `$${data.cost.toFixed(2)}` : Utils.formatCurrency(data.cost)}</td>
+                    <td style="color: ${profitColor}; font-weight: 600;">${isEcuador ? `$${profit.toFixed(2)}` : Utils.formatCurrency(profit)}</td>
             ` : '';
 
             return `
@@ -673,7 +682,7 @@ const AnalyticsModule = {
                         <div style="font-size: 0.75rem; color: var(--text-muted);">${data.guideCount} guías</div>
                     </td>
                     <td style="text-align: center; font-weight: 600;">${data.quantity}</td>
-                    <td style="color: var(--success); font-weight: 500;">${Utils.formatCurrency(data.revenue)}</td>
+                    <td style="color: var(--success); font-weight: 500;">${isEcuador ? `$${data.revenue.toFixed(2)}` : Utils.formatCurrency(data.revenue)}</td>
                     ${costCols}
                 </tr>
             `;
