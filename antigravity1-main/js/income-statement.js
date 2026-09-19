@@ -936,10 +936,10 @@ const IncomeStatementModule = {
         let sales = this.filterByDateAndCountry(
             this.guides,
             (guide) => guide.delivered_at || guide.created_at,
-            (guide) => this.getCountryFromCity(guide.cities)
+            (guide) => guide.country || this.getCountryFromCity(guide.cities)
         );
 
-        console.log('[IS Debug] Guías tras filtro fecha+país:', sales.length, '| países detectados:', [...new Set(sales.map(g => this.getCountryFromCity(g.cities)))]);
+        console.log('[IS Debug] Guías tras filtro fecha+país:', sales.length, '| países detectados:', [...new Set(sales.map(g => g.country || this.getCountryFromCity(g.cities)))]);
 
         if (this.productMultiSelect && !this.productMultiSelect.isAllSelected()) {
             sales = sales.filter(g => {
@@ -962,7 +962,7 @@ const IncomeStatementModule = {
         sales.forEach(guide => {
             if (this.isCancelado(guide)) return;
 
-            const baseCountry = this.getCountryFromCity(guide.cities);
+            const baseCountry = guide.country || this.getCountryFromCity(guide.cities);
             const country = `${baseCountry} Domi`;
             if (!byCountry[country]) {
                 byCountry[country] = {
