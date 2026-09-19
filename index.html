@@ -116,7 +116,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.65</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.66</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -5198,17 +5198,64 @@
                                         <th>Total Deudas</th>
                                         <th>Patrimonio Neto</th>
                                         <th>Acciones</th>
-                           <!-- Aviso de configuración pendiente -->
-                    <div class="card" id="expSetupNotice" style="display: none; margin-bottom: 1.5rem; border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.07);">
-                        <div class="card-body" style="display: flex; gap: 1rem; align-items: flex-start; padding: 1.1rem 1.25rem;">
-                            <div style="font-size: 1.6rem; line-height: 1;">⚙️</div>
-                            <div>
-                                <h4 style="margin: 0 0 0.35rem; color: #f59e0b;">Falta crear las tablas de gastos en Supabase</h4>
-                                <p style="margin: 0 0 0.5rem; color: var(--text-muted); font-size: 0.88rem; line-height: 1.5;">
-                                    Para activar este módulo, abre tu proyecto de Supabase → <strong>SQL Editor</strong> y ejecuta
-                                    el script <code style="background: var(--bg-secondary); padding: 1px 6px; border-radius: 4px;">supabase_expenses_schema.sql</code>.
-                                </p>
-                                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                                    </tr>
+                                </thead>
+                                <tbody id="pfSnapshotsTable">
+                                    <!-- Dynamic -->
+                                    <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No hay reportes históricos guardados</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- Expenses Section (Gastos Mensuales y Presupuestación Independiente) -->
+            <section class="content-section" id="section-expenses">
+                <div class="section-header">
+                    <h2>Gastos Mensuales y Presupuestación</h2>
+                    <div class="header-buttons">
+                        <button class="btn btn-secondary" onclick="ExpensesModule.openMonthBudgetModal()" style="border: 1px solid rgba(99, 102, 241, 0.4); color: #818cf8; font-weight: 600;">
+                            🎯 Presupuesto del Mes
+                        </button>
+                        <button class="btn btn-secondary" onclick="ExpensesModule.openSQLModal()" style="border: 1px solid rgba(245, 158, 11, 0.4); color: #f59e0b;">
+                            ⚡ SQL Supabase
+                        </button>
+                        <button class="btn btn-secondary" id="btnExpCategories">
+                            ⚙️ Categorías
+                        </button>
+                        <button class="btn btn-secondary" id="btnExpExport">
+                            📊 Exportar Excel
+                        </button>
+                        <button class="btn btn-primary" id="btnNewExpense">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                            Registrar Gasto
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Aviso de configuración pendiente -->
+                <div class="card" id="expSetupNotice" style="display: none; margin-bottom: 1.5rem; border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.07);">
+                    <div class="card-body" style="display: flex; gap: 1rem; align-items: flex-start; padding: 1.1rem 1.25rem;">
+                        <div style="font-size: 1.6rem; line-height: 1;">⚙️</div>
+                        <div>
+                            <h4 style="margin: 0 0 0.35rem; color: #f59e0b;">Falta crear las tablas de gastos en Supabase</h4>
+                            <p style="margin: 0 0 0.5rem; color: var(--text-muted); font-size: 0.88rem; line-height: 1.5;">
+                                Para activar este módulo, abre tu proyecto de Supabase → <strong>SQL Editor</strong> y ejecuta
+                                el script <code style="background: var(--bg-secondary); padding: 1px 6px; border-radius: 4px;">supabase_expenses_schema.sql</code>.
+                            </p>
+                            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
+                                <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.render()">Ya lo ejecuté, reintentar</button>
+                                <button class="btn btn-primary btn-sm" onclick="ExpensesModule.copySQLToClipboard()" style="background: #f59e0b; border-color: #f59e0b; color: #000; font-weight: 600;">📋 Copiar SQL al Portapapeles</button>
+                                <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.openSQLModal()">👁️ Ver SQL Completo</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>y: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap;">
                                     <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.render()">Ya lo ejecuté, reintentar</button>
                                     <button class="btn btn-primary btn-sm" onclick="ExpensesModule.copySQLToClipboard()" style="background: #f59e0b; border-color: #f59e0b; color: #000; font-weight: 600;">📋 Copiar SQL al Portapapeles</button>
                                     <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.openSQLModal()">👁️ Ver SQL Completo</button>
