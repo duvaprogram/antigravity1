@@ -901,7 +901,7 @@ const IncomeStatementModule = {
 
     filterByDateAndCountry(items, dateField = 'created_at', getCountry = null) {
         return items.filter(item => {
-            let dateVal = item[dateField];
+            let dateVal = typeof dateField === 'function' ? dateField(item) : item[dateField];
             if (!dateVal) return false;
             const itemDate = new Date(dateVal).toISOString().split('T')[0];
 
@@ -921,11 +921,25 @@ const IncomeStatementModule = {
     // SALES DATA
     // ========================================
     getFilteredSales() {
+        // DEBUG TEMPORAL - remover después de diagnóstico
+        console.group('[IS Debug] getFilteredSales');
+        console.log('Total guías cargadas:', this.guides.length);
+        console.log('Filtros activos:', JSON.stringify({ dateFrom: this.filters.dateFrom, dateTo: this.filters.dateTo, countries: this.filters.countries, country: this.filters.country }));
+        const sample = this.guides.slice(0, 3).map(g => ({
+            id: g.id, created_at: g.created_at, delivered_at: g.delivered_at,
+            cities: g.cities, country: g.country, total_amount: g.total_amount,
+            status: g.guide_statuses?.name || g.status
+        }));
+        console.log('Muestra de primeras 3 guías:', sample);
+        console.groupEnd();
+
         let sales = this.filterByDateAndCountry(
             this.guides,
-            'created_at',
+            (guide) => guide.delivered_at || guide.created_at,
             (guide) => this.getCountryFromCity(guide.cities)
         );
+
+        console.log('[IS Debug] Guías tras filtro fecha+país:', sales.length, '| países detectados:', [...new Set(sales.map(g => this.getCountryFromCity(g.cities)))]);
 
         if (this.productMultiSelect && !this.productMultiSelect.isAllSelected()) {
             sales = sales.filter(g => {
