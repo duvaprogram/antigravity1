@@ -359,7 +359,14 @@ const IncomeStatementModule = {
 
     getGuideRevenueUSD(guide) {
         if (this.isExcludedFromSales(guide)) return 0;
-        const rawAmount = parseFloat(guide.amount_usd || guide.total_amount || guide.revenue || 0);
+        
+        let amountStr = guide.amount_usd || guide.total_amount || guide.revenue || 0;
+        if (typeof amountStr === 'string') {
+            // Remove $ and spaces, convert comma to dot if needed, but in Dropi sometimes it's 70,00 so just parse it cleanly
+            amountStr = amountStr.replace(/[$\s]/g, '').replace(',', '.');
+        }
+        const rawAmount = parseFloat(amountStr) || 0;
+        
         if (this.isColombiaOrder(guide)) {
             // If amount_usd is populated, positive and < 1000 while total_amount is > 1000, it's already USD
             if (guide.amount_usd && parseFloat(guide.amount_usd) > 0 && parseFloat(guide.amount_usd) < 1000 && parseFloat(guide.total_amount || 0) > 1000) {
@@ -372,7 +379,12 @@ const IncomeStatementModule = {
     },
 
     getGuideShippingCostUSD(guide) {
-        const rawShipping = parseFloat(guide.shipping_cost || 0);
+        let shippingStr = guide.shipping_cost || 0;
+        if (typeof shippingStr === 'string') {
+            shippingStr = shippingStr.replace(/[$\s]/g, '').replace(',', '.');
+        }
+        const rawShipping = parseFloat(shippingStr) || 0;
+        
         if (this.isColombiaOrder(guide)) {
             // Typical shipping in Colombia is 10,000 - 30,000 COP
             const rate = this.getExchangeRateForDate(guide.created_at || guide.date || guide.sale_date);
@@ -936,10 +948,17 @@ const IncomeStatementModule = {
         let sales = this.filterByDateAndCountry(
             this.guides,
             (guide) => guide.delivered_at || guide.created_at,
-            (guide) => guide.country || this.getCountryFromCity(guide.cities)
+            (guide) => {
+                const cityCountry = this.getCountryFromCity(guide.cities);
+                if (cityCountry && cityCountry !== 'Desconocido') return cityCountry;
+                return guide.country || 'Desconocido';
+            }
         );
 
-        console.log('[IS Debug] Guías tras filtro fecha+país:', sales.length, '| países detectados:', [...new Set(sales.map(g => g.country || this.getCountryFromCity(g.cities)))]);
+        console.log('[IS Debug] Guías tras filtro fecha+país:', sales.length, '| países detectados:', [...new Set(sales.map(g => {
+            const cc = this.getCountryFromCity(g.cities);
+            return (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
+        }))]);
 
         if (this.productMultiSelect && !this.productMultiSelect.isAllSelected()) {
             sales = sales.filter(g => {
@@ -962,7 +981,10 @@ const IncomeStatementModule = {
         sales.forEach(guide => {
             if (this.isCancelado(guide)) return;
 
-            const baseCountry = guide.country || this.getCountryFromCity(guide.cities);
+            let baseCountry = this.getCountryFromCity(guide.cities);
+            if (!baseCountry || baseCountry === 'Desconocido') {
+                baseCountry = guide.country || 'Desconocido';
+            }
             const country = `${baseCountry} Domi`;
             if (!byCountry[country]) {
                 byCountry[country] = {
