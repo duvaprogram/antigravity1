@@ -341,7 +341,7 @@ const IncomeStatementModule = {
         if (!guide) return false;
         
         // First prioritize city-based detection
-        const cityCountry = this.getCountryFromCity(guide.cities);
+        const cityCountry = this.getCountryFromCity(guide.cities, guide.city);
         if (cityCountry && cityCountry !== 'Desconocido') {
             if (cityCountry === 'Colombia') return true;
             if (cityCountry !== 'Colombia') return false; // E.g., Ecuador or Venezuela
@@ -837,10 +837,22 @@ const IncomeStatementModule = {
     // ========================================
     // FILTERING
     // ========================================
-    getCountryFromCity(cityData) {
-        if (!cityData) return 'Desconocido';
-        const city = (cityData.name || '').trim().toLowerCase();
-        const country = (cityData.country || '').trim().toLowerCase();
+    getCountryFromCity(cityData, directCityString = null) {
+        let city = '';
+        let country = '';
+        
+        if (typeof cityData === 'string') {
+            city = cityData.trim().toLowerCase();
+        } else if (cityData) {
+            city = (cityData.name || '').trim().toLowerCase();
+            country = (cityData.country || '').trim().toLowerCase();
+        }
+        
+        if (!city && directCityString) {
+            city = directCityString.trim().toLowerCase();
+        }
+
+        if (!city) return 'Desconocido';
 
         // Colombia detection
         const colombiaCities = [
@@ -955,14 +967,14 @@ const IncomeStatementModule = {
             this.guides,
             (guide) => guide.delivered_at || guide.created_at,
             (guide) => {
-                const cityCountry = this.getCountryFromCity(guide.cities);
+                const cityCountry = this.getCountryFromCity(guide.cities, guide.city);
                 if (cityCountry && cityCountry !== 'Desconocido') return cityCountry;
                 return guide.country || 'Desconocido';
             }
         );
 
         console.log('[IS Debug] Guías tras filtro fecha+país:', sales.length, '| países detectados:', [...new Set(sales.map(g => {
-            const cc = this.getCountryFromCity(g.cities);
+            const cc = this.getCountryFromCity(g.cities, g.city);
             return (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
         }))]);
 
@@ -987,7 +999,7 @@ const IncomeStatementModule = {
         sales.forEach(guide => {
             if (this.isCancelado(guide)) return;
 
-            let baseCountry = this.getCountryFromCity(guide.cities);
+            let baseCountry = this.getCountryFromCity(guide.cities, guide.city);
             if (!baseCountry || baseCountry === 'Desconocido') {
                 baseCountry = guide.country || 'Desconocido';
             }
@@ -1575,7 +1587,7 @@ const IncomeStatementModule = {
         const dropiOrdersCount = {};
         sales.forEach(guide => {
             if (this.isCancelado(guide)) return;
-            const country = this.getCountryFromCity(guide.cities);
+            const country = this.getCountryFromCity(guide.cities, guide.city);
             dropiOrdersCount[country] = (dropiOrdersCount[country] || 0) + 1;
         });
 
@@ -1583,7 +1595,7 @@ const IncomeStatementModule = {
         sales.forEach(guide => {
             if (this.isCancelado(guide)) return;
 
-            const country = this.getCountryFromCity(guide.cities);
+            const country = this.getCountryFromCity(guide.cities, guide.city);
             const id = `Dropi_${guide.id}`;
             const isExcluded = this.isExcludedFromSales(guide);
             const isDevol = this.isDevolucion(guide);
@@ -3949,7 +3961,7 @@ const IncomeStatementModule = {
         const filteredGuides = this.guides || [];
         filteredGuides.forEach(g => {
             if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
-            const gCountry = g.country || this.getCountryFromCity(g.cities);
+            const gCountry = g.country || this.getCountryFromCity(g.cities, g.city);
             if (!this.matchesCountryFilter(gCountry)) return;
             const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
@@ -6070,7 +6082,7 @@ const IncomeStatementModule = {
             const filteredGuides = this.guides || [];
             filteredGuides.forEach(g => {
                 if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
-                const gCountry = g.country || this.getCountryFromCity(g.cities);
+                const gCountry = g.country || this.getCountryFromCity(g.cities, g.city);
                 if (!this.matchesCountryFilter(gCountry)) return;
                 const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
                 if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
@@ -6198,7 +6210,7 @@ const IncomeStatementModule = {
 
             const orderRows = [];
             filteredGuides.forEach(g => {
-                const gCountry = g.country || this.getCountryFromCity(g.cities);
+                const gCountry = g.country || this.getCountryFromCity(g.cities, g.city);
                 if (!this.matchesCountryFilter(gCountry)) return;
                 const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
                 if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
@@ -6515,7 +6527,7 @@ const IncomeStatementModule = {
         if (tabsContainer) tabsContainer.style.display = '';
         const baseCountry = country.replace(' Domi', '').trim();
         const sales = this.getFilteredSales().filter(guide => {
-            return this.getCountryFromCity(guide.cities) === baseCountry;
+            return this.getCountryFromCity(guide.cities, guide.city) === baseCountry;
         });
 
         // Freight cost for this country
@@ -7020,7 +7032,7 @@ const IncomeStatementModule = {
                     allOrders.push({
                         ...order,
                         __source: 'Dropi',
-                        __sourceName: `Dropi (${this.getCountryFromCity(order.cities)})`
+                        __sourceName: `Dropi (${this.getCountryFromCity(order.cities, order.city)})`
                     });
                 }
             } else if (itemId.startsWith('Ext_')) {
@@ -7110,7 +7122,7 @@ const IncomeStatementModule = {
                             <div style="font-family: monospace; font-size: 0.72rem; color: var(--text-muted);" title="${fullId}">${shortId}...</div>
                             <span class="badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1; font-size: 0.65rem;">Dropi</span>
                         </td>
-                        <td style="padding: 0.5rem 0.75rem;"><div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="${this.getCountryFromCity(o.cities)}">${this.getCountryFromCity(o.cities)}</div></td>
+                        <td style="padding: 0.5rem 0.75rem;"><div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;" title="${this.getCountryFromCity(o.cities, o.city)}">${this.getCountryFromCity(o.cities, o.city)}</div></td>
                         <td style="padding: 0.5rem 0.75rem; white-space: nowrap;">${statusBadge}</td>
                         <td style="padding: 0.5rem 0.75rem;">
                             <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;" title="${productLabel.replace(/"/g, '&quot;')}">${productLabel}</div>
@@ -7208,7 +7220,7 @@ const IncomeStatementModule = {
         const filteredGuides = this.guides || [];
         filteredGuides.forEach(g => {
             if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
-            const gCountry = g.country || this.getCountryFromCity(g.cities);
+            const gCountry = g.country || this.getCountryFromCity(g.cities, g.city);
             if (!this.matchesCountryFilter(gCountry)) return;
             const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
@@ -7255,7 +7267,7 @@ const IncomeStatementModule = {
                     matchingOrders.push({
                         date: gDate,
                         origin: isDevol ? 'Dropi (Devolución)' : 'Guía Dropi',
-                        location: `${g.country || ''} - ${this.getCountryFromCity(g.cities) || g.cities || ''}`,
+                        location: `${g.country || ''} - ${this.getCountryFromCity(g.cities, g.city) || g.city || ''}`,
                         status: g.guide_statuses?.name || g.status || '',
                         originalName: rawName,
                         qty: isExcluded ? 0 : qty,
