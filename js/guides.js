@@ -162,6 +162,12 @@ const GuidesModule = {
             filterStatusEl.addEventListener('change', () => this.filterGuides());
         }
 
+        // Filter by country
+        const filterCountryEl = document.getElementById('filterGuideCountry');
+        if (filterCountryEl) {
+            filterCountryEl.addEventListener('change', () => this.filterGuides());
+        }
+
         // Filter by city
         const filterCityEl = document.getElementById('filterGuideCity');
         if (filterCityEl) {
@@ -205,6 +211,7 @@ const GuidesModule = {
             btnClearFilters.addEventListener('click', () => {
                 if (searchGuidesEl) searchGuidesEl.value = '';
                 if (filterStatusEl) filterStatusEl.value = '';
+                if (filterCountryEl) filterCountryEl.value = '';
                 if (filterCityEl) filterCityEl.value = '';
                 if (filterPaymentEl) filterPaymentEl.value = '';
                 if (filterDateFromEl) filterDateFromEl.value = '';
@@ -632,6 +639,7 @@ const GuidesModule = {
     async filterGuides() {
         const searchQuery = document.getElementById('searchGuides').value.toLowerCase();
         const statusFilter = document.getElementById('filterGuideStatus').value;
+        const countryFilter = document.getElementById('filterGuideCountry') ? document.getElementById('filterGuideCountry').value : '';
         const cityFilter = document.getElementById('filterGuideCity').value;
         const paymentFilter = document.getElementById('filterGuidePayment').value;
         const dateFromFilter = document.getElementById('filterGuideDateFrom').value;
@@ -654,6 +662,26 @@ const GuidesModule = {
         // Apply status filter
         if (statusFilter) {
             guides = guides.filter(g => g.status === statusFilter);
+        }
+
+        // Apply country filter
+        if (countryFilter) {
+            guides = guides.filter(g => {
+                let guideCountry = g.country || 'Desconocido';
+                const cityLower = (g.city || '').toLowerCase();
+                
+                if (cityLower) {
+                    const colombiaCities = ['medellin', 'medellín', 'bogota', 'bogotá', 'cali', 'barranquilla', 'bucaramanga', 'cartagena', 'pereira', 'manizales', 'cucuta', 'cúcuta', 'santa marta', 'ibague', 'ibagué', 'pasto', 'monteria', 'montería', 'neiva', 'villavicencio', 'armenia', 'valledupar', 'soledad', 'bello', 'itagui', 'itaguí', 'envigado', 'sandona', 'sandoná', 'dosquebradas', 'floridablanca', 'rionegro', 'popayan', 'popayán', 'palmira'];
+                    const ecuadorCities = ['quito', 'guayaquil', 'cuenca', 'santo domingo', 'machala', 'duran', 'durán', 'manta', 'portoviejo', 'loja', 'ambato', 'esmeraldas', 'quevedo', 'riobamba', 'milagro', 'ibarra', 'la libertad', 'babahoyo', 'sangolqui', 'sangolquí', 'daule', 'latacunga', 'tulcan', 'tulcán', 'chone', 'pasaje', 'santa rosa', 'nueva loja', 'huaquillas', 'el carmen', 'montecristi', 'samborondon', 'samborondón', 'puerto francisco de orellana', 'jipijapa', 'piñas'];
+                    const venezuelaCities = ['caracas', 'maracaibo', 'valencia', 'barquisimeto', 'maracay', 'ciudad guayana', 'maturin', 'maturín', 'barcelona', 'san cristobal', 'san cristóbal', 'turmero', 'ciudad bolivar', 'ciudad bolívar', 'barinas', 'los teques', 'cumana', 'cumaná', 'san fernando de apure', 'puerto la cruz', 'merida', 'mérida', 'cabimas'];
+                    
+                    if (colombiaCities.some(c => cityLower.includes(c))) guideCountry = 'Colombia';
+                    else if (ecuadorCities.some(c => cityLower.includes(c))) guideCountry = 'Ecuador';
+                    else if (venezuelaCities.some(c => cityLower.includes(c))) guideCountry = 'Venezuela';
+                }
+                
+                return guideCountry === countryFilter;
+            });
         }
 
         // Apply city filter
