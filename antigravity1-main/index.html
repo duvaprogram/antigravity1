@@ -116,7 +116,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.62</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.1.63</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -4989,6 +4989,19 @@
                     </div>
                 </div>
 
+                <!-- Sub-pestañas de Finanzas Personales -->
+                <div class="pf-subtabs" style="display: flex; gap: 0.5rem; border-bottom: 1px solid var(--border); margin-bottom: 1.75rem; flex-wrap: wrap;">
+                    <button type="button" class="pf-subtab-btn active" data-pftab="patrimonio" onclick="FinanceModule.switchTab('patrimonio')">
+                        <span style="font-size: 1rem;">💼</span> Patrimonio
+                    </button>
+                    <button type="button" class="pf-subtab-btn" data-pftab="gastos" onclick="FinanceModule.switchTab('gastos')">
+                        <span style="font-size: 1rem;">🧾</span> Gastos Mensuales
+                    </button>
+                </div>
+
+                <!-- ============ PANEL: PATRIMONIO ============ -->
+                <div class="pf-tab-pane" id="pf-tab-patrimonio">
+
                 <div class="stats-grid" style="margin-bottom: 2rem;">
                     <div class="stat-card">
                         <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
@@ -5199,6 +5212,209 @@
                         </div>
                     </div>
                 </div>
+
+                </div><!-- /pf-tab-patrimonio -->
+
+                <!-- ============ PANEL: GASTOS MENSUALES ============ -->
+                <div class="pf-tab-pane" id="pf-tab-gastos" style="display: none;">
+
+                    <!-- Aviso de configuración pendiente -->
+                    <div class="card" id="expSetupNotice" style="display: none; margin-bottom: 1.5rem; border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.07);">
+                        <div class="card-body" style="display: flex; gap: 1rem; align-items: flex-start; padding: 1.1rem 1.25rem;">
+                            <div style="font-size: 1.6rem; line-height: 1;">⚙️</div>
+                            <div>
+                                <h4 style="margin: 0 0 0.35rem; color: #f59e0b;">Falta crear las tablas de gastos</h4>
+                                <p style="margin: 0 0 0.5rem; color: var(--text-muted); font-size: 0.88rem; line-height: 1.5;">
+                                    Para usar este módulo, abre tu proyecto de Supabase → <strong>SQL Editor</strong> y ejecuta
+                                    el archivo <code style="background: var(--bg-secondary); padding: 1px 6px; border-radius: 4px;">supabase_expenses_schema.sql</code>
+                                    que está en la raíz del proyecto. Crea las tablas y once categorías iniciales.
+                                </p>
+                                <button class="btn btn-secondary btn-sm" onclick="ExpensesModule.render()">Ya lo ejecuté, reintentar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Barra de navegación por mes -->
+                    <div class="card" style="margin-bottom: 1.5rem;">
+                        <div class="card-body" style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 1rem 1.25rem;">
+                            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                                <button class="btn btn-secondary btn-sm" id="btnExpPrevMonth" title="Mes anterior" style="padding: 0.4rem 0.7rem;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <polyline points="15 18 9 12 15 6"></polyline>
+                                    </svg>
+                                </button>
+                                <div style="min-width: 190px; text-align: center;">
+                                    <div style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary);" id="expMonthLabel">—</div>
+                                    <span style="font-size: 0.68rem; padding: 2px 8px; border-radius: 10px; font-weight: 700; letter-spacing: 0.4px;" id="expMonthBadge">—</span>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" id="btnExpNextMonth" title="Mes siguiente" style="padding: 0.4rem 0.7rem;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <polyline points="9 18 15 12 9 6"></polyline>
+                                    </svg>
+                                </button>
+                                <input type="month" id="expMonthPicker" title="Ir a un mes específico"
+                                    style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.42rem 0.7rem; border-radius: 6px; font-size: 0.85rem;">
+                            </div>
+
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button class="btn btn-secondary btn-sm" id="btnExpCategories">⚙️ Categorías y Presupuestos</button>
+                                <button class="btn btn-secondary btn-sm" id="btnExpExport">📊 Exportar Excel</button>
+                                <button class="btn btn-primary btn-sm" id="btnNewExpense">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                    </svg>
+                                    Registrar Gasto
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- KPIs -->
+                    <div class="stats-grid" style="margin-bottom: 1.75rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="expKpiTotal">$0.00</span>
+                                <span class="stat-label">Total Gastado</span>
+                                <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiCount">0 movimientos</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20 6L9 17l-5-5"></path>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="expKpiBudget">$0.00</span>
+                                <span class="stat-label">Presupuesto del Mes</span>
+                                <span style="font-size: 0.72rem; display: block; margin-top: 2px;" id="expKpiBudgetSub">—</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: rgba(6, 182, 212, 0.1); color: #06b6d4;">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12 6 12 12 16 14"></polyline>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="expKpiDaily">$0.00</span>
+                                <span class="stat-label">Promedio Diario</span>
+                                <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiDailySub">—</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                                    <polyline points="17 6 23 6 23 12"></polyline>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="expKpiVariation">—</span>
+                                <span class="stat-label">vs. Mes Anterior</span>
+                                <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiVariationSub">—</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                                    <line x1="3" y1="9" x2="21" y2="9"></line>
+                                </svg>
+                            </div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="expKpiFixed">$0.00</span>
+                                <span class="stat-label">Gastos Fijos</span>
+                                <span style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-top: 2px;" id="expKpiFixedSub">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Gráficos -->
+                    <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); margin-bottom: 1.75rem;">
+                        <div class="card">
+                            <div class="card-header"><h3>Distribución por Categoría</h3></div>
+                            <div class="card-body" style="position: relative; height: 280px;">
+                                <canvas id="expCategoryChart"></canvas>
+                                <div id="expCategoryChartEmpty" style="display: none; text-align: center; color: var(--text-muted); padding-top: 5rem;">
+                                    <div style="font-size: 2rem;">🍩</div>
+                                    <p style="margin: 0.5rem 0 0;">Sin gastos este mes</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h3>Tendencia (últimos 6 meses)</h3></div>
+                            <div class="card-body" style="position: relative; height: 280px;">
+                                <canvas id="expTrendChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid" style="grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); margin-bottom: 1.75rem;">
+                        <div class="card">
+                            <div class="card-header"><h3>Ritmo de Gasto Acumulado</h3></div>
+                            <div class="card-body" style="position: relative; height: 280px;">
+                                <canvas id="expPaceChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h3>Presupuesto por Categoría</h3></div>
+                            <div class="card-body" style="max-height: 280px; overflow-y: auto; padding-top: 0.25rem;">
+                                <div id="expBudgetList"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de gastos -->
+                    <div class="card">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                            <h3>Detalle de Gastos</h3>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <select id="expFilterCategory" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.85rem;">
+                                    <option value="">Todas las categorías</option>
+                                </select>
+                                <select id="expFilterPayment" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.85rem;">
+                                    <option value="">Todos los métodos</option>
+                                </select>
+                                <select id="expFilterType" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.85rem;">
+                                    <option value="">Fijos y variables</option>
+                                    <option value="fixed">Solo fijos</option>
+                                    <option value="variable">Solo variables</option>
+                                </select>
+                                <input type="text" id="expSearch" placeholder="Buscar gasto..."
+                                    style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.7rem; border-radius: 6px; font-size: 0.85rem;">
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead id="expTableHead">
+                                        <tr>
+                                            <th data-sort="date" style="cursor: pointer; user-select: none;">Fecha</th>
+                                            <th data-sort="category" style="cursor: pointer; user-select: none;">Categoría</th>
+                                            <th data-sort="description" style="cursor: pointer; user-select: none;">Descripción</th>
+                                            <th>Método</th>
+                                            <th style="text-align: center;">Tipo</th>
+                                            <th data-sort="amount" style="cursor: pointer; user-select: none; text-align: right;">Monto</th>
+                                            <th style="text-align: right;">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="expTableBody"></tbody>
+                                </table>
+                            </div>
+                            <div style="padding: 0.85rem 0.25rem 0; border-top: 1px solid var(--border); margin-top: 0.5rem; text-align: right; font-size: 0.85rem; font-weight: 600; color: var(--text-primary);" id="expTableFooter"></div>
+                        </div>
+                    </div>
+
+                </div><!-- /pf-tab-gastos -->
             </section>
 
             <!-- Multimedia Section (Imágenes y Videos) -->
@@ -5213,7 +5429,7 @@
                                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                                 </svg>
                                 Multimedia
-                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.1.62</span>
+                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.1.63</span>
                             </h2>
                             <p style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
                                 Biblioteca centralizada de imágenes y videos (Cloudflare & CDN) para anuncios y creativos
@@ -5295,7 +5511,7 @@
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <h4 style="margin: 0; color: #fbbf24; font-size: 0.95rem; display: flex; align-items: center; gap: 0.4rem;">
                                     <span>🩺 Consola de Diagnóstico Multimedia</span>
-                                    <span style="font-size: 0.75rem; background: #fbbf24; color: #000; padding: 1px 6px; border-radius: 4px; font-weight: bold;">v2.1.62</span>
+                                    <span style="font-size: 0.75rem; background: #fbbf24; color: #000; padding: 1px 6px; border-radius: 4px; font-weight: bold;">v2.1.63</span>
                                 </h4>
                                 <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('multimediaInPageDiag').style.display='none'" style="font-size: 0.75rem; padding: 2px 8px;">Cerrar Consola</button>
                             </div>
@@ -7279,6 +7495,100 @@
         </div>
     </div>
 
+    <!-- Modal: Registrar / Editar Gasto Mensual -->
+    <div class="modal" id="modalExpense">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalExpenseTitle">Registrar Gasto</h2>
+                <button class="modal-close" data-close="modalExpense">&times;</button>
+            </div>
+            <form id="formExpense">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="expAmount">Monto *</label>
+                        <input type="number" id="expAmount" step="0.01" min="0.01" required placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="expDate">Fecha *</label>
+                        <input type="date" id="expDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="expCategory">Categoría *</label>
+                        <select id="expCategory" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="expPaymentMethod">Método de pago</label>
+                        <select id="expPaymentMethod"></select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="expDescription">Descripción *</label>
+                        <input type="text" id="expDescription" required placeholder="Ej: Supermercado, Arriendo, Gasolina...">
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="expNotes">Notas (opcional)</label>
+                        <input type="text" id="expNotes" placeholder="Detalle adicional, nº de factura, etc.">
+                    </div>
+                    <div class="form-group full-width">
+                        <label style="display: flex; align-items: center; gap: 0.6rem; cursor: pointer; font-weight: 500;">
+                            <input type="checkbox" id="expIsRecurring" style="width: 16px; height: 16px; cursor: pointer;">
+                            <span>Es un gasto fijo / recurrente</span>
+                        </label>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-top: 0.3rem; margin-left: 1.9rem;">
+                            Márcalo para separar tus gastos fijos (arriendo, servicios) de los variables.
+                        </span>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalExpense">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Gasto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Categorías y Presupuestos de Gasto -->
+    <div class="modal" id="modalExpCategories">
+        <div class="modal-content" style="max-width: 640px;">
+            <div class="modal-header">
+                <h2>Categorías y Presupuestos</h2>
+                <button class="modal-close" data-close="modalExpCategories">&times;</button>
+            </div>
+            <div class="modal-body" style="padding: 1.25rem 0 0 0;">
+                <form id="formExpCategory" style="background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem;">
+                    <div style="display: grid; grid-template-columns: 60px 1fr 60px 110px; gap: 0.6rem; align-items: end;">
+                        <div class="form-group" style="margin: 0;">
+                            <label for="expCatIcon" style="font-size: 0.75rem;">Icono</label>
+                            <input type="text" id="expCatIcon" maxlength="4" value="📦" style="text-align: center; font-size: 1.1rem;">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="expCatName" style="font-size: 0.75rem;">Nombre *</label>
+                            <input type="text" id="expCatName" required placeholder="Ej: Alimentación">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="expCatColor" style="font-size: 0.75rem;">Color</label>
+                            <input type="color" id="expCatColor" value="#6366f1" style="height: 38px; padding: 2px; cursor: pointer;">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="expCatBudget" style="font-size: 0.75rem;">Presupuesto/mes</label>
+                            <input type="number" id="expCatBudget" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 0.85rem;">
+                        <button type="button" class="btn btn-secondary btn-sm" id="btnCancelExpCategoryEdit" style="display: none;" onclick="ExpensesModule.resetCategoryForm()">Cancelar edición</button>
+                        <button type="submit" class="btn btn-primary btn-sm" id="btnSaveExpCategory">Agregar Categoría</button>
+                    </div>
+                </form>
+
+                <div style="max-height: 320px; overflow-y: auto;">
+                    <div id="expCategoriesList"></div>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" data-close="modalExpCategories">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Personal Finance Categories Manager -->
     <div class="modal" id="modalPFCategories">
         <div class="modal-content" style="max-width: 600px;">
@@ -7603,7 +7913,7 @@
                 <div>
                     <h2 style="margin: 0; font-size: 1.2rem; display: flex; align-items: center; gap: 0.5rem;">
                         <span>🩺 Diagnóstico del Módulo Multimedia</span>
-                        <span id="diagVersion" style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.2); color: #818cf8; padding: 2px 6px; border-radius: 4px;">v2.1.62</span>
+                        <span id="diagVersion" style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.2); color: #818cf8; padding: 2px 6px; border-radius: 4px;">v2.1.63</span>
                     </h2>
                     <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-muted);">Estado del sistema, almacenamiento y registro de errores con identificadores</p>
                 </div>
@@ -7677,7 +7987,8 @@
     <script src="js/campaigns.js?v=2.1.37"></script>
     <script src="js/calculator.js?v=2.2.2"></script>
     <script src="js/multimedia.js?v=2.1.37"></script>
-    <script src="js/finance.js?v=2.1.37"></script>
+    <script src="js/finance.js?v=2.1.63"></script>
+    <script src="js/expenses.js?v=2.1.63"></script>
     <script src="js/income-statement.js?v=2.2.6"></script>
     <script src="js/materials-calculator.js?v=2.1.37"></script>
     <script src="js/journal-data.js?v=2.1.37"></script>
