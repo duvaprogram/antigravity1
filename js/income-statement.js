@@ -339,10 +339,16 @@ const IncomeStatementModule = {
 
     isColombiaOrder(guide) {
         if (!guide) return false;
+        
+        // First prioritize city-based detection
+        const cityCountry = this.getCountryFromCity(guide.cities);
+        if (cityCountry && cityCountry !== 'Desconocido') {
+            if (cityCountry === 'Colombia') return true;
+            if (cityCountry !== 'Colombia') return false; // E.g., Ecuador or Venezuela
+        }
+
         if (guide.country === 'Colombia') return true;
         if ((guide.currency || '').toUpperCase() === 'COP') return true;
-        const country = this.getCountryFromCity(guide.cities);
-        if (country === 'Colombia') return true;
         
         // Also inspect city name if available
         const cityName = (guide.cities?.name || guide.city || '').toLowerCase();
