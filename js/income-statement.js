@@ -409,7 +409,14 @@ const IncomeStatementModule = {
         const colombiaGuides = (this.guides || []).filter(g => {
             if (this.isCancelado(g)) return false;
             if (!this.isColombiaOrder(g)) return false;
-            const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
+            const dates = [g.delivered_at, g.created_at, g.date, g.createdAt];
+            let validDate = '';
+            for (let d of dates) {
+                if (d && d !== 'null' && d !== '0000-00-00') {
+                    try { new Date(d).toISOString(); validDate = d; break; } catch(e) {}
+                }
+            }
+            const gDate = validDate ? validDate.split('T')[0] : '';
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return false;
             if (this.filters.dateTo && gDate > this.filters.dateTo) return false;
             return true;
@@ -965,7 +972,18 @@ const IncomeStatementModule = {
 
         let sales = this.filterByDateAndCountry(
             this.guides,
-            (guide) => guide.delivered_at || guide.created_at || guide.date || guide.createdAt,
+            (guide) => {
+                const dates = [guide.delivered_at, guide.created_at, guide.date, guide.createdAt];
+                for (let d of dates) {
+                    if (d && d !== 'null' && d !== '0000-00-00') {
+                        try {
+                            new Date(d).toISOString();
+                            return d;
+                        } catch(e) {}
+                    }
+                }
+                return null;
+            },
             (guide) => {
                 const cityCountry = this.getCountryFromCity(guide.cities, guide.city);
                 if (cityCountry && cityCountry !== 'Desconocido') return cityCountry;
@@ -3964,7 +3982,14 @@ const IncomeStatementModule = {
             const cc = this.getCountryFromCity(g.cities, g.city);
             const gCountry = (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
             if (!this.matchesCountryFilter(gCountry)) return;
-            const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
+            const dates = [g.delivered_at, g.created_at, g.date, g.createdAt];
+            let validDate = '';
+            for (let d of dates) {
+                if (d && d !== 'null' && d !== '0000-00-00') {
+                    try { new Date(d).toISOString(); validDate = d; break; } catch(e) {}
+                }
+            }
+            const gDate = validDate ? validDate.split('T')[0] : '';
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
             if (this.filters.dateTo && gDate > this.filters.dateTo) return;
 
@@ -6086,7 +6111,14 @@ const IncomeStatementModule = {
                 const cc = this.getCountryFromCity(g.cities, g.city);
                 const gCountry = (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
                 if (!this.matchesCountryFilter(gCountry)) return;
-                const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
+                const dates = [g.delivered_at, g.created_at, g.date, g.createdAt];
+                let validDate = '';
+                for (let d of dates) {
+                    if (d && d !== 'null' && d !== '0000-00-00') {
+                        try { new Date(d).toISOString(); validDate = d; break; } catch(e) {}
+                    }
+                }
+                const gDate = validDate ? validDate.split('T')[0] : '';
                 if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
                 if (this.filters.dateTo && gDate > this.filters.dateTo) return;
 
@@ -6215,7 +6247,14 @@ const IncomeStatementModule = {
                 const cc = this.getCountryFromCity(g.cities, g.city);
                 const gCountry = (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
                 if (!this.matchesCountryFilter(gCountry)) return;
-                const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
+                const dates = [g.delivered_at, g.created_at, g.date, g.createdAt];
+                let validDate = '';
+                for (let d of dates) {
+                    if (d && d !== 'null' && d !== '0000-00-00') {
+                        try { new Date(d).toISOString(); validDate = d; break; } catch(e) {}
+                    }
+                }
+                const gDate = validDate ? validDate.split('T')[0] : '';
                 if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
                 if (this.filters.dateTo && gDate > this.filters.dateTo) return;
 
@@ -7226,7 +7265,14 @@ const IncomeStatementModule = {
             const cc = this.getCountryFromCity(g.cities, g.city);
             const gCountry = (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
             if (!this.matchesCountryFilter(gCountry)) return;
-            const gDate = g.created_at ? g.created_at.split('T')[0] : (g.date || '');
+            const dates = [g.delivered_at, g.created_at, g.date, g.createdAt];
+            let validDate = '';
+            for (let d of dates) {
+                if (d && d !== 'null' && d !== '0000-00-00') {
+                    try { new Date(d).toISOString(); validDate = d; break; } catch(e) {}
+                }
+            }
+            const gDate = validDate ? validDate.split('T')[0] : '';
             if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
             if (this.filters.dateTo && gDate > this.filters.dateTo) return;
             
