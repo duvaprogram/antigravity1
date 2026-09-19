@@ -1,5 +1,6 @@
 // ========================================
 // Gastos Mensuales (Finanzas Personales)
+// Versión Mejorada v2.1.64
 // ========================================
 
 const ExpensesModule = {
@@ -96,7 +97,9 @@ const ExpensesModule = {
             this.syncMonthControls();
             this.populateFilterOptions();
             this.renderKPIs();
+            this.renderHighlights();
             this.renderBudgets();
+            this.renderPaymentBreakdown();
             this.renderTable();
             this.renderCharts();
             this.toggleSetupNotice(Database.expensesTablesMissing);
@@ -155,8 +158,6 @@ const ExpensesModule = {
         return new Date(y, m, 0).getDate();
     },
 
-    // new Date('2026-09-01') se interpreta como medianoche UTC y en UTC-5 se
-    // renderiza como el día anterior. Por eso una fecha sin hora se arma a mano.
     formatDate(dateStr) {
         if (!dateStr) return '';
         const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -201,8 +202,6 @@ const ExpensesModule = {
         return this.expenses.filter(e => (e.date || '').startsWith(ym));
     },
 
-    // Se prefiere el registro completo: el objeto del JOIN solo trae
-    // name/icon/color y le falta monthly_budget.
     categoryOf(expense) {
         const full = this.categories.find(c => c.id === expense.category_id);
         return full || expense.pf_expense_categories || null;
@@ -227,8 +226,6 @@ const ExpensesModule = {
 
         const totalDays = this.daysInMonth(this.currentMonth);
         const isCurrent = this.currentMonth === this.todayMonth();
-        // En el mes en curso el promedio se calcula sobre los días transcurridos,
-        // de lo contrario la proyección quedaría artificialmente baja.
         const elapsedDays = isCurrent ? new Date().getDate() : totalDays;
 
         const dailyAvg = elapsedDays > 0 ? total / elapsedDays : 0;
@@ -245,6 +242,93 @@ const ExpensesModule = {
             budgetUsed: budget > 0 ? (total / budget) * 100 : null,
             remaining: budget - total
         };
+    },
+
+    // ========================================
+    // HIGHLIGHTS Y RESUMEN RÁPIDO
+    // ========================================
+    renderHighlights() {
+        const container = document.getElementById('expHighlightsContainer');
+        if (!container) return;
+
+        const monthExpenses = this.expensesOfMonth(this.currentMonth);
+        if (monthExpenses.length === 0) {
+            container.style.display = 'none';
+            return;
+        }
+
+        // Mayor gasto
+        let biggest = monthExpenses[0];
+        monthExpenses.forEach(e => {
+            if (parseFloat(e.amount || 0) > parseFloat(biggest.amount || 0)) {
+                biggest = e;
+            }
+        });
+
+        // Día de mayor consumo
+        const dayTotals = {};
+        monthExpenses.forEach(e => {
+            const day = (e.date || '').split('-')[2] || '01';
+            dayTotals[day] = (dayTotals[day] || 0) + parseFloat(e.amount || 0);
+        });
+
+        let peakDay = '01';
+        let peakVal = 0;
+        Object.entries(dayTotals).forEach(([d, val]) => {
+            if (val > peakVal) {
+                peakVal = val;
+                peakDay = d;
+            }
+        });
+
+        // Top Categoría
+        const catTotals = {};
+        monthExpenses.forEach(e => {
+            const cat = this.categoryOf(e);
+            const name = cat?.name || 'Sin categoría';
+            catTotals[name] = (catTotals[name] || 0) + parseFloat(e.amount || 0);
+        });
+
+        let topCatName = 'N/A';
+        let topCatVal = 0;
+        Object.entries(catTotals).forEach(([name, val]) => {
+            if (val > topCatVal) {
+                topCatVal = val;
+                topCatName = name;
+            }
+        });
+
+        const biggestCat = this.categoryOf(biggest);
+
+        container.style.display = 'grid';
+        container.innerHTML = `
+            <div style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.2); padding: 0.85rem 1rem; border-radius: var(--radius-md); display: flex; align-items: center; gap: 0.75rem;">
+                <div style="font-size: 1.5rem; background: rgba(99, 102, 241, 0.15); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">🏆</div>
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.4px;">Gasto Más Elevado</div>
+                    <div style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">${Utils.formatCurrency(parseFloat(biggest.amount || 0))}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">${this.escape(biggest.description)} (${biggestCat?.name || 'Sin cat.'})</div>
+                </div>
+            </div>
+
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 0.85rem 1rem; border-radius: var(--radius-md); display: flex; align-items: center; gap: 0.75rem;">
+                <div style="font-size: 1.5rem; background: rgba(16, 185, 129, 0.15); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">🎯</div>
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.4px;">Categoría Principal</div>
+                    <div style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">${this.escape(topCatName)}</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">${Utils.formatCurrency(topCatVal)} gastados</div>
+                </div>
+            </div>
+
+            <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.2); padding: 0.85rem 1rem; border-radius: var(--radius-md); display: flex; align-items: center; gap: 0.75rem;">
+                <div style="font-size: 1.5rem; background: rgba(245, 158, 11, 0.15); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">🔥</div>
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.4px;">Pico de Consumo</div>
+                    <div style="font-weight: 700; color: var(--text-primary); font-size: 0.95rem;">Día ${parseInt(peakDay, 10)} del mes</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">${Utils.formatCurrency(peakVal)} registrado</div>
+                </div>
+            </div>
+        `;
     },
 
     // ========================================
@@ -370,7 +454,57 @@ const ExpensesModule = {
     },
 
     // ========================================
-    // TABLA
+    // DESGLOSE POR MÉTODO DE PAGO
+    // ========================================
+    renderPaymentBreakdown() {
+        const container = document.getElementById('expPaymentBreakdownList');
+        if (!container) return;
+
+        const monthExpenses = this.expensesOfMonth(this.currentMonth);
+        const total = monthExpenses.reduce((s, e) => s + parseFloat(e.amount || 0), 0);
+
+        if (monthExpenses.length === 0 || total === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 2rem 1rem; color: var(--text-muted);">
+                    <div style="font-size: 1.8rem; margin-bottom: 0.4rem;">💳</div>
+                    <p style="margin: 0; font-size: 0.85rem;">Sin movimientos en este mes.</p>
+                </div>`;
+            return;
+        }
+
+        const byMethod = {};
+        monthExpenses.forEach(e => {
+            const pm = e.payment_method || 'cash';
+            byMethod[pm] = (byMethod[pm] || 0) + parseFloat(e.amount || 0);
+        });
+
+        const rows = this.PAYMENT_METHODS
+            .map(pm => ({
+                label: pm.label,
+                val: byMethod[pm.value] || 0,
+                pct: total > 0 ? ((byMethod[pm.value] || 0) / total) * 100 : 0
+            }))
+            .filter(r => r.val > 0)
+            .sort((a, b) => b.val - a.val);
+
+        container.innerHTML = rows.map(r => `
+            <div style="padding: 0.75rem 0; border-bottom: 1px solid var(--border);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                    <span style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">${r.label}</span>
+                    <div>
+                        <span style="font-weight: 700; color: var(--text-primary); font-size: 0.9rem;">${Utils.formatCurrency(r.val)}</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted); margin-left: 0.4rem;">(${r.pct.toFixed(1)}%)</span>
+                    </div>
+                </div>
+                <div style="height: 6px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
+                    <div style="height: 100%; width: ${r.pct}%; background: linear-gradient(90deg, #6366f1, #06b6d4); border-radius: 4px;"></div>
+                </div>
+            </div>
+        `).join('');
+    },
+
+    // ========================================
+    // TABLA Y ACCIONES
     // ========================================
     getFilteredExpenses() {
         let list = this.expensesOfMonth(this.currentMonth);
@@ -467,6 +601,9 @@ const ExpensesModule = {
                         ${Utils.formatCurrency(parseFloat(e.amount || 0))}
                     </td>
                     <td style="text-align: right; white-space: nowrap;">
+                        <button class="btn btn-icon btn-sm" title="Duplicar" onclick="ExpensesModule.duplicateExpense('${e.id}')">
+                            📋
+                        </button>
                         <button class="btn btn-icon btn-sm" title="Editar" onclick="ExpensesModule.openExpenseModal('${e.id}')">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
@@ -666,7 +803,6 @@ const ExpensesModule = {
         let running = 0;
         const cumulative = perDay.map((v, i) => {
             running += v;
-            // En el mes en curso no se dibuja el futuro: quedaría como una línea plana engañosa.
             return i < lastDay ? running : null;
         });
 
@@ -730,6 +866,95 @@ const ExpensesModule = {
     },
 
     // ========================================
+    // REGISTRO RÁPIDO & PRESETS
+    // ========================================
+    quickAddPreset(description, amount, defaultCatName) {
+        if (this.categories.length === 0) {
+            Utils.showToast('Primero crea al menos una categoría de gasto', 'warning');
+            this.openCategoriesModal();
+            return;
+        }
+
+        this.editingExpenseId = null;
+
+        const title = document.getElementById('modalExpenseTitle');
+        if (title) title.textContent = `Registrar Gasto (${description})`;
+
+        const catSelect = document.getElementById('expCategory');
+        if (catSelect) {
+            catSelect.innerHTML = this.categories
+                .map(c => `<option value="${c.id}">${c.icon || '📦'} ${this.escape(c.name)}</option>`).join('');
+        }
+
+        const paySelect = document.getElementById('expPaymentMethod');
+        if (paySelect) {
+            paySelect.innerHTML = this.PAYMENT_METHODS
+                .map(p => `<option value="${p.value}">${p.label}</option>`).join('');
+        }
+
+        const targetCat = this.categories.find(c => c.name.toLowerCase().includes(defaultCatName.toLowerCase()))
+            || this.categories[0];
+
+        const set = (elId, val) => {
+            const el = document.getElementById(elId);
+            if (el) el.value = val;
+        };
+
+        set('expAmount', amount || '');
+        set('expDate', this.todayISO());
+        set('expCategory', targetCat?.id || '');
+        set('expDescription', description || '');
+        set('expPaymentMethod', 'cash');
+        set('expNotes', 'Registrado con Preset Rápido');
+
+        const rec = document.getElementById('expIsRecurring');
+        if (rec) rec.checked = false;
+
+        Utils.openModal('modalExpense');
+        setTimeout(() => document.getElementById('expAmount')?.focus(), 80);
+    },
+
+    duplicateExpense(id) {
+        const expense = this.expenses.find(e => e.id === id);
+        if (!expense) return;
+
+        this.editingExpenseId = null;
+
+        const title = document.getElementById('modalExpenseTitle');
+        if (title) title.textContent = 'Duplicar Gasto';
+
+        const catSelect = document.getElementById('expCategory');
+        if (catSelect) {
+            catSelect.innerHTML = this.categories
+                .map(c => `<option value="${c.id}">${c.icon || '📦'} ${this.escape(c.name)}</option>`).join('');
+        }
+
+        const paySelect = document.getElementById('expPaymentMethod');
+        if (paySelect) {
+            paySelect.innerHTML = this.PAYMENT_METHODS
+                .map(p => `<option value="${p.value}">${p.label}</option>`).join('');
+        }
+
+        const set = (elId, val) => {
+            const el = document.getElementById(elId);
+            if (el) el.value = val;
+        };
+
+        set('expAmount', parseFloat(expense.amount || 0));
+        set('expDate', this.todayISO());
+        set('expCategory', expense.category_id || '');
+        set('expDescription', expense.description || '');
+        set('expPaymentMethod', expense.payment_method || 'cash');
+        set('expNotes', expense.notes ? `${expense.notes} (Copia)` : '');
+
+        const rec = document.getElementById('expIsRecurring');
+        if (rec) rec.checked = !!expense.is_recurring;
+
+        Utils.openModal('modalExpense');
+        setTimeout(() => document.getElementById('expAmount')?.focus(), 80);
+    },
+
+    // ========================================
     // MODAL DE GASTO
     // ========================================
     openExpenseModal(id = null) {
@@ -773,7 +998,6 @@ const ExpensesModule = {
             if (rec) rec.checked = !!expense.is_recurring;
         } else {
             set('expAmount', '');
-            // Si se mira un mes distinto al actual, se propone el día 1 de ese mes.
             set('expDate', this.currentMonth === this.todayMonth()
                 ? this.todayISO()
                 : `${this.currentMonth}-01`);
@@ -819,7 +1043,6 @@ const ExpensesModule = {
             Utils.closeModal('modalExpense');
             Utils.showToast(this.editingExpenseId ? 'Gasto actualizado' : 'Gasto registrado', 'success');
 
-            // Si el gasto quedó en otro mes, se salta a ese mes para que sea visible.
             const savedMonth = (document.getElementById('expDate')?.value || '').slice(0, 7);
             if (savedMonth && savedMonth !== this.currentMonth) this.currentMonth = savedMonth;
 
@@ -907,7 +1130,6 @@ const ExpensesModule = {
             return;
         }
 
-        // Se cuenta el uso histórico para advertir antes de borrar.
         const usage = {};
         this.expenses.forEach(e => {
             if (e.category_id) usage[e.category_id] = (usage[e.category_id] || 0) + 1;
@@ -978,7 +1200,9 @@ const ExpensesModule = {
             this.renderCategoriesList();
             this.populateFilterOptions();
             this.renderKPIs();
+            this.renderHighlights();
             this.renderBudgets();
+            this.renderPaymentBreakdown();
             this.renderCharts();
         } catch (error) {
             console.error('Error saving category:', error);
@@ -1006,6 +1230,101 @@ const ExpensesModule = {
             console.error('Error deleting category:', error);
             Utils.showToast('No se pudo eliminar la categoría', 'error');
         }
+    },
+
+    // ========================================
+    // AYUDANTES Y SCRIPT SQL PARA SUPABASE
+    // ========================================
+    getSQLScript() {
+        return `-- ==========================================================
+-- SCRIPT SQL PARA SUPABASE: GASTOS MENSUALES (Finanzas Personales)
+-- ==========================================================
+-- Ejecuta este script completo en el SQL Editor de tu proyecto de Supabase.
+-- Es idempotente: puedes correrlo varias veces sin romper nada.
+
+-- 1. Categorías de gasto (con presupuesto mensual por categoría)
+CREATE TABLE IF NOT EXISTS public.pf_expense_categories (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    icon TEXT DEFAULT '📦',
+    color TEXT DEFAULT '#6366f1',
+    monthly_budget NUMERIC(14,2) DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT pf_expense_categories_name_key UNIQUE (name)
+);
+
+-- 2. Gastos
+CREATE TABLE IF NOT EXISTS public.pf_expenses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+    category_id UUID REFERENCES public.pf_expense_categories(id) ON DELETE SET NULL,
+    description TEXT NOT NULL,
+    payment_method TEXT DEFAULT 'cash',
+    is_recurring BOOLEAN DEFAULT FALSE,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Columnas añadidas por seguridad
+ALTER TABLE public.pf_expenses ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'cash';
+ALTER TABLE public.pf_expenses ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.pf_expenses ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE public.pf_expenses ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.pf_expense_categories ADD COLUMN IF NOT EXISTS monthly_budget NUMERIC(14,2) DEFAULT 0;
+ALTER TABLE public.pf_expense_categories ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+
+-- 3. Índices para consultas por mes y por categoría
+CREATE INDEX IF NOT EXISTS idx_pf_expenses_date ON public.pf_expenses (date DESC);
+CREATE INDEX IF NOT EXISTS idx_pf_expenses_category ON public.pf_expenses (category_id);
+
+-- 4. Seguridad a nivel de fila (RLS)
+ALTER TABLE public.pf_expense_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.pf_expenses ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow all operations for authenticated users" ON public.pf_expense_categories;
+CREATE POLICY "Allow all operations for authenticated users"
+ON public.pf_expense_categories FOR ALL USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all operations for authenticated users" ON public.pf_expenses;
+CREATE POLICY "Allow all operations for authenticated users"
+ON public.pf_expenses FOR ALL USING (true) WITH CHECK (true);
+
+-- 5. Categorías iniciales sugeridas
+INSERT INTO public.pf_expense_categories (name, icon, color, monthly_budget, sort_order) VALUES
+    ('Vivienda',        '🏠', '#6366f1', 0, 1),
+    ('Alimentación',    '🍽️', '#22c55e', 0, 2),
+    ('Transporte',      '🚗', '#f59e0b', 0, 3),
+    ('Servicios',       '💡', '#06b6d4', 0, 4),
+    ('Salud',           '🏥', '#ef4444', 0, 5),
+    ('Educación',       '📚', '#8b5cf6', 0, 6),
+    ('Entretenimiento', '🎬', '#ec4899', 0, 7),
+    ('Ropa',            '👕', '#14b8a6', 0, 8),
+    ('Deudas',          '💳', '#f97316', 0, 9),
+    ('Ahorro',          '🐷', '#10b981', 0, 10),
+    ('Otros',           '📦', '#64748b', 0, 11)
+ON CONFLICT (name) DO NOTHING;`;
+    },
+
+    async copySQLToClipboard() {
+        try {
+            const sql = this.getSQLScript();
+            await navigator.clipboard.writeText(sql);
+            Utils.showToast('¡Script SQL copiado al portapapeles!', 'success');
+        } catch (err) {
+            console.error('Error al copiar SQL:', err);
+            this.openSQLModal();
+        }
+    },
+
+    openSQLModal() {
+        const codeEl = document.getElementById('expSQLCode');
+        if (codeEl) codeEl.textContent = this.getSQLScript();
+        Utils.openModal('modalExpSQL');
     },
 
     // ========================================
