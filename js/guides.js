@@ -648,6 +648,11 @@ const GuidesModule = {
 
         let guides = await Database.getGuides();
 
+        // Auto-classify clients from web orders
+        guides
+            .filter(g => g.source === 'Tienda Web' && g.clientId)
+            .forEach(g => Database.setClientOriginFromWebOrder(g.clientId));
+
         // Sort by date (newest first)
         guides.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -674,13 +679,15 @@ const GuidesModule = {
                     const colombiaCities = ['medellin', 'medellín', 'bogota', 'bogotá', 'cali', 'barranquilla', 'bucaramanga', 'cartagena', 'pereira', 'manizales', 'cucuta', 'cúcuta', 'santa marta', 'ibague', 'ibagué', 'pasto', 'monteria', 'montería', 'neiva', 'villavicencio', 'armenia', 'valledupar', 'soledad', 'bello', 'itagui', 'itaguí', 'envigado', 'sandona', 'sandoná', 'dosquebradas', 'floridablanca', 'rionegro', 'popayan', 'popayán', 'palmira'];
                     const ecuadorCities = ['quito', 'guayaquil', 'cuenca', 'santo domingo', 'machala', 'duran', 'durán', 'manta', 'portoviejo', 'loja', 'ambato', 'esmeraldas', 'quevedo', 'riobamba', 'milagro', 'ibarra', 'la libertad', 'babahoyo', 'sangolqui', 'sangolquí', 'daule', 'latacunga', 'tulcan', 'tulcán', 'chone', 'pasaje', 'santa rosa', 'nueva loja', 'huaquillas', 'el carmen', 'montecristi', 'samborondon', 'samborondón', 'puerto francisco de orellana', 'jipijapa', 'piñas'];
                     const venezuelaCities = ['caracas', 'maracaibo', 'valencia', 'barquisimeto', 'maracay', 'ciudad guayana', 'maturin', 'maturín', 'barcelona', 'san cristobal', 'san cristóbal', 'turmero', 'ciudad bolivar', 'ciudad bolívar', 'barinas', 'los teques', 'cumana', 'cumaná', 'san fernando de apure', 'puerto la cruz', 'merida', 'mérida', 'cabimas'];
+                    const mexicoCities = ['cdmx', 'ciudad de mexico', 'ciudad de méxico', 'guadalajara', 'monterrey', 'puebla', 'toluca', 'tijuana', 'leon', 'león', 'juarez', 'juárez', 'torreon', 'torreón', 'queretaro', 'querétaro', 'san luis potosi', 'san luis potosí', 'merida', 'mérida', 'mexicali', 'aguascalientes', 'cuernavaca', 'acapulco', 'tampico', 'chihuahua', 'morelia', 'veracruz', 'cancun', 'cancún', 'saltillo'];
                     
                     if (colombiaCities.some(c => cityLower.includes(c))) guideCountry = 'Colombia';
                     else if (ecuadorCities.some(c => cityLower.includes(c))) guideCountry = 'Ecuador';
                     else if (venezuelaCities.some(c => cityLower.includes(c))) guideCountry = 'Venezuela';
+                    else if (mexicoCities.some(c => cityLower.includes(c))) guideCountry = 'Mexico';
                 }
                 
-                return guideCountry === countryFilter;
+                return guideCountry === countryFilter || (countryFilter === 'Mexico' && guideCountry === 'México') || (countryFilter === 'México' && guideCountry === 'Mexico');
             });
         }
 
@@ -1083,6 +1090,18 @@ const GuidesModule = {
             document.getElementById('infoClientPhone').textContent = client.phone;
             document.getElementById('infoClientAddress').textContent = client.address;
             document.getElementById('infoClientCity').textContent = client.city;
+
+            // Display client origin / channel if available
+            const originRow = document.getElementById('infoClientOriginRow');
+            const originEl = document.getElementById('infoClientOrigin');
+            if (originRow && originEl) {
+                if (client.origin) {
+                    originRow.style.display = 'block';
+                    originEl.textContent = client.origin;
+                } else {
+                    originRow.style.display = 'none';
+                }
+            }
 
             // Clear previous product selection when client (and potentially city) changes
             this.clearProductSelection();

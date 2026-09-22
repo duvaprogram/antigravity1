@@ -532,6 +532,12 @@ const Database = {
         }
     },
 
+    extractOriginFromNotes(notes) {
+        if (!notes || typeof notes !== 'string') return '';
+        const match = notes.match(/\[Origen:\s*([^\]]+)\]/i);
+        return match ? match[1].trim() : '';
+    },
+
     // ========================================
     // CLIENTS
     // ========================================
@@ -564,6 +570,7 @@ const Database = {
                     cityId: c.city_id,
                     reference: c.reference || '',
                     notes: c.notes || '',
+                    origin: c.origin || this.extractOriginFromNotes(c.notes),
                     active: c.active !== false,
                     createdAt: c.created_at
                 }));
@@ -579,6 +586,7 @@ const Database = {
                 cityId: c.city_id,
                 reference: c.reference || '',
                 notes: c.notes || '',
+                origin: c.origin || this.extractOriginFromNotes(c.notes),
                 active: c.active !== false,
                 createdAt: c.created_at
             }));
@@ -616,6 +624,7 @@ const Database = {
                     cityId: rawData.city_id,
                     reference: rawData.reference || '',
                     notes: rawData.notes || '',
+                    origin: rawData.origin || this.extractOriginFromNotes(rawData.notes),
                     active: rawData.active !== false,
                     createdAt: rawData.created_at
                 } : null;
@@ -631,6 +640,7 @@ const Database = {
                 cityId: data.city_id,
                 reference: data.reference || '',
                 notes: data.notes || '',
+                origin: data.origin || this.extractOriginFromNotes(data.notes),
                 active: data.active !== false,
                 createdAt: data.created_at
             } : null;
@@ -653,6 +663,7 @@ const Database = {
                 city_id: cityId,
                 reference: client.reference || null,
                 notes: client.notes || null,
+                origin: client.origin || null,
                 active: true
             };
 
@@ -684,11 +695,37 @@ const Database = {
                 address: result.address,
                 city: result.cities?.name || '',
                 reference: result.reference,
+                notes: result.notes || '',
+                origin: client.origin || this.extractOriginFromNotes(result.notes),
                 createdAt: result.created_at
             };
         } catch (error) {
             console.error('Error saving client:', error);
             throw error;
+        }
+    },
+
+    async setClientOriginFromWebOrder(clientId) {
+        try {
+            const { data: existing } = await supabaseClient
+                .from('clients')
+                .select('origin, notes')
+                .eq('id', clientId)
+                .single();
+
+            if (existing && !existing.origin) {
+                const originTag = '[Origen: Página Web]';
+                const currentNotes = existing.notes || '';
+                const cleanNotes = currentNotes.replace(/\[Origen:\s*[^\]]+\]\s*/i, '').trim();
+                const finalNotes = cleanNotes ? `${originTag} ${cleanNotes}` : originTag;
+
+                await supabaseClient
+                    .from('clients')
+                    .update({ origin: 'Página Web', notes: finalNotes })
+                    .eq('id', clientId);
+            }
+        } catch (error) {
+            console.error('Error setting client origin from web order:', error);
         }
     },
 
@@ -708,7 +745,9 @@ const Database = {
                 phone: c.phone,
                 address: c.address,
                 city: c.cities?.name || '',
-                reference: c.reference
+                reference: c.reference,
+                notes: c.notes || '',
+                origin: c.origin || this.extractOriginFromNotes(c.notes)
             }));
         } catch (error) {
             console.error('Error searching clients:', error);
