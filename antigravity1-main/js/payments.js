@@ -67,6 +67,12 @@ const PaymentsModule = {
                     cityFilter.value = 'Caracas';
                     this.filterModalGuides();
                 }
+            } else if (val.includes('CDMX') || val.includes('México') || val.includes('Mexico')) {
+                if (currencySelect) currencySelect.value = 'MXN';
+                if (cityFilter) {
+                    cityFilter.value = 'CDMX';
+                    this.filterModalGuides();
+                }
             }
         });
 
@@ -248,6 +254,25 @@ const PaymentsModule = {
             };
         }
 
+        // 4. Mexico detection (CDMX, Guadalajara, Monterrey, Mexico, MXN, etc.)
+        if (
+            combined.includes('cdmx') ||
+            combined.includes('ciudad de mexico') ||
+            combined.includes('guadalajara') ||
+            combined.includes('monterrey') ||
+            combined.includes('mexico') ||
+            combined.includes('mxn') ||
+            combined.includes('domiciliarios cdmx')
+        ) {
+            return {
+                name: 'México',
+                flag: '🇲🇽',
+                color: '#10b981',
+                bg: 'rgba(16, 185, 129, 0.15)',
+                border: 'rgba(16, 185, 129, 0.3)'
+            };
+        }
+
         // 4. Default / Other
         return {
             name: 'Otro',
@@ -372,6 +397,8 @@ const PaymentsModule = {
             'Colombia': { count: 0, usd: 0, cop: 0, flag: '🇨🇴' },
             'Ecuador': { count: 0, usd: 0, cop: 0, flag: '🇪🇨' },
             'Venezuela': { count: 0, usd: 0, cop: 0, flag: '🇻🇪' },
+            'México': { count: 0, usd: 0, cop: 0, flag: '🇲🇽' },
+            'Mexico': { count: 0, usd: 0, cop: 0, flag: '🇲🇽' },
             'Otro': { count: 0, usd: 0, cop: 0, flag: '🌐' }
         };
 

@@ -464,7 +464,8 @@ const IncomeStatementModule = {
                 items: [
                     { value: 'Ecuador', label: '🇪🇨 Ecuador' },
                     { value: 'Venezuela', label: '🇻🇪 Venezuela' },
-                    { value: 'Colombia', label: '🇨🇴 Colombia' }
+                    { value: 'Colombia', label: '🇨🇴 Colombia' },
+                    { value: 'Mexico', label: '🇲🇽 México' }
                 ],
                 defaultAll: true,
                 onChange: (selected) => {
@@ -905,6 +906,17 @@ const IncomeStatementModule = {
         ];
         if (venezuelaCities.some(c => city.includes(c)) || country.includes('venezuela')) {
             return 'Venezuela';
+        }
+
+        // Mexico detection
+        const mexicoCities = [
+            'cdmx', 'ciudad de mexico', 'ciudad de méxico', 'guadalajara', 'monterrey',
+            'puebla', 'toluca', 'tijuana', 'leon', 'león', 'juarez', 'juárez',
+            'torreon', 'torreón', 'queretaro', 'querétaro', 'san luis potosi',
+            'san luis potosí', 'merida', 'mérida', 'mexicali', 'aguascalientes'
+        ];
+        if (mexicoCities.some(c => city.includes(c)) || country.includes('mexico') || country.includes('méxico')) {
+            return 'Mexico';
         }
 
         return cityData.country || 'Desconocido';

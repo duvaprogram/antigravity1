@@ -4,7 +4,8 @@ const CampaignsModule = {
     countries: {
         'ECU': 'Ecuador',
         'VEN': 'Venezuela',
-        'COL': 'Colombia'
+        'COL': 'Colombia',
+        'MEX': 'México'
     },
 
     // Campaign types
@@ -1276,6 +1277,7 @@ const CampaignsModule = {
                                     <option value="ECU" ${campaign.country === 'ECU' ? 'selected' : ''}>🇪🇨 Ecuador (ECU)</option>
                                     <option value="VEN" ${campaign.country === 'VEN' ? 'selected' : ''}>🇻🇪 Venezuela (VEN)</option>
                                     <option value="COL" ${campaign.country === 'COL' ? 'selected' : ''}>🇨🇴 Colombia (COL)</option>
+                                    <option value="MEX" ${campaign.country === 'MEX' ? 'selected' : ''}>🇲🇽 México (MEX)</option>
                                 </select>
                             </div>
                             <div class="form-group">
@@ -1758,7 +1760,7 @@ const CampaignsModule = {
             let product = '';
             if (rawCampaignName.includes('-')) {
                 const parts = rawCampaignName.split('-');
-                if (parts[0] && ['ECU', 'VEN', 'COL'].includes(parts[0].toUpperCase())) {
+                if (parts[0] && ['ECU', 'VEN', 'COL', 'MEX'].includes(parts[0].toUpperCase())) {
                     country = parts[0].toUpperCase();
                 }
                 if (parts.length >= 6) {
@@ -1942,7 +1944,7 @@ const CampaignsModule = {
                     id: Date.now() + Math.floor(Math.random() * 1000),
                     name: c.originalName,
                     code: c.code,
-                    country: c.originalName.startsWith('VEN') ? 'VEN' : (c.originalName.startsWith('ECU') ? 'ECU' : 'COL'),
+                    country: c.originalName.startsWith('MEX') ? 'MEX' : (c.originalName.startsWith('VEN') ? 'VEN' : (c.originalName.startsWith('ECU') ? 'ECU' : 'COL')),
                     type: c.originalName.includes('CBO') ? 'CBO' : 'ABO',
                     objective: c.originalName.includes('COMPRAS') ? 'COMPRAS' : 'MENSAJES',
                     date: c.startDate || new Date().toISOString().split('T')[0],

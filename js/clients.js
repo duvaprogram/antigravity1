@@ -13,20 +13,45 @@ const ClientsModule = {
 
     bindEvents() {
         // New client button
-        document.getElementById('btnNewClient').addEventListener('click', () => {
+        document.getElementById('btnNewClient')?.addEventListener('click', () => {
             this.openClientModal();
         });
 
         // Client form submission
-        document.getElementById('formClient').addEventListener('submit', (e) => {
+        document.getElementById('formClient')?.addEventListener('submit', (e) => {
             e.preventDefault();
             this.saveClient();
         });
 
+        // Origin select toggle in modal
+        document.getElementById('clientOrigin')?.addEventListener('change', (e) => {
+            const val = e.target.value;
+            const customGroup = document.getElementById('clientOriginCustomGroup');
+            const customInput = document.getElementById('clientOriginCustom');
+            if (val === 'Otro') {
+                if (customGroup) customGroup.style.display = 'block';
+                if (customInput) {
+                    customInput.required = true;
+                    customInput.focus();
+                }
+            } else {
+                if (customGroup) customGroup.style.display = 'none';
+                if (customInput) {
+                    customInput.required = false;
+                    customInput.value = '';
+                }
+            }
+        });
+
         // Search clients
-        document.getElementById('searchClients').addEventListener('input',
+        document.getElementById('searchClients')?.addEventListener('input',
             Utils.debounce((e) => this.filterClients(e.target.value), 300)
         );
+
+        // Filter clients by origin
+        document.getElementById('filterClientOrigin')?.addEventListener('change', () => {
+            this.filterClients(document.getElementById('searchClients')?.value || '');
+        });
 
         // Modal close buttons
         document.querySelectorAll('[data-close="modalClient"]').forEach(btn => {
@@ -35,21 +60,61 @@ const ClientsModule = {
     },
 
     async render() {
-        await this.filterClients('');
+        await this.filterClients(document.getElementById('searchClients')?.value || '');
     },
 
-    async filterClients(query) {
-        let clients;
-        if (query) {
-            clients = await Database.searchClients(query);
-        } else {
-            clients = await Database.getClients();
+    getOriginBadge(origin) {
+        if (!origin) return '';
+        const lower = origin.toLowerCase();
+        if (lower.includes('whatsapp') || lower.includes('wpp')) {
+            return `<span class="origin-badge whatsapp" title="Canal: WhatsApp">💬 WhatsApp</span>`;
         }
+        if (lower.includes('página') || lower.includes('pagina') || lower.includes('web')) {
+            return `<span class="origin-badge pagina" title="Canal: Página Web">🌐 Página Web</span>`;
+        }
+        const cleanOrigin = origin.replace(/^Otro\s*[-:]\s*/i, '').trim();
+        return `<span class="origin-badge otro" title="Canal: ${Utils.escapeHtml(cleanOrigin || 'Otro')}">📝 ${Utils.escapeHtml(cleanOrigin || 'Otro')}</span>`;
+    },
+
+    async filterClients(query = '') {
+        let clients = await Database.getClients();
+        const originFilter = document.getElementById('filterClientOrigin')?.value || '';
+
+        if (query) {
+            const q = query.toLowerCase().trim();
+            clients = clients.filter(c =>
+                (c.fullName && c.fullName.toLowerCase().includes(q)) ||
+                (c.phone && c.phone.toLowerCase().includes(q)) ||
+                (c.address && c.address.toLowerCase().includes(q)) ||
+                (c.city && c.city.toLowerCase().includes(q)) ||
+                (c.origin && c.origin.toLowerCase().includes(q))
+            );
+        }
+
+        if (originFilter) {
+            clients = clients.filter(c => {
+                if (!c.origin) return false;
+                const lower = c.origin.toLowerCase();
+                if (originFilter === 'WhatsApp') {
+                    return lower.includes('whatsapp') || lower.includes('wpp');
+                }
+                if (originFilter === 'Página Web') {
+                    return lower.includes('página') || lower.includes('pagina') || lower.includes('web');
+                }
+                if (originFilter === 'Otro') {
+                    return !lower.includes('whatsapp') && !lower.includes('wpp') &&
+                           !lower.includes('página') && !lower.includes('pagina') && !lower.includes('web');
+                }
+                return true;
+            });
+        }
+
         this.renderGrid(clients);
     },
 
     renderGrid(clients) {
         const container = document.getElementById('clientsGrid');
+        if (!container) return;
 
         if (clients.length === 0) {
             container.innerHTML = `
@@ -68,12 +133,16 @@ const ClientsModule = {
         }
 
         container.innerHTML = clients.map(client => {
-            const cityClass = client.city.toLowerCase();
+            const cityClass = (client.city || '').toLowerCase();
+            const originBadge = this.getOriginBadge(client.origin);
             return `
                 <div class="client-card">
                     <div class="client-header">
                         <div class="client-name">${Utils.escapeHtml(client.fullName)}</div>
-                        <span class="city-badge ${cityClass}">${client.city}</span>
+                        <div style="display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap;">
+                            ${originBadge}
+                            <span class="city-badge ${cityClass}">${Utils.escapeHtml(client.city)}</span>
+                        </div>
                     </div>
                     <div class="client-info-row">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -123,9 +192,17 @@ const ClientsModule = {
         const modal = document.getElementById('modalClient');
         const form = document.getElementById('formClient');
         const title = document.getElementById('modalClientTitle');
+        const customGroup = document.getElementById('clientOriginCustomGroup');
+        const customInput = document.getElementById('clientOriginCustom');
+        const originSelect = document.getElementById('clientOrigin');
 
         form.reset();
         document.getElementById('clientId').value = '';
+        if (customGroup) customGroup.style.display = 'none';
+        if (customInput) {
+            customInput.required = false;
+            customInput.value = '';
+        }
 
         if (clientId) {
             const client = await Database.getClient(clientId);
@@ -137,9 +214,34 @@ const ClientsModule = {
                 document.getElementById('clientCity').value = client.city;
                 document.getElementById('clientAddress').value = client.address;
                 document.getElementById('clientReference').value = client.reference || '';
+
+                // Restore origin selection
+                const origin = client.origin || Database.extractOriginFromNotes(client.notes);
+                if (origin) {
+                    const lower = origin.toLowerCase();
+                    if (lower.includes('whatsapp') || lower.includes('wpp')) {
+                        originSelect.value = 'WhatsApp';
+                        if (customGroup) customGroup.style.display = 'none';
+                        if (customInput) customInput.required = false;
+                    } else if (lower.includes('página') || lower.includes('pagina') || lower.includes('web')) {
+                        originSelect.value = 'Página Web';
+                        if (customGroup) customGroup.style.display = 'none';
+                        if (customInput) customInput.required = false;
+                    } else {
+                        originSelect.value = 'Otro';
+                        if (customGroup) customGroup.style.display = 'block';
+                        if (customInput) {
+                            customInput.required = true;
+                            customInput.value = origin.replace(/^Otro\s*[-:]\s*/i, '').trim();
+                        }
+                    }
+                } else {
+                    originSelect.value = '';
+                }
             }
         } else {
             title.textContent = 'Nuevo Cliente';
+            if (originSelect) originSelect.value = '';
         }
 
         Utils.openModal('modalClient');
@@ -150,13 +252,47 @@ const ClientsModule = {
     },
 
     async saveClient() {
+        const originSelect = document.getElementById('clientOrigin');
+        const originVal = originSelect?.value || '';
+
+        if (!originVal) {
+            Utils.showToast('Por favor selecciona el origen del cliente (WhatsApp, Página Web u Otro)', 'warning');
+            originSelect?.focus();
+            return;
+        }
+
+        let originFinal = originVal;
+        if (originVal === 'Otro') {
+            const customVal = document.getElementById('clientOriginCustom')?.value.trim() || '';
+            if (!customVal) {
+                Utils.showToast('Por favor especifica de dónde llegó el cliente', 'warning');
+                document.getElementById('clientOriginCustom')?.focus();
+                return;
+            }
+            originFinal = `Otro - ${customVal}`;
+        }
+
+        const clientId = document.getElementById('clientId').value || null;
+        let existingNotes = '';
+        if (clientId) {
+            const existingClient = await Database.getClient(clientId);
+            if (existingClient && existingClient.notes) {
+                existingNotes = existingClient.notes.replace(/\[Origen:\s*[^\]]+\]\s*/i, '').trim();
+            }
+        }
+
+        const tag = `[Origen: ${originFinal}]`;
+        const finalNotes = existingNotes ? `${tag} ${existingNotes}` : tag;
+
         const client = {
-            id: document.getElementById('clientId').value || null,
+            id: clientId,
             fullName: document.getElementById('clientName').value.trim(),
             phone: document.getElementById('clientPhone').value.trim(),
             city: document.getElementById('clientCity').value,
             address: document.getElementById('clientAddress').value.trim(),
-            reference: document.getElementById('clientReference').value.trim()
+            reference: document.getElementById('clientReference').value.trim(),
+            origin: originFinal,
+            notes: finalNotes
         };
 
         try {
@@ -167,7 +303,7 @@ const ClientsModule = {
             App.updateDashboard();
         } catch (error) {
             console.error('Error saving client:', error);
-            Utils.showToast('Error al guardar el cliente', 'error');
+            Utils.showToast('Error al guardar el cliente: ' + (error.message || 'Verifique los datos'), 'error');
         }
     }
 };

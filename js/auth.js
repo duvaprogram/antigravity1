@@ -101,6 +101,7 @@ const AuthModule = {
                 calculator: { can_access: true, can_edit: true },
                 'materials-calculator': { can_access: true, can_edit: true },
                 finance: { can_access: true, can_edit: true },
+                expenses: { can_access: true, can_edit: true },
                 multimedia: { can_access: true, can_edit: true },
                 images: { can_access: true, can_edit: true },
                 journal: { can_access: true, can_edit: true },

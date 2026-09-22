@@ -8,7 +8,7 @@
     <meta name="description" content="Sistema de gestión de domicilios para Quito y Guayaquil">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="css/styles.css?v=2.2.4">
+    <link rel="stylesheet" href="css/styles.css?v=2.3.0">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
@@ -336,6 +336,9 @@
                         <option value="Caracas">Caracas</option>
                         <option value="Medellin">Medellín</option>
                         <option value="Bogota">Bogotá</option>
+                        <option value="CDMX">🇲🇽 Ciudad de México (CDMX)</option>
+                        <option value="Guadalajara">🇲🇽 Guadalajara</option>
+                        <option value="Monterrey">🇲🇽 Monterrey</option>
                     </select>
                 </div>
             </div>
@@ -624,6 +627,9 @@
                         <button class="city-tab" data-city="Caracas">Caracas</button>
                         <button class="city-tab" data-city="Medellin">Medellín</button>
                         <button class="city-tab" data-city="Bogota">Bogotá</button>
+                        <button class="city-tab" data-city="CDMX">CDMX</button>
+                        <button class="city-tab" data-city="Guadalajara">Guadalajara</button>
+                        <button class="city-tab" data-city="Monterrey">Monterrey</button>
                     </div>
                     <div style="display: flex; gap: 0.5rem;">
                         <button class="btn btn-secondary" id="btnInventoryHistory">
@@ -742,14 +748,22 @@
 
             <!-- Clients Section -->
             <section class="content-section" id="section-clients">
-                <div class="section-header">
-                    <div class="search-bar">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                        <input type="text" id="searchClients" placeholder="Buscar por nombre o teléfono...">
+                <div class="section-header" style="flex-wrap: wrap; gap: 1rem;">
+                    <div style="display: flex; gap: 0.75rem; flex: 1; min-width: 280px; align-items: center; flex-wrap: wrap;">
+                        <div class="search-bar" style="flex: 1; min-width: 200px;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                            <input type="text" id="searchClients" placeholder="Buscar por nombre, teléfono o canal...">
+                        </div>
+                        <select id="filterClientOrigin" class="form-control" style="width: auto; min-width: 170px; height: 42px; border-radius: var(--radius-md); padding: 0.5rem 0.75rem; background: var(--surface); color: var(--text-primary); border: 1px solid var(--border);">
+                            <option value="">Todos los orígenes</option>
+                            <option value="WhatsApp">💬 WhatsApp</option>
+                            <option value="Página Web">🌐 Página Web</option>
+                            <option value="Otro">📝 Otro</option>
+                        </select>
                     </div>
                     <button class="btn btn-primary" id="btnNewClient">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -973,6 +987,7 @@
                                 <option value="Colombia">🇨🇴 Colombia (Bogotá, Medellín, Hoko)</option>
                                 <option value="Ecuador">🇪🇨 Ecuador (Quito, Guayaquil)</option>
                                 <option value="Venezuela">🇻🇪 Venezuela (Caracas, Binance)</option>
+                                <option value="Mexico">🇲🇽 México (CDMX, Guadalajara, Monterrey)</option>
                                 <option value="Otro">🌐 Otros / Personalizados</option>
                             </select>
                         </div>
@@ -985,6 +1000,7 @@
                                 <option value="">Todas las monedas</option>
                                 <option value="USD">💵 Dólares ($ USD)</option>
                                 <option value="COP">🇨🇴 Pesos ($ COP)</option>
+                                <option value="MXN">🇲🇽 Pesos ($ MXN)</option>
                             </select>
                         </div>
 
@@ -1406,6 +1422,27 @@
                                         <div class="bar caracas" id="analyticsCaracasBar" style="width: 0%"></div>
                                     </div>
                                     <span class="city-count" id="analyticsCaracasCount">0</span>
+                                </div>
+                                <div class="city-bar">
+                                    <span class="city-name">CDMX</span>
+                                    <div class="bar-container">
+                                        <div class="bar cdmx" id="analyticsCdmxBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="city-count" id="analyticsCdmxCount">0</span>
+                                </div>
+                                <div class="city-bar">
+                                    <span class="city-name">Guadalajara</span>
+                                    <div class="bar-container">
+                                        <div class="bar guadalajara" id="analyticsGuadalajaraBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="city-count" id="analyticsGuadalajaraCount">0</span>
+                                </div>
+                                <div class="city-bar">
+                                    <span class="city-name">Monterrey</span>
+                                    <div class="bar-container">
+                                        <div class="bar monterrey" id="analyticsMonterreyBar" style="width: 0%"></div>
+                                    </div>
+                                    <span class="city-count" id="analyticsMonterreyCount">0</span>
                                 </div>
                             </div>
                         </div>
@@ -2709,6 +2746,7 @@
                                             <option value="Colombia">Colombia</option>
                                             <option value="Ecuador">Ecuador</option>
                                             <option value="Venezuela">Venezuela</option>
+                                            <option value="Mexico">México</option>
                                         </select>
                                     </div>
                                     <div class="form-group full-width">
@@ -3137,8 +3175,11 @@
                                 <select id="freightFilterRoute" class="form-control">
                                     <option value="">Todas</option>
                                     <option value="China -> Colombia">China -> Colombia</option>
+                                    <option value="China -> México">China -> México</option>
                                     <option value="Colombia -> Ecuador">Colombia -> Ecuador</option>
                                     <option value="Colombia -> Venezuela">Colombia -> Venezuela</option>
+                                    <option value="México -> Ecuador">México -> Ecuador</option>
+                                    <option value="México -> Colombia">México -> Colombia</option>
                                 </select>
                             </div>
                             <div class="filter-buttons" style="display: flex; gap: 0.5rem;">
@@ -3503,6 +3544,7 @@
                                             <option value="ECU">🇪🇨 Ecuador (ECU)</option>
                                             <option value="VEN">🇻🇪 Venezuela (VEN)</option>
                                             <option value="COL">🇨🇴 Colombia (COL)</option>
+                                            <option value="MEX">🇲🇽 México (MEX)</option>
                                         </select>
                                     </div>
 
@@ -4463,6 +4505,7 @@
                                         <option value="Ecuador">🇪🇨 Ecuador</option>
                                         <option value="Venezuela">🇻🇪 Venezuela</option>
                                         <option value="Colombia">🇨🇴 Colombia</option>
+                                        <option value="Mexico">🇲🇽 México</option>
                                     </select>
                                     <input type="file" id="fbReportFile" accept=".csv,.xlsx,.xls"
                                         style="display: none;">
@@ -4494,6 +4537,7 @@
                                         onchange="IncomeStatementModule.onCurrencyChange()">
                                         <option value="USD">🇺🇸 USD (Dólar)</option>
                                         <option value="COP">🇨🇴 COP (Peso Colombiano)</option>
+                                        <option value="MXN">🇲🇽 MXN (Peso Mexicano)</option>
                                     </select>
                                     <div id="trmInputContainer"
                                         style="display: none; align-items: center; gap: 0.5rem;">
@@ -4532,6 +4576,7 @@
                                     <option value="Ecuador">🇪🇨 Ecuador</option>
                                     <option value="Venezuela">🇻🇪 Venezuela</option>
                                     <option value="Colombia">🇨🇴 Colombia</option>
+                                    <option value="Mexico">🇲🇽 México</option>
                                 </select>
                             </div>
                             <div class="form-group" style="flex: 1; min-width: 120px; margin: 0;">
@@ -6040,7 +6085,23 @@
                             <option value="Caracas">Caracas</option>
                             <option value="Medellin">Medellín</option>
                             <option value="Bogota">Bogotá</option>
+                            <option value="CDMX">CDMX (Ciudad de México)</option>
+                            <option value="Guadalajara">Guadalajara</option>
+                            <option value="Monterrey">Monterrey</option>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="clientOrigin">Origen / Canal de Llegada *</label>
+                        <select id="clientOrigin" required>
+                            <option value="">Seleccionar canal/origen...</option>
+                            <option value="WhatsApp">💬 WhatsApp</option>
+                            <option value="Página Web">🌐 Página Web</option>
+                            <option value="Otro">📝 Otro (Especificar)</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width" id="clientOriginCustomGroup" style="display: none;">
+                        <label for="clientOriginCustom">¿De dónde llegó el cliente? (Especificar) *</label>
+                        <input type="text" id="clientOriginCustom" placeholder="Ej: Instagram, TikTok, Facebook, Llamada, Recomendado...">
                     </div>
                     <div class="form-group full-width">
                         <label for="clientAddress">Dirección Completa *</label>
@@ -6083,6 +6144,9 @@
                             <option value="Caracas">Caracas</option>
                             <option value="Medellin">Medellín</option>
                             <option value="Bogota">Bogotá</option>
+                            <option value="CDMX">CDMX (Ciudad de México)</option>
+                            <option value="Guadalajara">Guadalajara</option>
+                            <option value="Monterrey">Monterrey</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -6146,6 +6210,7 @@
                             <p><strong>Teléfono:</strong> <span id="infoClientPhone"></span></p>
                             <p><strong>Dirección:</strong> <span id="infoClientAddress"></span></p>
                             <p><strong>Ciudad:</strong> <span id="infoClientCity"></span></p>
+                            <p id="infoClientOriginRow" style="display: none;"><strong>Origen / Canal:</strong> <span id="infoClientOrigin"></span></p>
                             <button type="button" class="btn btn-sm btn-secondary"
                                 onclick="GuidesModule.clearClientSelection()" style="margin-top: 0.5rem;">
                                 Cambiar cliente
@@ -6663,6 +6728,9 @@
                         <option value="Caracas">Caracas</option>
                         <option value="Medellin">Medellín</option>
                         <option value="Bogota">Bogotá</option>
+                        <option value="CDMX">CDMX</option>
+                        <option value="Guadalajara">Guadalajara</option>
+                        <option value="Monterrey">Monterrey</option>
                     </select>
                     <select id="filterHistoryType">
                         <option value="">Todos los tipos</option>
@@ -6713,6 +6781,7 @@
                             <option value="Ecuador">🇪🇨 Ecuador</option>
                             <option value="Venezuela">🇻🇪 Venezuela</option>
                             <option value="Colombia">🇨🇴 Colombia</option>
+                            <option value="Mexico">🇲🇽 México</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -6781,6 +6850,7 @@
                             <option value="Ecuador">🇪🇨 Ecuador</option>
                             <option value="Venezuela">🇻🇪 Venezuela</option>
                             <option value="Colombia">🇨🇴 Colombia</option>
+                            <option value="Mexico">🇲🇽 México</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -6925,6 +6995,7 @@
                             <option value="Ecuador">🇪🇨 Ecuador</option>
                             <option value="Venezuela">🇻🇪 Venezuela</option>
                             <option value="Colombia">🇨🇴 Colombia</option>
+                            <option value="Mexico">🇲🇽 México</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -7295,8 +7366,11 @@
                         <select id="freightRoute" required>
                             <option value="">Seleccionar ruta...</option>
                             <option value="China -> Colombia">China -> Colombia</option>
+                            <option value="China -> México">China -> México</option>
                             <option value="Colombia -> Ecuador">Colombia -> Ecuador</option>
                             <option value="Colombia -> Venezuela">Colombia -> Venezuela</option>
+                            <option value="México -> Ecuador">México -> Ecuador</option>
+                            <option value="México -> Colombia">México -> Colombia</option>
                             <option value="Otra">Otra</option>
                         </select>
                     </div>
@@ -7313,6 +7387,7 @@
                         <select id="freightCurrency" required>
                             <option value="USD">USD ($)</option>
                             <option value="COP">COP ($)</option>
+                            <option value="MXN">MXN ($)</option>
                             <option value="Bs">Bs</option>
                         </select>
                     </div>
@@ -7347,6 +7422,7 @@
                             <option value="Pago de Venezuela Binance">Pago de Venezuela Binance</option>
                             <option value="Pago de Domiciliarios Bogotá">Pago de Domiciliarios Bogotá</option>
                             <option value="Pago de Domiciliarios Medellín">Pago de Domiciliarios Medellín</option>
+                            <option value="Pago de Domiciliarios CDMX">Pago de Domiciliarios CDMX</option>
                             <option value="Pago de Domicilios Ecuador">Pago de Domicilios Ecuador</option>
                             <option value="Otro">Otro (Especificar)</option>
                         </select>
@@ -7364,6 +7440,7 @@
                         <select id="paymentCurrency" required>
                             <option value="USD">Dólares (USD)</option>
                             <option value="COP">Pesos Colombianos (COP)</option>
+                            <option value="MXN">Pesos Mexicanos (MXN)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -7389,6 +7466,9 @@
                         <option value="Caracas">Venezuela - Caracas</option>
                         <option value="Medellin">Colombia - Medellín</option>
                         <option value="Bogota">Colombia - Bogotá</option>
+                        <option value="CDMX">México - CDMX</option>
+                        <option value="Guadalajara">México - Guadalajara</option>
+                        <option value="Monterrey">México - Monterrey</option>
                     </select>
                     <div style="display: flex; gap: 0.5rem; align-items: center;">
                         <input type="date" id="filterPaymentGuideDateStart" title="Fecha inicio">
@@ -8037,31 +8117,31 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase-config.js?v=2.1.37"></script>
-    <script src="js/utils.js?v=2.2.4"></script>
-    <script src="js/database.js?v=2.2.2"></script>
-    <script src="js/products.js?v=2.1.37"></script>
-    <script src="js/inventory.js?v=2.1.37"></script>
-    <script src="js/clients.js?v=2.1.37"></script>
-    <script src="js/guides.js?v=2.1.37"></script>
-    <script src="js/analytics.js?v=2.2.4"></script>
-    <script src="js/confirmation.js?v=2.1.37"></script>
-    <script src="js/purchases.js?v=2.1.37"></script>
-    <script src="js/freights.js?v=2.1.37"></script>
-    <script src="js/payments.js?v=2.1.37"></script>
-    <script src="js/accounts.js?v=2.1.37"></script>
-    <script src="js/users.js?v=2.1.37"></script>
-    <script src="js/campaigns.js?v=2.1.37"></script>
-    <script src="js/calculator.js?v=2.2.2"></script>
-    <script src="js/multimedia.js?v=2.1.37"></script>
-    <script src="js/finance.js?v=2.1.63"></script>
-    <script src="js/expenses.js?v=2.1.63"></script>
-    <script src="js/income-statement.js?v=2.2.6"></script>
-    <script src="js/materials-calculator.js?v=2.1.37"></script>
-    <script src="js/journal-data.js?v=2.1.37"></script>
-    <script src="js/journal.js?v=2.1.37"></script>
-    <script src="js/app.js?v=2.1.37"></script>
-    <script src="js/auth.js?v=2.1.37"></script>
+    <script src="js/supabase-config.js?v=2.3.0"></script>
+    <script src="js/utils.js?v=2.3.0"></script>
+    <script src="js/database.js?v=2.3.0"></script>
+    <script src="js/products.js?v=2.3.0"></script>
+    <script src="js/inventory.js?v=2.3.0"></script>
+    <script src="js/clients.js?v=2.3.0"></script>
+    <script src="js/guides.js?v=2.3.0"></script>
+    <script src="js/analytics.js?v=2.3.0"></script>
+    <script src="js/confirmation.js?v=2.3.0"></script>
+    <script src="js/purchases.js?v=2.3.0"></script>
+    <script src="js/freights.js?v=2.3.0"></script>
+    <script src="js/payments.js?v=2.3.0"></script>
+    <script src="js/accounts.js?v=2.3.0"></script>
+    <script src="js/users.js?v=2.3.0"></script>
+    <script src="js/campaigns.js?v=2.3.0"></script>
+    <script src="js/calculator.js?v=2.3.0"></script>
+    <script src="js/multimedia.js?v=2.3.0"></script>
+    <script src="js/finance.js?v=2.3.0"></script>
+    <script src="js/expenses.js?v=2.3.0"></script>
+    <script src="js/income-statement.js?v=2.3.0"></script>
+    <script src="js/materials-calculator.js?v=2.3.0"></script>
+    <script src="js/journal-data.js?v=2.3.0"></script>
+    <script src="js/journal.js?v=2.3.0"></script>
+    <script src="js/app.js?v=2.3.0"></script>
+    <script src="js/auth.js?v=2.3.0"></script>
 </body>
 
 </html>

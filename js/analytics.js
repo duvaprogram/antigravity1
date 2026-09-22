@@ -43,7 +43,10 @@ const AnalyticsModule = {
                     { value: 'Guayaquil', label: '🇪🇨 Ecuador - Guayaquil' },
                     { value: 'Caracas', label: '🇻🇪 Venezuela - Caracas' },
                     { value: 'Medellin', label: '🇨🇴 Colombia - Medellín' },
-                    { value: 'Bogota', label: '🇨🇴 Colombia - Bogotá' }
+                    { value: 'Bogota', label: '🇨🇴 Colombia - Bogotá' },
+                    { value: 'CDMX', label: '🇲🇽 México - CDMX' },
+                    { value: 'Guadalajara', label: '🇲🇽 México - Guadalajara' },
+                    { value: 'Monterrey', label: '🇲🇽 México - Monterrey' }
                 ],
                 defaultAll: true,
                 onChange: (selected) => {
@@ -377,22 +380,39 @@ const AnalyticsModule = {
         const quitoCount = guides.filter(g => g.city === 'Quito').length;
         const guayaquilCount = guides.filter(g => g.city === 'Guayaquil').length;
         const caracasCount = guides.filter(g => g.city === 'Caracas').length;
+        const cdmxCount = guides.filter(g => g.city === 'CDMX').length;
+        const guadalajaraCount = guides.filter(g => g.city === 'Guadalajara').length;
+        const monterreyCount = guides.filter(g => g.city === 'Monterrey').length;
 
-        const maxCount = Math.max(quitoCount, guayaquilCount, caracasCount, 1);
+        const maxCount = Math.max(quitoCount, guayaquilCount, caracasCount, cdmxCount, guadalajaraCount, monterreyCount, 1);
 
         const qCountEl = document.getElementById('analyticsQuitoCount');
         const gCountEl = document.getElementById('analyticsGuayaquilCount');
         const cCountEl = document.getElementById('analyticsCaracasCount');
+        const cdmxCountEl = document.getElementById('analyticsCdmxCount');
+        const guadalajaraCountEl = document.getElementById('analyticsGuadalajaraCount');
+        const monterreyCountEl = document.getElementById('analyticsMonterreyCount');
+
         if (qCountEl) qCountEl.textContent = quitoCount;
         if (gCountEl) gCountEl.textContent = guayaquilCount;
         if (cCountEl) cCountEl.textContent = caracasCount;
+        if (cdmxCountEl) cdmxCountEl.textContent = cdmxCount;
+        if (guadalajaraCountEl) guadalajaraCountEl.textContent = guadalajaraCount;
+        if (monterreyCountEl) monterreyCountEl.textContent = monterreyCount;
 
         const qBarEl = document.getElementById('analyticsQuitoBar');
         const gBarEl = document.getElementById('analyticsGuayaquilBar');
         const cBarEl = document.getElementById('analyticsCaracasBar');
+        const cdmxBarEl = document.getElementById('analyticsCdmxBar');
+        const guadalajaraBarEl = document.getElementById('analyticsGuadalajaraBar');
+        const monterreyBarEl = document.getElementById('analyticsMonterreyBar');
+
         if (qBarEl) qBarEl.style.width = `${(quitoCount / maxCount) * 100}%`;
         if (gBarEl) gBarEl.style.width = `${(guayaquilCount / maxCount) * 100}%`;
         if (cBarEl) cBarEl.style.width = `${(caracasCount / maxCount) * 100}%`;
+        if (cdmxBarEl) cdmxBarEl.style.width = `${(cdmxCount / maxCount) * 100}%`;
+        if (guadalajaraBarEl) guadalajaraBarEl.style.width = `${(guadalajaraCount / maxCount) * 100}%`;
+        if (monterreyBarEl) monterreyBarEl.style.width = `${(monterreyCount / maxCount) * 100}%`;
     },
 
     updateStatusChart() {
