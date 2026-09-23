@@ -36,6 +36,9 @@ const App = {
             AccountsModule.init();
             UsersModule.init();
             CampaignsModule.init();
+            if (typeof MetaAdsModule !== 'undefined') {
+                MetaAdsModule.init();
+            }
             IncomeStatementModule.init();
             CalculatorModule.init();
             MaterialsCalculatorModule.init();
@@ -160,6 +163,7 @@ const App = {
             'accounts': 'Cuentas y Flujo de Efectivo',
             'users': 'Administración de Usuarios',
             'campaigns': 'Creación de Campañas',
+            'meta-ads': 'Meta Ads',
             'income-statement': 'Estado de Resultados',
             'calculator': 'Calculadora de Utilidad',
             'materials-calculator': 'Calculadora de Materiales',
@@ -240,6 +244,12 @@ const App = {
                 } else {
                     await CampaignsModule.loadAllDataFromDb();
                     await CampaignsModule.loadProducts();
+                }
+                break;
+            case 'meta-ads':
+                if (typeof MetaAdsModule !== 'undefined') {
+                    MetaAdsModule.init();
+                    MetaAdsModule.render();
                 }
                 break;
             case 'income-statement':
