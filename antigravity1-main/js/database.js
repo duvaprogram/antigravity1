@@ -57,9 +57,16 @@ const Database = {
 
     // Helper: Get city ID by name
     getCityId(cityName) {
-        if (!this._cache.cities || !Array.isArray(this._cache.cities)) return null;
-        const city = this._cache.cities.find(c => c.name === cityName);
-        return city ? city.id : null;
+        if (!this._cache.cities || !Array.isArray(this._cache.cities) || this._cache.cities.length === 0) return null;
+        if (!cityName) return this._cache.cities[0].id;
+        const exact = this._cache.cities.find(c => c.name === cityName);
+        if (exact) return exact.id;
+
+        const normSearch = cityName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const matched = this._cache.cities.find(c =>
+            (c.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normSearch
+        );
+        return matched ? matched.id : this._cache.cities[0].id;
     },
 
     // Helper: Get city name by ID
@@ -653,7 +660,7 @@ const Database = {
     async saveClient(client) {
         try {
             const cityId = this.getCityId(client.city);
-            if (!cityId) throw new Error('City not found: ' + client.city);
+            if (!cityId) throw new Error('No se pudo determinar una ciudad válida.');
 
             const clientData = {
                 full_name: client.fullName,
@@ -663,7 +670,6 @@ const Database = {
                 city_id: cityId,
                 reference: client.reference || null,
                 notes: client.notes || null,
-                origin: client.origin || null,
                 active: true
             };
 
@@ -693,7 +699,7 @@ const Database = {
                 phone: result.phone,
                 email: result.email,
                 address: result.address,
-                city: result.cities?.name || '',
+                city: client.city || result.cities?.name || '',
                 reference: result.reference,
                 notes: result.notes || '',
                 origin: client.origin || this.extractOriginFromNotes(result.notes),
@@ -709,20 +715,22 @@ const Database = {
         try {
             const { data: existing } = await supabaseClient
                 .from('clients')
-                .select('origin, notes')
+                .select('notes')
                 .eq('id', clientId)
                 .single();
 
-            if (existing && !existing.origin) {
+            if (existing) {
                 const originTag = '[Origen: Página Web]';
                 const currentNotes = existing.notes || '';
-                const cleanNotes = currentNotes.replace(/\[Origen:\s*[^\]]+\]\s*/i, '').trim();
-                const finalNotes = cleanNotes ? `${originTag} ${cleanNotes}` : originTag;
+                if (!currentNotes.includes('[Origen:')) {
+                    const cleanNotes = currentNotes.replace(/\[Origen:\s*[^\]]+\]\s*/i, '').trim();
+                    const finalNotes = cleanNotes ? `${originTag} ${cleanNotes}` : originTag;
 
-                await supabaseClient
-                    .from('clients')
-                    .update({ origin: 'Página Web', notes: finalNotes })
-                    .eq('id', clientId);
+                    await supabaseClient
+                        .from('clients')
+                        .update({ notes: finalNotes })
+                        .eq('id', clientId);
+                }
             }
         } catch (error) {
             console.error('Error setting client origin from web order:', error);
