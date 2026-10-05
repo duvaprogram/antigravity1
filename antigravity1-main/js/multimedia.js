@@ -1270,10 +1270,10 @@ const MultimediaModule = {
             const imagenes = this.getImagesFiltrados();
             if (imagenes.length === 0) {
                 const msg = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos')
-                    ? `No hay imágenes registradas en la carpeta "${this.selectedImageCategory}".`
-                    : 'No hay imágenes disponibles para exportar.';
-                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'warning');
-                else alert(msg);
+                    ? `No hay imágenes registradas en la carpeta "${this.selectedImageCategory}". Registra imágenes a continuación.`
+                    : 'No hay imágenes cargadas en el catálogo. Abriendo ventana para agregar imágenes o enlaces...';
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'info');
+                this.openUploadImageModal();
                 return;
             }
 
@@ -1319,10 +1319,10 @@ const MultimediaModule = {
             const imagenes = this.getImagesFiltrados();
             if (imagenes.length === 0) {
                 const msg = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos')
-                    ? `No hay imágenes en la carpeta "${this.selectedImageCategory}" para descargar.`
-                    : 'No hay imágenes registradas para descargar.';
-                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'warning');
-                else alert(msg);
+                    ? `No hay imágenes en la carpeta "${this.selectedImageCategory}" para descargar. Registra imágenes a continuación.`
+                    : 'No hay imágenes registradas para descargar. Abriendo ventana para agregar imágenes...';
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'info');
+                this.openUploadImageModal();
                 return;
             }
 
@@ -1413,6 +1413,113 @@ const MultimediaModule = {
             if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Error al descargar ZIP: ' + err.message, 'error');
             else alert('Error al descargar ZIP: ' + err.message);
         }
+    },
+
+    openUploadImageModal() {
+        try {
+            const modal = document.getElementById('modalUploadImage');
+            if (!modal) return;
+            const text = document.getElementById('modalImageUrlTextArea');
+            const fileInput = document.getElementById('modalImageFileInput');
+            if (text) text.value = '';
+            if (fileInput) fileInput.value = '';
+
+            if (typeof Utils !== 'undefined' && Utils.openModal) {
+                Utils.openModal('modalUploadImage');
+            } else {
+                modal.classList.add('active');
+                modal.style.setProperty('display', 'flex', 'important');
+                document.body.style.overflow = 'hidden';
+            }
+        } catch(e){ console.error('Error al abrir modal de imagen:', e); }
+    },
+
+    async saveImageRecordFromModal() {
+        try {
+            const categorySelect = document.getElementById('modalImageCategorySelect');
+            const category = categorySelect ? categorySelect.value : 'General';
+            const textEl = document.getElementById('modalImageUrlTextArea');
+            const textVal = textEl ? textEl.value.trim() : '';
+            const fileInput = document.getElementById('modalImageFileInput');
+            const files = fileInput ? fileInput.files : [];
+
+            let agregadas = 0;
+
+            if (textVal) {
+                const urls = textVal.split(/[\n,]+/).map(u => u.trim()).filter(u => u.length > 5 && u.startsWith('http'));
+                urls.forEach((u, idx) => {
+                    if (!this.images.some(img => img.url === u)) {
+                        this.images.push({
+                            id: 'img_url_' + Date.now() + '_' + idx,
+                            title: `Imagen ${this.images.length + 1}`,
+                            category: category,
+                            url: u,
+                            thumbnail_url: u,
+                            created_at: new Date().toISOString()
+                        });
+                        agregadas++;
+                    }
+                });
+            }
+
+            if (files && files.length > 0) {
+                for (let i = 0; i < files.length; i++) {
+                    const file = files[i];
+                    const blobUrl = URL.createObjectURL(file);
+                    const cleanName = file.name.replace(/\.[^/.]+$/, "");
+                    this.images.push({
+                        id: 'img_file_' + Date.now() + '_' + i,
+                        title: cleanName,
+                        category: category,
+                        url: blobUrl,
+                        thumbnail_url: blobUrl,
+                        file_object: file,
+                        created_at: new Date().toISOString()
+                    });
+                    agregadas++;
+                }
+            }
+
+            if (agregadas === 0) {
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Por favor pega al menos un enlace URL o selecciona un archivo de imagen.', 'warning');
+                else alert('Por favor pega al menos un enlace URL o selecciona un archivo de imagen.');
+                return;
+            }
+
+            this.saveLocalImagesMeta();
+            this.updateImageBadgeCount();
+
+            if (typeof Utils !== 'undefined' && Utils.closeModal) Utils.closeModal('modalUploadImage');
+            else {
+                const modal = document.getElementById('modalUploadImage');
+                if (modal) {
+                    modal.classList.remove('active');
+                    modal.style.display = '';
+                    document.body.style.overflow = '';
+                }
+            }
+
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast(`¡Se registraron ${agregadas} ${agregadas === 1 ? 'imagen' : 'imágenes'} en la carpeta "${category}"!`, 'success');
+            }
+        } catch(err) {
+            console.error('[Multimedia] Error al guardar imágenes:', err);
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Error al guardar imágenes: ' + err.message, 'error');
+        }
+    },
+
+    saveLocalImagesMeta() {
+        try {
+            const meta = this.images.map(img => ({
+                id: img.id,
+                title: img.title,
+                category: img.category || 'General',
+                url: (img.url && img.url.startsWith('blob:')) ? '' : img.url,
+                thumbnail_url: (img.thumbnail_url && img.thumbnail_url.startsWith('blob:')) ? '' : img.thumbnail_url,
+                created_at: img.created_at
+            })).filter(img => img.url && img.url.length > 0);
+            localStorage.setItem('multimedia_images_meta', JSON.stringify(meta));
+        } catch(e){}
     },
 
     // Lista que el usuario está viendo: categoría + búsqueda + orden activos.
