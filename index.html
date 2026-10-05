@@ -8,7 +8,7 @@
     <meta name="description" content="Sistema de gestión de domicilios para Quito y Guayaquil">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="css/styles.css?v=2.5.0">
+    <link rel="stylesheet" href="css/styles.css?v=2.6.0">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
@@ -5792,7 +5792,11 @@
                                     </select>
                                 </div>
                             </div>
-                            <div class="multimedia-toolbar-right">
+                            <div class="multimedia-toolbar-right" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-secondary" id="btnExportVideosCrm" onclick="MultimediaModule.exportarCsvParaCrm()" title="Descarga un CSV con los videos de esta vista para subirlo en el CRM → Catálogo → Importar. No sube archivos: solo viajan los enlaces." style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    <span>Exportar al CRM</span>
+                                </button>
                                 <button type="button" class="btn btn-primary" id="btnOpenUploadVideoModal" onclick="document.getElementById('directVideoFileInput').click()" style="display: flex; align-items: center; gap: 0.5rem;">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                                     <span>+ Subir Video</span>
@@ -8244,32 +8248,32 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase-config.js?v=2.5.0"></script>
-    <script src="js/utils.js?v=2.5.0"></script>
-    <script src="js/database.js?v=2.5.0"></script>
-    <script src="js/products.js?v=2.5.0"></script>
-    <script src="js/inventory.js?v=2.5.0"></script>
-    <script src="js/clients.js?v=2.5.0"></script>
-    <script src="js/guides.js?v=2.5.0"></script>
-    <script src="js/analytics.js?v=2.5.0"></script>
-    <script src="js/confirmation.js?v=2.5.0"></script>
-    <script src="js/purchases.js?v=2.5.0"></script>
-    <script src="js/freights.js?v=2.5.0"></script>
-    <script src="js/payments.js?v=2.5.0"></script>
-    <script src="js/accounts.js?v=2.5.0"></script>
-    <script src="js/users.js?v=2.5.0"></script>
-    <script src="js/campaigns.js?v=2.5.0"></script>
-    <script src="js/meta-ads.js?v=2.5.0"></script>
-    <script src="js/calculator.js?v=2.5.0"></script>
-    <script src="js/multimedia.js?v=2.5.0"></script>
-    <script src="js/finance.js?v=2.5.0"></script>
-    <script src="js/expenses.js?v=2.5.0"></script>
-    <script src="js/income-statement.js?v=2.5.0"></script>
-    <script src="js/materials-calculator.js?v=2.5.0"></script>
-    <script src="js/journal-data.js?v=2.5.0"></script>
-    <script src="js/journal.js?v=2.5.0"></script>
-    <script src="js/app.js?v=2.5.0"></script>
-    <script src="js/auth.js?v=2.5.0"></script>
+    <script src="js/supabase-config.js?v=2.6.0"></script>
+    <script src="js/utils.js?v=2.6.0"></script>
+    <script src="js/database.js?v=2.6.0"></script>
+    <script src="js/products.js?v=2.6.0"></script>
+    <script src="js/inventory.js?v=2.6.0"></script>
+    <script src="js/clients.js?v=2.6.0"></script>
+    <script src="js/guides.js?v=2.6.0"></script>
+    <script src="js/analytics.js?v=2.6.0"></script>
+    <script src="js/confirmation.js?v=2.6.0"></script>
+    <script src="js/purchases.js?v=2.6.0"></script>
+    <script src="js/freights.js?v=2.6.0"></script>
+    <script src="js/payments.js?v=2.6.0"></script>
+    <script src="js/accounts.js?v=2.6.0"></script>
+    <script src="js/users.js?v=2.6.0"></script>
+    <script src="js/campaigns.js?v=2.6.0"></script>
+    <script src="js/meta-ads.js?v=2.6.0"></script>
+    <script src="js/calculator.js?v=2.6.0"></script>
+    <script src="js/multimedia.js?v=2.6.0"></script>
+    <script src="js/finance.js?v=2.6.0"></script>
+    <script src="js/expenses.js?v=2.6.0"></script>
+    <script src="js/income-statement.js?v=2.6.0"></script>
+    <script src="js/materials-calculator.js?v=2.6.0"></script>
+    <script src="js/journal-data.js?v=2.6.0"></script>
+    <script src="js/journal.js?v=2.6.0"></script>
+    <script src="js/app.js?v=2.6.0"></script>
+    <script src="js/auth.js?v=2.6.0"></script>
 </body>
 
 </html>
