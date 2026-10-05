@@ -5659,7 +5659,39 @@
 
                     <!-- Submodule 1: Imágenes -->
                     <div id="multimedia-subtab-images" class="multimedia-subtab-pane">
-                        <iframe src="https://cloudflare-image-manager.vercel.app?v=3" style="width: 100%; height: calc(100vh - 145px); border: none; border-radius: 12px;" allow="clipboard-write"></iframe>
+                        <!-- Toolbar de Acciones de Imágenes -->
+                        <div class="multimedia-toolbar glass-card" style="margin-bottom: 1rem; padding: 0.85rem 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                            <div class="multimedia-toolbar-left" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+                                <div style="display: flex; align-items: center; gap: 0.4rem; color: var(--text-primary);">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                                    <span style="font-weight: 600; font-size: 0.9rem;">Carpeta:</span>
+                                </div>
+                                <select id="imageCategorySelect" onchange="MultimediaModule.onImageCategoryChange(this.value)" style="background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border); padding: 0.4rem 0.75rem; border-radius: 8px; font-size: 0.85rem; font-weight: 500; min-width: 170px;">
+                                    <option value="Todos">📁 Todas las Carpetas</option>
+                                    <option value="Anuncios / Ads">📢 Anuncios / Ads</option>
+                                    <option value="Creativos">🎨 Creativos</option>
+                                    <option value="Productos">📦 Productos</option>
+                                    <option value="Banners">🖼️ Banners</option>
+                                    <option value="General" selected>📂 General</option>
+                                </select>
+                                <span id="imageCategoryBadgeCount" style="font-size: 0.75rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 3px 10px; border-radius: 12px; font-weight: 600; border: 1px solid rgba(99, 102, 241, 0.3);">
+                                    Cargando...
+                                </span>
+                            </div>
+                            <div class="multimedia-toolbar-right" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-secondary" id="btnExportImagesCrm" onclick="MultimediaModule.exportarImagenesCsvParaCrm()" title="Descarga un CSV con las imágenes de la carpeta activa para subirlo en el CRM (Catálogo > Importar)" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; padding: 0.45rem 0.85rem;">
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                    <span>Exportar Catálogo al CRM (CSV)</span>
+                                </button>
+                                <button type="button" class="btn btn-primary" id="btnDownloadImagesZip" onclick="MultimediaModule.descargarCarpetaImagenesZip()" title="Descarga un archivo ZIP comprimido con todas las imágenes de la carpeta seleccionada a tu equipo" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; background: #6366f1; border-color: #6366f1; padding: 0.45rem 0.85rem;">
+                                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                    <span>Descargar Carpeta (ZIP)</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Iframe Gestor de Imágenes -->
+                        <iframe id="cfImageManagerIframe" src="https://cloudflare-image-manager.vercel.app?v=3" style="width: 100%; height: calc(100vh - 215px); border: none; border-radius: 12px;" allow="clipboard-write"></iframe>
                     </div>
 
                     <!-- Submodule 2: Videos -->
@@ -8246,33 +8278,35 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- JSZip para empaquetar descargas ZIP de imágenes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase-config.js?v=2.6.0"></script>
-    <script src="js/utils.js?v=2.6.0"></script>
-    <script src="js/database.js?v=2.6.0"></script>
-    <script src="js/products.js?v=2.6.0"></script>
-    <script src="js/inventory.js?v=2.6.0"></script>
-    <script src="js/clients.js?v=2.6.0"></script>
-    <script src="js/guides.js?v=2.6.0"></script>
-    <script src="js/analytics.js?v=2.6.0"></script>
-    <script src="js/confirmation.js?v=2.6.0"></script>
-    <script src="js/purchases.js?v=2.6.0"></script>
-    <script src="js/freights.js?v=2.6.0"></script>
-    <script src="js/payments.js?v=2.6.0"></script>
-    <script src="js/accounts.js?v=2.6.0"></script>
-    <script src="js/users.js?v=2.6.0"></script>
-    <script src="js/campaigns.js?v=2.6.0"></script>
-    <script src="js/meta-ads.js?v=2.6.0"></script>
-    <script src="js/calculator.js?v=2.6.0"></script>
-    <script src="js/multimedia.js?v=2.6.0"></script>
-    <script src="js/finance.js?v=2.6.0"></script>
-    <script src="js/expenses.js?v=2.6.0"></script>
-    <script src="js/income-statement.js?v=2.6.0"></script>
-    <script src="js/materials-calculator.js?v=2.6.0"></script>
-    <script src="js/journal-data.js?v=2.6.0"></script>
-    <script src="js/journal.js?v=2.6.0"></script>
-    <script src="js/app.js?v=2.6.0"></script>
+    <script src="js/supabase-config.js?v=2.7.0"></script>
+    <script src="js/utils.js?v=2.7.0"></script>
+    <script src="js/database.js?v=2.7.0"></script>
+    <script src="js/products.js?v=2.7.0"></script>
+    <script src="js/inventory.js?v=2.7.0"></script>
+    <script src="js/clients.js?v=2.7.0"></script>
+    <script src="js/guides.js?v=2.7.0"></script>
+    <script src="js/analytics.js?v=2.7.0"></script>
+    <script src="js/confirmation.js?v=2.7.0"></script>
+    <script src="js/purchases.js?v=2.7.0"></script>
+    <script src="js/freights.js?v=2.7.0"></script>
+    <script src="js/payments.js?v=2.7.0"></script>
+    <script src="js/accounts.js?v=2.7.0"></script>
+    <script src="js/users.js?v=2.7.0"></script>
+    <script src="js/campaigns.js?v=2.7.0"></script>
+    <script src="js/meta-ads.js?v=2.7.0"></script>
+    <script src="js/calculator.js?v=2.7.0"></script>
+    <script src="js/multimedia.js?v=2.7.0"></script>
+    <script src="js/finance.js?v=2.7.0"></script>
+    <script src="js/expenses.js?v=2.7.0"></script>
+    <script src="js/income-statement.js?v=2.7.0"></script>
+    <script src="js/materials-calculator.js?v=2.7.0"></script>
+    <script src="js/journal-data.js?v=2.7.0"></script>
+    <script src="js/journal.js?v=2.7.0"></script>
+    <script src="js/app.js?v=2.7.0"></script>
     <script src="js/auth.js?v=2.6.0"></script>
 </body>
 

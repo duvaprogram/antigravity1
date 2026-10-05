@@ -9,6 +9,8 @@ const MultimediaModule = {
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
+    images: [],
+    selectedImageCategory: 'General',
     categories: ['Todos', 'Anuncios / Ads', 'Creativos', 'Productos', 'UGC', 'Testimonios', 'Tutoriales', 'General'],
     selectedCategory: 'Todos',
     searchQuery: '',
@@ -550,6 +552,7 @@ const MultimediaModule = {
             await this.initDB();
             this.setupEventListeners();
             await this.loadVideos();
+            await this.loadImages();
 
             const savedTab = localStorage.getItem('multimedia_active_tab');
             if (savedTab && (savedTab === 'images' || savedTab === 'videos')) {
@@ -571,6 +574,8 @@ const MultimediaModule = {
             await this.renderVideosList();
             this.updateStats();
             this.updateCloudflareUI();
+        } else if (this.activeTab === 'images') {
+            await this.loadImages();
         }
     },
 
@@ -598,6 +603,7 @@ const MultimediaModule = {
             if (tabName === 'images') {
                 imagesView.style.display = 'block';
                 videosView.style.display = 'none';
+                this.loadImages();
             } else {
                 imagesView.style.display = 'none';
                 videosView.style.display = 'block';
@@ -1177,6 +1183,235 @@ const MultimediaModule = {
         } catch (e) {
             this.logError('ERR_CRM_CSV_EXPORT', 'No se pudo generar el CSV para el CRM', e);
             if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('No se pudo generar el CSV: ' + e.message, 'error');
+        }
+    },
+
+    // --------------------------------------------------------------------------
+    // Gestión e Integración de Imágenes (Carga, Filtrado por Carpeta, CSV CRM y Descarga ZIP)
+    // --------------------------------------------------------------------------
+    async loadImages() {
+        try {
+            let loaded = [];
+            const saved = localStorage.getItem('multimedia_images_meta');
+            if (saved) {
+                try { loaded = JSON.parse(saved); } catch(e){}
+            }
+
+            // Consultar Cloudflare Images API si existen credenciales guardadas
+            const cf = this.getCloudflareConfig();
+            if (cf.accountId && cf.apiToken) {
+                try {
+                    const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cf.accountId}/images/v1`, {
+                        headers: { 'Authorization': `Bearer ${cf.apiToken}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.success && Array.isArray(data.result?.images)) {
+                            const cfImages = data.result.images.map(img => {
+                                const variantUrl = (img.variants && img.variants.length > 0) ? img.variants[0] : `https://imagedelivery.net/${cf.accountId}/${img.id}/public`;
+                                const metaCat = (img.meta && (img.meta.category || img.meta.catalogo || img.meta.folder)) || 'General';
+                                const metaTitle = (img.meta && img.meta.name) || img.filename || img.id;
+                                return {
+                                    id: img.id,
+                                    title: metaTitle,
+                                    category: metaCat,
+                                    url: variantUrl,
+                                    thumbnail_url: variantUrl,
+                                    uploaded: img.uploaded,
+                                    source_type: 'cloudflare'
+                                };
+                            });
+
+                            const map = new Map();
+                            loaded.forEach(item => map.set(item.id || item.url, item));
+                            cfImages.forEach(item => map.set(item.id || item.url, item));
+                            loaded = Array.from(map.values());
+                        }
+                    }
+                } catch(cfErr) {
+                    console.warn('[Multimedia] No se pudo obtener imágenes desde Cloudflare Images:', cfErr);
+                }
+            }
+
+            this.images = loaded;
+            this.updateImageBadgeCount();
+        } catch(err) {
+            console.error('[Multimedia] Error en loadImages:', err);
+        }
+    },
+
+    onImageCategoryChange(category) {
+        this.selectedImageCategory = category;
+        this.updateImageBadgeCount();
+    },
+
+    getImagesFiltrados() {
+        if (!this.images || !Array.isArray(this.images)) return [];
+        if (!this.selectedImageCategory || this.selectedImageCategory === 'Todos') {
+            return this.images;
+        }
+        return this.images.filter(img => (img.category || 'General') === this.selectedImageCategory);
+    },
+
+    updateImageBadgeCount() {
+        const badge = document.getElementById('imageCategoryBadgeCount');
+        if (!badge) return;
+        const filtered = this.getImagesFiltrados();
+        const total = this.images ? this.images.length : 0;
+        if (this.selectedImageCategory === 'Todos') {
+            badge.textContent = `${total} ${total === 1 ? 'imagen' : 'imágenes'} en total`;
+        } else {
+            badge.textContent = `${filtered.length} de ${total} en "${this.selectedImageCategory}"`;
+        }
+    },
+
+    exportarImagenesCsvParaCrm() {
+        try {
+            const imagenes = this.getImagesFiltrados();
+            if (imagenes.length === 0) {
+                const msg = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos')
+                    ? `No hay imágenes registradas en la carpeta "${this.selectedImageCategory}".`
+                    : 'No hay imágenes disponibles para exportar.';
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'warning');
+                else alert(msg);
+                return;
+            }
+
+            const columnas = ['catalogo', 'titulo', 'image_url', 'variante', 'precio', 'descripcion', 'external_id'];
+            const filas = imagenes.map(img => [
+                img.category || 'General',
+                img.title || 'Imagen sin título',
+                img.url || img.thumbnail_url || '',
+                '', // variante
+                '', // precio
+                img.description || `Imagen del catálogo (${img.category || 'General'})`,
+                'mmimg:' + (img.id || Math.random().toString(36).substr(2, 8))
+            ]);
+
+            const lineas = [columnas].concat(filas)
+                .map(fila => fila.map(c => this.csvCampo(c)).join(','));
+
+            const csvContent = '﻿' + lineas.join('\r\n') + '\r\n';
+            const etiqueta = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos')
+                ? this.selectedImageCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+                : 'todas';
+            const fecha = new Date().toISOString().slice(0, 10);
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+            const enlace = document.createElement('a');
+            enlace.href = URL.createObjectURL(blob);
+            enlace.download = `catalogo-imagenes-${etiqueta}-${fecha}.csv`;
+            document.body.appendChild(enlace);
+            enlace.click();
+            document.body.removeChild(enlace);
+            URL.revokeObjectURL(enlace.href);
+
+            const mensaje = `CSV de imágenes listo con ${imagenes.length} ${imagenes.length === 1 ? 'imagen' : 'imágenes'}. Súbelo en el CRM → Catálogo → Importar.`;
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(mensaje, 'success');
+        } catch(e) {
+            console.error('[Multimedia] Error exportando CSV de imágenes:', e);
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Error al exportar CSV: ' + e.message, 'error');
+        }
+    },
+
+    async descargarCarpetaImagenesZip() {
+        try {
+            const imagenes = this.getImagesFiltrados();
+            if (imagenes.length === 0) {
+                const msg = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos')
+                    ? `No hay imágenes en la carpeta "${this.selectedImageCategory}" para descargar.`
+                    : 'No hay imágenes registradas para descargar.';
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'warning');
+                else alert(msg);
+                return;
+            }
+
+            if (typeof JSZip === 'undefined') {
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Cargando librería comprimidora JSZip...', 'info');
+                await new Promise(r => setTimeout(r, 1000));
+            }
+
+            if (typeof JSZip === 'undefined') {
+                throw new Error('La librería JSZip no se pudo cargar. Revisa tu conexión a internet.');
+            }
+
+            const zip = new JSZip();
+            const folderName = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos')
+                ? this.selectedImageCategory.replace(/[^a-zA-Z0-9_-]/g, '_')
+                : 'Todas_las_Imagenes';
+
+            const imgFolder = zip.folder(folderName);
+            let exitosos = 0;
+            let fallidos = 0;
+
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast(`Iniciando descarga de ${imagenes.length} imágenes para la carpeta ZIP...`, 'info');
+            }
+
+            for (let i = 0; i < imagenes.length; i++) {
+                const img = imagenes[i];
+                const imgUrl = img.url || img.thumbnail_url;
+                if (!imgUrl) {
+                    fallidos++;
+                    continue;
+                }
+
+                try {
+                    const res = await fetch(imgUrl);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const blob = await res.blob();
+
+                    let ext = 'jpg';
+                    if (blob.type.includes('png')) ext = 'png';
+                    else if (blob.type.includes('webp')) ext = 'webp';
+                    else if (blob.type.includes('gif')) ext = 'gif';
+                    else if (imgUrl.match(/\.(png|webp|gif|jpg|jpeg)/i)) {
+                        const m = imgUrl.match(/\.(png|webp|gif|jpg|jpeg)/i);
+                        ext = m[1].toLowerCase();
+                    }
+
+                    const safeTitle = (img.title || `imagen_${i + 1}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+                    const fileName = `${String(i + 1).padStart(2, '0')}_${safeTitle}.${ext}`;
+
+                    imgFolder.file(fileName, blob);
+                    exitosos++;
+
+                    if (typeof Utils !== 'undefined' && Utils.showToast && (i + 1) % 3 === 0) {
+                        Utils.showToast(`Procesando imágenes (${i + 1}/${imagenes.length})...`, 'info');
+                    }
+                } catch(fetchErr) {
+                    console.warn(`[Multimedia] No se pudo descargar la imagen ${imgUrl}:`, fetchErr);
+                    fallidos++;
+                }
+            }
+
+            if (exitosos === 0) {
+                throw new Error('No se pudo descargar ninguna imagen. Verifica los enlaces o permisos de red.');
+            }
+
+            if (typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast('Comprimiendo carpeta en archivo ZIP...', 'info');
+            }
+
+            const zipContent = await zip.generateAsync({ type: 'blob' });
+            const fecha = new Date().toISOString().slice(0, 10);
+            const downloadName = `carpeta-imagenes-${folderName.toLowerCase()}-${fecha}.zip`;
+
+            const enlace = document.createElement('a');
+            enlace.href = URL.createObjectURL(zipContent);
+            enlace.download = downloadName;
+            document.body.appendChild(enlace);
+            enlace.click();
+            document.body.removeChild(enlace);
+            URL.revokeObjectURL(enlace.href);
+
+            let msgFinal = `¡Carpeta ZIP descargada con éxito (${exitosos} ${exitosos === 1 ? 'imagen' : 'imágenes'})!`;
+            if (fallidos > 0) msgFinal += ` (Omitidas ${fallidos} sin enlace directo).`;
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msgFinal, 'success');
+        } catch(err) {
+            console.error('[Multimedia] Error generando ZIP de imágenes:', err);
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Error al descargar ZIP: ' + err.message, 'error');
+            else alert('Error al descargar ZIP: ' + err.message);
         }
     },
 
