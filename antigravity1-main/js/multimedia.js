@@ -1078,11 +1078,112 @@ const MultimediaModule = {
     // --------------------------------------------------------------------------
     // 11. Renderizado de la Lista de Videos
     // --------------------------------------------------------------------------
-    async renderVideosList() {
-        const grid = document.getElementById('multimediaVideosGrid');
-        const emptyState = document.getElementById('multimediaVideosEmpty');
-        if (!grid) return;
+    // --------------------------------------------------------------------------
+    // Exportar al CRM — CSV que entra en /admin/catalogo/importar del bot
+    // --------------------------------------------------------------------------
+    // No se copia ningún archivo: los videos ya viven en Cloudflare Stream y lo
+    // único que viaja al CRM son sus enlaces. La columna `catalogo` lleva la
+    // categoría (las "carpetas" de este módulo) y `external_id` conserva la
+    // identidad del video, así que reimportar actualiza en vez de duplicar.
 
+    CRM_CSV_COLUMNAS: ['catalogo', 'titulo', 'image_url', 'variante', 'precio', 'descripcion', 'external_id'],
+
+    // RFC 4180: solo hay que entrecomillar si el valor trae separador, comilla
+    // o salto de línea. Las comillas internas se duplican.
+    csvCampo(valor) {
+        const texto = (valor === null || valor === undefined) ? '' : String(valor);
+        if (!/[",;\r\n]/.test(texto)) return texto;
+        return '"' + texto.replace(/"/g, '""') + '"';
+    },
+
+    construirCsvParaCrm() {
+        const videos = this.getVideosFiltrados();
+        const filas = [];
+        const omitidos = [];
+
+        videos.forEach(v => {
+            // El catálogo del CRM muestra UNA imagen por ítem, así que lo que
+            // viaja es la miniatura; el enlace del video se guarda en la
+            // descripción para no perderlo en el camino.
+            const esHttps = u => typeof u === 'string' && /^https:\/\//i.test(u);
+            const imagen = [v.thumbnail_url, v.url].find(esHttps);
+
+            if (!imagen) {
+                // Un video local (blob / ruta del disco) no es alcanzable desde
+                // el CRM: habría que subirlo a Cloudflare primero.
+                omitidos.push((v.title || v.id) + ' — sin enlace https, está solo en este equipo');
+                return;
+            }
+
+            const descripcion = [];
+            if (v.description) descripcion.push(v.description);
+            if (esHttps(v.url)) descripcion.push('Video: ' + v.url);
+
+            filas.push([
+                v.category || 'General',
+                v.title || 'Video sin título',
+                imagen,
+                '',  // variante — el módulo de videos no maneja variantes
+                '',  // precio   — se pone en el CRM
+                descripcion.join(' · '),
+                'mmvideo:' + v.id
+            ]);
+        });
+
+        const lineas = [this.CRM_CSV_COLUMNAS].concat(filas)
+            .map(fila => fila.map(c => this.csvCampo(c)).join(','));
+
+        return {
+            // BOM para que Excel respete los acentos al abrir el archivo.
+            csv: '﻿' + lineas.join('\r\n') + '\r\n',
+            incluidos: filas.length,
+            omitidos
+        };
+    },
+
+    exportarCsvParaCrm() {
+        try {
+            const { csv, incluidos, omitidos } = this.construirCsvParaCrm();
+
+            if (incluidos === 0) {
+                const motivo = omitidos.length
+                    ? 'Los ' + omitidos.length + ' videos de esta vista están solo en este equipo. Súbelos a Cloudflare primero.'
+                    : 'No hay videos en esta vista para exportar.';
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(motivo, 'warning');
+                else alert(motivo);
+                return;
+            }
+
+            const etiqueta = (this.selectedCategory && this.selectedCategory !== 'Todos')
+                ? this.selectedCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+                : 'todos';
+            const fecha = new Date().toISOString().slice(0, 10);
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+            const enlace = document.createElement('a');
+            enlace.href = URL.createObjectURL(blob);
+            enlace.download = 'catalogo-multimedia-' + etiqueta + '-' + fecha + '.csv';
+            document.body.appendChild(enlace);
+            enlace.click();
+            document.body.removeChild(enlace);
+            URL.revokeObjectURL(enlace.href);
+
+            let mensaje = 'CSV listo con ' + incluidos + (incluidos === 1 ? ' video' : ' videos') + '. Súbelo en el CRM → Catálogo → Importar.';
+            if (omitidos.length) {
+                mensaje += ' Se omitieron ' + omitidos.length + ' sin enlace público.';
+                console.warn('[Multimedia] Omitidos al exportar para el CRM:', omitidos);
+            }
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(mensaje, 'success');
+        } catch (e) {
+            this.logError('ERR_CRM_CSV_EXPORT', 'No se pudo generar el CSV para el CRM', e);
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('No se pudo generar el CSV: ' + e.message, 'error');
+        }
+    },
+
+    // Lista que el usuario está viendo: categoría + búsqueda + orden activos.
+    // La comparten la galería y la exportación al CRM, para que exportar
+    // entregue exactamente lo que hay en pantalla.
+    getVideosFiltrados() {
         let filtered = [...this.videos];
 
         if (this.selectedCategory && this.selectedCategory !== 'Todos') {
@@ -1090,7 +1191,7 @@ const MultimediaModule = {
         }
 
         if (this.searchQuery) {
-            filtered = filtered.filter(v => 
+            filtered = filtered.filter(v =>
                 (v.title && v.title.toLowerCase().includes(this.searchQuery)) ||
                 (v.description && v.description.toLowerCase().includes(this.searchQuery)) ||
                 (v.category && v.category.toLowerCase().includes(this.searchQuery))
@@ -1104,6 +1205,16 @@ const MultimediaModule = {
             if (this.sortBy === 'size') return (b.size_bytes || 0) - (a.size_bytes || 0);
             return 0;
         });
+
+        return filtered;
+    },
+
+    async renderVideosList() {
+        const grid = document.getElementById('multimediaVideosGrid');
+        const emptyState = document.getElementById('multimediaVideosEmpty');
+        if (!grid) return;
+
+        const filtered = this.getVideosFiltrados();
 
         if (filtered.length === 0) {
             grid.innerHTML = '';
