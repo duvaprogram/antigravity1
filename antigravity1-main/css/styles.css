@@ -6062,3 +6062,124 @@ form {
     color: var(--primary);
     border-bottom-color: var(--primary);
 }
+
+
+/* ==========================================================================
+   Multimedia · Galería de imágenes seleccionable (v2.8.0)
+   ========================================================================== */
+.mm-images-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+}
+
+.mm-image-card {
+    background: var(--bg-card, rgba(255, 255, 255, 0.03));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.mm-image-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(99, 102, 241, 0.5);
+}
+
+.mm-image-card.selected {
+    border-color: #10b981;
+    box-shadow: 0 0 0 1px #10b981, 0 6px 18px rgba(16, 185, 129, 0.18);
+}
+
+.mm-image-thumb {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    background: rgba(15, 23, 42, 0.6);
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.mm-image-check {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: 2px solid rgba(255, 255, 255, 0.75);
+    background: rgba(15, 23, 42, 0.65);
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 19px;
+    text-align: center;
+}
+
+.mm-image-card.selected .mm-image-check {
+    background: #10b981;
+    border-color: #10b981;
+}
+
+.mm-image-origin {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    font-size: 0.64rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 5px;
+    background: rgba(15, 23, 42, 0.75);
+    color: #cbd5e1;
+}
+
+.mm-image-body {
+    padding: 0.5rem 0.6rem 0.6rem;
+}
+
+.mm-image-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-image-cat {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.mm-image-actions {
+    display: flex;
+    gap: 0.35rem;
+    margin-top: 0.45rem;
+}
+
+.mm-image-actions button {
+    flex: 1;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 3px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    background: rgba(99, 102, 241, 0.12);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.28);
+}
+
+.mm-image-actions button:last-child {
+    background: rgba(239, 68, 68, 0.1);
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.28);
+}
+
+.mm-image-actions button:hover {
+    filter: brightness(1.25);
+}

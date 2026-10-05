@@ -1,16 +1,18 @@
 // ==============================================================================
-// Multimedia Module (Imágenes y Videos) - Versión 2.1.37
+// Multimedia Module (Imágenes y Videos) - Versión 2.8.0
 // Gestión de galería de imágenes y subida / reproducción de videos
 // Integración Directa con Cloudflare Stream Gateway (Sin errores de CORS)
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.1.37',
+    version: '2.8.0',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
     images: [],
-    selectedImageCategory: 'General',
+    selectedImageCategory: 'Todos',
+    selectedImageIds: [],
+    imageSearchQuery: '',
     categories: ['Todos', 'Anuncios / Ads', 'Creativos', 'Productos', 'UGC', 'Testimonios', 'Tutoriales', 'General'],
     selectedCategory: 'Todos',
     searchQuery: '',
@@ -474,11 +476,14 @@ const MultimediaModule = {
                     return resolve(null);
                 }
 
-                const request = indexedDB.open('MultimediaDB', 1);
+                const request = indexedDB.open('MultimediaDB', 2);
                 request.onupgradeneeded = (e) => {
                     const db = e.target.result;
                     if (!db.objectStoreNames.contains('video_files')) {
                         db.createObjectStore('video_files', { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains('image_files')) {
+                        db.createObjectStore('image_files', { keyPath: 'id' });
                     }
                 };
                 request.onsuccess = (e) => {
@@ -536,6 +541,45 @@ const MultimediaModule = {
             const tx = this.db.transaction('video_files', 'readwrite');
             const store = tx.objectStore('video_files');
             store.delete(id);
+        } catch (e) {}
+    },
+
+    // Archivos de imagen locales: se guardan igual que los videos para que
+    // sigan disponibles tras recargar y puedan empaquetarse en el ZIP.
+    async saveImageBlob(id, blob) {
+        if (!this.db) await this.initDB();
+        if (!this.db || !this.db.objectStoreNames.contains('image_files')) return false;
+        return new Promise((resolve) => {
+            try {
+                const tx = this.db.transaction('image_files', 'readwrite');
+                tx.objectStore('image_files').put({ id, blob, updated_at: new Date().toISOString() });
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => resolve(false);
+            } catch (e) {
+                resolve(false);
+            }
+        });
+    },
+
+    async getImageBlob(id) {
+        if (!this.db) await this.initDB();
+        if (!this.db || !this.db.objectStoreNames.contains('image_files')) return null;
+        return new Promise((resolve) => {
+            try {
+                const req = this.db.transaction('image_files', 'readonly').objectStore('image_files').get(id);
+                req.onsuccess = () => resolve(req.result ? req.result.blob : null);
+                req.onerror = () => resolve(null);
+            } catch (e) {
+                resolve(null);
+            }
+        });
+    },
+
+    async deleteImageBlob(id) {
+        if (!this.db) await this.initDB();
+        if (!this.db || !this.db.objectStoreNames.contains('image_files')) return;
+        try {
+            this.db.transaction('image_files', 'readwrite').objectStore('image_files').delete(id);
         } catch (e) {}
     },
 
@@ -1187,101 +1231,399 @@ const MultimediaModule = {
     },
 
     // --------------------------------------------------------------------------
-    // Gestión e Integración de Imágenes (Carga, Filtrado por Carpeta, CSV CRM y Descarga ZIP)
+    // Gestión e Integración de Imágenes
+    //   - Catálogo propio, visible y SELECCIONABLE (checkbox por imagen)
+    //   - Exportar CSV al CRM y descargar ZIP usan exactamente lo seleccionado
+    //   - Los archivos locales se guardan en IndexedDB y sobreviven a la recarga
     // --------------------------------------------------------------------------
+
+    // Carpetas fijas + las que ya existan en el catálogo cargado.
+    getImageCategories() {
+        const base = ['Anuncios / Ads', 'Creativos', 'Productos', 'Banners', 'UGC', 'Testimonios', 'General'];
+        (this.images || []).forEach(img => {
+            const cat = img.category || 'General';
+            if (!base.includes(cat)) base.push(cat);
+        });
+        return base;
+    },
+
     async loadImages() {
         try {
             let loaded = [];
             const saved = localStorage.getItem('multimedia_images_meta');
             if (saved) {
-                try { loaded = JSON.parse(saved); } catch(e){}
+                try { loaded = JSON.parse(saved) || []; } catch(e){ loaded = []; }
             }
 
-            // Consultar Cloudflare Images API si existen credenciales guardadas
+            // Rehidratar los archivos locales guardados en IndexedDB
+            for (const img of loaded) {
+                if (img.source_type === 'local' && (!img.url || img.url.startsWith('blob:'))) {
+                    const blob = await this.getImageBlob(img.id);
+                    if (blob) {
+                        const objUrl = URL.createObjectURL(blob);
+                        img.url = objUrl;
+                        img.thumbnail_url = objUrl;
+                        img.size_bytes = img.size_bytes || blob.size;
+                    } else {
+                        img.url = '';
+                        img.thumbnail_url = '';
+                    }
+                }
+            }
+
+            // Catálogo remoto de Cloudflare Images (vía gateway serverless, sin CORS)
             const cf = this.getCloudflareConfig();
             if (cf.accountId && cf.apiToken) {
-                try {
-                    const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cf.accountId}/images/v1`, {
-                        headers: { 'Authorization': `Bearer ${cf.apiToken}` }
+                const remotas = await this.fetchCloudflareImages(cf);
+                if (remotas.length > 0) {
+                    const map = new Map();
+                    loaded.forEach(item => map.set(item.id || item.url, item));
+                    remotas.forEach(item => {
+                        const prev = map.get(item.id);
+                        // Respetar la carpeta que el usuario ya le asignó aquí
+                        if (prev && prev.category) item.category = prev.category;
+                        map.set(item.id, item);
                     });
-                    if (res.ok) {
-                        const data = await res.json();
-                        if (data.success && Array.isArray(data.result?.images)) {
-                            const cfImages = data.result.images.map(img => {
-                                const variantUrl = (img.variants && img.variants.length > 0) ? img.variants[0] : `https://imagedelivery.net/${cf.accountId}/${img.id}/public`;
-                                const metaCat = (img.meta && (img.meta.category || img.meta.catalogo || img.meta.folder)) || 'General';
-                                const metaTitle = (img.meta && img.meta.name) || img.filename || img.id;
-                                return {
-                                    id: img.id,
-                                    title: metaTitle,
-                                    category: metaCat,
-                                    url: variantUrl,
-                                    thumbnail_url: variantUrl,
-                                    uploaded: img.uploaded,
-                                    source_type: 'cloudflare'
-                                };
-                            });
-
-                            const map = new Map();
-                            loaded.forEach(item => map.set(item.id || item.url, item));
-                            cfImages.forEach(item => map.set(item.id || item.url, item));
-                            loaded = Array.from(map.values());
-                        }
-                    }
-                } catch(cfErr) {
-                    console.warn('[Multimedia] No se pudo obtener imágenes desde Cloudflare Images:', cfErr);
+                    loaded = Array.from(map.values());
                 }
             }
 
             this.images = loaded;
+            this.limpiarSeleccionHuerfana();
+            this.renderImageCategoryOptions();
+            this.renderImagesGallery();
             this.updateImageBadgeCount();
         } catch(err) {
             console.error('[Multimedia] Error en loadImages:', err);
         }
     },
 
+    // Intenta el gateway /api (sin CORS) y, si no existe, la API directa.
+    async fetchCloudflareImages(cf) {
+        const normalizar = (data) => {
+            if (!data || !data.success || !Array.isArray(data.result && data.result.images)) return [];
+            return data.result.images.map(img => {
+                const variantUrl = (img.variants && img.variants.length > 0)
+                    ? img.variants[0]
+                    : `https://imagedelivery.net/${cf.accountId}/${img.id}/public`;
+                const metaCat = (img.meta && (img.meta.category || img.meta.catalogo || img.meta.folder)) || 'General';
+                return {
+                    id: img.id,
+                    title: (img.meta && img.meta.name) || img.filename || img.id,
+                    category: metaCat,
+                    url: variantUrl,
+                    thumbnail_url: variantUrl,
+                    created_at: img.uploaded || new Date().toISOString(),
+                    source_type: 'cloudflare'
+                };
+            });
+        };
+
+        try {
+            const res = await fetch('/api/cloudflare-images?action=list', {
+                headers: { 'x-account-id': cf.accountId, 'x-api-token': cf.apiToken }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const lista = normalizar(data);
+                if (lista.length > 0) return lista;
+            }
+        } catch(gwErr) {
+            console.warn('[Multimedia] Gateway de Cloudflare Images no disponible:', gwErr);
+        }
+
+        try {
+            const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${cf.accountId}/images/v1`, {
+                headers: { 'Authorization': `Bearer ${cf.apiToken}` }
+            });
+            if (res.ok) return normalizar(await res.json());
+        } catch(cfErr) {
+            console.warn('[Multimedia] No se pudo obtener imágenes desde Cloudflare Images:', cfErr);
+        }
+
+        return [];
+    },
+
+    // --------------------------------------------------------------------------
+    // Filtros, búsqueda y selección
+    // --------------------------------------------------------------------------
     onImageCategoryChange(category) {
         this.selectedImageCategory = category;
+        this.renderImagesGallery();
+        this.updateImageBadgeCount();
+    },
+
+    onImageSearchChange(query) {
+        this.imageSearchQuery = (query || '').trim().toLowerCase();
+        this.renderImagesGallery();
         this.updateImageBadgeCount();
     },
 
     getImagesFiltrados() {
         if (!this.images || !Array.isArray(this.images)) return [];
-        if (!this.selectedImageCategory || this.selectedImageCategory === 'Todos') {
-            return this.images;
+        let lista = this.images;
+
+        if (this.selectedImageCategory && this.selectedImageCategory !== 'Todos') {
+            lista = lista.filter(img => (img.category || 'General') === this.selectedImageCategory);
         }
-        return this.images.filter(img => (img.category || 'General') === this.selectedImageCategory);
+
+        if (this.imageSearchQuery) {
+            const q = this.imageSearchQuery;
+            lista = lista.filter(img =>
+                (img.title || '').toLowerCase().includes(q) ||
+                (img.category || '').toLowerCase().includes(q) ||
+                (img.url || '').toLowerCase().includes(q)
+            );
+        }
+
+        return lista;
+    },
+
+    // Lo que realmente se exporta o se descarga:
+    // si hay imágenes marcadas se usan esas; si no, todo lo que está en pantalla.
+    getImagesParaExportar() {
+        const filtradas = this.getImagesFiltrados();
+        if (!this.selectedImageIds || this.selectedImageIds.length === 0) return filtradas;
+        const marcadas = filtradas.filter(img => this.selectedImageIds.includes(img.id));
+        return marcadas.length > 0 ? marcadas : filtradas;
+    },
+
+    isImageSelected(id) {
+        return Array.isArray(this.selectedImageIds) && this.selectedImageIds.includes(id);
+    },
+
+    toggleImageSelection(id) {
+        if (!Array.isArray(this.selectedImageIds)) this.selectedImageIds = [];
+        const idx = this.selectedImageIds.indexOf(id);
+        if (idx >= 0) this.selectedImageIds.splice(idx, 1);
+        else this.selectedImageIds.push(id);
+
+        const card = document.querySelector(`.mm-image-card[data-id="${id}"]`);
+        if (card) {
+            card.classList.toggle('selected', this.isImageSelected(id));
+            const check = card.querySelector('.mm-image-check');
+            if (check) check.textContent = this.isImageSelected(id) ? '✓' : '';
+        }
+        this.updateImageBadgeCount();
+    },
+
+    toggleSelectAllImages() {
+        const filtradas = this.getImagesFiltrados();
+        const todasMarcadas = filtradas.length > 0 && filtradas.every(img => this.isImageSelected(img.id));
+        if (todasMarcadas) {
+            const ids = filtradas.map(i => i.id);
+            this.selectedImageIds = (this.selectedImageIds || []).filter(id => !ids.includes(id));
+        } else {
+            const set = new Set(this.selectedImageIds || []);
+            filtradas.forEach(img => set.add(img.id));
+            this.selectedImageIds = Array.from(set);
+        }
+        this.renderImagesGallery();
+        this.updateImageBadgeCount();
+    },
+
+    clearImageSelection() {
+        this.selectedImageIds = [];
+        this.renderImagesGallery();
+        this.updateImageBadgeCount();
+    },
+
+    limpiarSeleccionHuerfana() {
+        if (!Array.isArray(this.selectedImageIds)) { this.selectedImageIds = []; return; }
+        const existentes = new Set((this.images || []).map(i => i.id));
+        this.selectedImageIds = this.selectedImageIds.filter(id => existentes.has(id));
+    },
+
+    // --------------------------------------------------------------------------
+    // Galería visible y contadores
+    // --------------------------------------------------------------------------
+    renderImageCategoryOptions() {
+        const opciones = this.getImageCategories();
+        const iconos = {
+            'Anuncios / Ads': '📢', 'Creativos': '🎨', 'Productos': '📦',
+            'Banners': '🖼️', 'UGC': '📱', 'Testimonios': '💬', 'General': '📂'
+        };
+
+        const principal = document.getElementById('imageCategorySelect');
+        if (principal) {
+            const actual = this.selectedImageCategory || 'Todos';
+            principal.innerHTML = '<option value="Todos">📁 Todas las Carpetas</option>' +
+                opciones.map(c => `<option value="${this.escapeHtml(c)}">${iconos[c] || '📂'} ${this.escapeHtml(c)}</option>`).join('');
+            principal.value = actual;
+        }
+
+        const modal = document.getElementById('modalImageCategorySelect');
+        if (modal) {
+            const actual = modal.value || 'General';
+            modal.innerHTML = opciones
+                .map(c => `<option value="${this.escapeHtml(c)}">${iconos[c] || '📂'} ${this.escapeHtml(c)}</option>`).join('');
+            modal.value = opciones.includes(actual) ? actual : 'General';
+        }
+    },
+
+    renderImagesGallery() {
+        const grid = document.getElementById('multimediaImagesGrid');
+        const empty = document.getElementById('multimediaImagesEmpty');
+        if (!grid) return;
+
+        const filtradas = this.getImagesFiltrados();
+
+        if (filtradas.length === 0) {
+            grid.innerHTML = '';
+            if (empty) {
+                empty.style.display = 'block';
+                const hayCatalogo = (this.images || []).length > 0;
+                const titulo = document.getElementById('multimediaImagesEmptyTitle');
+                const texto = document.getElementById('multimediaImagesEmptyText');
+                if (titulo) titulo.textContent = hayCatalogo
+                    ? 'Ninguna imagen coincide con este filtro'
+                    : 'Tu catálogo de imágenes está vacío';
+                if (texto) texto.textContent = hayCatalogo
+                    ? 'Cambia la carpeta o limpia la búsqueda para ver el resto del catálogo.'
+                    : 'Registra imágenes (enlaces o archivos de tu equipo) para poder seleccionarlas, exportarlas al CRM y descargarlas en ZIP.';
+            }
+            return;
+        }
+
+        if (empty) empty.style.display = 'none';
+
+        grid.innerHTML = filtradas.map(img => {
+            const seleccionada = this.isImageSelected(img.id);
+            const url = img.url || img.thumbnail_url || '';
+            const origen = img.source_type === 'local' ? 'Archivo local'
+                : img.source_type === 'cloudflare' ? 'Cloudflare'
+                : 'Enlace web';
+            const miniatura = url
+                ? `<img src="${this.escapeHtml(url)}" alt="${this.escapeHtml(img.title || '')}" loading="lazy" style="width:100%;height:100%;object-fit:cover;display:block;">`
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:0.72rem;text-align:center;padding:0.5rem;">Sin archivo disponible<br>(vuelve a registrarla)</div>`;
+
+            return `
+                <div class="mm-image-card${seleccionada ? ' selected' : ''}" data-id="${this.escapeHtml(img.id)}">
+                    <div class="mm-image-thumb" onclick="MultimediaModule.toggleImageSelection('${this.escapeHtml(img.id)}')" title="Clic para seleccionar o quitar esta imagen de la descarga">
+                        ${miniatura}
+                        <span class="mm-image-check">${seleccionada ? '✓' : ''}</span>
+                        <span class="mm-image-origin">${origen}</span>
+                    </div>
+                    <div class="mm-image-body">
+                        <div class="mm-image-title" title="${this.escapeHtml(img.title || '')}">${this.escapeHtml(img.title || 'Imagen sin título')}</div>
+                        <div class="mm-image-cat">${this.escapeHtml(img.category || 'General')}</div>
+                        <div class="mm-image-actions">
+                            <button type="button" title="Copiar enlace" onclick="MultimediaModule.copyImageUrl('${this.escapeHtml(img.id)}')">🔗 Copiar</button>
+                            <button type="button" title="Quitar del catálogo" onclick="MultimediaModule.deleteImage('${this.escapeHtml(img.id)}')">🗑️ Quitar</button>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
     },
 
     updateImageBadgeCount() {
-        const badge = document.getElementById('imageCategoryBadgeCount');
-        if (!badge) return;
-        const filtered = this.getImagesFiltrados();
         const total = this.images ? this.images.length : 0;
-        if (this.selectedImageCategory === 'Todos') {
-            badge.textContent = `${total} ${total === 1 ? 'imagen' : 'imágenes'} en total`;
+        const filtradas = this.getImagesFiltrados();
+        const aExportar = this.getImagesParaExportar();
+        const marcadas = (this.selectedImageIds || []).filter(id => filtradas.some(i => i.id === id)).length;
+
+        const badge = document.getElementById('imageCategoryBadgeCount');
+        if (badge) {
+            badge.textContent = (this.selectedImageCategory === 'Todos' || !this.selectedImageCategory)
+                ? `${total} ${total === 1 ? 'imagen' : 'imágenes'} en total`
+                : `${filtradas.length} de ${total} en "${this.selectedImageCategory}"`;
+        }
+
+        const selBadge = document.getElementById('imageSelectionBadge');
+        if (selBadge) {
+            selBadge.textContent = marcadas > 0
+                ? `${marcadas} seleccionada${marcadas === 1 ? '' : 's'}`
+                : `Sin selección → se usarán las ${filtradas.length} visibles`;
+            selBadge.style.background = marcadas > 0 ? 'rgba(16, 185, 129, 0.15)' : 'rgba(148, 163, 184, 0.12)';
+            selBadge.style.color = marcadas > 0 ? '#34d399' : 'var(--text-muted)';
+            selBadge.style.borderColor = marcadas > 0 ? 'rgba(16, 185, 129, 0.35)' : 'var(--border)';
+        }
+
+        const selectAll = document.getElementById('imageSelectAllCheckbox');
+        if (selectAll) {
+            const todas = filtradas.length > 0 && filtradas.every(img => this.isImageSelected(img.id));
+            selectAll.checked = todas;
+            selectAll.indeterminate = !todas && marcadas > 0;
+        }
+
+        const btnClear = document.getElementById('btnClearImageSelection');
+        if (btnClear) btnClear.style.display = marcadas > 0 ? 'inline-flex' : 'none';
+
+        const n = aExportar.length;
+        const labelCsv = document.getElementById('btnExportImagesCrmLabel');
+        if (labelCsv) labelCsv.textContent = `Exportar al CRM (CSV · ${n})`;
+        const labelZip = document.getElementById('btnDownloadImagesZipLabel');
+        if (labelZip) labelZip.textContent = `Descargar ZIP (${n})`;
+
+        const btnCsv = document.getElementById('btnExportImagesCrm');
+        const btnZip = document.getElementById('btnDownloadImagesZip');
+        [btnCsv, btnZip].forEach(b => {
+            if (!b) return;
+            b.style.opacity = n === 0 ? '0.55' : '1';
+            b.title = n === 0
+                ? 'Registra o selecciona imágenes para habilitar esta acción'
+                : `Se incluirán ${n} ${n === 1 ? 'imagen' : 'imágenes'}`;
+        });
+    },
+
+    copyImageUrl(id) {
+        const img = (this.images || []).find(i => i.id === id);
+        const url = img && (img.url || img.thumbnail_url);
+        if (!url || url.startsWith('blob:')) {
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Esta imagen es un archivo local, no tiene enlace público.', 'warning');
+            return;
+        }
+        const ok = () => {
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Enlace copiado al portapapeles.', 'success');
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(ok).catch(() => {});
         } else {
-            badge.textContent = `${filtered.length} de ${total} en "${this.selectedImageCategory}"`;
+            const ta = document.createElement('textarea');
+            ta.value = url;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); ok(); } catch(e){}
+            document.body.removeChild(ta);
         }
     },
 
+    async deleteImage(id) {
+        const img = (this.images || []).find(i => i.id === id);
+        if (!img) return;
+        if (!confirm(`¿Quitar "${img.title || 'esta imagen'}" del catálogo?`)) return;
+
+        this.images = this.images.filter(i => i.id !== id);
+        this.selectedImageIds = (this.selectedImageIds || []).filter(x => x !== id);
+        if (img.source_type === 'local') await this.deleteImageBlob(id);
+        if (img.url && img.url.startsWith('blob:')) { try { URL.revokeObjectURL(img.url); } catch(e){} }
+
+        this.saveLocalImagesMeta();
+        this.renderImagesGallery();
+        this.updateImageBadgeCount();
+        if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Imagen quitada del catálogo.', 'success');
+    },
+
+    // --------------------------------------------------------------------------
+    // Exportación CSV al CRM
+    // --------------------------------------------------------------------------
     exportarImagenesCsvParaCrm() {
         try {
-            const imagenes = this.getImagesFiltrados();
+            const imagenes = this.getImagesParaExportar();
             if (imagenes.length === 0) {
-                const msg = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos')
-                    ? `No hay imágenes registradas en la carpeta "${this.selectedImageCategory}". Registra imágenes a continuación.`
-                    : 'No hay imágenes cargadas en el catálogo. Abriendo ventana para agregar imágenes o enlaces...';
-                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'info');
-                this.openUploadImageModal();
+                this.avisarCatalogoVacio('exportar al CRM');
                 return;
             }
 
             const columnas = ['catalogo', 'titulo', 'image_url', 'variante', 'precio', 'descripcion', 'external_id'];
+            const enlacePublico = (img) => {
+                const u = img.url || img.thumbnail_url || '';
+                return u.startsWith('blob:') ? '' : u;
+            };
             const filas = imagenes.map(img => [
                 img.category || 'General',
                 img.title || 'Imagen sin título',
-                img.url || img.thumbnail_url || '',
+                enlacePublico(img),
                 '', // variante
                 '', // precio
                 img.description || `Imagen del catálogo (${img.category || 'General'})`,
@@ -1298,15 +1640,11 @@ const MultimediaModule = {
             const fecha = new Date().toISOString().slice(0, 10);
 
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
-            const enlace = document.createElement('a');
-            enlace.href = URL.createObjectURL(blob);
-            enlace.download = `catalogo-imagenes-${etiqueta}-${fecha}.csv`;
-            document.body.appendChild(enlace);
-            enlace.click();
-            document.body.removeChild(enlace);
-            URL.revokeObjectURL(enlace.href);
+            this.dispararDescarga(blob, `catalogo-imagenes-${etiqueta}-${fecha}.csv`);
 
-            const mensaje = `CSV de imágenes listo con ${imagenes.length} ${imagenes.length === 1 ? 'imagen' : 'imágenes'}. Súbelo en el CRM → Catálogo → Importar.`;
+            const sinEnlace = filas.filter(f => !f[2]).length;
+            let mensaje = `CSV listo con ${imagenes.length} ${imagenes.length === 1 ? 'imagen' : 'imágenes'}. Súbelo en el CRM → Catálogo → Importar.`;
+            if (sinEnlace > 0) mensaje += ` (${sinEnlace} sin enlace público: súbelas a Cloudflare para que el CRM pueda verlas).`;
             if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(mensaje, 'success');
         } catch(e) {
             console.error('[Multimedia] Error exportando CSV de imágenes:', e);
@@ -1314,115 +1652,174 @@ const MultimediaModule = {
         }
     },
 
-    async descargarCarpetaImagenesZip() {
+    avisarCatalogoVacio(accion) {
+        const hayCatalogo = (this.images || []).length > 0;
+        const msg = hayCatalogo
+            ? `No hay imágenes visibles para ${accion}. Cambia la carpeta o limpia la búsqueda.`
+            : `Tu catálogo está vacío. Registra imágenes para poder ${accion}.`;
+        if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'info');
+        if (!hayCatalogo) this.openUploadImageModal();
+    },
+
+    dispararDescarga(blob, nombre) {
+        const enlace = document.createElement('a');
+        enlace.href = URL.createObjectURL(blob);
+        enlace.download = nombre;
+        document.body.appendChild(enlace);
+        enlace.click();
+        document.body.removeChild(enlace);
+        setTimeout(() => URL.revokeObjectURL(enlace.href), 2000);
+    },
+
+    // --------------------------------------------------------------------------
+    // Descarga ZIP de la selección
+    // --------------------------------------------------------------------------
+    // Obtiene los bytes de una imagen: primero IndexedDB (archivo local),
+    // luego descarga directa y, si el servidor bloquea CORS, el gateway /api.
+    async obtenerBlobDeImagen(img) {
+        if (img.source_type === 'local') {
+            const guardado = await this.getImageBlob(img.id);
+            if (guardado) return guardado;
+        }
+
+        const url = img.url || img.thumbnail_url;
+        if (!url) return null;
+
+        if (url.startsWith('blob:')) {
+            try {
+                const res = await fetch(url);
+                if (res.ok) return await res.blob();
+            } catch(e){}
+            return null;
+        }
+
         try {
-            const imagenes = this.getImagesFiltrados();
+            const res = await fetch(url);
+            if (res.ok) return await res.blob();
+        } catch(e) {
+            console.warn('[Multimedia] Descarga directa bloqueada, intentando gateway:', url);
+        }
+
+        try {
+            const res = await fetch('/api/cloudflare-images?action=proxy&url=' + encodeURIComponent(url));
+            if (res.ok) return await res.blob();
+        } catch(e) {
+            console.warn('[Multimedia] El gateway tampoco pudo traer la imagen:', url);
+        }
+
+        return null;
+    },
+
+    async descargarCarpetaImagenesZip() {
+        const btn = document.getElementById('btnDownloadImagesZip');
+        const labelZip = document.getElementById('btnDownloadImagesZipLabel');
+        const textoOriginal = labelZip ? labelZip.textContent : '';
+
+        try {
+            const imagenes = this.getImagesParaExportar();
             if (imagenes.length === 0) {
-                const msg = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos')
-                    ? `No hay imágenes en la carpeta "${this.selectedImageCategory}" para descargar. Registra imágenes a continuación.`
-                    : 'No hay imágenes registradas para descargar. Abriendo ventana para agregar imágenes...';
-                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'info');
-                this.openUploadImageModal();
+                this.avisarCatalogoVacio('descargar en ZIP');
                 return;
             }
 
             if (typeof JSZip === 'undefined') {
-                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Cargando librería comprimidora JSZip...', 'info');
-                await new Promise(r => setTimeout(r, 1000));
+                throw new Error('La librería JSZip no está disponible. Recarga la página y revisa tu conexión a internet.');
             }
 
-            if (typeof JSZip === 'undefined') {
-                throw new Error('La librería JSZip no se pudo cargar. Revisa tu conexión a internet.');
-            }
+            if (btn) btn.disabled = true;
 
             const zip = new JSZip();
-            const folderName = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos')
+            const hayFiltro = this.selectedImageCategory && this.selectedImageCategory !== 'Todos';
+            const folderName = hayFiltro
                 ? this.selectedImageCategory.replace(/[^a-zA-Z0-9_-]/g, '_')
-                : 'Todas_las_Imagenes';
+                : 'Catalogo_Imagenes';
 
             const imgFolder = zip.folder(folderName);
+            const usados = new Set();
             let exitosos = 0;
-            let fallidos = 0;
-
-            if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast(`Iniciando descarga de ${imagenes.length} imágenes para la carpeta ZIP...`, 'info');
-            }
+            const fallidos = [];
 
             for (let i = 0; i < imagenes.length; i++) {
                 const img = imagenes[i];
-                const imgUrl = img.url || img.thumbnail_url;
-                if (!imgUrl) {
-                    fallidos++;
+                if (labelZip) labelZip.textContent = `Preparando ${i + 1}/${imagenes.length}...`;
+
+                const blob = await this.obtenerBlobDeImagen(img);
+                if (!blob) {
+                    fallidos.push(img.title || `imagen ${i + 1}`);
                     continue;
                 }
 
-                try {
-                    const res = await fetch(imgUrl);
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    const blob = await res.blob();
-
-                    let ext = 'jpg';
-                    if (blob.type.includes('png')) ext = 'png';
-                    else if (blob.type.includes('webp')) ext = 'webp';
-                    else if (blob.type.includes('gif')) ext = 'gif';
-                    else if (imgUrl.match(/\.(png|webp|gif|jpg|jpeg)/i)) {
-                        const m = imgUrl.match(/\.(png|webp|gif|jpg|jpeg)/i);
-                        ext = m[1].toLowerCase();
-                    }
-
-                    const safeTitle = (img.title || `imagen_${i + 1}`).replace(/[^a-zA-Z0-9_-]/g, '_');
-                    const fileName = `${String(i + 1).padStart(2, '0')}_${safeTitle}.${ext}`;
-
-                    imgFolder.file(fileName, blob);
-                    exitosos++;
-
-                    if (typeof Utils !== 'undefined' && Utils.showToast && (i + 1) % 3 === 0) {
-                        Utils.showToast(`Procesando imágenes (${i + 1}/${imagenes.length})...`, 'info');
-                    }
-                } catch(fetchErr) {
-                    console.warn(`[Multimedia] No se pudo descargar la imagen ${imgUrl}:`, fetchErr);
-                    fallidos++;
+                const urlRef = img.url || img.thumbnail_url || '';
+                let ext = 'jpg';
+                if (blob.type && blob.type.includes('png')) ext = 'png';
+                else if (blob.type && blob.type.includes('webp')) ext = 'webp';
+                else if (blob.type && blob.type.includes('gif')) ext = 'gif';
+                else if (blob.type && blob.type.includes('svg')) ext = 'svg';
+                else {
+                    const m = urlRef.match(/\.(png|webp|gif|jpg|jpeg|svg)/i);
+                    if (m) ext = m[1].toLowerCase();
                 }
+
+                const safeTitle = ((img.title || `imagen_${i + 1}`)
+                    .replace(/\.[^/.]+$/, '')
+                    .replace(/[^a-zA-Z0-9_-]/g, '_')
+                    .slice(0, 60)) || `imagen_${i + 1}`;
+
+                let fileName = `${String(i + 1).padStart(2, '0')}_${safeTitle}.${ext}`;
+                let n = 2;
+                while (usados.has(fileName)) {
+                    fileName = `${String(i + 1).padStart(2, '0')}_${safeTitle}_${n++}.${ext}`;
+                }
+                usados.add(fileName);
+
+                imgFolder.file(fileName, blob);
+                exitosos++;
             }
 
             if (exitosos === 0) {
-                throw new Error('No se pudo descargar ninguna imagen. Verifica los enlaces o permisos de red.');
+                throw new Error('No se pudo obtener ninguna imagen. Si son enlaces externos, el servidor de origen puede estar bloqueando la descarga.');
             }
 
-            if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast('Comprimiendo carpeta en archivo ZIP...', 'info');
-            }
+            if (labelZip) labelZip.textContent = 'Comprimiendo ZIP...';
 
             const zipContent = await zip.generateAsync({ type: 'blob' });
             const fecha = new Date().toISOString().slice(0, 10);
-            const downloadName = `carpeta-imagenes-${folderName.toLowerCase()}-${fecha}.zip`;
+            this.dispararDescarga(zipContent, `carpeta-imagenes-${folderName.toLowerCase()}-${fecha}.zip`);
 
-            const enlace = document.createElement('a');
-            enlace.href = URL.createObjectURL(zipContent);
-            enlace.download = downloadName;
-            document.body.appendChild(enlace);
-            enlace.click();
-            document.body.removeChild(enlace);
-            URL.revokeObjectURL(enlace.href);
-
-            let msgFinal = `¡Carpeta ZIP descargada con éxito (${exitosos} ${exitosos === 1 ? 'imagen' : 'imágenes'})!`;
-            if (fallidos > 0) msgFinal += ` (Omitidas ${fallidos} sin enlace directo).`;
-            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msgFinal, 'success');
+            let msgFinal = `¡ZIP descargado con ${exitosos} ${exitosos === 1 ? 'imagen' : 'imágenes'}!`;
+            if (fallidos.length > 0) msgFinal += ` No se pudieron incluir ${fallidos.length}: ${fallidos.slice(0, 3).join(', ')}${fallidos.length > 3 ? '...' : ''}`;
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msgFinal, fallidos.length > 0 ? 'warning' : 'success');
         } catch(err) {
             console.error('[Multimedia] Error generando ZIP de imágenes:', err);
             if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Error al descargar ZIP: ' + err.message, 'error');
             else alert('Error al descargar ZIP: ' + err.message);
+        } finally {
+            if (btn) btn.disabled = false;
+            if (labelZip) labelZip.textContent = textoOriginal;
+            this.updateImageBadgeCount();
         }
     },
 
+    // --------------------------------------------------------------------------
+    // Registro de imágenes y persistencia
+    // --------------------------------------------------------------------------
     openUploadImageModal() {
         try {
             const modal = document.getElementById('modalUploadImage');
             if (!modal) return;
+
+            this.renderImageCategoryOptions();
+
             const text = document.getElementById('modalImageUrlTextArea');
             const fileInput = document.getElementById('modalImageFileInput');
             if (text) text.value = '';
             if (fileInput) fileInput.value = '';
+
+            // Preseleccionar la carpeta que el usuario está viendo
+            const catSelect = document.getElementById('modalImageCategorySelect');
+            if (catSelect && this.selectedImageCategory && this.selectedImageCategory !== 'Todos') {
+                catSelect.value = this.selectedImageCategory;
+            }
 
             if (typeof Utils !== 'undefined' && Utils.openModal) {
                 Utils.openModal('modalUploadImage');
@@ -1443,21 +1840,22 @@ const MultimediaModule = {
             const fileInput = document.getElementById('modalImageFileInput');
             const files = fileInput ? fileInput.files : [];
 
-            let agregadas = 0;
+            const nuevas = [];
 
             if (textVal) {
-                const urls = textVal.split(/[\n,]+/).map(u => u.trim()).filter(u => u.length > 5 && u.startsWith('http'));
+                const urls = textVal.split(/[\n,]+/).map(u => u.trim()).filter(u => /^https?:\/\/.{5,}/i.test(u));
                 urls.forEach((u, idx) => {
                     if (!this.images.some(img => img.url === u)) {
-                        this.images.push({
+                        const nombre = decodeURIComponent((u.split('?')[0].split('/').pop() || '')).replace(/\.[^/.]+$/, '');
+                        nuevas.push({
                             id: 'img_url_' + Date.now() + '_' + idx,
-                            title: `Imagen ${this.images.length + 1}`,
+                            title: nombre || `Imagen ${this.images.length + nuevas.length + 1}`,
                             category: category,
                             url: u,
                             thumbnail_url: u,
+                            source_type: 'url',
                             created_at: new Date().toISOString()
                         });
-                        agregadas++;
                     }
                 });
             }
@@ -1465,28 +1863,38 @@ const MultimediaModule = {
             if (files && files.length > 0) {
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
-                    const blobUrl = URL.createObjectURL(file);
-                    const cleanName = file.name.replace(/\.[^/.]+$/, "");
-                    this.images.push({
-                        id: 'img_file_' + Date.now() + '_' + i,
-                        title: cleanName,
+                    const id = 'img_file_' + Date.now() + '_' + i;
+                    // Guardar el archivo real: así sobrevive a la recarga y entra en el ZIP
+                    await this.saveImageBlob(id, file);
+                    const objUrl = URL.createObjectURL(file);
+                    nuevas.push({
+                        id: id,
+                        title: file.name.replace(/\.[^/.]+$/, ''),
                         category: category,
-                        url: blobUrl,
-                        thumbnail_url: blobUrl,
-                        file_object: file,
+                        url: objUrl,
+                        thumbnail_url: objUrl,
+                        size_bytes: file.size,
+                        file_name: file.name,
+                        source_type: 'local',
                         created_at: new Date().toISOString()
                     });
-                    agregadas++;
                 }
             }
 
-            if (agregadas === 0) {
-                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Por favor pega al menos un enlace URL o selecciona un archivo de imagen.', 'warning');
-                else alert('Por favor pega al menos un enlace URL o selecciona un archivo de imagen.');
+            if (nuevas.length === 0) {
+                const msg = 'Pega al menos un enlace que empiece por http(s):// o selecciona archivos de imagen.';
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'warning');
+                else alert(msg);
                 return;
             }
 
+            this.images = this.images.concat(nuevas);
+            // Las recién registradas quedan marcadas para exportarlas de inmediato
+            this.selectedImageIds = (this.selectedImageIds || []).concat(nuevas.map(n => n.id));
+
             this.saveLocalImagesMeta();
+            this.renderImageCategoryOptions();
+            this.renderImagesGallery();
             this.updateImageBadgeCount();
 
             if (typeof Utils !== 'undefined' && Utils.closeModal) Utils.closeModal('modalUploadImage');
@@ -1500,7 +1908,7 @@ const MultimediaModule = {
             }
 
             if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast(`¡Se registraron ${agregadas} ${agregadas === 1 ? 'imagen' : 'imágenes'} en la carpeta "${category}"!`, 'success');
+                Utils.showToast(`¡Se registraron ${nuevas.length} ${nuevas.length === 1 ? 'imagen' : 'imágenes'} en "${category}" y quedaron seleccionadas!`, 'success');
             }
         } catch(err) {
             console.error('[Multimedia] Error al guardar imágenes:', err);
@@ -1510,16 +1918,27 @@ const MultimediaModule = {
 
     saveLocalImagesMeta() {
         try {
-            const meta = this.images.map(img => ({
-                id: img.id,
-                title: img.title,
-                category: img.category || 'General',
-                url: (img.url && img.url.startsWith('blob:')) ? '' : img.url,
-                thumbnail_url: (img.thumbnail_url && img.thumbnail_url.startsWith('blob:')) ? '' : img.thumbnail_url,
-                created_at: img.created_at
-            })).filter(img => img.url && img.url.length > 0);
+            const meta = (this.images || [])
+                // Las de Cloudflare se vuelven a leer de la API en cada carga
+                .filter(img => img.source_type !== 'cloudflare')
+                .map(img => ({
+                    id: img.id,
+                    title: img.title,
+                    category: img.category || 'General',
+                    description: img.description || '',
+                    url: (img.url && img.url.startsWith('blob:')) ? '' : (img.url || ''),
+                    thumbnail_url: (img.thumbnail_url && img.thumbnail_url.startsWith('blob:')) ? '' : (img.thumbnail_url || ''),
+                    size_bytes: img.size_bytes || 0,
+                    file_name: img.file_name || '',
+                    source_type: img.source_type || 'url',
+                    created_at: img.created_at
+                }))
+                // Conservar los archivos locales aunque no tengan URL: viven en IndexedDB
+                .filter(img => (img.url && img.url.length > 0) || img.source_type === 'local');
             localStorage.setItem('multimedia_images_meta', JSON.stringify(meta));
-        } catch(e){}
+        } catch(e){
+            console.warn('[Multimedia] No se pudo guardar el catálogo de imágenes:', e);
+        }
     },
 
     // Lista que el usuario está viendo: categoría + búsqueda + orden activos.
