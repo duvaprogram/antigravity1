@@ -4260,9 +4260,11 @@ const IncomeStatementModule = {
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
         const totalExpenses = totalAdSpend + totalOpExp;
         const netProfit = grossProfit - totalExpenses;
+        const netSettlement = totalRevenue - totalShipping;
 
         const grossMargin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0.0';
         const netMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
+        const settlementMargin = totalRevenue > 0 ? ((netSettlement / totalRevenue) * 100).toFixed(1) : '0.0';
         const pct = (val) => totalRevenue > 0 ? ((val / totalRevenue) * 100).toFixed(1) + '%' : '0.0%';
         const fmt = (v) => '$' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -4282,6 +4284,9 @@ const IncomeStatementModule = {
         text += `👥 Gastos Operativos: -${fmt(totalOpExp)} (${pct(totalOpExp)})\n`;
         text += `────────────────────────────────────\n`;
         text += `🏆 UTILIDAD NETA: ${fmt(netProfit)} (${netMargin}%)\n`;
+        text += `════════════════════════════════════\n`;
+        text += `🏦 LIQUIDACIÓN NETA (A RECIBIR): ${fmt(netSettlement)} (${settlementMargin}%)\n`;
+        text += `   (Ventas cobradas menos fletes de transportadora)\n`;
         text += `════════════════════════════════════\n`;
 
         if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
@@ -4313,6 +4318,10 @@ const IncomeStatementModule = {
         const netProfit = grossProfit - totalExpenses;
         const grossMargin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0.0';
         const netMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
+
+        // Liquidación Neta (Dinero a Recibir de Transportadora / Dropi)
+        const netSettlement = totalRevenue - totalShipping;
+        const settlementMargin = totalRevenue > 0 ? ((netSettlement / totalRevenue) * 100).toFixed(1) : '0.0';
 
         const pct = (val) => totalRevenue > 0 ? ((val / totalRevenue) * 100).toFixed(1) + '%' : '0.0%';
         const pctNum = (val) => totalRevenue > 0 ? Math.min(100, Math.max(0, (val / totalRevenue) * 100)).toFixed(1) : 0;
@@ -4405,6 +4414,11 @@ const IncomeStatementModule = {
                     <div class="is-pl-kpi-value ${netProfit >= 0 ? 'is-success' : 'is-danger'}">${fmt(netProfit)}</div>
                     <div class="is-pl-kpi-sub ${netProfit >= 0 ? 'is-success' : 'is-danger'}">${netMargin}% margen ${netProfit >= 0 ? '· rentable' : '· pérdida'}</div>
                 </div>
+                <div class="is-pl-kpi is-accent-settlement">
+                    <div class="is-pl-kpi-label">Liquidación Neta</div>
+                    <div class="is-pl-kpi-value is-settlement">${fmt(netSettlement)}</div>
+                    <div class="is-pl-kpi-sub is-settlement">${settlementMargin}% a recibir (Transp.)</div>
+                </div>
             </div>
 
             <!-- Financial Statement Table -->
@@ -4470,6 +4484,21 @@ const IncomeStatementModule = {
                         <div class="is-pl-final-amount ${netProfit >= 0 ? 'is-success' : 'is-danger'}">${fmt(netProfit)}</div>
                         <div class="is-pl-final-margin">
                             <span class="is-pl-margin-chip ${netProfit >= 0 ? 'is-success' : 'is-danger'}">${netMargin}%</span>
+                        </div>
+                    </div>
+
+                    <!-- LIQUIDACIÓN NETA (DINERO A RECIBIR) -->
+                    <div class="is-pl-settlement ${netSettlement >= 0 ? 'is-settlement-positive' : 'is-settlement-negative'}">
+                        <div class="is-pl-final-label">
+                            <div class="is-pl-final-title" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                                <span>🏦 Liquidación Neta (Dinero a Recibir)</span>
+                                <span class="badge is-pl-settlement-badge">Transportadora</span>
+                            </div>
+                            <div class="is-pl-final-sub">Dinero en efectivo a transferir por la transportadora o Dropi (Ventas cobradas menos Fletes y Devoluciones).</div>
+                        </div>
+                        <div class="is-pl-final-amount ${netSettlement >= 0 ? 'is-settlement' : 'is-danger'}">${fmt(netSettlement)}</div>
+                        <div class="is-pl-final-margin">
+                            <span class="is-pl-margin-chip is-settlement-chip">${settlementMargin}%</span>
                         </div>
                     </div>
                 </div>
@@ -6017,10 +6046,12 @@ const IncomeStatementModule = {
                 ['   - Gastos Publicitarios (Ads)', -totalAdSpend, totalRevenue > 0 ? ((totalAdSpend / totalRevenue) * 100).toFixed(2) + '%' : '0%'],
                 ['   - Gastos Operativos', -totalOpExp, totalRevenue > 0 ? ((totalOpExp / totalRevenue) * 100).toFixed(2) + '%' : '0%'],
                 ['3. UTILIDAD NETA FINAL', netProfit, `${netMarginPct.toFixed(2)}%`],
+                ['4. LIQUIDACIÓN NETA (A RECIBIR TRANSPORTADORA)', totalRevenue - totalShipping, totalRevenue > 0 ? (((totalRevenue - totalShipping) / totalRevenue) * 100).toFixed(2) + '%' : '0%'],
                 [''],
                 ['MÉTRICAS ADICIONALES', 'VALOR'],
                 ['Margen Bruto', `${grossMarginPct.toFixed(2)}%`],
                 ['Margen Neto', `${netMarginPct.toFixed(2)}%`],
+                ['Liquidación Neta Estimada (Transp.)', totalRevenue - totalShipping],
                 ['Retorno Gasto Publicitario (ROAS)', roas],
                 ['Pedidos Entregados Totales', totalOrdersDelivered],
                 ['Unidades Vendidas Totales', totalUnitsSold]
