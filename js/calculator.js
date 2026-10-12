@@ -15,6 +15,21 @@ const CalculatorModule = (() => {
     let productsCatalog = [];
     let initialized = false;
 
+    // Costos landed dinámicos: el usuario puede quitar los estándar y añadir los suyos
+    let extraCosts = [];      // [{ id, label, amount, scope: 'batch'|'unit' }]
+    let hiddenCosts = [];     // claves de STANDARD_COSTS ocultadas por el usuario
+    let extraSeq = 0;
+
+    // Costos estándar que se pueden quitar/restaurar (el costo de compra siempre permanece)
+    const STANDARD_COSTS = {
+        shipping_main:  { input: 'calcCostShippingMain',  label: 'Flete Principal / Int.' },
+        customs:        { input: 'calcCostCustoms',       label: 'Arancel / Aduana' },
+        shipping_local: { input: 'calcCostShippingLocal', label: 'Acarreo / Flete Local' },
+        packaging:      { input: 'calcCostPackaging',     label: 'Empaque y Embalaje' },
+        fulfillment:    { input: 'calcCostFulfillment',   label: 'Picking & Bodegaje' },
+        other:          { input: 'calcCostOther',         label: 'Otros Gastos Directos' }
+    };
+
     // Presets de Marketplace
     const MP_PRESETS = {
         'ml_clasica': { fee: 14.0, fixed: 2000, shipping: 0, tax: 1.5, ads: 0 },
@@ -53,6 +68,8 @@ const CalculatorModule = (() => {
         bindEvents();
         await loadProductsCatalog();
         await loadSavedLiquidations();
+        applyHiddenCosts();
+        renderExtraCosts();
         updateCurrencyUI();
         switchPricingMode(pricingMode);
         calculate();
@@ -200,6 +217,9 @@ const CalculatorModule = (() => {
             });
         }
 
+        // Costos landed dinámicos (quitar / añadir líneas de costo)
+        bindLandedCostEvents();
+
         // Búsqueda y filtros de liquidaciones guardadas
         const searchSaved = document.getElementById('searchSavedLiquidations');
         if (searchSaved) {
@@ -290,6 +310,17 @@ const CalculatorModule = (() => {
             }
         });
 
+        // Convertir también los costos personalizados añadidos por el usuario
+        extraCosts.forEach(c => {
+            const cur = Number(c.amount) || 0;
+            if (cur > 0) {
+                c.amount = newCurrency === 'USD'
+                    ? parseFloat((cur / rate).toFixed(2))
+                    : Math.round(cur * rate);
+            }
+        });
+        renderExtraCosts();
+
         // Si el margen objetivo es fijo en dinero, convertirlo también
         const marginType = getText('calcTargetMarginType', 'margin_percent');
         if (marginType === 'fixed_profit') {
@@ -355,6 +386,188 @@ const CalculatorModule = (() => {
         if (sLabel) sLabel.textContent = isBatch ? `Flete Total Principal Lote ${symbol}` : `Flete Principal / Int. ${symbol}`;
         if (cLabel) cLabel.textContent = isBatch ? `Aranceles Total Lote ${symbol}` : `Arancel / Aduana ${symbol}`;
         if (lLabel) lLabel.textContent = isBatch ? `Acarreo Total Lote a Bodega ${symbol}` : `Acarreo / Flete Local ${symbol}`;
+
+        // Los costos personalizados muestran el selector de alcance solo en modo lote
+        document.querySelectorAll('#landedCostGrid .calc-cost-scope').forEach(sel => {
+            sel.style.display = isBatch ? 'block' : 'none';
+        });
+    }
+
+    /* ========================================
+       COSTOS LANDED DINÁMICOS (quitar / añadir)
+       ======================================== */
+
+    function isBatchMode() {
+        return getText('calcCostMode', 'unit') === 'batch';
+    }
+
+    /**
+     * Oculta un costo estándar y pone su valor en cero
+     */
+    function removeStandardCost(key) {
+        if (!STANDARD_COSTS[key]) return;
+        if (!hiddenCosts.includes(key)) hiddenCosts.push(key);
+        setVal(STANDARD_COSTS[key].input, 0);
+        applyHiddenCosts();
+        calculate();
+    }
+
+    /**
+     * Devuelve a la vista un costo estándar previamente quitado
+     */
+    function restoreStandardCost(key) {
+        hiddenCosts = hiddenCosts.filter(k => k !== key);
+        applyHiddenCosts();
+        const el = document.getElementById(STANDARD_COSTS[key] ? STANDARD_COSTS[key].input : '');
+        if (el) el.focus();
+        calculate();
+    }
+
+    /**
+     * Sincroniza la visibilidad de los costos estándar y los chips de restauración
+     */
+    function applyHiddenCosts() {
+        Object.keys(STANDARD_COSTS).forEach(key => {
+            const row = document.querySelector(`#landedCostGrid [data-cost-key="${key}"]`);
+            if (row) row.style.display = hiddenCosts.includes(key) ? 'none' : '';
+        });
+
+        const chips = document.getElementById('landedRemovedChips');
+        if (!chips) return;
+        chips.innerHTML = hiddenCosts.map(key => {
+            const def = STANDARD_COSTS[key];
+            if (!def) return '';
+            return `<button type="button" class="calc-cost-chip" data-cost-restore="${key}" title="Volver a incluir este costo">+ ${Utils.escapeHtml ? Utils.escapeHtml(def.label) : def.label}</button>`;
+        }).join('');
+    }
+
+    /**
+     * Añade una línea de costo personalizada
+     */
+    function addExtraCost(label = '', amount = 0, scope = 'batch', skipFocus = false) {
+        const item = {
+            id: 'ec_' + (++extraSeq) + '_' + Math.random().toString(36).substr(2, 4),
+            label: label || '',
+            amount: Number(amount) || 0,
+            scope: scope === 'unit' ? 'unit' : 'batch'
+        };
+        extraCosts.push(item);
+        renderExtraCosts();
+        if (!skipFocus) {
+            const el = document.querySelector(`[data-extra-name="${item.id}"]`);
+            if (el) el.focus();
+        }
+        calculate();
+        return item;
+    }
+
+    function removeExtraCost(id) {
+        extraCosts = extraCosts.filter(c => c.id !== id);
+        renderExtraCosts();
+        calculate();
+    }
+
+    /**
+     * Dibuja las líneas de costo personalizadas dentro de la grilla de costeo
+     */
+    function renderExtraCosts() {
+        const grid = document.getElementById('landedCostGrid');
+        if (!grid) return;
+
+        grid.querySelectorAll('.calc-cost-extra').forEach(el => el.remove());
+
+        const symbol = currentCurrency === 'USD' ? '($ USD)' : '($ COP)';
+        const step = currentCurrency === 'USD' ? '0.01' : '1';
+        const showScope = isBatchMode() ? 'block' : 'none';
+        const esc = (s) => (Utils.escapeHtml ? Utils.escapeHtml(String(s)) : String(s).replace(/"/g, '&quot;'));
+
+        extraCosts.forEach(c => {
+            const row = document.createElement('div');
+            row.className = 'form-group calc-cost-item calc-cost-extra';
+            row.dataset.extraId = c.id;
+            row.innerHTML = `
+                <input type="text" class="calc-cost-name" data-extra-name="${c.id}" value="${esc(c.label)}" placeholder="Nombre del costo ${symbol}" title="Escribe el nombre de este costo">
+                <button type="button" class="calc-cost-remove" data-extra-remove="${c.id}" title="Quitar este costo" aria-label="Quitar costo">&times;</button>
+                <input type="number" class="calc-cost-amount" data-extra-amount="${c.id}" value="${c.amount}" step="${step}" min="0">
+                <select class="calc-cost-scope" data-extra-scope="${c.id}" style="display:${showScope}" title="¿Este valor es del lote completo o de cada unidad?">
+                    <option value="batch"${c.scope === 'batch' ? ' selected' : ''}>Total del lote</option>
+                    <option value="unit"${c.scope === 'unit' ? ' selected' : ''}>Por unidad</option>
+                </select>
+            `;
+            grid.appendChild(row);
+        });
+    }
+
+    /**
+     * Suma unitaria de los costos personalizados
+     */
+    function getExtraCostsUnit(isBatch, batchUnits) {
+        const units = Math.max(1, batchUnits || 1);
+        return extraCosts.reduce((sum, c) => {
+            const amount = Number(c.amount) || 0;
+            if (isBatch && c.scope === 'batch') return sum + (amount / units);
+            return sum + amount;
+        }, 0);
+    }
+
+    function getExtraCostsRawTotal() {
+        return extraCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+    }
+
+    /**
+     * Listeners delegados de la grilla de costos dinámicos
+     */
+    function bindLandedCostEvents() {
+        const grid = document.getElementById('landedCostGrid');
+        const btnAdd = document.getElementById('btnAddLandedCost');
+        const chips = document.getElementById('landedRemovedChips');
+
+        if (btnAdd) btnAdd.addEventListener('click', () => addExtraCost());
+
+        if (chips) {
+            chips.addEventListener('click', (e) => {
+                const btn = e.target.closest('[data-cost-restore]');
+                if (btn) restoreStandardCost(btn.dataset.costRestore);
+            });
+        }
+
+        if (!grid) return;
+
+        grid.addEventListener('click', (e) => {
+            const removeStd = e.target.closest('[data-cost-remove]');
+            if (removeStd) {
+                removeStandardCost(removeStd.dataset.costRemove);
+                return;
+            }
+            const removeExtra = e.target.closest('[data-extra-remove]');
+            if (removeExtra) removeExtraCost(removeExtra.dataset.extraRemove);
+        });
+
+        const debouncedCalc = Utils.debounce(calculate, 80);
+
+        grid.addEventListener('input', (e) => {
+            const nameEl = e.target.closest('[data-extra-name]');
+            if (nameEl) {
+                const item = extraCosts.find(c => c.id === nameEl.dataset.extraName);
+                if (item) item.label = nameEl.value;
+                return;
+            }
+            const amountEl = e.target.closest('[data-extra-amount]');
+            if (amountEl) {
+                const item = extraCosts.find(c => c.id === amountEl.dataset.extraAmount);
+                if (item) item.amount = parseFloat(amountEl.value) || 0;
+                debouncedCalc();
+            }
+        });
+
+        grid.addEventListener('change', (e) => {
+            const scopeEl = e.target.closest('[data-extra-scope]');
+            if (scopeEl) {
+                const item = extraCosts.find(c => c.id === scopeEl.dataset.extraScope);
+                if (item) item.scope = scopeEl.value;
+                calculate();
+            }
+        });
     }
 
     /**
@@ -559,8 +772,9 @@ const CalculatorModule = (() => {
         let customsU = isBatch ? customsRaw / batchUnits : customsRaw;
         let shippingLocalU = isBatch ? shippingLocalRaw / batchUnits : shippingLocalRaw;
         let otherU = isBatch ? other / batchUnits : other;
+        const extrasU = getExtraCostsUnit(isBatch, batchUnits);
 
-        const landedCost = purchaseU + shippingMainU + customsU + shippingLocalU + packaging + fulfillment + otherU;
+        const landedCost = purchaseU + shippingMainU + customsU + shippingLocalU + packaging + fulfillment + otherU + extrasU;
 
         // Actualizar Badge de Landed
         const badgeLanded = document.getElementById('badgeLandedCost');
@@ -893,6 +1107,12 @@ const CalculatorModule = (() => {
         setVal('calcCostFulfillment', isUsd ? 0.40 : 1500);
         setVal('calcCostOther', 0);
 
+        // Restaurar todos los costos estándar y limpiar los personalizados
+        hiddenCosts = [];
+        extraCosts = [];
+        applyHiddenCosts();
+        renderExtraCosts();
+
         setVal('calcCpa', isUsd ? 3.75 : 15000);
         setVal('calcCancelacion', 10);
         setVal('calcDevolucion', 20);
@@ -940,7 +1160,7 @@ const CalculatorModule = (() => {
         const fulfillment = getNum('calcCostFulfillment', 0);
         const other = getNum('calcCostOther', 0);
 
-        const landedCost = calcData ? calcData.landedCost : ((isBatch ? (purchaseRaw + shippingMainRaw + customsRaw + shippingLocalRaw + other) / batchUnits : (purchaseRaw + shippingMainRaw + customsRaw + shippingLocalRaw + other)) + packaging + fulfillment);
+        const landedCost = calcData ? calcData.landedCost : ((isBatch ? (purchaseRaw + shippingMainRaw + customsRaw + shippingLocalRaw + other) / batchUnits : (purchaseRaw + shippingMainRaw + customsRaw + shippingLocalRaw + other)) + packaging + fulfillment + getExtraCostsUnit(isBatch, batchUnits));
 
         const salePrice = calcData ? calcData.finalSalePrice : (pricingMode === 'fixed_price' ? getNum('calcVenta', 0) : 0);
         const netProfit = calcData ? calcData.netProfit : 0;
@@ -968,6 +1188,16 @@ const CalculatorModule = (() => {
             cost_packaging: packaging,
             cost_fulfillment: fulfillment,
             cost_other: other,
+
+            // Costos landed personalizados y estándar ocultados por el usuario
+            cost_extra_items: extraCosts.map(c => ({
+                label: c.label || 'Costo adicional',
+                amount: Number(c.amount) || 0,
+                scope: c.scope === 'unit' ? 'unit' : 'batch'
+            })),
+            cost_extra_total: getExtraCostsRawTotal(),
+            cost_hidden_fields: [...hiddenCosts],
+
             total_landed_cost: landedCost,
 
             // Parámetros Canal 1: Contra Entrega (COD)
@@ -992,8 +1222,12 @@ const CalculatorModule = (() => {
             target_margin_type: getText('calcTargetMarginType', 'margin_percent'),
             target_margin_value: getNum('calcTargetMarginValue', 25),
             sale_price: salePrice,
+            recommended_price: calcData ? calcData.recommendedPrice : 0,
             net_profit: netProfit,
             net_margin_percent: netMargin,
+            roi_percent: calcData ? calcData.roiPercent : 0,
+            break_even_price: calcData ? calcData.breakEvenPrice : 0,
+            break_even_cpa: calcData ? calcData.breakEvenCpa : 0,
             total_batch_profit: netProfit * batchUnits,
             total_batch_revenue: salePrice * batchUnits,
 
@@ -1562,6 +1796,33 @@ const CalculatorModule = (() => {
         setVal('calcCostFulfillment', item.cost_fulfillment != null ? item.cost_fulfillment : 0);
         setVal('calcCostOther', item.cost_other != null ? item.cost_other : 0);
 
+        // Costos estándar ocultados y costos personalizados guardados
+        let savedHidden = item.cost_hidden_fields;
+        if (typeof savedHidden === 'string') {
+            try { savedHidden = JSON.parse(savedHidden); } catch (e) { savedHidden = []; }
+        }
+        hiddenCosts = Array.isArray(savedHidden)
+            ? savedHidden.filter(k => STANDARD_COSTS[k])
+            : [];
+        applyHiddenCosts();
+
+        extraCosts = [];
+        let savedExtras = item.cost_extra_items;
+        if (typeof savedExtras === 'string') {
+            try { savedExtras = JSON.parse(savedExtras); } catch (e) { savedExtras = []; }
+        }
+        if (Array.isArray(savedExtras)) {
+            savedExtras.forEach(c => {
+                extraCosts.push({
+                    id: 'ec_' + (++extraSeq) + '_' + Math.random().toString(36).substr(2, 4),
+                    label: c.label || '',
+                    amount: Number(c.amount) || 0,
+                    scope: c.scope === 'unit' ? 'unit' : 'batch'
+                });
+            });
+        }
+        renderExtraCosts();
+
         // COD
         setVal('calcCpa', item.sale_cpa != null ? item.sale_cpa : 0);
         setVal('calcCancelacion', item.cancel_rate != null ? item.cancel_rate : 0);
@@ -1704,15 +1965,28 @@ const CalculatorModule = (() => {
         y += 8;
 
         doc.setFont('helvetica', 'normal');
+        const hiddenPdf = Array.isArray(item.cost_hidden_fields) ? item.cost_hidden_fields : [];
         const landedRows = [
             ['Costo Base de Compra / Proveedor', formatMoney(item.cost_purchase || 0, itemCurr)],
-            ['Transporte / Flete Principal', formatMoney(item.cost_shipping_main || 0, itemCurr)],
-            ['Arancel / Aduana / Impuestos Importación', formatMoney(item.cost_customs || 0, itemCurr)],
-            ['Transporte Local / Acarreo a Bodega', formatMoney(item.cost_shipping_local || 0, itemCurr)],
-            ['Empaque y Embalaje de Despacho', formatMoney(item.cost_packaging || 0, itemCurr)],
-            ['Picking, Packing y Almacenamiento', formatMoney(item.cost_fulfillment || 0, itemCurr)],
-            ['Otros Gastos Directos', formatMoney(item.cost_other || 0, itemCurr)],
-        ];
+            ['Transporte / Flete Principal', formatMoney(item.cost_shipping_main || 0, itemCurr), 'shipping_main'],
+            ['Arancel / Aduana / Impuestos Importación', formatMoney(item.cost_customs || 0, itemCurr), 'customs'],
+            ['Transporte Local / Acarreo a Bodega', formatMoney(item.cost_shipping_local || 0, itemCurr), 'shipping_local'],
+            ['Empaque y Embalaje de Despacho', formatMoney(item.cost_packaging || 0, itemCurr), 'packaging'],
+            ['Picking, Packing y Almacenamiento', formatMoney(item.cost_fulfillment || 0, itemCurr), 'fulfillment'],
+            ['Otros Gastos Directos', formatMoney(item.cost_other || 0, itemCurr), 'other'],
+        ].filter(row => !row[2] || !hiddenPdf.includes(row[2]));
+
+        // Añadir los costos personalizados definidos para este producto
+        let pdfExtras = item.cost_extra_items;
+        if (typeof pdfExtras === 'string') {
+            try { pdfExtras = JSON.parse(pdfExtras); } catch (e) { pdfExtras = []; }
+        }
+        if (Array.isArray(pdfExtras)) {
+            pdfExtras.forEach(c => {
+                const scopeTag = (item.cost_mode === 'batch' && c.scope !== 'unit') ? ' (total lote)' : '';
+                landedRows.push([`${c.label || 'Costo adicional'}${scopeTag}`, formatMoney(Number(c.amount) || 0, itemCurr)]);
+            });
+        }
 
         landedRows.forEach(([concept, val]) => {
             doc.text(concept, 16, y);

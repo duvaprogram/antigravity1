@@ -79,6 +79,11 @@ CREATE TABLE IF NOT EXISTS public.product_liquidations (
 ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS marketplace_ads_percent NUMERIC DEFAULT 0;
 ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS profit_diff NUMERIC DEFAULT 0;
 
+-- Costos landed dinámicos: líneas personalizadas y costos estándar ocultados por producto
+ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS cost_extra_items JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS cost_extra_total NUMERIC DEFAULT 0;
+ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS cost_hidden_fields JSONB DEFAULT '[]'::jsonb;
+
 -- Índices para optimizar búsquedas frecuentes
 CREATE INDEX IF NOT EXISTS idx_liquidations_name ON public.product_liquidations(name);
 CREATE INDEX IF NOT EXISTS idx_liquidations_channel ON public.product_liquidations(channel);

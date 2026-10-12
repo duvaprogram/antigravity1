@@ -1770,35 +1770,49 @@
                                 </div>
                                 <div class="card-body">
                                     <form id="landedForm" class="calculator-form">
-                                        <div class="form-grid">
-                                            <div class="form-group">
+                                        <div class="form-grid" id="landedCostGrid">
+                                            <div class="form-group calc-cost-item" data-cost-key="purchase">
                                                 <label for="calcCostPurchase" id="labelCostPurchase">Costo de Compra ($)</label>
                                                 <input type="number" id="calcCostPurchase" value="16761" step="0.01" min="0">
                                             </div>
-                                            <div class="form-group">
+                                            <div class="form-group calc-cost-item" data-cost-key="shipping_main">
                                                 <label for="calcCostShippingMain" id="labelCostShippingMain">Flete Principal / Int. ($)</label>
+                                                <button type="button" class="calc-cost-remove" data-cost-remove="shipping_main" title="Quitar este costo" aria-label="Quitar costo">&times;</button>
                                                 <input type="number" id="calcCostShippingMain" value="2000" step="0.01" min="0" title="Flete marítimo, aéreo o transporte mayorista a tu país">
                                             </div>
-                                            <div class="form-group">
+                                            <div class="form-group calc-cost-item" data-cost-key="customs">
                                                 <label for="calcCostCustoms" id="labelCostCustoms">Arancel / Aduana ($)</label>
+                                                <button type="button" class="calc-cost-remove" data-cost-remove="customs" title="Quitar este costo" aria-label="Quitar costo">&times;</button>
                                                 <input type="number" id="calcCostCustoms" value="0" step="0.01" min="0" title="Costos aduaneros, nacionalización e impuestos de importación">
                                             </div>
-                                            <div class="form-group">
+                                            <div class="form-group calc-cost-item" data-cost-key="shipping_local">
                                                 <label for="calcCostShippingLocal" id="labelCostShippingLocal">Acarreo / Flete Local ($)</label>
+                                                <button type="button" class="calc-cost-remove" data-cost-remove="shipping_local" title="Quitar este costo" aria-label="Quitar costo">&times;</button>
                                                 <input type="number" id="calcCostShippingLocal" value="500" step="0.01" min="0" title="Transporte del puerto/aduana a tu bodega local">
                                             </div>
-                                            <div class="form-group">
+                                            <div class="form-group calc-cost-item" data-cost-key="packaging">
                                                 <label for="calcCostPackaging">Empaque y Embalaje ($)</label>
+                                                <button type="button" class="calc-cost-remove" data-cost-remove="packaging" title="Quitar este costo" aria-label="Quitar costo">&times;</button>
                                                 <input type="number" id="calcCostPackaging" value="1000" step="0.01" min="0" title="Caja, bolsa de seguridad, plástico burbuja, etiquetas">
                                             </div>
-                                            <div class="form-group">
+                                            <div class="form-group calc-cost-item" data-cost-key="fulfillment">
                                                 <label for="calcCostFulfillment">Picking & Bodegaje ($)</label>
+                                                <button type="button" class="calc-cost-remove" data-cost-remove="fulfillment" title="Quitar este costo" aria-label="Quitar costo">&times;</button>
                                                 <input type="number" id="calcCostFulfillment" value="1500" step="0.01" min="0" title="Mano de obra de alistamiento y almacenamiento">
                                             </div>
-                                            <div class="form-group">
+                                            <div class="form-group calc-cost-item" data-cost-key="other">
                                                 <label for="calcCostOther">Otros Gastos Directos ($)</label>
+                                                <button type="button" class="calc-cost-remove" data-cost-remove="other" title="Quitar este costo" aria-label="Quitar costo">&times;</button>
                                                 <input type="number" id="calcCostOther" value="0" step="0.01" min="0" title="Garantías directas o costos adicionales">
                                             </div>
+                                            <!-- Costos personalizados (se inyectan dinámicamente desde calculator.js) -->
+                                        </div>
+                                        <div class="calc-cost-toolbar">
+                                            <button type="button" class="calc-cost-add" id="btnAddLandedCost">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                                Añadir costo
+                                            </button>
+                                            <div class="calc-cost-restore" id="landedRemovedChips"></div>
                                         </div>
                                     </form>
                                 </div>

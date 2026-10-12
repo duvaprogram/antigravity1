@@ -2388,10 +2388,17 @@ const Database = {
                     .single();
 
                 // Si falló por columnas no existentes en el cache de Supabase, reintentar sin ellas
-                if (error && (error.code === 'PGRST204' || (error.message && error.message.includes('schema cache')))) {
+                if (error && (error.code === 'PGRST204' || error.code === '42703' || (error.message && (error.message.includes('schema cache') || error.message.includes('column'))))) {
                     console.warn('Reintentando guardar en Supabase sin columnas adicionales:', error.message);
                     delete supaPayload.marketplace_ads_percent;
                     delete supaPayload.profit_diff;
+                    delete supaPayload.cost_extra_items;
+                    delete supaPayload.cost_extra_total;
+                    delete supaPayload.cost_hidden_fields;
+                    delete supaPayload.recommended_price;
+                    delete supaPayload.roi_percent;
+                    delete supaPayload.break_even_price;
+                    delete supaPayload.break_even_cpa;
                     const retry = await supabaseClient
                         .from('product_liquidations')
                         .upsert(supaPayload, { onConflict: 'id' })

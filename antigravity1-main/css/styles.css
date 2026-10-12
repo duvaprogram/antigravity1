@@ -3793,6 +3793,115 @@ form {
     box-shadow: 0 0 0 2px var(--primary-light);
 }
 
+/* Costos Landed Dinámicos (añadir / quitar) */
+.calc-cost-item {
+    position: relative;
+}
+
+.calc-cost-item > label {
+    padding-right: 1.4rem;
+}
+
+.calc-cost-remove {
+    position: absolute;
+    top: -0.25rem;
+    right: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
+    color: var(--text-muted);
+    font-size: 1rem;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: all var(--transition-fast);
+}
+
+.calc-cost-item:hover .calc-cost-remove,
+.calc-cost-remove:focus-visible {
+    opacity: 1;
+}
+
+.calc-cost-remove:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #ef4444;
+}
+
+.calc-cost-name {
+    width: 100%;
+    margin-bottom: var(--space-xs);
+    padding: 0.2rem 0.3rem !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted) !important;
+    font-size: var(--font-size-xs) !important;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.calc-cost-name:hover {
+    border-color: var(--border) !important;
+}
+
+.calc-cost-name:focus {
+    background: var(--surface-hover) !important;
+    border-color: var(--primary) !important;
+    color: var(--text-primary) !important;
+}
+
+.calc-cost-scope {
+    margin-top: 0.35rem;
+    padding: 0.3rem 0.5rem !important;
+    font-size: var(--font-size-xs) !important;
+}
+
+.calc-cost-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+    border-top: 1px dashed var(--border);
+}
+
+.calc-cost-add,
+.calc-cost-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.4rem 0.8rem;
+    background: var(--surface-hover);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.calc-cost-add:hover,
+.calc-cost-chip:hover {
+    background: var(--primary-light);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+.calc-cost-restore {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
 /* Channel Selector Tabs */
 .calc-channel-tabs {
     display: grid;
