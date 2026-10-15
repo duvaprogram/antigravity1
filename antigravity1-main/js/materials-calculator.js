@@ -40,10 +40,62 @@ const MaterialsCalculatorModule = (() => {
     let initialized = false;
     
     // Pestaña activa
-    let activeTab = 'direct'; // 'direct' o 'inverse'
-    
-    // Entradas de stock para la calculadora inversa
+    let activeTab = 'direct'; // 'direct', 'inverse' o 'stock'
+
+    // Material disponible (compartido por la calculadora inversa y el inventario).
+    // Claves: typeId de balín -> unidades, 'thread' -> metros.
     let stockInputs = {};
+
+    // Dijes (colgantes): catálogo con su propio stock
+    let dijes = []; // { id, name, shape, color, stock }
+    let selectedDijeId = ''; // dije del diseño actual ('' = sin dije)
+
+    // Diseños ya comprometidos a producción (descuentan del material disponible)
+    let productions = []; // { id, name, color, qty, sequence, dijeId, threadCm }
+
+    const STORAGE_KEY = 'antigravity_materials_stock_v1';
+
+    const CHARM_SHAPES = {
+        medalla: 'Medalla',
+        cruz: 'Cruz',
+        corazon: 'Corazón',
+        estrella: 'Estrella'
+    };
+
+    const CHARM_COLORS = {
+        dorado: { name: 'Dorado', fill: '#e5b93b', stroke: '#8a6a10' },
+        plata: { name: 'Plata', fill: '#d4d4d4', stroke: '#777' },
+        ororosa: { name: 'Oro Rosa', fill: '#e09085', stroke: '#8a4a40' },
+        negro: { name: 'Negro', fill: '#2a2a2a', stroke: '#000' }
+    };
+
+    function esc(str) {
+        return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function loadState() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+            if (!saved) return;
+            stockInputs = saved.stock || {};
+            dijes = Array.isArray(saved.dijes) ? saved.dijes : [];
+            productions = Array.isArray(saved.productions) ? saved.productions : [];
+        } catch (e) {
+            console.warn('No se pudo leer el inventario guardado:', e);
+        }
+    }
+
+    function saveState() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ stock: stockInputs, dijes, productions }));
+        } catch (e) {
+            console.warn('No se pudo guardar el inventario:', e);
+        }
+    }
+
+    function getDije(id) {
+        return dijes.find(d => d.id === id) || null;
+    }
 
     // Gradientes SVG para renderizado fotorrealista
     const SVG_DEFS = `
@@ -106,13 +158,17 @@ const MaterialsCalculatorModule = (() => {
             updateCalculations();
             renderPreview();
             renderSequenceList();
+            renderDijeSelect();
             if (activeTab === 'inverse') {
                 renderInverseTable();
+            } else if (activeTab === 'stock') {
+                renderStockTab();
             }
             return;
         }
 
         console.log('Iniciando MaterialsCalculatorModule...');
+        loadState();
 
         // Bindear controles del lote
         const inputBatchNegro = document.getElementById('matCalcBatchNegro');
@@ -268,30 +324,27 @@ const MaterialsCalculatorModule = (() => {
         });
 
         // Bindeo de pestañas
-        const btnTabDirect = document.getElementById('btnTabDirect');
-        const btnTabInverse = document.getElementById('btnTabInverse');
-        const containerDirect = document.getElementById('containerDirectCalc');
-        const containerInverse = document.getElementById('containerInverseCalc');
-
-        if (btnTabDirect && btnTabInverse) {
-            btnTabDirect.addEventListener('click', () => {
-                activeTab = 'direct';
-                btnTabDirect.classList.add('active');
-                btnTabInverse.classList.remove('active');
-                containerDirect.style.display = 'block';
-                containerInverse.style.display = 'none';
-                updateCalculations();
+        const tabs = {
+            direct: { btn: 'btnTabDirect', box: 'containerDirectCalc' },
+            inverse: { btn: 'btnTabInverse', box: 'containerInverseCalc' },
+            stock: { btn: 'btnTabStock', box: 'containerStockCalc' }
+        };
+        Object.entries(tabs).forEach(([name, ids]) => {
+            const btn = document.getElementById(ids.btn);
+            if (!btn) return;
+            btn.addEventListener('click', () => {
+                activeTab = name;
+                Object.entries(tabs).forEach(([other, otherIds]) => {
+                    const b = document.getElementById(otherIds.btn);
+                    const box = document.getElementById(otherIds.box);
+                    if (b) b.classList.toggle('active', other === name);
+                    if (box) box.style.display = other === name ? 'block' : 'none';
+                });
+                if (name === 'direct') updateCalculations();
+                else if (name === 'inverse') renderInverseTable();
+                else renderStockTab();
             });
-
-            btnTabInverse.addEventListener('click', () => {
-                activeTab = 'inverse';
-                btnTabInverse.classList.add('active');
-                btnTabDirect.classList.remove('active');
-                containerDirect.style.display = 'none';
-                containerInverse.style.display = 'block';
-                renderInverseTable();
-            });
-        }
+        });
 
         // Escuchar cambios de inputs de stock en la tabla inversa
         const inverseTableBody = document.getElementById('matCalcInverseTable');
@@ -300,11 +353,19 @@ const MaterialsCalculatorModule = (() => {
                 if (e.target.classList.contains('mat-stock-input')) {
                     const typeId = e.target.dataset.typeId;
                     const val = parseFloat(e.target.value) || 0;
-                    stockInputs[typeId] = val;
+                    if (typeId.startsWith('dije:')) {
+                        const dije = getDije(typeId.slice(5));
+                        if (dije) dije.stock = val;
+                    } else {
+                        stockInputs[typeId] = val;
+                    }
+                    saveState();
                     updateInverseCapacity();
                 }
             });
         }
+
+        bindStockControls();
 
         // Exportar PDF
         const btnPdf = document.getElementById('btnMatCalcExportPdf');
@@ -428,12 +489,57 @@ const MaterialsCalculatorModule = (() => {
             currentAngle += angleStep;
         });
 
+        // Dije colgando de la parte inferior (fijo, no gira con las cuentas)
+        let charmString = '';
+        const dije = getDije(selectedDijeId);
+        if (dije) {
+            const charmSize = 13;
+            const hangY = cy + R + (12 * scale) + 3;
+            const charmCy = Math.min(hangY + charmSize + 4, 300 - charmSize - 2);
+            charmString = `
+                <line x1="${cx}" y1="${cy + R}" x2="${cx}" y2="${charmCy - charmSize}" stroke="#999" stroke-width="1.2" />
+                ${getCharmSVGString(dije, cx, charmCy, charmSize)}
+            `;
+        }
+
         svgEl.innerHTML += `
             <g class="${rotationClass}" style="transform-origin: 150px 150px;">
                 ${threadCircle}
                 ${beadGroupsString}
             </g>
+            ${charmString}
         `;
+    }
+
+    /**
+     * Retorna el SVG de un dije centrado en (cx, cy) con "s" como radio aproximado
+     */
+    function getCharmSVGString(dije, cx, cy, s) {
+        const c = CHARM_COLORS[dije.color] || CHARM_COLORS.dorado;
+        const common = `fill="${c.fill}" stroke="${c.stroke}" stroke-width="1" filter="url(#shadow)"`;
+        let shape = '';
+
+        if (dije.shape === 'cruz') {
+            const a = s * 0.3;
+            shape = `<path ${common} d="M${cx - a} ${cy - s} h${2 * a} v${s - a} h${s - a} v${2 * a} h${-(s - a)} v${s - a} h${-2 * a} v${-(s - a)} h${-(s - a)} v${-2 * a} h${s - a} z" />`;
+        } else if (dije.shape === 'corazon') {
+            shape = `<path ${common} d="M${cx} ${cy + s} C${cx - s * 1.6} ${cy - s * 0.1} ${cx - s * 0.7} ${cy - s * 1.1} ${cx} ${cy - s * 0.35} C${cx + s * 0.7} ${cy - s * 1.1} ${cx + s * 1.6} ${cy - s * 0.1} ${cx} ${cy + s} z" />`;
+        } else if (dije.shape === 'estrella') {
+            const pts = [];
+            for (let i = 0; i < 10; i++) {
+                const rad = i % 2 === 0 ? s : s * 0.45;
+                const ang = -Math.PI / 2 + (i * Math.PI) / 5;
+                pts.push(`${(cx + rad * Math.cos(ang)).toFixed(2)},${(cy + rad * Math.sin(ang)).toFixed(2)}`);
+            }
+            shape = `<polygon ${common} points="${pts.join(' ')}" />`;
+        } else {
+            shape = `
+                <circle cx="${cx}" cy="${cy}" r="${s}" ${common} />
+                <circle cx="${cx}" cy="${cy}" r="${s * 0.68}" fill="none" stroke="${c.stroke}" stroke-width="0.7" opacity="0.7" />
+            `;
+        }
+
+        return `<g class="charm-group"><title>${esc(dije.name)}</title>${shape}<circle cx="${cx - s * 0.3}" cy="${cy - s * 0.3}" r="${s * 0.14}" fill="rgba(255,255,255,0.55)" /></g>`;
     }
 
     /**
@@ -552,6 +658,9 @@ const MaterialsCalculatorModule = (() => {
 
         if (!tableBody) return;
 
+        // La pestaña de inventario depende del diseño actual
+        if (activeTab === 'stock') renderStockTab();
+
         const batchSize = batchNegro + batchRojo;
 
         if (batchQtyHeader) batchQtyHeader.textContent = `Total (${batchSize} ud)`;
@@ -645,6 +754,24 @@ const MaterialsCalculatorModule = (() => {
                 </tr>
             `;
         });
+
+        const charm = getDije(selectedDijeId);
+        if (charm) {
+            const charmColor = CHARM_COLORS[charm.color] || CHARM_COLORS.dorado;
+            rowsHtml += `
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div class="bead-color-dot" style="width: 12px; height: 12px; background: ${charmColor.fill}; flex-shrink: 0;"></div>
+                            <strong>Dije: ${esc(charm.name)}</strong>
+                        </div>
+                    </td>
+                    <td style="text-align: center; font-weight: 500;">1 ud</td>
+                    <td style="text-align: center; font-weight: 500;">${batchSize.toLocaleString()} ud</td>
+                    <td style="text-align: center; font-weight: 700; color: var(--primary);">${Math.ceil(batchSize * (1 + wastagePercent / 100)).toLocaleString()} ud</td>
+                </tr>
+            `;
+        }
 
         const singleThreadM = threadLengthCm / 100;
         const totalThreadM = singleThreadM * batchSize;
@@ -760,6 +887,33 @@ const MaterialsCalculatorModule = (() => {
             `;
         });
 
+        // Fila para el dije del diseño
+        const charm = getDije(selectedDijeId);
+        if (charm) {
+            const charmColor = CHARM_COLORS[charm.color] || CHARM_COLORS.dorado;
+            rowsHtml += `
+                <tr class="inverse-calc-row" data-type-id="dije:${charm.id}" data-single-qty="1">
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <div class="bead-color-dot" style="width: 12px; height: 12px; background: ${charmColor.fill}; flex-shrink: 0;"></div>
+                            <strong>Dije: ${esc(charm.name)}</strong>
+                        </div>
+                    </td>
+                    <td style="text-align: center; font-weight: 500;">1 ud</td>
+                    <td style="text-align: center;">
+                        <input type="number"
+                               class="mat-stock-input form-control input-sm"
+                               data-type-id="dije:${charm.id}"
+                               value="${charm.stock || ''}"
+                               min="0"
+                               placeholder="Ej. 100"
+                               style="width: 100%; text-align: center; padding: 0.25rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary);">
+                    </td>
+                    <td style="text-align: center; font-weight: 700; color: var(--primary);" class="row-capacity" id="cap-dije">0 pulseras</td>
+                </tr>
+            `;
+        }
+
         // Fila para el hilo
         const savedThreadStock = stockInputs.thread !== undefined ? stockInputs.thread : '';
         rowsHtml += `
@@ -856,6 +1010,24 @@ const MaterialsCalculatorModule = (() => {
                 unitName: 'balines'
             });
         });
+
+        // Dije del diseño (1 por pulsera)
+        const charm = getDije(selectedDijeId);
+        if (charm) {
+            const charmStock = parseFloat(charm.stock) || 0;
+            const charmCap = Math.floor(charmStock);
+            const cellCharm = document.getElementById('cap-dije');
+            if (cellCharm) cellCharm.textContent = `${charmCap.toLocaleString()} pulseras`;
+            capacities.push(charmCap);
+            materialDetails.push({
+                id: 'dije',
+                name: `Dije: ${charm.name}`,
+                singleQty: 1,
+                stock: charmStock,
+                capacity: charmCap,
+                unitName: 'dijes'
+            });
+        }
 
         // 2. Calcular para hilo (ingresado en metros)
         const threadStockM = parseFloat(stockInputs.thread) || 0;
@@ -970,6 +1142,397 @@ const MaterialsCalculatorModule = (() => {
         `;
     }
 
+    /* ======================================================================
+       Inventario disponible, dijes y diseños en producción
+       ====================================================================== */
+
+    /**
+     * Materiales por pulsera de un diseño. El neopreno se asigna al color elegido.
+     * Retorna { clave: cantidad }, donde la clave es typeId de balín.
+     */
+    function designRequirements(seq, neoColor) {
+        const beads = {};
+        seq.forEach(item => {
+            const id = item.typeId.includes('neopreno') ? `neopreno_${neoColor}` : item.typeId;
+            beads[id] = (beads[id] || 0) + item.qty;
+        });
+        return beads;
+    }
+
+    function getStockValue(key) {
+        if (key.startsWith('dije:')) {
+            const dije = getDije(key.slice(5));
+            return dije ? (parseFloat(dije.stock) || 0) : 0;
+        }
+        return parseFloat(stockInputs[key]) || 0;
+    }
+
+    function keyLabel(key) {
+        if (key === 'thread') return 'Hilo / Cordón Elástico';
+        if (key.startsWith('dije:')) {
+            const dije = getDije(key.slice(5));
+            return `Dije: ${dije ? dije.name : '(eliminado)'}`;
+        }
+        return BEAD_TYPES[key] ? BEAD_TYPES[key].name : key;
+    }
+
+    function keyUnit(key) {
+        if (key === 'thread') return 'm';
+        return 'ud';
+    }
+
+    function formatAmount(key, value) {
+        const rounded = key === 'thread' ? Math.round(value * 100) / 100 : Math.round(value);
+        return `${rounded.toLocaleString()} ${keyUnit(key)}`;
+    }
+
+    /** Material consumido por todos los diseños en producción */
+    function computeUsage() {
+        const used = {};
+        const add = (key, n) => { used[key] = (used[key] || 0) + n; };
+        productions.forEach(p => {
+            Object.entries(designRequirements(p.sequence, p.color)).forEach(([id, n]) => add(id, n * p.qty));
+            add('thread', (p.threadCm * p.qty) / 100);
+            if (p.dijeId) add(`dije:${p.dijeId}`, p.qty);
+        });
+        return used;
+    }
+
+    /** Claves de materiales que muestra la tabla de inventario */
+    function stockKeys() {
+        return [...Object.keys(BEAD_TYPES), 'thread', ...dijes.map(d => `dije:${d.id}`)];
+    }
+
+    function renderDijeSelect() {
+        const select = document.getElementById('matCalcDijeSelect');
+        if (!select) return;
+        if (!getDije(selectedDijeId)) selectedDijeId = '';
+        select.innerHTML = `<option value="">Sin dije</option>` + dijes.map(d => `
+            <option value="${d.id}">${esc(d.name)} (${CHARM_SHAPES[d.shape] || d.shape}, ${(CHARM_COLORS[d.color] || {}).name || d.color})</option>
+        `).join('');
+        select.value = selectedDijeId;
+    }
+
+    function refreshDesignViews() {
+        renderPreview();
+        updateCalculations();
+        if (activeTab === 'inverse') renderInverseTable();
+    }
+
+    function bindStockControls() {
+        const dijeSelect = document.getElementById('matCalcDijeSelect');
+        if (dijeSelect) {
+            dijeSelect.addEventListener('change', (e) => {
+                selectedDijeId = e.target.value;
+                refreshDesignViews();
+            });
+        }
+        renderDijeSelect();
+
+        const shapeSelect = document.getElementById('matCalcDijeShape');
+        if (shapeSelect) {
+            shapeSelect.innerHTML = Object.entries(CHARM_SHAPES).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+        }
+        const colorSelect = document.getElementById('matCalcDijeColor');
+        if (colorSelect) {
+            colorSelect.innerHTML = Object.entries(CHARM_COLORS).map(([k, v]) => `<option value="${k}">${v.name}</option>`).join('');
+        }
+
+        const btnAddDije = document.getElementById('btnMatCalcAddDije');
+        if (btnAddDije) {
+            btnAddDije.addEventListener('click', () => {
+                const nameInput = document.getElementById('matCalcDijeName');
+                const stockInput = document.getElementById('matCalcDijeStock');
+                const name = nameInput ? nameInput.value.trim() : '';
+                if (!name) {
+                    Utils.showToast('Escribe el nombre del dije', 'warning');
+                    return;
+                }
+                dijes.push({
+                    id: `d${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`,
+                    name,
+                    shape: shapeSelect ? shapeSelect.value : 'medalla',
+                    color: colorSelect ? colorSelect.value : 'dorado',
+                    stock: Math.max(0, parseInt(stockInput && stockInput.value) || 0)
+                });
+                if (nameInput) nameInput.value = '';
+                if (stockInput) stockInput.value = '';
+                saveState();
+                renderDijeSelect();
+                renderStockTab();
+                Utils.showToast('Dije agregado al inventario', 'success');
+            });
+        }
+
+        const stockTable = document.getElementById('matCalcStockTable');
+        if (stockTable) {
+            stockTable.addEventListener('input', (e) => {
+                const key = e.target.dataset && e.target.dataset.stockKey;
+                if (!key) return;
+                const val = Math.max(0, parseFloat(e.target.value) || 0);
+                if (key.startsWith('dije:')) {
+                    const dije = getDije(key.slice(5));
+                    if (dije) dije.stock = val;
+                } else {
+                    stockInputs[key] = val;
+                }
+                saveState();
+                refreshStockCells();
+                renderStockSummary();
+            });
+        }
+
+        const btnAddProd = document.getElementById('btnMatCalcAddProduction');
+        if (btnAddProd) {
+            btnAddProd.addEventListener('click', addCurrentDesignToProduction);
+        }
+
+        const prodColor = document.getElementById('matCalcProdColor');
+        if (prodColor) {
+            prodColor.addEventListener('change', renderStockSummary);
+        }
+    }
+
+    function addCurrentDesignToProduction() {
+        if (sequence.length === 0) {
+            Utils.showToast('Arma un diseño antes de agregarlo a producción', 'warning');
+            return;
+        }
+        const nameInput = document.getElementById('matCalcProdName');
+        const colorSelect = document.getElementById('matCalcProdColor');
+        const qtyInput = document.getElementById('matCalcProdQty');
+
+        const qty = Math.max(1, parseInt(qtyInput && qtyInput.value) || 1);
+        const name = (nameInput && nameInput.value.trim()) || `Diseño ${productions.length + 1}`;
+
+        productions.push({
+            id: `p${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`,
+            name,
+            color: colorSelect ? colorSelect.value : 'negro',
+            qty,
+            sequence: JSON.parse(JSON.stringify(sequence)),
+            dijeId: selectedDijeId || '',
+            threadCm: threadLengthCm
+        });
+        if (nameInput) nameInput.value = '';
+        saveState();
+        renderStockTab();
+
+        const short = Object.entries(computeUsage())
+            .filter(([key, used]) => used > getStockValue(key) + 1e-9)
+            .map(([key]) => keyLabel(key));
+        if (short.length > 0) {
+            Utils.showToast(`Diseño agregado, pero falta material: ${short.join(', ')}`, 'warning');
+        } else {
+            Utils.showToast('Diseño agregado. Material descontado del disponible', 'success');
+        }
+    }
+
+    function changeProductionQty(id, delta) {
+        const prod = productions.find(p => p.id === id);
+        if (!prod) return;
+        prod.qty = Math.max(1, prod.qty + delta);
+        saveState();
+        renderStockTab();
+    }
+
+    function removeProduction(id) {
+        productions = productions.filter(p => p.id !== id);
+        saveState();
+        renderStockTab();
+        Utils.showToast('Diseño quitado. Material devuelto al disponible', 'info');
+    }
+
+    function loadProduction(id) {
+        const prod = productions.find(p => p.id === id);
+        if (!prod) return;
+        sequence = JSON.parse(JSON.stringify(prod.sequence));
+        selectedDijeId = getDije(prod.dijeId) ? prod.dijeId : '';
+        threadLengthCm = prod.threadCm;
+        const threadInput = document.getElementById('matCalcThreadPerBrac');
+        if (threadInput) threadInput.value = threadLengthCm;
+        renderDijeSelect();
+        renderSequenceList();
+        refreshDesignViews();
+        Utils.showToast('Diseño cargado en el editor', 'info');
+    }
+
+    function removeDije(id) {
+        if (productions.some(p => p.dijeId === id)) {
+            Utils.showToast('Ese dije se usa en un diseño en producción. Quita el diseño primero', 'warning');
+            return;
+        }
+        dijes = dijes.filter(d => d.id !== id);
+        if (selectedDijeId === id) selectedDijeId = '';
+        saveState();
+        renderDijeSelect();
+        refreshDesignViews();
+        renderStockTab();
+    }
+
+    function renderStockTab() {
+        const tableBody = document.getElementById('matCalcStockTable');
+        if (!tableBody) return;
+
+        const rows = stockKeys().map(key => {
+            let dot = '';
+            let label = '';
+            if (key === 'thread') {
+                dot = `<span style="font-size: 1.1rem; flex-shrink: 0;">🧵</span>`;
+                label = `<strong>${keyLabel(key)}</strong> <span style="font-size: 0.75rem; color: var(--text-muted);">(metros)</span>`;
+            } else if (key.startsWith('dije:')) {
+                const dije = getDije(key.slice(5));
+                const c = CHARM_COLORS[dije.color] || CHARM_COLORS.dorado;
+                dot = `<div class="bead-color-dot" style="width: 12px; height: 12px; background: ${c.fill}; flex-shrink: 0;"></div>`;
+                label = `<strong>Dije: ${esc(dije.name)}</strong> <span style="font-size: 0.75rem; color: var(--text-muted);">(${CHARM_SHAPES[dije.shape] || ''})</span>
+                    <button type="button" class="bead-action-btn delete-btn" title="Eliminar dije" onclick="MaterialsCalculatorModule.removeDije('${dije.id}')" style="margin-left: 0.25rem;">✕</button>`;
+            } else {
+                const bead = BEAD_TYPES[key];
+                dot = `<div class="bead-color-dot" style="width: 12px; height: 12px; background: ${bead.displayColor}; flex-shrink: 0;"></div>`;
+                label = `<strong>${bead.name}</strong>`;
+            }
+            const current = getStockValue(key);
+            return `
+                <tr>
+                    <td><div style="display: flex; align-items: center; gap: 0.5rem;">${dot}<span>${label}</span></div></td>
+                    <td style="text-align: center;">
+                        <input type="number" class="form-control input-sm" data-stock-key="${key}" value="${current || ''}" min="0" ${key === 'thread' ? 'step="0.1"' : ''} placeholder="0"
+                               style="width: 100px; text-align: center; padding: 0.25rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary);">
+                    </td>
+                    <td style="text-align: center;" id="stk-used-${key}">0</td>
+                    <td style="text-align: center; font-weight: 700;" id="stk-avail-${key}">0</td>
+                </tr>
+            `;
+        }).join('');
+        tableBody.innerHTML = rows;
+
+        refreshStockCells();
+        renderProductionList();
+        renderStockSummary();
+    }
+
+    /** Actualiza las columnas "Usado" y "Disponible" sin tocar los inputs (conserva el foco) */
+    function refreshStockCells() {
+        const used = computeUsage();
+        stockKeys().forEach(key => {
+            const u = used[key] || 0;
+            const avail = getStockValue(key) - u;
+            const usedCell = document.getElementById(`stk-used-${key}`);
+            const availCell = document.getElementById(`stk-avail-${key}`);
+            if (usedCell) usedCell.textContent = formatAmount(key, u);
+            if (availCell) {
+                availCell.textContent = formatAmount(key, avail);
+                availCell.style.color = avail < -1e-9 ? 'var(--danger)' : (u > 0 ? 'var(--primary)' : 'var(--text-primary)');
+            }
+        });
+    }
+
+    function renderProductionList() {
+        const list = document.getElementById('matCalcProductionList');
+        if (!list) return;
+
+        if (productions.length === 0) {
+            list.innerHTML = `
+                <div style="text-align: center; padding: 1rem; color: var(--text-muted); font-style: italic; font-size: 0.85rem;">
+                    Aún no has agregado diseños. Arma uno arriba y agrégalo para descontar su material.
+                </div>
+            `;
+            return;
+        }
+
+        list.innerHTML = productions.map(p => {
+            const dije = getDije(p.dijeId);
+            const neo = BEAD_TYPES[`neopreno_${p.color}`];
+            const beadCount = p.sequence.reduce((sum, i) => sum + i.qty, 0);
+            return `
+                <div class="bead-sequence-item">
+                    <div class="bead-info-col">
+                        <div class="bead-color-dot" style="background: ${neo ? neo.displayColor : '#888'};"></div>
+                        <div class="bead-name-text">
+                            ${esc(p.name)}
+                            <span style="font-size: 0.75rem; color: var(--text-muted);">
+                                (${beadCount} balines · neopreno ${p.color}${dije ? ` · dije ${esc(dije.name)}` : ''} · ${p.threadCm} cm hilo)
+                            </span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center;">
+                        <div class="bead-qty-controls">
+                            <button type="button" class="bead-qty-btn" onclick="MaterialsCalculatorModule.changeProductionQty('${p.id}', -1)">−</button>
+                            <span class="bead-qty-display">${p.qty}</span>
+                            <button type="button" class="bead-qty-btn" onclick="MaterialsCalculatorModule.changeProductionQty('${p.id}', 1)">+</button>
+                        </div>
+                        <div class="bead-action-controls">
+                            <button type="button" class="bead-action-btn" title="Cargar en el editor" onclick="MaterialsCalculatorModule.loadProduction('${p.id}')">✎</button>
+                            <button type="button" class="bead-action-btn delete-btn" title="Quitar de producción" onclick="MaterialsCalculatorModule.removeProduction('${p.id}')">✕</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /** Resumen: total en producción y cuántas pulseras más del diseño actual alcanzan */
+    function renderStockSummary() {
+        const box = document.getElementById('matCalcStockSummary');
+        if (!box) return;
+
+        const totalBracelets = productions.reduce((sum, p) => sum + p.qty, 0);
+        const used = computeUsage();
+        const deficits = Object.entries(used)
+            .filter(([key, u]) => u > getStockValue(key) + 1e-9)
+            .map(([key, u]) => `<li>Faltan <strong>${formatAmount(key, u - getStockValue(key))}</strong> de ${esc(keyLabel(key))}</li>`);
+
+        let html = `
+            <span style="display: block; font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 600; letter-spacing: 0.05em;">
+                Pulseras en producción
+            </span>
+            <span style="display: block; font-size: 2rem; font-weight: 800; color: var(--primary); line-height: 1.2;">
+                ${totalBracelets.toLocaleString()}
+            </span>
+        `;
+
+        if (deficits.length > 0) {
+            html += `
+                <div style="text-align: left; margin-top: 0.75rem; font-size: 0.8rem; color: var(--danger);">
+                    <strong>⚠️ Material insuficiente para lo planeado:</strong>
+                    <ul style="padding-left: 1.2rem; margin: 0.25rem 0 0; line-height: 1.4;">${deficits.join('')}</ul>
+                </div>
+            `;
+        }
+
+        // Capacidad restante con el diseño que está en el editor
+        if (sequence.length > 0) {
+            const colorSelect = document.getElementById('matCalcProdColor');
+            const color = colorSelect ? colorSelect.value : 'negro';
+            const perBracelet = designRequirements(sequence, color);
+            perBracelet.thread = threadLengthCm / 100;
+            if (selectedDijeId) perBracelet[`dije:${selectedDijeId}`] = 1;
+
+            let maxMore = Infinity;
+            let limiting = [];
+            Object.entries(perBracelet).forEach(([key, per]) => {
+                const remaining = getStockValue(key) - (used[key] || 0);
+                const cap = Math.max(0, Math.floor((remaining + 1e-9) / per));
+                if (cap < maxMore) {
+                    maxMore = cap;
+                    limiting = [key];
+                } else if (cap === maxMore) {
+                    limiting.push(key);
+                }
+            });
+
+            html += `
+                <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px dashed var(--border); font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
+                    Con lo que queda disponible aún puedes hacer
+                    <strong style="color: var(--text-primary);">${maxMore.toLocaleString()} pulseras</strong> más del diseño actual
+                    ${maxMore === 0 || limiting.length ? `(limita: ${limiting.map(k => esc(keyLabel(k))).join(', ')})` : ''}.
+                </div>
+            `;
+        }
+
+        box.innerHTML = html;
+    }
+
     /**
      * Genera y exporta los resultados de los cálculos a un libro de Excel
      */
@@ -1050,6 +1613,17 @@ const MaterialsCalculatorModule = (() => {
                     beadType.sizeName
                 ]);
             });
+
+            const charm = getDije(selectedDijeId);
+            if (charm) {
+                data.push([
+                    `Dije: ${charm.name}`,
+                    1,
+                    batchSize,
+                    Math.ceil(batchSize * (1 + wastagePercent / 100)),
+                    `${CHARM_SHAPES[charm.shape] || ''} ${(CHARM_COLORS[charm.color] || {}).name || ''}`.trim()
+                ]);
+            }
 
             const singleThreadM = threadLengthCm / 100;
             const totalThreadM = singleThreadM * batchSize;
@@ -1214,6 +1788,19 @@ const MaterialsCalculatorModule = (() => {
                 yPos += 8;
             });
 
+            const charm = getDije(selectedDijeId);
+            if (charm) {
+                doc.text(`Dije: ${charm.name}`, 23, yPos);
+                doc.text('1 ud', 100, yPos, { align: 'right' });
+                doc.text(`${batchSize.toLocaleString()} ud`, 140, yPos, { align: 'right' });
+                doc.setFont('helvetica', 'bold');
+                doc.text(`${Math.ceil(batchSize * (1 + wastagePercent / 100)).toLocaleString()} ud`, 185, yPos, { align: 'right' });
+                doc.setFont('helvetica', 'normal');
+                doc.setDrawColor(240, 242, 245);
+                doc.line(20, yPos + 3, 190, yPos + 3);
+                yPos += 8;
+            }
+
             const singleThreadM = threadLengthCm / 100;
             const totalThreadM = singleThreadM * batchSize;
             const totalThreadWithWastageM = totalThreadM * (1 + wastagePercent / 100);
@@ -1269,7 +1856,11 @@ const MaterialsCalculatorModule = (() => {
         init,
         updateBeadQty,
         moveBead,
-        removeBeadGroup
+        removeBeadGroup,
+        changeProductionQty,
+        removeProduction,
+        loadProduction,
+        removeDije
     };
 })();
 

@@ -2546,6 +2546,21 @@
                                         <!-- Dynamic items -->
                                     </div>
                                 </div>
+
+                                <!-- Dije (colgante) del diseño -->
+                                <div style="display: flex; gap: 0.5rem; align-items: flex-end; margin-top: 1rem; padding-top: 0.75rem; border-top: 1px dashed var(--border); flex-wrap: wrap;">
+                                    <div style="flex: 1; min-width: 180px;">
+                                        <label for="matCalcDijeSelect" style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">
+                                            Dije del diseño (1 por pulsera)
+                                        </label>
+                                        <select id="matCalcDijeSelect" class="form-control" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                            <option value="">Sin dije</option>
+                                        </select>
+                                    </div>
+                                    <span style="font-size: 0.72rem; color: var(--text-muted); padding-bottom: 0.5rem;">
+                                        Crea dijes nuevos en la pestaña «Material Disponible».
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2588,6 +2603,9 @@
                                     </button>
                                     <button class="mat-tab" id="btnTabInverse" type="button">
                                         Capacidad (Pulseras Posibles)
+                                    </button>
+                                    <button class="mat-tab" id="btnTabStock" type="button">
+                                        Material Disponible
                                     </button>
                                 </div>
                             </div>
@@ -2655,6 +2673,85 @@
                                     
                                     <!-- Caja de Resultados de Capacidad -->
                                     <div id="inverseResultCard" style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1.25rem; border-radius: var(--radius-md); text-align: center;">
+                                        <!-- Dynamic summary -->
+                                    </div>
+                                </div>
+
+                                <!-- Contenedor Material Disponible / Producción -->
+                                <div id="containerStockCalc" style="display: none;">
+                                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;">
+                                        Registra el material que tienes físicamente. Cada diseño que agregues a producción descuenta su material del disponible.
+                                    </p>
+
+                                    <div class="table-container" style="margin-bottom: 1.25rem;">
+                                        <table class="table" style="font-size: 0.875rem;">
+                                            <thead>
+                                                <tr>
+                                                    <th>Material</th>
+                                                    <th style="text-align: center; width: 130px;">Material Disponible</th>
+                                                    <th style="text-align: center;">Usado en Diseños</th>
+                                                    <th style="text-align: center; color: var(--primary);">Restante</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="matCalcStockTable">
+                                                <!-- Dynamic stock rows -->
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Alta de dijes -->
+                                    <div style="background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 1.25rem;">
+                                        <span style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Añadir un dije al inventario</span>
+                                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
+                                            <div style="flex: 2; min-width: 150px;">
+                                                <label for="matCalcDijeName" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Nombre</label>
+                                                <input type="text" id="matCalcDijeName" placeholder="Ej. Medalla San Benito" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                            </div>
+                                            <div style="flex: 1; min-width: 110px;">
+                                                <label for="matCalcDijeShape" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Forma</label>
+                                                <select id="matCalcDijeShape" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);"></select>
+                                            </div>
+                                            <div style="flex: 1; min-width: 110px;">
+                                                <label for="matCalcDijeColor" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Color</label>
+                                                <select id="matCalcDijeColor" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);"></select>
+                                            </div>
+                                            <div style="width: 90px;">
+                                                <label for="matCalcDijeStock" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Stock</label>
+                                                <input type="number" id="matCalcDijeStock" min="0" placeholder="0" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                            </div>
+                                            <button class="btn btn-secondary" id="btnMatCalcAddDije" style="padding: 0.4rem 1rem;">+ Dije</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Agregar el diseño actual a producción -->
+                                    <div style="background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 1.25rem;">
+                                        <span style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Agregar el diseño actual a producción</span>
+                                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
+                                            <div style="flex: 2; min-width: 150px;">
+                                                <label for="matCalcProdName" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Nombre del diseño</label>
+                                                <input type="text" id="matCalcProdName" placeholder="Ej. San Benito Negra" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                            </div>
+                                            <div style="flex: 1; min-width: 120px;">
+                                                <label for="matCalcProdColor" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Neopreno</label>
+                                                <select id="matCalcProdColor" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                                    <option value="negro">Negro</option>
+                                                    <option value="rojo">Rojo</option>
+                                                </select>
+                                            </div>
+                                            <div style="width: 90px;">
+                                                <label for="matCalcProdQty" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Pulseras</label>
+                                                <input type="number" id="matCalcProdQty" value="1" min="1" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                            </div>
+                                            <button class="btn btn-primary" id="btnMatCalcAddProduction" style="padding: 0.4rem 1rem;">+ Producir</button>
+                                        </div>
+                                    </div>
+
+                                    <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-bottom: 0.5rem;">Diseños en producción</div>
+                                    <div id="matCalcProductionList" class="bead-sequence-list" style="margin-bottom: 1.25rem;">
+                                        <!-- Dynamic production rows -->
+                                    </div>
+
+                                    <div id="matCalcStockSummary" style="background: var(--surface-hover); border: 1px solid var(--border); padding: 1.25rem; border-radius: var(--radius-md); text-align: center;">
                                         <!-- Dynamic summary -->
                                     </div>
                                 </div>
@@ -8456,7 +8553,7 @@
     <script src="js/finance.js?v=2.7.0"></script>
     <script src="js/expenses.js?v=2.7.0"></script>
     <script src="js/income-statement.js?v=2.7.3"></script>
-    <script src="js/materials-calculator.js?v=2.7.0"></script>
+    <script src="js/materials-calculator.js?v=2.8.0"></script>
     <script src="js/journal-data.js?v=2.7.0"></script>
     <script src="js/journal.js?v=2.7.0"></script>
     <script src="js/app.js?v=2.7.0"></script>
