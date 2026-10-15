@@ -1240,11 +1240,80 @@ const MultimediaModule = {
     // Carpetas fijas + las que ya existan en el catálogo cargado.
     getImageCategories() {
         const base = ['Anuncios / Ads', 'Creativos', 'Productos', 'Banners', 'UGC', 'Testimonios', 'General'];
+        this.getCustomImageFolders().forEach(cat => {
+            if (!base.includes(cat)) base.push(cat);
+        });
         (this.images || []).forEach(img => {
             const cat = img.category || 'General';
             if (!base.includes(cat)) base.push(cat);
         });
         return base;
+    },
+
+    // Carpetas creadas por el usuario (persisten aunque estén vacías).
+    getCustomImageFolders() {
+        try {
+            const arr = JSON.parse(localStorage.getItem('multimedia_image_folders') || '[]');
+            return Array.isArray(arr) ? arr.filter(x => typeof x === 'string' && x.trim()) : [];
+        } catch (e) { return []; }
+    },
+
+    createImageFolder(presetName) {
+        let name = presetName;
+        if (name === undefined) name = window.prompt('Nombre de la nueva carpeta:');
+        name = (name || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+        if (!name) return null;
+
+        const existente = this.getImageCategories().find(c => c.toLowerCase() === name.toLowerCase());
+        if (existente) {
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(`La carpeta "${existente}" ya existe.`, 'info');
+            this.selectedImageCategory = existente;
+        } else {
+            try {
+                const lista = this.getCustomImageFolders();
+                lista.push(name);
+                localStorage.setItem('multimedia_image_folders', JSON.stringify(lista));
+            } catch (e) {
+                console.warn('[Multimedia] No se pudo guardar la carpeta:', e);
+            }
+            this.selectedImageCategory = name;
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(`Carpeta "${name}" creada.`, 'success');
+        }
+
+        this.renderImageCategoryOptions();
+        const modalSel = document.getElementById('modalImageCategorySelect');
+        if (modalSel) modalSel.value = this.selectedImageCategory;
+        this.renderImagesGallery();
+        this.updateImageBadgeCount();
+        return this.selectedImageCategory;
+    },
+
+    // Sube un archivo a Cloudflare Images (URL directa vía gateway). Devuelve null si falla.
+    async uploadImageToCloudflare(file, category) {
+        const cf = this.getCloudflareConfig();
+        if (!cf.accountId || !cf.apiToken) return null;
+        try {
+            const gw = await fetch(`/api/cloudflare-images?action=get_upload_url&folder=${encodeURIComponent(category)}&name=${encodeURIComponent(file.name)}`, {
+                headers: { 'x-account-id': cf.accountId, 'x-api-token': cf.apiToken }
+            });
+            const info = await gw.json().catch(() => ({}));
+            if (!gw.ok || !info.success) throw new Error(info.error || `Gateway HTTP ${gw.status}`);
+
+            const fd = new FormData();
+            fd.append('file', file);
+            const up = await fetch(info.uploadURL, { method: 'POST', body: fd });
+            const data = await up.json().catch(() => ({}));
+            if (!up.ok || !data.success) throw new Error((data.errors && data.errors[0] && data.errors[0].message) || `HTTP ${up.status}`);
+
+            const variants = data.result && data.result.variants;
+            return {
+                id: data.result.id,
+                url: (variants && variants[0]) || `https://imagedelivery.net/${cf.accountId}/${data.result.id}/public`
+            };
+        } catch (e) {
+            console.warn('[Multimedia] Subida a Cloudflare Images falló, se guardará localmente:', e.message);
+            return null;
+        }
     },
 
     async loadImages() {
@@ -1864,6 +1933,21 @@ const MultimediaModule = {
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
                     const id = 'img_file_' + Date.now() + '_' + i;
+                    const remota = await this.uploadImageToCloudflare(file, category);
+                    if (remota) {
+                        nuevas.push({
+                            id: remota.id,
+                            title: file.name.replace(/\.[^/.]+$/, ''),
+                            category: category,
+                            url: remota.url,
+                            thumbnail_url: remota.url,
+                            size_bytes: file.size,
+                            file_name: file.name,
+                            source_type: 'cloudflare',
+                            created_at: new Date().toISOString()
+                        });
+                        continue;
+                    }
                     // Guardar el archivo real: así sobrevive a la recarga y entra en el ZIP
                     await this.saveImageBlob(id, file);
                     const objUrl = URL.createObjectURL(file);
