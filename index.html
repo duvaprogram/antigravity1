@@ -5665,7 +5665,7 @@
                                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                                 </svg>
                                 Multimedia
-                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.8.1</span>
+                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.8.2</span>
                             </h2>
                             <p style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
                                 Biblioteca centralizada de imágenes y videos (Cloudflare & CDN) para anuncios y creativos
@@ -5719,9 +5719,9 @@
                                     </p>
                                 </div>
                                 <div class="multimedia-toolbar-right" style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                                    <button type="button" class="btn btn-secondary" onclick="MultimediaModule.openUploadImageModal()" title="Agregar enlaces de imagen o subir archivos de tu equipo al catálogo" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; padding: 0.45rem 0.85rem; border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; background: rgba(16, 185, 129, 0.1);">
+                                    <button type="button" class="btn btn-secondary" onclick="MultimediaModule.openUploadImageModal()" title="Subir imágenes desde tu equipo o agregar enlaces al catálogo" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; padding: 0.45rem 0.85rem; border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; background: rgba(16, 185, 129, 0.1);">
                                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                                        <span>+ Registrar Imagen</span>
+                                        <span>+ Subir / Registrar Imagen</span>
                                     </button>
                                     <button type="button" class="btn btn-secondary" id="btnExportImagesCrm" onclick="MultimediaModule.exportarImagenesCsvParaCrm()" style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; font-weight: 600; padding: 0.45rem 0.85rem;">
                                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -5777,8 +5777,8 @@
                             <p id="multimediaImagesEmptyText" style="margin: 0 auto 1rem auto; max-width: 480px; font-size: 0.85rem; color: var(--text-muted);">
                                 Registra imágenes (enlaces o archivos de tu equipo) para poder seleccionarlas, exportarlas al CRM y descargarlas en ZIP.
                             </p>
-                            <button type="button" class="btn btn-primary" onclick="MultimediaModule.openUploadImageModal()" style="background: #10b981; border-color: #10b981; font-weight: 600;">
-                                + Registrar mis primeras imágenes
+                            <button type="button" class="btn btn-primary" id="btnEmptyRegisterImages" onclick="MultimediaModule.openUploadImageModal()" style="background: #10b981; border-color: #10b981; font-weight: 600;">
+                                + Subir o Registrar imágenes
                             </button>
                         </div>
 
@@ -8318,24 +8318,24 @@
         </div>
     </div>
 
-    <!-- Modal: Registrar Imagen para Catálogo -->
+    <!-- Modal: Registrar / Subir Imagen para Catálogo -->
     <div class="modal" id="modalUploadImage">
         <div class="modal-content" style="max-width: 560px; background: #0e0e22; border: 1px solid rgba(16, 185, 129, 0.4);">
             <div class="modal-header" style="border-bottom: 1px solid var(--border); padding-bottom: 0.75rem;">
                 <div>
                     <h2 style="margin: 0; font-size: 1.15rem; display: flex; align-items: center; gap: 0.5rem; color: #34d399;">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                        <span>Registrar Imágenes para Catálogo / Descargas</span>
+                        <span>Subir o Registrar Imágenes</span>
                     </h2>
                     <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-muted);">
-                        Pega enlaces URL de imágenes o sube archivos para empaquetarlos en las descargas ZIP y CSV del CRM.
+                        Sube fotos de tu equipo o pega enlaces de imagen para organizarlas por carpeta y descargarlas en ZIP.
                     </p>
                 </div>
-                <button type="button" class="modal-close" onclick="Utils.closeModal('modalUploadImage')">&times;</button>
+                <button type="button" class="modal-close" onclick="MultimediaModule.closeUploadImageModal()">&times;</button>
             </div>
             <div class="modal-body" style="padding: 1rem 0;">
                 <div class="form-group" style="margin-bottom: 1rem;">
-                    <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Carpeta / Categoría:</label>
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Carpeta de destino:</label>
                     <div style="display: flex; gap: 0.5rem;">
                         <select id="modalImageCategorySelect" class="form-control" style="flex: 1;">
                             <option value="Anuncios / Ads">📢 Anuncios / Ads</option>
@@ -8348,20 +8348,23 @@
                     </div>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 1rem;">
-                    <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Enlaces URL de Imágenes (Pega 1 o varias por línea):</label>
-                    <textarea id="modalImageUrlTextArea" class="form-control" rows="4" placeholder="https://imagedelivery.net/...&#10;https://ejemplo.com/imagen2.jpg"></textarea>
-                    <small style="color: var(--text-muted); font-size: 0.75rem;">Puedes pegar múltiples enlaces separados por salto de línea.</small>
+                <div class="form-group" style="margin-bottom: 1.1rem; padding: 0.9rem; background: rgba(16, 185, 129, 0.05); border: 1px dashed rgba(16, 185, 129, 0.4); border-radius: 8px;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.4rem; color: #34d399;">
+                        📁 Opción 1: Seleccionar archivos de imagen de tu equipo (fotos, banners, etc.):
+                    </label>
+                    <input type="file" id="modalImageFileInput" accept="image/*" class="form-control" multiple onchange="MultimediaModule.onModalImageFilesChange(this)" style="cursor: pointer;">
+                    <div id="modalImageFilesPreview"></div>
                 </div>
 
-                <div class="form-group" style="margin-bottom: 1rem;">
-                    <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">O seleccionar archivos de imagen del equipo:</label>
-                    <input type="file" id="modalImageFileInput" accept="image/*" class="form-control" multiple>
+                <div class="form-group" style="margin-bottom: 0.5rem;">
+                    <label style="font-weight: 600; display: block; margin-bottom: 0.4rem;">O pegar enlaces URL web (1 o varios por línea):</label>
+                    <textarea id="modalImageUrlTextArea" class="form-control" rows="3" placeholder="https://imagedelivery.net/...&#10;https://ejemplo.com/imagen2.jpg"></textarea>
+                    <small style="color: var(--text-muted); font-size: 0.75rem;">Opcional: puedes pegar URLs directas si ya están alojadas en la nube.</small>
                 </div>
             </div>
             <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; border-top: 1px solid var(--border); padding-top: 0.75rem;">
-                <button type="button" class="btn btn-secondary" onclick="Utils.closeModal('modalUploadImage')">Cancelar</button>
-                <button type="button" class="btn btn-primary" onclick="MultimediaModule.saveImageRecordFromModal()" style="background: #10b981; border-color: #10b981; font-weight: 600;">💾 Guardar e Incluir en Catálogo</button>
+                <button type="button" class="btn btn-secondary" onclick="MultimediaModule.closeUploadImageModal()">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btnSaveImageRecord" onclick="MultimediaModule.saveImageRecordFromModal()" style="background: #10b981; border-color: #10b981; font-weight: 600;">💾 Guardar e Incluir en Catálogo</button>
             </div>
         </div>
     </div>
@@ -8449,7 +8452,7 @@
     <script src="js/campaigns.js?v=2.7.0"></script>
     <script src="js/meta-ads.js?v=2.7.0"></script>
     <script src="js/calculator.js?v=2.7.0"></script>
-    <script src="js/multimedia.js?v=2.8.1"></script>
+    <script src="js/multimedia.js?v=2.8.2"></script>
     <script src="js/finance.js?v=2.7.0"></script>
     <script src="js/expenses.js?v=2.7.0"></script>
     <script src="js/income-statement.js?v=2.7.3"></script>

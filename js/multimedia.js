@@ -5,7 +5,7 @@
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.8.0',
+    version: '2.8.2',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -476,7 +476,7 @@ const MultimediaModule = {
                     return resolve(null);
                 }
 
-                const request = indexedDB.open('MultimediaDB', 2);
+                const request = indexedDB.open('MultimediaDB', 4);
                 request.onupgradeneeded = (e) => {
                     const db = e.target.result;
                     if (!db.objectStoreNames.contains('video_files')) {
@@ -1544,12 +1544,17 @@ const MultimediaModule = {
                 const hayCatalogo = (this.images || []).length > 0;
                 const titulo = document.getElementById('multimediaImagesEmptyTitle');
                 const texto = document.getElementById('multimediaImagesEmptyText');
+                const btnEmpty = empty.querySelector('button');
+                const catNombre = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos') ? this.selectedImageCategory : '';
                 if (titulo) titulo.textContent = hayCatalogo
-                    ? 'Ninguna imagen coincide con este filtro'
+                    ? (catNombre ? `Carpeta "${catNombre}" sin imágenes` : 'Ninguna imagen coincide con este filtro')
                     : 'Tu catálogo de imágenes está vacío';
                 if (texto) texto.textContent = hayCatalogo
-                    ? 'Cambia la carpeta o limpia la búsqueda para ver el resto del catálogo.'
-                    : 'Registra imágenes (enlaces o archivos de tu equipo) para poder seleccionarlas, exportarlas al CRM y descargarlas en ZIP.';
+                    ? (catNombre ? `Esta carpeta aún no tiene fotos. Haz clic en el botón de abajo para subir tus primeras imágenes aquí.` : 'Cambia la carpeta o limpia la búsqueda para ver el resto del catálogo.')
+                    : 'Registra o sube imágenes (archivos de tu equipo o enlaces) para poder organizarlas y descargarlas en ZIP.';
+                if (btnEmpty) btnEmpty.textContent = catNombre
+                    ? `+ Subir imágenes a "${catNombre}"`
+                    : '+ Subir o Registrar imágenes';
             }
             return;
         }
@@ -1875,7 +1880,10 @@ const MultimediaModule = {
     openUploadImageModal() {
         try {
             const modal = document.getElementById('modalUploadImage');
-            if (!modal) return;
+            if (!modal) {
+                console.error('[Multimedia] Modal modalUploadImage no encontrado');
+                return;
+            }
 
             this.renderImageCategoryOptions();
 
@@ -1884,23 +1892,54 @@ const MultimediaModule = {
             if (text) text.value = '';
             if (fileInput) fileInput.value = '';
 
-            // Preseleccionar la carpeta que el usuario está viendo
+            const preview = document.getElementById('modalImageFilesPreview');
+            if (preview) preview.innerHTML = '';
+
+            // Preseleccionar la carpeta que el usuario está viendo actualmente
             const catSelect = document.getElementById('modalImageCategorySelect');
             if (catSelect && this.selectedImageCategory && this.selectedImageCategory !== 'Todos') {
                 catSelect.value = this.selectedImageCategory;
             }
 
-            if (typeof Utils !== 'undefined' && Utils.openModal) {
-                Utils.openModal('modalUploadImage');
-            } else {
-                modal.classList.add('active');
-                modal.style.setProperty('display', 'flex', 'important');
-                document.body.style.overflow = 'hidden';
-            }
+            modal.classList.add('active');
+            modal.style.setProperty('display', 'flex', 'important');
+            modal.style.zIndex = '10005';
+            document.body.style.overflow = 'hidden';
         } catch(e){ console.error('Error al abrir modal de imagen:', e); }
     },
 
+    closeUploadImageModal() {
+        const modal = document.getElementById('modalUploadImage');
+        if (modal) {
+            modal.classList.remove('active');
+            modal.style.setProperty('display', 'none', 'important');
+            document.body.style.overflow = '';
+        }
+        if (typeof Utils !== 'undefined' && Utils.closeModal) {
+            Utils.closeModal('modalUploadImage');
+        }
+    },
+
+    onModalImageFilesChange(input) {
+        const preview = document.getElementById('modalImageFilesPreview');
+        if (!preview) return;
+        const files = input ? input.files : [];
+        if (!files || files.length === 0) {
+            preview.innerHTML = '';
+            return;
+        }
+        const nombres = Array.from(files).map(f => this.escapeHtml(f.name)).join(', ');
+        preview.innerHTML = `
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.5rem 0.75rem; margin-top: 0.4rem; font-size: 0.8rem; color: #34d399;">
+                ✅ <strong>${files.length} ${files.length === 1 ? 'archivo seleccionado' : 'archivos seleccionados'}:</strong>
+                <div style="max-height: 60px; overflow-y: auto; color: var(--text-secondary); margin-top: 0.2rem; font-size: 0.75rem;">${nombres}</div>
+            </div>
+        `;
+    },
+
     async saveImageRecordFromModal() {
+        const btnSave = document.getElementById('btnSaveImageRecord');
+        const origBtnHtml = btnSave ? btnSave.innerHTML : '';
         try {
             const categorySelect = document.getElementById('modalImageCategorySelect');
             const category = categorySelect ? categorySelect.value : 'General';
@@ -1908,6 +1947,18 @@ const MultimediaModule = {
             const textVal = textEl ? textEl.value.trim() : '';
             const fileInput = document.getElementById('modalImageFileInput');
             const files = fileInput ? fileInput.files : [];
+
+            if (!textVal && (!files || files.length === 0)) {
+                const msg = 'Por favor selecciona archivos de imagen desde tu equipo o pega al menos un enlace URL.';
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'warning');
+                else alert(msg);
+                return;
+            }
+
+            if (btnSave) {
+                btnSave.disabled = true;
+                btnSave.innerHTML = `⏳ Guardando ${files && files.length > 0 ? files.length + ' imagen(es)...' : 'enlaces...'}`;
+            }
 
             const nuevas = [];
 
@@ -1966,7 +2017,7 @@ const MultimediaModule = {
             }
 
             if (nuevas.length === 0) {
-                const msg = 'Pega al menos un enlace que empiece por http(s):// o selecciona archivos de imagen.';
+                const msg = 'No se agregaron imágenes nuevas. Verifica los enlaces o los archivos seleccionados.';
                 if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'warning');
                 else alert(msg);
                 return;
@@ -1981,22 +2032,19 @@ const MultimediaModule = {
             this.renderImagesGallery();
             this.updateImageBadgeCount();
 
-            if (typeof Utils !== 'undefined' && Utils.closeModal) Utils.closeModal('modalUploadImage');
-            else {
-                const modal = document.getElementById('modalUploadImage');
-                if (modal) {
-                    modal.classList.remove('active');
-                    modal.style.display = '';
-                    document.body.style.overflow = '';
-                }
-            }
+            this.closeUploadImageModal();
 
             if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast(`¡Se registraron ${nuevas.length} ${nuevas.length === 1 ? 'imagen' : 'imágenes'} en "${category}" y quedaron seleccionadas!`, 'success');
+                Utils.showToast(`¡Se subieron ${nuevas.length} ${nuevas.length === 1 ? 'imagen' : 'imágenes'} a "${category}" con éxito!`, 'success');
             }
         } catch(err) {
             console.error('[Multimedia] Error al guardar imágenes:', err);
             if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Error al guardar imágenes: ' + err.message, 'error');
+        } finally {
+            if (btnSave) {
+                btnSave.disabled = false;
+                if (origBtnHtml) btnSave.innerHTML = origBtnHtml;
+            }
         }
     },
 
@@ -2554,6 +2602,16 @@ window.switchMultimediaTab = function(tab) {
             window.MultimediaModule.switchTab(tab);
         }
     } catch(e) {}
+};
+
+window.openUploadImageModal = function() {
+    try {
+        if (window.MultimediaModule) {
+            window.MultimediaModule.openUploadImageModal();
+        }
+    } catch(e) {
+        console.error('Error openUploadImageModal:', e);
+    }
 };
 
 // Auto-inicializar
