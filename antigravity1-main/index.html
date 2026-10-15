@@ -2508,17 +2508,48 @@
                         <div class="card" style="margin-top: 1.5rem;">
                             <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
                                 <h3>2. Diseño y Secuencia de Balines</h3>
-                                <div style="display: flex; gap: 0.5rem;">
-                                    <select id="matCalcPresetSelect" class="form-control btn-sm" style="max-width: 180px; padding: 0.25rem 0.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
-                                        <option value="san_benito">Preset: San Benito</option>
-                                        <option value="empty">Preset: Vacío</option>
-                                    </select>
-                                    <button class="btn btn-secondary btn-sm" id="btnMatCalcResetPreset" title="Restablecer diseño">
-                                        Reajustar
+                                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                                    <button class="btn btn-secondary btn-sm" id="btnMatCalcNewDesign" title="Empezar un nuevo diseño en blanco" type="button" style="display: flex; align-items: center; gap: 0.25rem;">
+                                        <span>+ Nuevo Diseño</span>
                                     </button>
                                 </div>
                             </div>
                             <div class="card-body">
+                                <!-- Barra de Catálogo de Diseños Guardados -->
+                                <div class="saved-designs-bar" style="background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 1rem;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.25rem;">
+                                        <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                                            💎 Catálogo de Diseños de Pulseras
+                                        </span>
+                                        <span id="matCalcDesignStatusBadge" style="font-size: 0.72rem; color: var(--text-muted);"></span>
+                                    </div>
+                                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
+                                        <div style="flex: 2; min-width: 170px;">
+                                            <label for="matCalcDesignSelect" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">
+                                                Diseño seleccionado
+                                            </label>
+                                            <select id="matCalcDesignSelect" class="form-control" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                            </select>
+                                        </div>
+                                        <div style="flex: 2; min-width: 170px;">
+                                            <label for="matCalcDesignNameInput" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">
+                                                Nombre del diseño
+                                            </label>
+                                            <input type="text" id="matCalcDesignNameInput" placeholder="Ej. San Benito Clásica" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                        </div>
+                                        <div style="display: flex; gap: 0.35rem; align-items: flex-end;">
+                                            <button class="btn btn-primary btn-sm" id="btnMatCalcSaveDesign" type="button" title="Guardar cambios en el diseño" style="padding: 0.42rem 0.75rem; display: flex; align-items: center; gap: 0.25rem;">
+                                                <span>💾 Guardar</span>
+                                            </button>
+                                            <button class="btn btn-secondary btn-sm" id="btnMatCalcSaveAsNew" type="button" title="Guardar como un nuevo diseño en el catálogo" style="padding: 0.42rem 0.75rem;">
+                                                <span>+ Copia</span>
+                                            </button>
+                                            <button class="btn btn-secondary btn-sm delete-btn" id="btnMatCalcDeleteDesign" type="button" title="Eliminar este diseño del catálogo" style="padding: 0.42rem 0.6rem; color: var(--danger);">
+                                                <span>🗑️</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div class="add-bead-panel" style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; background: var(--surface-hover); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border);">
                                     <div style="flex: 1; min-width: 180px;">
                                         <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.25rem;">Tipo de Balín a Añadir</label>
@@ -2723,22 +2754,39 @@
                                         </div>
                                     </div>
 
-                                    <!-- Agregar el diseño actual a producción -->
+                                    <!-- Agregar diseño a producción -->
                                     <div style="background: var(--surface-hover); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 1.25rem;">
-                                        <span style="display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">Agregar el diseño actual a producción</span>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; flex-wrap: wrap; gap: 0.25rem;">
+                                            <span style="font-size: 0.8rem; font-weight: 600; color: var(--text-primary);">
+                                                Agregar diseño a producción
+                                            </span>
+                                            <button type="button" class="btn btn-xs btn-secondary" id="btnMatCalcLoadSelectedToEditor" style="font-size: 0.72rem; padding: 0.2rem 0.5rem;" title="Cargar este diseño en el visor interactivo">
+                                                👁️ Ver en visor
+                                            </button>
+                                        </div>
                                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end;">
+                                            <div style="flex: 2; min-width: 170px;">
+                                                <label for="matCalcProdDesignSelect" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">
+                                                    Diseño de pulsera
+                                                </label>
+                                                <select id="matCalcProdDesignSelect" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
+                                                    <!-- Se llena con la lista de diseños guardados -->
+                                                </select>
+                                            </div>
                                             <div style="flex: 2; min-width: 150px;">
-                                                <label for="matCalcProdName" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Nombre del diseño</label>
+                                                <label for="matCalcProdName" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">
+                                                    Nombre en orden (opcional)
+                                                </label>
                                                 <input type="text" id="matCalcProdName" placeholder="Ej. San Benito Negra" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
                                             </div>
-                                            <div style="flex: 1; min-width: 120px;">
+                                            <div style="flex: 1; min-width: 110px;">
                                                 <label for="matCalcProdColor" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Neopreno</label>
                                                 <select id="matCalcProdColor" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
                                                     <option value="negro">Negro</option>
                                                     <option value="rojo">Rojo</option>
                                                 </select>
                                             </div>
-                                            <div style="width: 90px;">
+                                            <div style="width: 80px;">
                                                 <label for="matCalcProdQty" style="font-size: 0.72rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Pulseras</label>
                                                 <input type="number" id="matCalcProdQty" value="1" min="1" style="width: 100%; padding: 0.4rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--text-primary);">
                                             </div>

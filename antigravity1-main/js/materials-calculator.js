@@ -53,7 +53,19 @@ const MaterialsCalculatorModule = (() => {
     // Diseños ya comprometidos a producción (descuentan del material disponible)
     let productions = []; // { id, name, color, qty, sequence, dijeId, threadCm }
 
+    // Biblioteca de diseños guardados
+    let designs = []; // { id, name, sequence, dijeId, threadCm }
+    let currentDesignId = ''; // diseño abierto en el editor ('' = sin guardar)
+
     const STORAGE_KEY = 'antigravity_materials_stock_v1';
+
+    // Tablas de Supabase (ver supabase_bracelets_schema.sql)
+    const TABLES = {
+        designs: 'bracelet_designs',
+        charms: 'bracelet_charms',
+        stock: 'bracelet_material_stock',
+        productions: 'bracelet_productions'
+    };
 
     const CHARM_SHAPES = {
         medalla: 'Medalla',
@@ -73,25 +85,104 @@ const MaterialsCalculatorModule = (() => {
         return String(str).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
 
-    function loadState() {
+    function newId(prefix) {
+        return `${prefix}${Date.now().toString(36)}${Math.floor(Math.random() * 100000).toString(36)}`;
+    }
+
+    /* ---------- Persistencia: Supabase con respaldo en localStorage ---------- */
+
+    function sb() {
+        return (typeof supabaseClient !== 'undefined' && supabaseClient) ? supabaseClient : null;
+    }
+
+    function loadLocalState() {
         try {
             const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
             if (!saved) return;
             stockInputs = saved.stock || {};
             dijes = Array.isArray(saved.dijes) ? saved.dijes : [];
             productions = Array.isArray(saved.productions) ? saved.productions : [];
+            designs = Array.isArray(saved.designs) ? saved.designs : [];
         } catch (e) {
             console.warn('No se pudo leer el inventario guardado:', e);
         }
     }
 
+    /** Guarda siempre en local (instantáneo); Supabase se sincroniza aparte */
     function saveState() {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ stock: stockInputs, dijes, productions }));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ stock: stockInputs, dijes, productions, designs }));
         } catch (e) {
             console.warn('No se pudo guardar el inventario:', e);
         }
     }
+
+    /** Trae todo desde Supabase; si falla, se queda con lo local */
+    async function loadFromCloud() {
+        const client = sb();
+        if (!client) return false;
+
+        try {
+            const [resDesigns, resCharms, resStock, resProds] = await Promise.all([
+                client.from(TABLES.designs).select('*').order('created_at', { ascending: true }),
+                client.from(TABLES.charms).select('*').order('created_at', { ascending: true }),
+                client.from(TABLES.stock).select('*'),
+                client.from(TABLES.productions).select('*').order('created_at', { ascending: true })
+            ]);
+
+            const firstError = [resDesigns, resCharms, resStock, resProds].find(r => r.error);
+            if (firstError) throw firstError.error;
+
+            designs = (resDesigns.data || []).map(r => ({
+                id: r.id,
+                name: r.name,
+                sequence: r.sequence || [],
+                dijeId: r.dije_id || '',
+                threadCm: r.thread_cm || 35
+            }));
+            dijes = (resCharms.data || []).map(r => ({
+                id: r.id, name: r.name, shape: r.shape, color: r.color, stock: Number(r.stock) || 0
+            }));
+            stockInputs = {};
+            (resStock.data || []).forEach(r => { stockInputs[r.material_key] = Number(r.quantity) || 0; });
+            productions = (resProds.data || []).map(r => ({
+                id: r.id,
+                name: r.name,
+                color: r.color,
+                qty: Number(r.qty) || 1,
+                sequence: r.sequence || [],
+                dijeId: r.dije_id || '',
+                threadCm: r.thread_cm || 35
+            }));
+
+            saveState();
+            return true;
+        } catch (e) {
+            console.warn('No se pudo cargar desde Supabase, se usa el respaldo local:', e.message || e);
+            return false;
+        }
+    }
+
+    /** Envía un cambio a Supabase sin bloquear la interfaz */
+    function cloudUpsert(table, row) {
+        const client = sb();
+        if (!client) return;
+        client.from(table).upsert(row).then(({ error }) => {
+            if (error) console.warn(`No se pudo guardar en ${table}:`, error.message);
+        });
+    }
+
+    function cloudDelete(table, id, column = 'id') {
+        const client = sb();
+        if (!client) return;
+        client.from(table).delete().eq(column, id).then(({ error }) => {
+            if (error) console.warn(`No se pudo eliminar de ${table}:`, error.message);
+        });
+    }
+
+    const designRow = d => ({ id: d.id, name: d.name, sequence: d.sequence, dije_id: d.dijeId || null, thread_cm: d.threadCm });
+    const charmRow = d => ({ id: d.id, name: d.name, shape: d.shape, color: d.color, stock: d.stock || 0 });
+    const productionRow = p => ({ id: p.id, name: p.name, color: p.color, qty: p.qty, sequence: p.sequence, dije_id: p.dijeId || null, thread_cm: p.threadCm });
 
     function getDije(id) {
         return dijes.find(d => d.id === id) || null;
@@ -159,6 +250,7 @@ const MaterialsCalculatorModule = (() => {
             renderPreview();
             renderSequenceList();
             renderDijeSelect();
+            renderDesignSelect();
             if (activeTab === 'inverse') {
                 renderInverseTable();
             } else if (activeTab === 'stock') {
@@ -168,7 +260,7 @@ const MaterialsCalculatorModule = (() => {
         }
 
         console.log('Iniciando MaterialsCalculatorModule...');
-        loadState();
+        loadLocalState();
 
         // Bindear controles del lote
         const inputBatchNegro = document.getElementById('matCalcBatchNegro');
@@ -235,6 +327,8 @@ const MaterialsCalculatorModule = (() => {
                 const val = e.target.value;
                 if (PRESETS[val]) {
                     sequence = JSON.parse(JSON.stringify(PRESETS[val]));
+                    currentDesignId = '';
+                    renderDesignSelect();
                     renderSequenceList();
                     renderPreview();
                     updateCalculations();
@@ -355,9 +449,13 @@ const MaterialsCalculatorModule = (() => {
                     const val = parseFloat(e.target.value) || 0;
                     if (typeId.startsWith('dije:')) {
                         const dije = getDije(typeId.slice(5));
-                        if (dije) dije.stock = val;
+                        if (dije) {
+                            dije.stock = val;
+                            cloudUpsert(TABLES.charms, charmRow(dije));
+                        }
                     } else {
                         stockInputs[typeId] = val;
+                        cloudUpsert(TABLES.stock, { material_key: typeId, quantity: val });
                     }
                     saveState();
                     updateInverseCapacity();
@@ -366,6 +464,7 @@ const MaterialsCalculatorModule = (() => {
         }
 
         bindStockControls();
+        bindDesignControls();
 
         // Exportar PDF
         const btnPdf = document.getElementById('btnMatCalcExportPdf');
@@ -383,6 +482,18 @@ const MaterialsCalculatorModule = (() => {
         renderSequenceList();
         renderPreview();
         updateCalculations();
+
+        // Sincronizar con Supabase y repintar con los datos de la nube
+        loadFromCloud().then(ok => {
+            if (!ok) return;
+            renderDijeSelect();
+            renderDesignSelect();
+            renderSequenceList();
+            renderPreview();
+            updateCalculations();
+            if (activeTab === 'inverse') renderInverseTable();
+            else if (activeTab === 'stock') renderStockTab();
+        });
     }
 
     /**
@@ -1203,6 +1314,194 @@ const MaterialsCalculatorModule = (() => {
         return [...Object.keys(BEAD_TYPES), 'thread', ...dijes.map(d => `dije:${d.id}`)];
     }
 
+    /* ---------------------- Biblioteca de diseños ---------------------- */
+
+    function getDesign(id) {
+        return designs.find(d => d.id === id) || null;
+    }
+
+    /** Rellena el selector del catálogo, el de producción y la insignia de estado */
+    function renderDesignSelect() {
+        if (!getDesign(currentDesignId)) currentDesignId = '';
+        const options = designs.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join('');
+
+        const editorSelect = document.getElementById('matCalcDesignSelect');
+        if (editorSelect) {
+            editorSelect.innerHTML = `<option value="">— Diseño nuevo (sin guardar) —</option>` + options;
+            editorSelect.value = currentDesignId;
+        }
+
+        const prodSelect = document.getElementById('matCalcProdDesignSelect');
+        if (prodSelect) {
+            const previous = prodSelect.value;
+            prodSelect.innerHTML = `<option value="">Diseño actual del visor</option>` + options;
+            prodSelect.value = getDesign(previous) ? previous : '';
+        }
+
+        const badge = document.getElementById('matCalcDesignStatusBadge');
+        if (badge) {
+            const open = getDesign(currentDesignId);
+            const total = designs.length === 1 ? '1 diseño' : `${designs.length} diseños`;
+            badge.textContent = open
+                ? `Editando «${open.name}» · ${total} en catálogo`
+                : `Diseño sin guardar · ${total} en catálogo`;
+        }
+
+        const nameInput = document.getElementById('matCalcDesignNameInput');
+        if (nameInput && !nameInput.matches(':focus')) {
+            const open = getDesign(currentDesignId);
+            nameInput.value = open ? open.name : '';
+        }
+    }
+
+    function snapshotOfEditor(name) {
+        return {
+            id: newId('dsg'),
+            name,
+            sequence: JSON.parse(JSON.stringify(sequence)),
+            dijeId: selectedDijeId || '',
+            threadCm: threadLengthCm
+        };
+    }
+
+    function persistDesign(design, message) {
+        saveState();
+        cloudUpsert(TABLES.designs, designRow(design));
+        renderDesignSelect();
+        if (activeTab === 'stock') renderStockTab();
+        Utils.showToast(message, 'success');
+    }
+
+    /** 💾 Guardar: actualiza el diseño abierto, o crea uno si no hay ninguno */
+    function saveCurrentDesign() {
+        if (sequence.length === 0) {
+            Utils.showToast('Arma un diseño antes de guardarlo', 'warning');
+            return;
+        }
+        const nameInput = document.getElementById('matCalcDesignNameInput');
+        const typed = nameInput ? nameInput.value.trim() : '';
+        const open = getDesign(currentDesignId);
+
+        if (open) {
+            open.name = typed || open.name;
+            open.sequence = JSON.parse(JSON.stringify(sequence));
+            open.dijeId = selectedDijeId || '';
+            open.threadCm = threadLengthCm;
+            persistDesign(open, `Diseño «${open.name}» actualizado`);
+        } else {
+            const design = snapshotOfEditor(typed || `Diseño ${designs.length + 1}`);
+            designs.push(design);
+            currentDesignId = design.id;
+            persistDesign(design, `Diseño «${design.name}» guardado en el catálogo`);
+        }
+    }
+
+    /** + Copia: siempre crea una entrada nueva en el catálogo */
+    function saveDesignAsNew() {
+        if (sequence.length === 0) {
+            Utils.showToast('Arma un diseño antes de guardarlo', 'warning');
+            return;
+        }
+        const nameInput = document.getElementById('matCalcDesignNameInput');
+        const typed = nameInput ? nameInput.value.trim() : '';
+        const open = getDesign(currentDesignId);
+        const name = typed && (!open || typed !== open.name)
+            ? typed
+            : `${open ? open.name : 'Diseño'} (copia)`;
+
+        const design = snapshotOfEditor(name);
+        designs.push(design);
+        currentDesignId = design.id;
+        persistDesign(design, `Copia guardada como «${design.name}»`);
+    }
+
+    /** Carga un diseño guardado en el visor */
+    function openDesign(id, { silent = false } = {}) {
+        if (!id) {
+            currentDesignId = '';
+            renderDesignSelect();
+            return;
+        }
+        const design = getDesign(id);
+        if (!design) return;
+
+        currentDesignId = design.id;
+        sequence = JSON.parse(JSON.stringify(design.sequence));
+        selectedDijeId = getDije(design.dijeId) ? design.dijeId : '';
+        threadLengthCm = design.threadCm || threadLengthCm;
+
+        const threadInput = document.getElementById('matCalcThreadPerBrac');
+        if (threadInput) threadInput.value = threadLengthCm;
+
+        renderDijeSelect();
+        renderDesignSelect();
+        renderSequenceList();
+        refreshDesignViews();
+        if (!silent) Utils.showToast(`Diseño «${design.name}» cargado en el visor`, 'info');
+    }
+
+    /** + Nuevo Diseño: deja el visor en blanco */
+    function newDesign() {
+        sequence = [];
+        currentDesignId = '';
+        selectedDijeId = '';
+        const nameInput = document.getElementById('matCalcDesignNameInput');
+        if (nameInput) nameInput.value = '';
+        renderDijeSelect();
+        renderDesignSelect();
+        renderSequenceList();
+        refreshDesignViews();
+        Utils.showToast('Visor en blanco para un diseño nuevo', 'info');
+    }
+
+    function deleteCurrentDesign() {
+        const design = getDesign(currentDesignId);
+        if (!design) {
+            Utils.showToast('Elige un diseño del catálogo para eliminarlo', 'warning');
+            return;
+        }
+        designs = designs.filter(d => d.id !== design.id);
+        currentDesignId = '';
+        saveState();
+        cloudDelete(TABLES.designs, design.id);
+        renderDesignSelect();
+        if (activeTab === 'stock') renderStockTab();
+        Utils.showToast(`Diseño «${design.name}» eliminado del catálogo`, 'info');
+    }
+
+    function bindDesignControls() {
+        const select = document.getElementById('matCalcDesignSelect');
+        if (select) select.addEventListener('change', (e) => openDesign(e.target.value));
+
+        const btnSave = document.getElementById('btnMatCalcSaveDesign');
+        if (btnSave) btnSave.addEventListener('click', saveCurrentDesign);
+
+        const btnSaveAs = document.getElementById('btnMatCalcSaveAsNew');
+        if (btnSaveAs) btnSaveAs.addEventListener('click', saveDesignAsNew);
+
+        const btnDelete = document.getElementById('btnMatCalcDeleteDesign');
+        if (btnDelete) btnDelete.addEventListener('click', deleteCurrentDesign);
+
+        const btnNew = document.getElementById('btnMatCalcNewDesign');
+        if (btnNew) btnNew.addEventListener('click', newDesign);
+
+        // "👁️ Ver en visor": carga el diseño elegido en la sección de producción
+        const btnLoadToEditor = document.getElementById('btnMatCalcLoadSelectedToEditor');
+        if (btnLoadToEditor) {
+            btnLoadToEditor.addEventListener('click', () => {
+                const prodSelect = document.getElementById('matCalcProdDesignSelect');
+                const id = prodSelect ? prodSelect.value : '';
+                if (!id) {
+                    Utils.showToast('Elige un diseño guardado para verlo', 'warning');
+                    return;
+                }
+                openDesign(id);
+            });
+        }
+
+        renderDesignSelect();
+    }
+
     function renderDijeSelect() {
         const select = document.getElementById('matCalcDijeSelect');
         if (!select) return;
@@ -1248,16 +1547,18 @@ const MaterialsCalculatorModule = (() => {
                     Utils.showToast('Escribe el nombre del dije', 'warning');
                     return;
                 }
-                dijes.push({
-                    id: `d${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`,
+                const dije = {
+                    id: newId('dij'),
                     name,
                     shape: shapeSelect ? shapeSelect.value : 'medalla',
                     color: colorSelect ? colorSelect.value : 'dorado',
                     stock: Math.max(0, parseInt(stockInput && stockInput.value) || 0)
-                });
+                };
+                dijes.push(dije);
                 if (nameInput) nameInput.value = '';
                 if (stockInput) stockInput.value = '';
                 saveState();
+                cloudUpsert(TABLES.charms, charmRow(dije));
                 renderDijeSelect();
                 renderStockTab();
                 Utils.showToast('Dije agregado al inventario', 'success');
@@ -1272,9 +1573,13 @@ const MaterialsCalculatorModule = (() => {
                 const val = Math.max(0, parseFloat(e.target.value) || 0);
                 if (key.startsWith('dije:')) {
                     const dije = getDije(key.slice(5));
-                    if (dije) dije.stock = val;
+                    if (dije) {
+                        dije.stock = val;
+                        cloudUpsert(TABLES.charms, charmRow(dije));
+                    }
                 } else {
                     stockInputs[key] = val;
+                    cloudUpsert(TABLES.stock, { material_key: key, quantity: val });
                 }
                 saveState();
                 refreshStockCells();
@@ -1294,28 +1599,40 @@ const MaterialsCalculatorModule = (() => {
     }
 
     function addCurrentDesignToProduction() {
-        if (sequence.length === 0) {
-            Utils.showToast('Arma un diseño antes de agregarlo a producción', 'warning');
-            return;
-        }
+        const designSelect = document.getElementById('matCalcProdDesignSelect');
         const nameInput = document.getElementById('matCalcProdName');
         const colorSelect = document.getElementById('matCalcProdColor');
         const qtyInput = document.getElementById('matCalcProdQty');
 
-        const qty = Math.max(1, parseInt(qtyInput && qtyInput.value) || 1);
-        const name = (nameInput && nameInput.value.trim()) || `Diseño ${productions.length + 1}`;
-
-        productions.push({
-            id: `p${Date.now().toString(36)}${Math.floor(Math.random() * 1000)}`,
-            name,
-            color: colorSelect ? colorSelect.value : 'negro',
-            qty,
-            sequence: JSON.parse(JSON.stringify(sequence)),
+        // Diseño guardado elegido en la lista, o el que está en el visor
+        const chosen = designSelect ? getDesign(designSelect.value) : null;
+        const source = chosen || {
+            name: getDesign(currentDesignId) ? getDesign(currentDesignId).name : `Diseño ${productions.length + 1}`,
+            sequence,
             dijeId: selectedDijeId || '',
             threadCm: threadLengthCm
-        });
+        };
+
+        if (!source.sequence || source.sequence.length === 0) {
+            Utils.showToast('Arma o elige un diseño antes de agregarlo a producción', 'warning');
+            return;
+        }
+
+        const orderName = nameInput ? nameInput.value.trim() : '';
         if (nameInput) nameInput.value = '';
+
+        const production = {
+            id: newId('prd'),
+            name: orderName || source.name,
+            color: colorSelect ? colorSelect.value : 'negro',
+            qty: Math.max(1, parseInt(qtyInput && qtyInput.value) || 1),
+            sequence: JSON.parse(JSON.stringify(source.sequence)),
+            dijeId: source.dijeId || '',
+            threadCm: source.threadCm || threadLengthCm
+        };
+        productions.push(production);
         saveState();
+        cloudUpsert(TABLES.productions, productionRow(production));
         renderStockTab();
 
         const short = Object.entries(computeUsage())
@@ -1333,12 +1650,14 @@ const MaterialsCalculatorModule = (() => {
         if (!prod) return;
         prod.qty = Math.max(1, prod.qty + delta);
         saveState();
+        cloudUpsert(TABLES.productions, productionRow(prod));
         renderStockTab();
     }
 
     function removeProduction(id) {
         productions = productions.filter(p => p.id !== id);
         saveState();
+        cloudDelete(TABLES.productions, id);
         renderStockTab();
         Utils.showToast('Diseño quitado. Material devuelto al disponible', 'info');
     }
@@ -1365,6 +1684,7 @@ const MaterialsCalculatorModule = (() => {
         dijes = dijes.filter(d => d.id !== id);
         if (selectedDijeId === id) selectedDijeId = '';
         saveState();
+        cloudDelete(TABLES.charms, id);
         renderDijeSelect();
         refreshDesignViews();
         renderStockTab();
@@ -1860,7 +2180,12 @@ const MaterialsCalculatorModule = (() => {
         changeProductionQty,
         removeProduction,
         loadProduction,
-        removeDije
+        removeDije,
+        openDesign,
+        saveCurrentDesign,
+        saveDesignAsNew,
+        deleteCurrentDesign,
+        newDesign
     };
 })();
 
