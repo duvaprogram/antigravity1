@@ -73,6 +73,34 @@ export default async function handler(req, res) {
         });
     }
 
+    // ------------------------------------------------------------------
+    // Direct Creator Upload: devuelve una URL de un solo uso a la que el
+    // navegador envía el archivo directamente (así no pasa por Vercel).
+    // ------------------------------------------------------------------
+    if (action === 'get_upload_url') {
+        try {
+            const form = new FormData();
+            const folder = req.query.folder ? decodeURIComponent(req.query.folder) : 'General';
+            const name = req.query.name ? decodeURIComponent(req.query.name) : '';
+            form.append('metadata', JSON.stringify({ category: folder, name }));
+            form.append('requireSignedURLs', 'false');
+
+            const cfRes = await fetch(
+                `https://api.cloudflare.com/client/v4/accounts/${accountId}/images/v2/direct_upload`,
+                { method: 'POST', headers: { 'Authorization': `Bearer ${apiToken}` }, body: form }
+            );
+            const cfData = await cfRes.json();
+
+            if (!cfData.success) {
+                const detalle = cfData.errors && cfData.errors[0] ? cfData.errors[0].message : 'Error desconocido de Cloudflare';
+                return res.status(cfRes.status || 400).json({ success: false, error: `Cloudflare Error: ${detalle}`, details: cfData.errors });
+            }
+            return res.status(200).json({ success: true, uploadURL: cfData.result.uploadURL, id: cfData.result.id });
+        } catch (err) {
+            return res.status(500).json({ success: false, error: 'Error generando URL de subida: ' + err.message });
+        }
+    }
+
     try {
         const perPage = Math.min(parseInt(req.query.perPage || '200', 10) || 200, 1000);
         const page = Math.max(parseInt(req.query.page || '1', 10) || 1, 1);

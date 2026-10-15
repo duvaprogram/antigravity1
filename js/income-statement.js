@@ -1915,10 +1915,8 @@ const IncomeStatementModule = {
             </tr>`;
     },
 
-    renderAdExpensesTable() {
-        const tbody = document.getElementById('isAdExpensesTable');
-        // Comenzar con TODOS los gastos para que los filtros locales puedan sobrescribir los globales
-        let expenses = this.adExpenses;
+    getAdExpensesForDisplay() {
+        let expenses = this.adExpenses || [];
 
         // Obtain specific filters for ads and global filters as fallbacks
         const adCountry = document.getElementById('adFilterCountry')?.value || '';
@@ -1961,6 +1959,15 @@ const IncomeStatementModule = {
             );
         }
 
+        return expenses;
+    },
+
+    renderAdExpensesTable() {
+        const tbody = document.getElementById('isAdExpensesTable');
+        if (!tbody) return;
+
+        const expenses = this.getAdExpensesForDisplay();
+
         // Update filter summary
         const summaryEl = document.getElementById('adFilterSummary');
         if (summaryEl) {
@@ -1984,6 +1991,7 @@ const IncomeStatementModule = {
                         <br>No hay gastos publicitarios. Importa un reporte para comenzar.
                     </td>
                 </tr>`;
+            this.updateSelectedAdExpensesCount();
             return;
         }
 
@@ -2052,6 +2060,8 @@ const IncomeStatementModule = {
                     </td>
                 </tr>`;
         }).join('');
+
+        this.updateSelectedAdExpensesCount();
     },
 
     // Predictive Search for Ad Expense Product Linking
@@ -5609,6 +5619,11 @@ const IncomeStatementModule = {
         const countSpan = document.getElementById('selectedAdExpensesCount');
         if (countSpan) countSpan.textContent = checked;
         if (btnDeleteSelected) btnDeleteSelected.style.display = checked > 0 ? 'inline-flex' : 'none';
+
+        const btnExportSelected = document.getElementById('btnExportSelectedAdExpenses');
+        const exportCountSpan = document.getElementById('exportSelectedAdExpensesCount');
+        if (exportCountSpan) exportCountSpan.textContent = checked;
+        if (btnExportSelected) btnExportSelected.style.display = checked > 0 ? 'inline-flex' : 'none';
         
         const groupToolbar = document.getElementById('adExpensesGroupToolbar');
         const groupBtn = document.getElementById('btnGroupAdExpenses');
@@ -6398,6 +6413,37 @@ const IncomeStatementModule = {
                 { wch: 16 }
             ];
 
+            // 6. SHEET: DETALLE DE PUBLICIDAD (ADS)
+            const adDetailHeaders = ['#', 'Fecha', 'País', 'Plataforma', 'Campaña', 'Conjunto Anuncios', 'Anuncio', 'Producto Vinculado', 'Inversión ($ USD)', 'Impresiones', 'Clics', 'CTR (%)', 'Compras', 'CPA ($)'];
+            const adDetailRows = adExpenses.map((a, idx) => {
+                const spent = parseFloat(a.amount_spent || 0);
+                const imps = parseInt(a.impressions || 0);
+                const clks = parseInt(a.clicks || 0);
+                const purch = parseInt(a.purchases || 0);
+                const ctrVal = a.ctr != null && a.ctr !== '' ? parseFloat(a.ctr) : (imps > 0 ? (clks / imps) * 100 : 0);
+                const cpaVal = purch > 0 ? (spent / purch) : (a.cost_per_purchase ? parseFloat(a.cost_per_purchase) : null);
+                return [
+                    idx + 1,
+                    a.date_start ? String(a.date_start).split('T')[0] : (a.date || ''),
+                    a.country || '',
+                    a.source || 'Facebook',
+                    a.campaign_name || '-',
+                    a.ad_set_name || '-',
+                    a.ad_name || '-',
+                    a.product_name || 'Sin vincular',
+                    spent,
+                    imps,
+                    clks,
+                    parseFloat(ctrVal.toFixed(2)),
+                    purch,
+                    cpaVal !== null ? parseFloat(cpaVal.toFixed(2)) : '-'
+                ];
+            });
+            const wsAdDetail = XLSX.utils.aoa_to_sheet([adDetailHeaders, ...adDetailRows]);
+            wsAdDetail['!cols'] = [
+                { wch: 6 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 30 }, { wch: 24 }, { wch: 24 }, { wch: 26 }, { wch: 16 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 14 }
+            ];
+
             // Build workbook
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, wsPL, 'P&L Consolidado');
@@ -6405,6 +6451,7 @@ const IncomeStatementModule = {
             XLSX.utils.book_append_sheet(wb, wsProducts, 'Rentabilidad Productos');
             XLSX.utils.book_append_sheet(wb, wsOrders, 'Detalle de Pedidos');
             XLSX.utils.book_append_sheet(wb, wsExpenses, 'Gastos y Publicidad');
+            XLSX.utils.book_append_sheet(wb, wsAdDetail, 'Detalle Publicidad');
 
             const dateStr = (this.filters.dateFrom || 'inicio') + '_a_' + (this.filters.dateTo || 'hoy');
             XLSX.writeFile(wb, `estado_resultados_${dateStr}.xlsx`);
@@ -6418,6 +6465,428 @@ const IncomeStatementModule = {
 
     exportToCSV() {
         this.exportToExcel();
+    },
+
+    // ========================================
+    // EXPORT AD EXPENSES REPORT TO EXCEL
+    // ========================================
+    async exportAdExpensesToExcel(onlySelected = false) {
+        if (typeof XLSX === 'undefined') {
+            Utils.showToast('La librería XLSX no está disponible', 'error');
+            return;
+        }
+
+        try {
+            if (!this.adExpenses || this.adExpenses.length === 0) {
+                await this.loadAllData();
+            }
+
+            let expenses = [];
+            if (onlySelected) {
+                const checkedIds = new Set(Array.from(document.querySelectorAll('.ad-expense-checkbox:checked')).map(cb => String(cb.value)));
+                if (checkedIds.size === 0) {
+                    Utils.showToast('No has seleccionado ninguna campaña para exportar.', 'warning');
+                    return;
+                }
+                expenses = (this.adExpenses || []).filter(e => checkedIds.has(String(e.id)));
+            } else {
+                expenses = this.getAdExpensesForDisplay();
+            }
+
+            if (!expenses || expenses.length === 0) {
+                Utils.showToast('No hay registros de publicidad para exportar con los filtros actuales.', 'warning');
+                return;
+            }
+
+            Utils.showToast(`Generando reporte de publicidad (${expenses.length} campañas)...`, 'info');
+
+            // 1. Calculate general metrics
+            const totalSpend = expenses.reduce((s, e) => s + parseFloat(e.amount_spent || 0), 0);
+            const totalImpressions = expenses.reduce((s, e) => s + parseInt(e.impressions || 0), 0);
+            const totalClicks = expenses.reduce((s, e) => s + parseInt(e.clicks || 0), 0);
+            const totalReach = expenses.reduce((s, e) => s + parseInt(e.reach || 0), 0);
+            const totalPurchases = expenses.reduce((s, e) => s + parseInt(e.purchases || 0), 0);
+            const ctr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+            const cpa = totalPurchases > 0 ? totalSpend / totalPurchases : 0;
+            const cpc = totalClicks > 0 ? totalSpend / totalClicks : 0;
+            const cpm = totalImpressions > 0 ? (totalSpend / totalImpressions) * 1000 : 0;
+
+            const filterDateFrom = document.getElementById('adFilterDateFrom')?.value || this.filters.dateFrom || 'Inicio';
+            const filterDateTo = document.getElementById('adFilterDateTo')?.value || this.filters.dateTo || 'Hoy';
+            const filterCountry = document.getElementById('adFilterCountry')?.value || (this.countryMultiSelect ? (this.countryMultiSelect.isAllSelected() ? 'Todos los Países' : this.countryMultiSelect.getSelected().join(', ')) : (this.filters.country || 'Todos los Países'));
+
+            // --- SHEET 1: RESUMEN PUBLICITARIO ---
+            const summaryAoa = [
+                ['REPORTE DE PUBLICIDAD (ADS) - ESTADO DE RESULTADOS'],
+                ['Generado el:', new Date().toLocaleString('es-ES')],
+                ['Período Desde:', filterDateFrom],
+                ['Período Hasta:', filterDateTo],
+                ['País Filtrado:', filterCountry],
+                ['Modo de Exportación:', onlySelected ? `Selección manual (${expenses.length} campañas)` : `Filtro actual (${expenses.length} campañas)`],
+                [''],
+                ['MÉTRICA GLOBAL', 'VALOR'],
+                ['Inversión Total en Publicidad ($ USD)', totalSpend],
+                ['Total de Impresiones', totalImpressions],
+                ['Total de Alcance', totalReach > 0 ? totalReach : 'N/A'],
+                ['Total de Clics', totalClicks],
+                ['CTR Promedio (%)', `${ctr.toFixed(2)}%`],
+                ['Total de Compras Registradas (Ads)', totalPurchases],
+                ['Costo Promedio por Compra / CPA ($ USD)', totalPurchases > 0 ? cpa : 'N/A'],
+                ['Costo Promedio por Clic / CPC ($ USD)', totalClicks > 0 ? cpc : 'N/A'],
+                ['Costo Promedio por Mil Impresiones / CPM ($ USD)', totalImpressions > 0 ? cpm : 'N/A'],
+                [''],
+                ['DESGLOSE POR PAÍS', '', '', '', '', '', '', '', ''],
+                ['País', 'Nº Campañas', 'Inversión ($ USD)', 'Impresiones', 'Clics', 'CTR (%)', 'Compras', 'CPA ($ USD)', '% Inversión']
+            ];
+
+            // Country Breakdown
+            const countryMap = {};
+            expenses.forEach(e => {
+                const c = e.country || 'Desconocido';
+                if (!countryMap[c]) {
+                    countryMap[c] = { country: c, count: 0, spend: 0, impressions: 0, clicks: 0, purchases: 0 };
+                }
+                countryMap[c].count++;
+                countryMap[c].spend += parseFloat(e.amount_spent || 0);
+                countryMap[c].impressions += parseInt(e.impressions || 0);
+                countryMap[c].clicks += parseInt(e.clicks || 0);
+                countryMap[c].purchases += parseInt(e.purchases || 0);
+            });
+
+            Object.values(countryMap).sort((a, b) => b.spend - a.spend).forEach(c => {
+                const cCtr = c.impressions > 0 ? ((c.clicks / c.impressions) * 100).toFixed(2) + '%' : '0.00%';
+                const cCpa = c.purchases > 0 ? (c.spend / c.purchases) : '-';
+                const pct = totalSpend > 0 ? ((c.spend / totalSpend) * 100).toFixed(1) + '%' : '0%';
+                summaryAoa.push([
+                    c.country,
+                    c.count,
+                    c.spend,
+                    c.impressions,
+                    c.clicks,
+                    cCtr,
+                    c.purchases,
+                    cCpa,
+                    pct
+                ]);
+            });
+
+            // Platform Breakdown
+            summaryAoa.push(['']);
+            summaryAoa.push(['DESGLOSE POR PLATAFORMA', '', '', '', '', '', '', '', '']);
+            summaryAoa.push(['Plataforma', 'Nº Campañas', 'Inversión ($ USD)', 'Impresiones', 'Clics', 'CTR (%)', 'Compras', 'CPA ($ USD)', '% Inversión']);
+
+            const platformMap = {};
+            expenses.forEach(e => {
+                const p = e.source || 'Facebook';
+                if (!platformMap[p]) {
+                    platformMap[p] = { platform: p, count: 0, spend: 0, impressions: 0, clicks: 0, purchases: 0 };
+                }
+                platformMap[p].count++;
+                platformMap[p].spend += parseFloat(e.amount_spent || 0);
+                platformMap[p].impressions += parseInt(e.impressions || 0);
+                platformMap[p].clicks += parseInt(e.clicks || 0);
+                platformMap[p].purchases += parseInt(e.purchases || 0);
+            });
+
+            Object.values(platformMap).sort((a, b) => b.spend - a.spend).forEach(p => {
+                const pCtr = p.impressions > 0 ? ((p.clicks / p.impressions) * 100).toFixed(2) + '%' : '0.00%';
+                const pCpa = p.purchases > 0 ? (p.spend / p.purchases) : '-';
+                const pct = totalSpend > 0 ? ((p.spend / totalSpend) * 100).toFixed(1) + '%' : '0%';
+                summaryAoa.push([
+                    p.platform,
+                    p.count,
+                    p.spend,
+                    p.impressions,
+                    p.clicks,
+                    pCtr,
+                    p.purchases,
+                    pCpa,
+                    pct
+                ]);
+            });
+
+            // Product Breakdown
+            summaryAoa.push(['']);
+            summaryAoa.push(['DESGLOSE POR PRODUCTO VINCULADO', '', '', '', '', '', '', '', '']);
+            summaryAoa.push(['Producto', 'Nº Campañas', 'Inversión ($ USD)', 'Impresiones', 'Clics', 'CTR (%)', 'Compras', 'CPA ($ USD)', '% Inversión']);
+
+            const prodMap = {};
+            expenses.forEach(e => {
+                const rawName = e.product_name || '(Sin vincular)';
+                const name = this.productMappings && this.productMappings[rawName] ? this.productMappings[rawName] : rawName;
+                if (!prodMap[name]) {
+                    prodMap[name] = { name, count: 0, spend: 0, impressions: 0, clicks: 0, purchases: 0 };
+                }
+                prodMap[name].count++;
+                prodMap[name].spend += parseFloat(e.amount_spent || 0);
+                prodMap[name].impressions += parseInt(e.impressions || 0);
+                prodMap[name].clicks += parseInt(e.clicks || 0);
+                prodMap[name].purchases += parseInt(e.purchases || 0);
+            });
+
+            Object.values(prodMap).sort((a, b) => b.spend - a.spend).forEach(p => {
+                const pCtr = p.impressions > 0 ? ((p.clicks / p.impressions) * 100).toFixed(2) + '%' : '0.00%';
+                const pCpa = p.purchases > 0 ? (p.spend / p.purchases) : '-';
+                const pct = totalSpend > 0 ? ((p.spend / totalSpend) * 100).toFixed(1) + '%' : '0%';
+                summaryAoa.push([
+                    p.name,
+                    p.count,
+                    p.spend,
+                    p.impressions,
+                    p.clicks,
+                    pCtr,
+                    p.purchases,
+                    pCpa,
+                    pct
+                ]);
+            });
+
+            const wsSummary = XLSX.utils.aoa_to_sheet(summaryAoa);
+            wsSummary['!cols'] = [
+                { wch: 38 },
+                { wch: 14 },
+                { wch: 18 },
+                { wch: 16 },
+                { wch: 14 },
+                { wch: 12 },
+                { wch: 12 },
+                { wch: 16 },
+                { wch: 14 }
+            ];
+
+            // --- SHEET 2: DETALLE DE CAMPAÑAS ---
+            const detailHeaders = [
+                '#',
+                'Fecha Inicio',
+                'Fecha Fin',
+                'País',
+                'Plataforma',
+                'Campaña',
+                'Conjunto de Anuncios',
+                'Anuncio',
+                'Producto Vinculado',
+                'Inversión ($ USD)',
+                'Impresiones',
+                'Alcance',
+                'Clics',
+                'CTR (%)',
+                'Compras',
+                'Costo/Compra (CPA $)',
+                'CPC ($)',
+                'CPM ($)'
+            ];
+
+            const detailRows = expenses.map((exp, idx) => {
+                const spent = parseFloat(exp.amount_spent || 0);
+                const imps = parseInt(exp.impressions || 0);
+                const clks = parseInt(exp.clicks || 0);
+                const rch = parseInt(exp.reach || 0);
+                const purch = parseInt(exp.purchases || 0);
+                const ctrVal = exp.ctr != null && exp.ctr !== '' ? parseFloat(exp.ctr) : (imps > 0 ? (clks / imps) * 100 : 0);
+                const cppVal = purch > 0 ? (spent / purch) : (exp.cost_per_purchase ? parseFloat(exp.cost_per_purchase) : null);
+                const cpcVal = clks > 0 ? (spent / clks) : (exp.cpc ? parseFloat(exp.cpc) : null);
+                const cpmVal = imps > 0 ? (spent / imps) * 1000 : (exp.cpm ? parseFloat(exp.cpm) : null);
+
+                return [
+                    idx + 1,
+                    exp.date_start ? String(exp.date_start).split('T')[0] : '',
+                    exp.date_end ? String(exp.date_end).split('T')[0] : (exp.date_start ? String(exp.date_start).split('T')[0] : ''),
+                    exp.country || '',
+                    exp.source || 'Facebook',
+                    exp.campaign_name || '-',
+                    exp.ad_set_name || '-',
+                    exp.ad_name || '-',
+                    exp.product_name || 'Sin vincular',
+                    spent,
+                    imps,
+                    rch,
+                    clks,
+                    parseFloat(ctrVal.toFixed(2)),
+                    purch,
+                    cppVal !== null ? parseFloat(cppVal.toFixed(2)) : '-',
+                    cpcVal !== null ? parseFloat(cpcVal.toFixed(2)) : '-',
+                    cpmVal !== null ? parseFloat(cpmVal.toFixed(2)) : '-'
+                ];
+            });
+
+            const wsDetail = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows]);
+            wsDetail['!cols'] = [
+                { wch: 6 },
+                { wch: 14 },
+                { wch: 14 },
+                { wch: 14 },
+                { wch: 14 },
+                { wch: 34 },
+                { wch: 26 },
+                { wch: 26 },
+                { wch: 28 },
+                { wch: 18 },
+                { wch: 14 },
+                { wch: 14 },
+                { wch: 12 },
+                { wch: 12 },
+                { wch: 12 },
+                { wch: 20 },
+                { wch: 14 },
+                { wch: 14 }
+            ];
+
+            // --- SHEET 3: RENDIMIENTO Y ROAS POR PRODUCTO ---
+            const productSalesData = {};
+            const filteredGuides = this.guides || [];
+            filteredGuides.forEach(g => {
+                if (this.isCancelado(g) || g.status === 'CANCELLED' || g.status === 'ANULADO') return;
+                const cc = this.getCountryFromCity(g.cities, g.city);
+                const gCountry = (cc && cc !== 'Desconocido') ? cc : (g.country || 'Desconocido');
+                if (!this.matchesCountryFilter(gCountry)) return;
+                const dates = [g.delivered_at, g.created_at, g.date, g.createdAt];
+                let validDate = '';
+                for (let d of dates) {
+                    if (d && d !== 'null' && d !== '0000-00-00') {
+                        try { new Date(d).toISOString(); validDate = d; break; } catch(e) {}
+                    }
+                }
+                const gDate = validDate ? validDate.split('T')[0] : '';
+                if (this.filters.dateFrom && gDate < this.filters.dateFrom) return;
+                if (this.filters.dateTo && gDate > this.filters.dateTo) return;
+
+                const isExcluded = this.isExcludedFromSales(g);
+                const items = g.guide_items || g.products || g.items || [];
+                const shippingUSD = this.getGuideShippingCostUSD(g);
+                const shippingPerItem = items.length > 0 ? (shippingUSD / items.length) : 0;
+                const totalRev = isExcluded ? 0 : this.getGuideRevenueUSD(g);
+                const totalItemsCost = items.reduce((s, item) => {
+                    const prod = item.products || item;
+                    const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
+                    return s + (unitCost * (item.quantity || 1));
+                }, 0);
+
+                items.forEach(item => {
+                    const prod = item.products || item;
+                    const rawName = prod.name || item.name || 'Producto Desconocido';
+                    const name = this.productMappings && this.productMappings[rawName] ? this.productMappings[rawName] : rawName;
+                    const qty = parseInt(item.quantity || 1);
+                    const unitCost = window.ProductsModule ? window.ProductsModule.getRealCost(prod) : parseFloat(prod.cost || 0) * 40000;
+                    const realCost = isExcluded ? 0 : (unitCost * qty);
+                    const revProp = isExcluded ? 0 : (totalItemsCost > 0 ? (realCost / totalItemsCost) * totalRev : (totalRev / items.length));
+
+                    if (!productSalesData[name]) {
+                        productSalesData[name] = { name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: 0 };
+                    }
+                    if (!isExcluded) {
+                        productSalesData[name].orders += 1;
+                        productSalesData[name].units += qty;
+                        productSalesData[name].revenue += revProp;
+                        productSalesData[name].cost += realCost;
+                    }
+                    productSalesData[name].shipping += shippingPerItem;
+                });
+            });
+
+            // External sales
+            const extSales = this.getFilteredExternalSales ? this.getFilteredExternalSales() : [];
+            extSales.forEach(s => {
+                const rawName = s.product_name || s.description || 'Venta Manual';
+                const name = this.productMappings && this.productMappings[rawName] ? this.productMappings[rawName] : rawName;
+                if (!productSalesData[name]) {
+                    productSalesData[name] = { name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: 0 };
+                }
+                const ordersQty = (parseInt(s.delivered || 0) + parseInt(s.returned || 0));
+                productSalesData[name].orders += ordersQty;
+                productSalesData[name].units += (parseInt(s.units || ordersQty || 0));
+                productSalesData[name].revenue += parseFloat(s.revenue || 0);
+                productSalesData[name].cost += parseFloat(s.product_cost || 0);
+                productSalesData[name].shipping += (parseFloat(s.shipping_cost || 0) + parseFloat(s.return_shipping_cost || 0));
+            });
+
+            // Map expenses to productSalesData
+            expenses.forEach(exp => {
+                const rawName = exp.product_name;
+                if (!rawName) return;
+                const name = this.productMappings && this.productMappings[rawName] ? this.productMappings[rawName] : rawName;
+                if (productSalesData[name]) {
+                    productSalesData[name].adSpend += parseFloat(exp.amount_spent || 0);
+                } else {
+                    productSalesData[name] = { name, orders: 0, units: 0, revenue: 0, cost: 0, shipping: 0, adSpend: parseFloat(exp.amount_spent || 0) };
+                }
+            });
+
+            const roasHeaders = [
+                '#',
+                'Producto',
+                'Inversión Publicidad ($)',
+                'Ventas Totales ($)',
+                'ROAS (Retorno)',
+                'Pedidos Entregados',
+                'Unidades Vendidas',
+                'Costo Mercancía ($)',
+                'Costo Envíos ($)',
+                'Utilidad Bruta ($)',
+                'Utilidad Neta ($)',
+                'Margen Neto (%)'
+            ];
+
+            const roasProducts = Object.values(productSalesData)
+                .filter(p => p.adSpend > 0 || p.revenue > 0)
+                .sort((a, b) => b.adSpend - a.adSpend);
+
+            const roasRows = roasProducts.map((p, idx) => {
+                const gross = p.revenue - p.cost - p.shipping;
+                const net = gross - p.adSpend;
+                const roas = p.adSpend > 0 ? (p.revenue / p.adSpend).toFixed(2) + 'x' : 'N/A';
+                const margin = p.revenue > 0 ? ((net / p.revenue) * 100).toFixed(1) + '%' : '0%';
+                return [
+                    idx + 1,
+                    p.name,
+                    p.adSpend,
+                    p.revenue,
+                    roas,
+                    p.orders,
+                    p.units,
+                    p.cost,
+                    p.shipping,
+                    gross,
+                    net,
+                    margin
+                ];
+            });
+
+            const wsRoas = XLSX.utils.aoa_to_sheet([roasHeaders, ...roasRows]);
+            wsRoas['!cols'] = [
+                { wch: 6 },
+                { wch: 32 },
+                { wch: 22 },
+                { wch: 18 },
+                { wch: 16 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 18 },
+                { wch: 14 }
+            ];
+
+            // Build workbook
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, wsSummary, 'Resumen Publicitario');
+            XLSX.utils.book_append_sheet(wb, wsDetail, 'Detalle de Campañas');
+            XLSX.utils.book_append_sheet(wb, wsRoas, 'Rentabilidad y ROAS');
+
+            const dateStr = (filterDateFrom || 'inicio').replace(/\//g, '-') + '_a_' + (filterDateTo || 'hoy').replace(/\//g, '-');
+            const fileName = `reporte_publicidad_${dateStr}.xlsx`;
+            XLSX.writeFile(wb, fileName);
+
+            Utils.showToast(`Reporte de publicidad descargado exitosamente (${expenses.length} campañas)`, 'success');
+
+        } catch (error) {
+            console.error('Error al exportar reporte de publicidad:', error);
+            Utils.showToast('Error al exportar reporte de publicidad: ' + (error.message || error), 'error');
+        }
+    },
+
+    exportAdExpensesToCSV() {
+        this.exportAdExpensesToExcel();
     },
 
     // ========================================
