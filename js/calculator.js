@@ -724,7 +724,7 @@ const CalculatorModule = (() => {
 
         set('sub', `${formatMoney(r.unitPriceEff)} / unid. · ${r.discountPercent >= 0 ? '-' : '+'}${Math.abs(r.discountPercent).toFixed(0)}% vs unitario`);
         set('suggest', `Sugerido: ${formatMoney(r.suggestedPrice)}`);
-        set('profit', `${formatMoney(r.profit)} <em class="result-badge ${offerMarginBadgeClass(r.margin)}">${r.margin.toFixed(1)}%</em>`);
+        set('profit', `${formatMoney(r.profit)} <em class="calc-offer-badge ${offerMarginBadgeClass(r.margin)}" title="Utilidad neta sobre la venta del combo">${r.margin.toFixed(1)}%</em>`);
         set('profitUnit', formatMoney(r.profitPerUnit));
         set('roi', `${r.roi.toFixed(1)}%`);
         set('be', formatMoney(r.breakEvenPrice));

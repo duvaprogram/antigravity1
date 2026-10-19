@@ -6617,10 +6617,15 @@ body.dark-mode .is-settlement-chip {
     color: #10b981;
 }
 
-.calc-offer-metric .result-badge {
-    font-size: 0.64rem;
+.calc-offer-badge {
+    display: inline-block;
+    padding: 0.12rem 0.45rem;
+    border-radius: var(--radius-full);
+    font-size: 0.68rem;
     font-style: normal;
-    padding: 0.1rem 0.35rem;
+    font-weight: 700;
+    line-height: 1.35;
+    white-space: nowrap;
 }
 
 .calc-offer-foot {
