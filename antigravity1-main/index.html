@@ -116,7 +116,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.7.4</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.8.0</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -2022,6 +2022,44 @@
                                 </div>
                             </div>
 
+                            <!-- Card: Ofertas y Combos Multi-unidad (2x, 3x...) -->
+                            <div class="card calc-offers-card" id="calcOffersCard">
+                                <div class="calc-offers-header">
+                                    <h4>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                        Ofertas y Combos (2x, 3x...)
+                                    </h4>
+                                    <div class="calc-offers-presets">
+                                        <button type="button" class="calc-offer-preset-btn" data-offer-preset="2" title="Añadir una oferta de 2 unidades">+ 2x</button>
+                                        <button type="button" class="calc-offer-preset-btn" data-offer-preset="3" title="Añadir una oferta de 3 unidades">+ 3x</button>
+                                        <button type="button" class="calc-offer-preset-btn" data-offer-preset="4" title="Añadir una oferta de 4 unidades">+ 4x</button>
+                                        <button type="button" class="calc-offer-preset-btn is-primary" id="btnAddOffer" title="Añadir otra oferta">+ Oferta</button>
+                                    </div>
+                                </div>
+
+                                <p class="calc-offers-note">
+                                    Un pedido es <strong>un solo envío y un solo CPA</strong>, lleve 1, 2 o 3 unidades: solo se multiplica la mercancía.
+                                </p>
+
+                                <div class="calc-offers-controls">
+                                    <label class="calc-offers-check" title="El empaque y el picking se cobran una sola vez por pedido, no por unidad">
+                                        <input type="checkbox" id="calcOfferPackOnce" checked>
+                                        <span>Empaque y picking una sola vez por pedido</span>
+                                    </label>
+                                    <div class="calc-offers-orders">
+                                        <span>Proyectar</span>
+                                        <input type="number" id="calcOfferOrders" value="10" min="1" step="1" title="Cantidad de pedidos de esta oferta para proyectar la ganancia">
+                                        <span>pedidos</span>
+                                    </div>
+                                </div>
+
+                                <div class="calc-offers-unitref" id="offersUnitRef">Venta unitaria: $0.00</div>
+
+                                <div id="offersList" class="calc-offers-list"></div>
+
+                                <div class="calc-offers-best" id="offersBestSummary"></div>
+                            </div>
+
                             <!-- KPI Grid -->
                             <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
                                 <div class="stat-card">
@@ -2318,6 +2356,25 @@
                                         <div id="modalResBatchCost" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary); line-height: 1.2;">$0.00</div>
                                     </div>
                                 </div>
+                            </div>
+
+                            <!-- Ofertas y Combos guardados -->
+                            <div class="card" id="modalOffersCard" style="border: 1px solid rgba(245, 158, 11, 0.28); border-radius: var(--radius-lg); padding: 1.1rem; margin-bottom: 1.25rem; display: none;">
+                                <h4 style="font-size: 0.85rem; text-transform: uppercase; color: #f59e0b; font-weight: 700; margin: 0 0 0.3rem;">Ofertas y Combos</h4>
+                                <p style="font-size: 0.74rem; color: var(--text-muted); margin: 0 0 0.6rem;">Un solo envío y un solo CPA por pedido, lleve 1, 2 o 3 unidades.</p>
+                                <table class="calc-offers-detail-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Oferta</th>
+                                            <th>$ / unid.</th>
+                                            <th>Ganancia</th>
+                                            <th>Margen</th>
+                                            <th>Gan. / unid.</th>
+                                            <th>CPA máx.</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="modalOffersBody"></tbody>
+                                </table>
                             </div>
 
                             <!-- KPI Grid (Image 3 middle: 6 cards) -->
@@ -5581,7 +5638,7 @@
                     <div>
                         <h2 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                             💳 Gastos Mensuales y Presupuestación
-                            <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.7.4</span>
+                            <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v2.8.0</span>
                         </h2>
                         <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--text-muted);">
                             Planificación mensual estimada, registro de consumos y control de presupuesto independiente.

@@ -84,6 +84,10 @@ ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS cost_extra_item
 ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS cost_extra_total NUMERIC DEFAULT 0;
 ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS cost_hidden_fields JSONB DEFAULT '[]'::jsonb;
 
+-- Ofertas / combos multi-unidad (2x, 3x...): un solo envío y un solo CPA por pedido
+ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS offer_items JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS offers_pack_once BOOLEAN DEFAULT TRUE;
+
 -- Índices para optimizar búsquedas frecuentes
 CREATE INDEX IF NOT EXISTS idx_liquidations_name ON public.product_liquidations(name);
 CREATE INDEX IF NOT EXISTS idx_liquidations_channel ON public.product_liquidations(channel);

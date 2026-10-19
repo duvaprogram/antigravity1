@@ -20,6 +20,11 @@ const CalculatorModule = (() => {
     let hiddenCosts = [];     // claves de STANDARD_COSTS ocultadas por el usuario
     let extraSeq = 0;
 
+    // Ofertas / Combos multi-unidad: un solo envío y un solo CPA por pedido
+    let offers = [];           // [{ id, units, price }]
+    let offersSeq = 0;
+    let offersPackOnce = true; // el empaque/picking se cobra una sola vez por pedido
+
     // Costos estándar que se pueden quitar/restaurar (el costo de compra siempre permanece)
     const STANDARD_COSTS = {
         shipping_main:  { input: 'calcCostShippingMain',  label: 'Flete Principal / Int.' },
@@ -70,6 +75,7 @@ const CalculatorModule = (() => {
         await loadSavedLiquidations();
         applyHiddenCosts();
         renderExtraCosts();
+        if (!offers.length) offers = defaultOffers();
         updateCurrencyUI();
         switchPricingMode(pricingMode);
         calculate();
@@ -220,6 +226,9 @@ const CalculatorModule = (() => {
         // Costos landed dinámicos (quitar / añadir líneas de costo)
         bindLandedCostEvents();
 
+        // Ofertas / combos multi-unidad
+        bindOfferEvents();
+
         // Búsqueda y filtros de liquidaciones guardadas
         const searchSaved = document.getElementById('searchSavedLiquidations');
         if (searchSaved) {
@@ -320,6 +329,16 @@ const CalculatorModule = (() => {
             }
         });
         renderExtraCosts();
+
+        // Convertir también los precios de las ofertas / combos
+        offers.forEach(o => {
+            const cur = Number(o.price) || 0;
+            if (cur > 0) {
+                o.price = newCurrency === 'USD'
+                    ? parseFloat((cur / rate).toFixed(2))
+                    : Math.round(cur * rate);
+            }
+        });
 
         // Si el margen objetivo es fijo en dinero, convertirlo también
         const marginType = getText('calcTargetMarginType', 'margin_percent');
@@ -512,6 +531,327 @@ const CalculatorModule = (() => {
 
     function getExtraCostsRawTotal() {
         return extraCosts.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+    }
+
+    /* ======================================================
+       OFERTAS / COMBOS MULTI-UNIDAD (2x, 3x, ...)
+       Regla de negocio: un pedido = un solo CPA y un solo envío,
+       sin importar cuántas unidades lleve el combo.
+       ====================================================== */
+
+    function defaultOffers() {
+        offersSeq = 0;
+        return [
+            { id: 'of_' + (++offersSeq), units: 2, price: 0 },
+            { id: 'of_' + (++offersSeq), units: 3, price: 0 }
+        ];
+    }
+
+    function addOffer(units = 2, price = 0, skipFocus = false) {
+        const item = {
+            id: 'of_' + (++offersSeq) + '_' + Math.random().toString(36).substr(2, 4),
+            units: Math.max(1, Math.round(Number(units) || 1)),
+            price: Math.max(0, Number(price) || 0)
+        };
+        offers.push(item);
+        calculate();
+        if (!skipFocus) {
+            const el = document.querySelector(`[data-offer-price="${item.id}"]`);
+            if (el) el.focus();
+        }
+        return item;
+    }
+
+    function removeOffer(id) {
+        offers = offers.filter(o => o.id !== id);
+        calculate();
+    }
+
+    /**
+     * Pone en la oferta el precio que mantiene el mismo margen neto % de la venta unitaria
+     */
+    function applySuggestedOfferPrice(id) {
+        const data = calculate();
+        const row = (data && data.offers) ? data.offers.find(o => o.id === id) : null;
+        const item = offers.find(o => o.id === id);
+        if (!row || !item) return;
+        item.price = currentCurrency === 'USD'
+            ? parseFloat(row.suggestedPrice.toFixed(2))
+            : Math.round(row.suggestedPrice);
+        calculate();
+    }
+
+    /**
+     * Calcula la rentabilidad de una oferta de N unidades a un precio de combo.
+     * El CPA, el flete y el costo administrativo se cobran UNA sola vez (un pedido).
+     */
+    function computeOffer(offer, ctx) {
+        const units = Math.max(1, Math.round(Number(offer.units) || 1));
+        const price = Math.max(0, Number(offer.price) || 0);
+
+        // Mercancía: el costo landed sí se multiplica por cada unidad del combo.
+        // Si el empaque va una sola vez por pedido, se descuenta el excedente.
+        const packSaving = ctx.packOnce ? ctx.packPerUnit * (units - 1) : 0;
+        const goodsCost = Math.max(0, (ctx.landedCost * units) - packSaving);
+
+        // Costos que no se repiten aunque el pedido lleve 2 o 3 unidades
+        const fixedPerOrder = ctx.channel === 'cod'
+            ? (ctx.realCpa + ctx.realFreight + ctx.adminCost)
+            : (ctx.mpFixedFee + ctx.mpShipping);
+        const variableRate = ctx.channel === 'cod' ? ctx.recaudoRate : ctx.mpPercentTotal;
+
+        const totalFixed = goodsCost + fixedPerOrder;
+        const variableCost = price * variableRate;
+        const profit = price - variableCost - totalFixed;
+        const margin = price > 0 ? (profit / price) * 100 : 0;
+        const roi = goodsCost > 0 ? (profit / goodsCost) * 100 : 0;
+        const breakEvenPrice = (1 - variableRate) > 0 ? totalFixed / (1 - variableRate) : totalFixed;
+
+        // Precio de combo que mantiene el mismo margen neto % de la venta unitaria
+        const targetMargin = Math.max(0, Math.min(80, ctx.unitMargin || 0)) / 100;
+        const den = 1 - variableRate - targetMargin;
+        const suggestedPrice = den > 0 ? totalFixed / den : breakEvenPrice;
+
+        // CPA máximo que soporta el combo (un solo CPA por pedido)
+        const maxCpa = ctx.channel === 'cod'
+            ? Math.max(0, ((price * (1 - variableRate)) - goodsCost - ctx.realFreight - ctx.adminCost) * (1 - ctx.ineffectiveness))
+            : 0;
+        const roas = (ctx.channel === 'cod' && ctx.realCpa > 0) ? price / ctx.realCpa : 0;
+
+        const unitPriceEff = price / units;
+        const profitPerUnit = profit / units;
+        const discountPercent = ctx.unitPrice > 0 ? (1 - (unitPriceEff / ctx.unitPrice)) * 100 : 0;
+
+        // Comparación: las mismas unidades vendidas en pedidos individuales
+        const separateProfit = (ctx.unitProfit || 0) * units;
+        const upliftVsSeparate = profit - separateProfit;
+
+        return {
+            id: offer.id,
+            units,
+            price,
+            goodsCost,
+            fixedPerOrder,
+            variableCost,
+            profit,
+            margin,
+            roi,
+            breakEvenPrice,
+            suggestedPrice,
+            maxCpa,
+            roas,
+            unitPriceEff,
+            profitPerUnit,
+            discountPercent,
+            separateProfit,
+            upliftVsSeparate,
+            isViable: profit > 0
+        };
+    }
+
+    function offerMarginBadgeClass(marginPercent) {
+        if (marginPercent >= 22) return 'badge-success';
+        if (marginPercent >= 10) return 'badge-warning';
+        return 'badge-danger';
+    }
+
+    /**
+     * Estructura HTML de una fila de oferta (se construye una sola vez por combo)
+     */
+    function offerRowHtml(r, step) {
+        return `
+                <div class="calc-offer-row" data-offer-row="${r.id}">
+                    <div class="calc-offer-head">
+                        <div class="calc-offer-qty">
+                            <input type="number" class="calc-offer-units" data-offer-units="${r.id}" value="${r.units}" min="1" step="1" title="Unidades que lleva el combo">
+                            <span class="calc-offer-x">por</span>
+                            <input type="number" class="calc-offer-price" data-offer-price="${r.id}" value="${r.price}" min="0" step="${step}" title="Precio total del combo">
+                        </div>
+                        <div class="calc-offer-sub" data-offer-field="sub"></div>
+                        <div class="calc-offer-actions">
+                            <button type="button" class="calc-offer-suggest" data-offer-apply="${r.id}" data-offer-field="suggest" title="Usar el precio que mantiene tu mismo margen neto"></button>
+                            <button type="button" class="calc-offer-remove" data-offer-remove="${r.id}" title="Quitar esta oferta" aria-label="Quitar oferta">&times;</button>
+                        </div>
+                    </div>
+                    <div class="calc-offer-metrics">
+                        <div class="calc-offer-metric is-main">
+                            <span>Ganancia por pedido</span>
+                            <strong data-offer-field="profit"></strong>
+                        </div>
+                        <div class="calc-offer-metric">
+                            <span>Ganancia por unidad</span>
+                            <strong data-offer-field="profitUnit"></strong>
+                        </div>
+                        <div class="calc-offer-metric">
+                            <span>ROI sobre mercancía</span>
+                            <strong data-offer-field="roi"></strong>
+                        </div>
+                        <div class="calc-offer-metric">
+                            <span>Precio equilibrio</span>
+                            <strong data-offer-field="be"></strong>
+                        </div>
+                        <div class="calc-offer-metric">
+                            <span>CPA máximo del pedido</span>
+                            <strong data-offer-field="maxCpa"></strong>
+                        </div>
+                        <div class="calc-offer-metric">
+                            <span>ROAS del combo</span>
+                            <strong data-offer-field="roas"></strong>
+                        </div>
+                        <div class="calc-offer-metric">
+                            <span data-offer-field="goodsLabel">Mercancía</span>
+                            <strong data-offer-field="goods"></strong>
+                        </div>
+                        <div class="calc-offer-metric">
+                            <span data-offer-field="fixedLabel">Costos por pedido</span>
+                            <strong data-offer-field="fixed"></strong>
+                        </div>
+                    </div>
+                    <div class="calc-offer-foot">
+                        <span data-offer-field="vsSeparate"></span>
+                        <span data-offer-field="projection"></span>
+                    </div>
+                </div>`;
+    }
+
+    /**
+     * Refresca los valores calculados de una fila sin tocar los inputs (no pierde el foco)
+     */
+    function updateOfferRow(el, r, orders) {
+        el.classList.toggle('is-loss', !r.isViable && r.price > 0);
+        const f = (name) => el.querySelector(`[data-offer-field="${name}"]`);
+        const set = (name, html) => { const n = f(name); if (n) n.innerHTML = html; };
+
+        set('sub', `${formatMoney(r.unitPriceEff)} / unid. · ${r.discountPercent >= 0 ? '-' : '+'}${Math.abs(r.discountPercent).toFixed(0)}% vs unitario`);
+        set('suggest', `Sugerido: ${formatMoney(r.suggestedPrice)}`);
+        set('profit', `${formatMoney(r.profit)} <em class="result-badge ${offerMarginBadgeClass(r.margin)}">${r.margin.toFixed(1)}%</em>`);
+        set('profitUnit', formatMoney(r.profitPerUnit));
+        set('roi', `${r.roi.toFixed(1)}%`);
+        set('be', formatMoney(r.breakEvenPrice));
+        set('maxCpa', currentChannel === 'cod' ? formatMoney(r.maxCpa) : 'N/A');
+        set('roas', currentChannel === 'cod' ? `${r.roas.toFixed(2)}x` : 'N/A');
+        set('goodsLabel', `Mercancía (${r.units} unid.)`);
+        set('goods', formatMoney(r.goodsCost));
+        set('fixedLabel', currentChannel === 'cod' ? 'CPA + flete + admin (1 pedido)' : 'Cargo fijo + envío (1 pedido)');
+        set('fixed', formatMoney(r.fixedPerOrder));
+
+        const upliftColor = r.upliftVsSeparate >= 0 ? '#10b981' : '#ef4444';
+        const upliftSign = r.upliftVsSeparate >= 0 ? '+' : '';
+        set('vsSeparate', `vs. ${r.units} pedidos individuales (${formatMoney(r.separateProfit)}): <strong style="color:${upliftColor}">${upliftSign}${formatMoney(r.upliftVsSeparate)}</strong>`);
+        set('projection', `${orders} pedidos: <strong>${formatMoney(r.profit * orders)}</strong> · ${r.units * orders} unid.`);
+    }
+
+    /**
+     * Dibuja la tarjeta de ofertas con la rentabilidad de cada combo
+     */
+    function renderOffers(data) {
+        const list = document.getElementById('offersList');
+        if (!list) return;
+
+        const rows = (data && data.offers) ? data.offers : [];
+        const step = currentCurrency === 'USD' ? '0.01' : '1';
+        const orders = Math.max(1, getNum('calcOfferOrders', 10));
+
+        // Solo se reconstruye el DOM cuando cambian las filas o la moneda,
+        // así no se pierde el foco mientras se escribe un precio.
+        const signature = rows.map(r => r.id).join('|') + '#' + currentCurrency;
+        if (list.dataset.offersSig !== signature) {
+            list.innerHTML = rows.length
+                ? rows.map(r => offerRowHtml(r, step)).join('')
+                : '<div class="calc-offer-empty">Aún no hay ofertas. Añade un combo (ej: 2 por 100) para ver su rentabilidad.</div>';
+            list.dataset.offersSig = signature;
+        }
+
+        rows.forEach(r => {
+            const el = list.querySelector(`[data-offer-row="${r.id}"]`);
+            if (!el) return;
+            const unitsEl = el.querySelector(`[data-offer-units="${r.id}"]`);
+            const priceEl = el.querySelector(`[data-offer-price="${r.id}"]`);
+            if (unitsEl && document.activeElement !== unitsEl) unitsEl.value = r.units;
+            if (priceEl && document.activeElement !== priceEl) priceEl.value = r.price;
+            updateOfferRow(el, r, orders);
+        });
+
+        // Resumen: mejor oferta por ganancia de pedido y por ganancia por unidad
+        const sumBest = document.getElementById('offersBestSummary');
+        if (sumBest) {
+            const viable = rows.filter(r => r.price > 0);
+            if (!viable.length) {
+                sumBest.innerHTML = '<span class="calc-offer-hint">Escribe el precio de cada combo (o usa el precio sugerido) para comparar.</span>';
+            } else {
+                const bestOrder = viable.reduce((a, b) => (b.profit > a.profit ? b : a));
+                const bestUnit = viable.reduce((a, b) => (b.profitPerUnit > a.profitPerUnit ? b : a));
+                sumBest.innerHTML = `
+                    <span>🏆 Mejor por pedido: <strong>${bestOrder.units} por ${formatMoney(bestOrder.price)}</strong> → ${formatMoney(bestOrder.profit)}</span>
+                    <span>⚖️ Mejor por unidad: <strong>${bestUnit.units} por ${formatMoney(bestUnit.price)}</strong> → ${formatMoney(bestUnit.profitPerUnit)}/unid.</span>`;
+            }
+        }
+
+        const noteUnit = document.getElementById('offersUnitRef');
+        if (noteUnit && data) {
+            noteUnit.textContent = `Venta unitaria: ${formatMoney(data.finalSalePrice)} · ganancia ${formatMoney(data.netProfit)} (${data.netMarginPercent.toFixed(1)}%)`;
+        }
+    }
+
+    /**
+     * Listeners delegados de la tarjeta de ofertas
+     */
+    function bindOfferEvents() {
+        const list = document.getElementById('offersList');
+        const btnAdd = document.getElementById('btnAddOffer');
+        const packToggle = document.getElementById('calcOfferPackOnce');
+        const inputOrders = document.getElementById('calcOfferOrders');
+
+        document.querySelectorAll('[data-offer-preset]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const units = Math.max(1, parseInt(btn.dataset.offerPreset, 10) || 2);
+                addOffer(units, 0);
+            });
+        });
+
+        if (btnAdd) {
+            btnAdd.addEventListener('click', () => {
+                const nextUnits = offers.length ? offers[offers.length - 1].units + 1 : 2;
+                addOffer(nextUnits, 0);
+            });
+        }
+
+        if (packToggle) {
+            packToggle.checked = offersPackOnce;
+            packToggle.addEventListener('change', () => {
+                offersPackOnce = packToggle.checked;
+                calculate();
+            });
+        }
+
+        if (inputOrders) inputOrders.addEventListener('input', Utils.debounce(calculate, 80));
+
+        if (!list) return;
+
+        list.addEventListener('click', (e) => {
+            const rm = e.target.closest('[data-offer-remove]');
+            if (rm) { removeOffer(rm.dataset.offerRemove); return; }
+            const ap = e.target.closest('[data-offer-apply]');
+            if (ap) applySuggestedOfferPrice(ap.dataset.offerApply);
+        });
+
+        const debouncedCalc = Utils.debounce(calculate, 300);
+
+        list.addEventListener('input', (e) => {
+            const unitsEl = e.target.closest('[data-offer-units]');
+            if (unitsEl) {
+                const item = offers.find(o => o.id === unitsEl.dataset.offerUnits);
+                if (item) item.units = Math.max(1, Math.round(parseFloat(unitsEl.value) || 1));
+                debouncedCalc();
+                return;
+            }
+            const priceEl = e.target.closest('[data-offer-price]');
+            if (priceEl) {
+                const item = offers.find(o => o.id === priceEl.dataset.offerPrice);
+                if (item) item.price = Math.max(0, parseFloat(priceEl.value) || 0);
+                debouncedCalc();
+            }
+        });
     }
 
     /**
@@ -894,6 +1234,27 @@ const CalculatorModule = (() => {
         const totalBatchRevenue = finalSalePrice * batchUnitsTotal;
         const totalBatchCost = landedCost * batchUnitsTotal;
 
+        // 5.b Ofertas / combos multi-unidad
+        // El CPA, el flete y el costo administrativo se cobran una sola vez por pedido.
+        const offersCtx = {
+            channel: currentChannel,
+            landedCost,
+            packPerUnit: packaging + fulfillment,
+            packOnce: offersPackOnce,
+            realCpa,
+            realFreight,
+            adminCost,
+            recaudoRate,
+            ineffectiveness,
+            mpPercentTotal,
+            mpFixedFee,
+            mpShipping,
+            unitPrice: finalSalePrice,
+            unitProfit: netProfit,
+            unitMargin: netMarginPercent
+        };
+        const offersData = offers.map(o => computeOffer(o, offersCtx));
+
         // 6. Actualizar UI en vivo
         const calcResult = {
             landedCost,
@@ -917,7 +1278,8 @@ const CalculatorModule = (() => {
             batchUnitsTotal,
             totalBatchProfit,
             totalBatchRevenue,
-            totalBatchCost
+            totalBatchCost,
+            offers: offersData
         };
 
         updateUI(calcResult);
@@ -1084,6 +1446,9 @@ const CalculatorModule = (() => {
         if (cCodMargin) cCodMargin.textContent = `${data.simCodMargin.toFixed(1)}%`;
         if (cMpProfit) cMpProfit.textContent = formatMoney(data.simMpProfit);
         if (cMpMargin) cMpMargin.textContent = `${data.simMpMargin.toFixed(1)}%`;
+
+        // Ofertas / combos multi-unidad
+        renderOffers(data);
     }
 
     /**
@@ -1112,6 +1477,10 @@ const CalculatorModule = (() => {
         extraCosts = [];
         applyHiddenCosts();
         renderExtraCosts();
+        offers = defaultOffers();
+        offersPackOnce = true;
+        const packChk = document.getElementById('calcOfferPackOnce');
+        if (packChk) packChk.checked = true;
 
         setVal('calcCpa', isUsd ? 3.75 : 15000);
         setVal('calcCancelacion', 10);
@@ -1197,6 +1566,21 @@ const CalculatorModule = (() => {
             })),
             cost_extra_total: getExtraCostsRawTotal(),
             cost_hidden_fields: [...hiddenCosts],
+
+            // Ofertas / combos multi-unidad (un envío y un CPA por pedido)
+            offers_pack_once: offersPackOnce,
+            offer_items: ((calcData && calcData.offers) ? calcData.offers : []).map(o => ({
+                units: o.units,
+                price: o.price,
+                unit_price_eff: o.unitPriceEff,
+                profit: o.profit,
+                margin_percent: o.margin,
+                profit_per_unit: o.profitPerUnit,
+                roi_percent: o.roi,
+                break_even_price: o.breakEvenPrice,
+                max_cpa: o.maxCpa,
+                uplift_vs_separate: o.upliftVsSeparate
+            })),
 
             total_landed_cost: landedCost,
 
@@ -1725,6 +2109,34 @@ const CalculatorModule = (() => {
         }
         if (cmpMpMargin) cmpMpMargin.textContent = `${mpMargin.toFixed(1)}%`;
 
+        // Ofertas y combos guardados de esta liquidación
+        const modalOffersCard = document.getElementById('modalOffersCard');
+        const modalOffersBody = document.getElementById('modalOffersBody');
+        let detailOffers = item.offer_items;
+        if (typeof detailOffers === 'string') {
+            try { detailOffers = JSON.parse(detailOffers); } catch (e) { detailOffers = []; }
+        }
+        if (modalOffersCard && modalOffersBody) {
+            if (Array.isArray(detailOffers) && detailOffers.length) {
+                modalOffersCard.style.display = '';
+                modalOffersBody.innerHTML = detailOffers.map(o => {
+                    const profit = Number(o.profit) || 0;
+                    const margin = Number(o.margin_percent) || 0;
+                    return `<tr>
+                        <td><strong>${Number(o.units) || 1} por ${formatMoney(Number(o.price) || 0, itemCurr)}</strong></td>
+                        <td>${formatMoney(Number(o.unit_price_eff) || 0, itemCurr)}</td>
+                        <td style="color: ${profit >= 0 ? '#10b981' : '#ef4444'}; font-weight: 700;">${formatMoney(profit, itemCurr)}</td>
+                        <td>${margin.toFixed(1)}%</td>
+                        <td>${formatMoney(Number(o.profit_per_unit) || 0, itemCurr)}</td>
+                        <td>${formatMoney(Number(o.max_cpa) || 0, itemCurr)}</td>
+                    </tr>`;
+                }).join('');
+            } else {
+                modalOffersCard.style.display = 'none';
+                modalOffersBody.innerHTML = '';
+            }
+        }
+
         // Acciones del Footer del Modal
         const btnLoad = document.getElementById('btnModalLoadCalculator');
         const btnPdf = document.getElementById('btnModalExportPdf');
@@ -1822,6 +2234,23 @@ const CalculatorModule = (() => {
             });
         }
         renderExtraCosts();
+
+        // Ofertas / combos guardados
+        offersPackOnce = item.offers_pack_once !== false;
+        const packChkLoad = document.getElementById('calcOfferPackOnce');
+        if (packChkLoad) packChkLoad.checked = offersPackOnce;
+
+        let savedOffers = item.offer_items;
+        if (typeof savedOffers === 'string') {
+            try { savedOffers = JSON.parse(savedOffers); } catch (e) { savedOffers = []; }
+        }
+        offers = Array.isArray(savedOffers) && savedOffers.length
+            ? savedOffers.map(o => ({
+                id: 'of_' + (++offersSeq) + '_' + Math.random().toString(36).substr(2, 4),
+                units: Math.max(1, Math.round(Number(o.units) || 1)),
+                price: Math.max(0, Number(o.price) || 0)
+            }))
+            : [];
 
         // COD
         setVal('calcCpa', item.sale_cpa != null ? item.sale_cpa : 0);
@@ -2093,6 +2522,45 @@ const CalculatorModule = (() => {
         doc.setTextColor(30, 30, 30);
         doc.setFont('helvetica', 'normal');
 
+        // 5. Ofertas y combos multi-unidad
+        let pdfOffers = item.offer_items;
+        if (typeof pdfOffers === 'string') {
+            try { pdfOffers = JSON.parse(pdfOffers); } catch (e) { pdfOffers = []; }
+        }
+        if (Array.isArray(pdfOffers) && pdfOffers.length) {
+            y += 12;
+            if (y > 235) { doc.addPage(); y = 25; }
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setFillColor(240, 240, 248);
+            doc.rect(14, y - 5, 182, 8, 'F');
+            doc.text('5. OFERTAS Y COMBOS (UN ENVIO Y UN CPA POR PEDIDO)', 16, y);
+            y += 8;
+
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.text('Oferta', 16, y);
+            doc.text('Precio', 86, y, { align: 'right' });
+            doc.text('$/unid.', 112, y, { align: 'right' });
+            doc.text('Ganancia', 146, y, { align: 'right' });
+            doc.text('Margen', 168, y, { align: 'right' });
+            doc.text('CPA máx.', 196, y, { align: 'right' });
+            y += 5;
+
+            pdfOffers.forEach(o => {
+                if (y > 275) { doc.addPage(); y = 25; }
+                const units = Number(o.units) || 1;
+                doc.text(units + ' x 1 pedido', 16, y);
+                doc.text(formatMoney(Number(o.price) || 0, itemCurr), 86, y, { align: 'right' });
+                doc.text(formatMoney(Number(o.unit_price_eff) || 0, itemCurr), 112, y, { align: 'right' });
+                doc.text(formatMoney(Number(o.profit) || 0, itemCurr), 146, y, { align: 'right' });
+                doc.text((Number(o.margin_percent) || 0).toFixed(1) + '%', 168, y, { align: 'right' });
+                doc.text(formatMoney(Number(o.max_cpa) || 0, itemCurr), 196, y, { align: 'right' });
+                y += 5.5;
+            });
+            doc.setFontSize(10);
+        }
+
         // Guardar archivo
         const safeName = (item.name || 'producto').replace(/[^a-zA-Z0-9_-]/g, '_');
         doc.save(`Liquidacion_Comparativa_${safeName}_${itemCurr}.pdf`);
@@ -2107,6 +2575,8 @@ const CalculatorModule = (() => {
         init,
         resetInit,
         calculate,
+        addOffer,
+        removeOffer,
         resetCalculator,
         saveCurrentLiquidation,
         loadLiquidation,
