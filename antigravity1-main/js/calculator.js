@@ -1255,6 +1255,27 @@ const CalculatorModule = (() => {
         };
         const offersData = offers.map(o => computeOffer(o, offersCtx));
 
+        // 5.c Desglose item por item del precio de venta
+        const priceBreakdown = buildPriceBreakdown({
+            channel: currentChannel,
+            currency: currentCurrency,
+            salePrice: finalSalePrice,
+            landedCost,
+            netProfit,
+            freightOut: fleteOut,
+            freightReturn: fleteRet,
+            returnRate: pReturn,
+            ineffectiveness,
+            cpa,
+            recaudoRate,
+            adminCost,
+            mpShipping,
+            mpFixedFee,
+            mpFeeRate,
+            mpAdsRate,
+            mpTaxRate
+        });
+
         // 6. Actualizar UI en vivo
         const calcResult = {
             landedCost,
@@ -1279,7 +1300,8 @@ const CalculatorModule = (() => {
             totalBatchProfit,
             totalBatchRevenue,
             totalBatchCost,
-            offers: offersData
+            offers: offersData,
+            priceBreakdown
         };
 
         updateUI(calcResult);
@@ -1289,6 +1311,90 @@ const CalculatorModule = (() => {
     /**
      * Renderizar métricas en la interfaz
      */
+    /**
+     * Construir el desglose item por item del precio de venta.
+     * Separa el flete de envio del flete de devolucion y la publicidad de las comisiones.
+     */
+    function buildPriceBreakdown(p) {
+        const curr = p.currency;
+        const fmt = (v) => formatMoney(v, curr);
+        const price = p.salePrice || 0;
+
+        if (p.channel === 'cod') {
+            const pReturn = Math.min(0.9, Math.max(0, p.returnRate || 0));
+            const ineff = Math.min(0.92, Math.max(0, p.ineffectiveness || 0));
+            const fleteOut = p.freightOut || 0;
+            const fleteRet = p.freightReturn || 0;
+            const cpa = p.cpa || 0;
+            const recaudoRate = Math.max(0, p.recaudoRate || 0);
+
+            const freightOutUnit = pReturn < 1 ? fleteOut / (1 - pReturn) : fleteOut;
+            const freightReturnUnit = pReturn < 1 ? (pReturn * fleteRet) / (1 - pReturn) : 0;
+            const realCpaUnit = ineff < 1 ? cpa / (1 - ineff) : cpa;
+
+            return [
+                { label: 'Producto Landed', color: '#3b82f6', unit: p.landedCost || 0, always: true },
+                { label: 'Flete de Envío', color: '#f59e0b', unit: freightOutUnit, hint: `Flete base ${fmt(fleteOut)} repartido entre los pedidos entregados (${(pReturn * 100).toFixed(0)}% devolución)` },
+                { label: 'Flete Devolución', color: '#fbbf24', unit: freightReturnUnit, hint: `${(pReturn * 100).toFixed(0)}% de los pedidos regresa a ${fmt(fleteRet)} de flete de retorno` },
+                { label: 'Publicidad (CPA)', color: '#ec4899', unit: realCpaUnit, hint: `CPA ${fmt(cpa)} ajustado por ${(ineff * 100).toFixed(0)}% de pedidos cancelados/devueltos` },
+                { label: 'Comisión Recaudo', color: '#a855f7', unit: price * recaudoRate, hint: `${(recaudoRate * 100).toFixed(1)}% sobre el precio de venta` },
+                { label: 'Costo Administrativo', color: '#94a3b8', unit: p.adminCost || 0, hint: 'Costo fijo administrativo por pedido' },
+                { label: 'Utilidad Neta', color: '#10b981', unit: p.netProfit || 0, always: true }
+            ];
+        }
+
+        const feeRate = Math.max(0, p.mpFeeRate || 0);
+        const adsRate = Math.max(0, p.mpAdsRate || 0);
+        const taxRate = Math.max(0, p.mpTaxRate || 0);
+
+        return [
+            { label: 'Producto Landed', color: '#3b82f6', unit: p.landedCost || 0, always: true },
+            { label: 'Envío al Cliente', color: '#f59e0b', unit: p.mpShipping || 0, hint: 'Costo de envío asumido por unidad' },
+            { label: 'Tarifa Fija', color: '#fbbf24', unit: p.mpFixedFee || 0, hint: 'Cargo fijo por venta del marketplace' },
+            { label: 'Comisión Marketplace', color: '#a855f7', unit: price * feeRate, hint: `${(feeRate * 100).toFixed(1)}% sobre el precio de venta` },
+            { label: 'Publicidad Marketplace', color: '#ec4899', unit: price * adsRate, hint: `${(adsRate * 100).toFixed(1)}% sobre el precio de venta` },
+            { label: 'Impuestos', color: '#64748b', unit: price * taxRate, hint: `${(taxRate * 100).toFixed(1)}% sobre el precio de venta` },
+            { label: 'Utilidad Neta', color: '#10b981', unit: p.netProfit || 0, always: true }
+        ];
+    }
+
+    /**
+     * Pintar la barra segmentada y la leyenda del desglose detallado.
+     */
+    function renderPriceBreakdown(barId, legendId, items, salePrice, batchUnits, currency) {
+        const totalPrice = Math.max(0.01, salePrice || 0);
+        const units = batchUnits || 1;
+        const visible = (items || []).filter(it => it.always || Math.abs(it.unit) > 0.004);
+
+        const barEl = document.getElementById(barId);
+        const legendEl = document.getElementById(legendId);
+
+        if (barEl) {
+            barEl.innerHTML = visible.map(it => {
+                const pct = Math.max(0, Math.min(100, (it.unit / totalPrice) * 100));
+                const tip = `${it.label}: ${formatMoney(it.unit, currency)} (${pct.toFixed(1)}%)${it.hint ? ' — ' + it.hint : ''}`;
+                return `<div class="calc-bar-segment" style="width: ${pct}%; background: ${it.color};" title="${tip}"></div>`;
+            }).join('');
+        }
+
+        if (legendEl) {
+            legendEl.innerHTML = visible.map(it => {
+                const pct = Math.max(-999, Math.min(999, (it.unit / totalPrice) * 100));
+                const tip = it.hint ? ` title="${it.hint}"` : '';
+                return `
+                    <div class="calc-legend-item"${tip}>
+                        <div class="calc-legend-label">
+                            <span class="calc-legend-dot" style="background: ${it.color};"></span> ${it.label}
+                        </div>
+                        <div class="calc-legend-data">
+                            <span class="calc-legend-value">${formatMoney(it.unit, currency)} (${pct.toFixed(1)}%)</span>
+                            <span class="calc-legend-batch">Lote: ${formatMoney(it.unit * units, currency)}</span>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+    }
+
     function updateUI(data) {
         // Utilidad Neta y Badge
         const resProfit = document.getElementById('resUtilidadNeta');
@@ -1375,54 +1481,9 @@ const CalculatorModule = (() => {
             resMinRoas.textContent = currentChannel === 'cod' ? `${data.minRoas.toFixed(2)}x` : 'N/A (Orgánico)';
         }
 
-        // Segmented Breakdown Bar
-        const totalPrice = Math.max(0.01, data.finalSalePrice);
-        const pLanded = Math.max(0, Math.min(100, (data.landedCost / totalPrice) * 100));
-        const pFreight = Math.max(0, Math.min(100, (currentChannel === 'cod' ? (data.realFreight / totalPrice) * 100 : 0)));
-        const pAds = Math.max(0, Math.min(100, (currentChannel === 'cod' ? (data.realCpa / totalPrice) * 100 : (data.channelOperationalCost / totalPrice) * 100)));
-        const pProfit = Math.max(0, Math.min(100, (Math.max(0, data.netProfit) / totalPrice) * 100));
-
-        const segLanded = document.getElementById('segLanded');
-        const segFreight = document.getElementById('segFreight');
-        const segAds = document.getElementById('segAds');
-        const segProfit = document.getElementById('segProfit');
-
-        if (segLanded) segLanded.style.width = `${pLanded}%`;
-        if (segFreight) segFreight.style.width = `${pFreight}%`;
-        if (segAds) segAds.style.width = `${pAds}%`;
-        if (segProfit) segProfit.style.width = `${pProfit}%`;
-
-        // Legend
-        const landedUnit = data.landedCost;
-        const freightUnit = currentChannel === 'cod' ? data.realFreight : getNum('calcMpShipping', 0);
-        const adsUnit = currentChannel === 'cod' ? data.realCpa : data.channelOperationalCost;
-        const profitUnit = data.netProfit;
-
+        // Desglose Detallado del Precio de Venta (item por item)
         const batchUnits = data.batchUnitsTotal || 1;
-        const landedBatch = landedUnit * batchUnits;
-        const freightBatch = freightUnit * batchUnits;
-        const adsBatch = adsUnit * batchUnits;
-        const profitBatch = profitUnit * batchUnits;
-
-        const legLanded = document.getElementById('legLanded');
-        const legFreight = document.getElementById('legFreight');
-        const legAds = document.getElementById('legAds');
-        const legProfit = document.getElementById('legProfit');
-
-        if (legLanded) legLanded.textContent = `${formatMoney(landedUnit)} (${pLanded.toFixed(0)}%)`;
-        if (legFreight) legFreight.textContent = `${formatMoney(freightUnit)} (${pFreight.toFixed(0)}%)`;
-        if (legAds) legAds.textContent = `${formatMoney(adsUnit)} (${pAds.toFixed(0)}%)`;
-        if (legProfit) legProfit.textContent = `${formatMoney(profitUnit)} (${pProfit.toFixed(0)}%)`;
-
-        const legLandedBatch = document.getElementById('legLandedBatch');
-        const legFreightBatch = document.getElementById('legFreightBatch');
-        const legAdsBatch = document.getElementById('legAdsBatch');
-        const legProfitBatch = document.getElementById('legProfitBatch');
-
-        if (legLandedBatch) legLandedBatch.textContent = `Lote: ${formatMoney(landedBatch)}`;
-        if (legFreightBatch) legFreightBatch.textContent = `Lote: ${formatMoney(freightBatch)}`;
-        if (legAdsBatch) legAdsBatch.textContent = `Lote: ${formatMoney(adsBatch)}`;
-        if (legProfitBatch) legProfitBatch.textContent = `Lote: ${formatMoney(profitBatch)}`;
+        renderPriceBreakdown('calcBreakdownBar', 'calcBreakdownLegend', data.priceBreakdown, data.finalSalePrice, batchUnits, currentCurrency);
 
         const legBatchBadge = document.getElementById('legBatchBadge');
         if (legBatchBadge) legBatchBadge.textContent = `Lote: ${batchUnits} unid.`;
@@ -2017,62 +2078,32 @@ const CalculatorModule = (() => {
             kpiRoiEl.style.color = roi >= 0 ? '#10b981' : '#ef4444';
         }
 
-        // Distribución del Precio de Venta (Barra segmentada de Imagen 3)
-        let freightCost = 0;
-        let adsCost = 0;
-        if (isCodActive) {
-            const pReturn = Math.min(0.9, (item.return_rate || 0) / 100);
-            freightCost = pReturn < 1 ? ((item.freight_out || 0) + (pReturn * (item.freight_return || item.freight_out || 0))) / (1 - pReturn) : (item.freight_out || 0);
-            const ineff = Math.min(0.92, ((item.cancel_rate || 0) + (item.return_rate || 0)) / 100);
-            adsCost = ineff < 1 ? (item.sale_cpa || 0) / (1 - ineff) : (item.sale_cpa || 0);
-        } else {
-            freightCost = (item.marketplace_shipping_cost || 0);
-            adsCost = (salePrice * (((item.marketplace_fee_percent || 0) + (item.marketplace_tax_percent || 0) + (item.marketplace_ads_percent || 0)) / 100)) + (item.marketplace_fixed_fee || 0);
-        }
+        // Distribución del Precio de Venta (desglose item por item)
+        const modalBreakdown = buildPriceBreakdown({
+            channel: isCodActive ? 'cod' : 'marketplace',
+            currency: itemCurr,
+            salePrice: salePrice,
+            landedCost,
+            netProfit,
+            freightOut: item.freight_out || 0,
+            freightReturn: item.freight_return != null ? item.freight_return : (item.freight_out || 0),
+            returnRate: Math.min(0.9, (item.return_rate || 0) / 100),
+            ineffectiveness: Math.min(0.92, ((item.cancel_rate || 0) + (item.return_rate || 0)) / 100),
+            cpa: item.sale_cpa || 0,
+            recaudoRate: (item.cod_fee_percent || 0) / 100,
+            adminCost: item.cost_admin || 0,
+            mpShipping: item.marketplace_shipping_cost || 0,
+            mpFixedFee: item.marketplace_fixed_fee || 0,
+            mpFeeRate: (item.marketplace_fee_percent || 0) / 100,
+            mpAdsRate: (item.marketplace_ads_percent || 0) / 100,
+            mpTaxRate: (item.marketplace_tax_percent || 0) / 100
+        });
 
-        const safePrice = Math.max(1, salePrice);
-        const pLanded = Math.max(0, Math.min(100, (landedCost / safePrice) * 100));
-        const pFreight = Math.max(0, Math.min(100, (freightCost / safePrice) * 100));
-        const pAds = Math.max(0, Math.min(100, (adsCost / safePrice) * 100));
-        const pProfit = Math.max(0, Math.min(100, (Math.max(0, netProfit) / safePrice) * 100));
-
-        const segLanded = document.getElementById('modalSegLanded');
-        const segFreight = document.getElementById('modalSegFreight');
-        const segAds = document.getElementById('modalSegAds');
-        const segProfit = document.getElementById('modalSegProfit');
-
-        if (segLanded) segLanded.style.width = `${pLanded}%`;
-        if (segFreight) segFreight.style.width = `${pFreight}%`;
-        if (segAds) segAds.style.width = `${pAds}%`;
-        if (segProfit) segProfit.style.width = `${pProfit}%`;
-
-        const landedBatch = landedCost * batchUnits;
-        const freightBatch = freightCost * batchUnits;
-        const adsBatch = adsCost * batchUnits;
-        const profitBatch = netProfit * batchUnits;
-
-        const legLanded = document.getElementById('modalLegLanded');
-        const legFreight = document.getElementById('modalLegFreight');
-        const legAds = document.getElementById('modalLegAds');
-        const legProfit = document.getElementById('modalLegProfit');
-
-        if (legLanded) legLanded.textContent = `${formatMoney(landedCost, itemCurr)} (${pLanded.toFixed(0)}%)`;
-        if (legFreight) legFreight.textContent = `${formatMoney(freightCost, itemCurr)} (${pFreight.toFixed(0)}%)`;
-        if (legAds) legAds.textContent = `${formatMoney(adsCost, itemCurr)} (${pAds.toFixed(0)}%)`;
-        if (legProfit) legProfit.textContent = `${formatMoney(netProfit, itemCurr)} (${pProfit.toFixed(0)}%)`;
-
-        const modalLegLandedBatch = document.getElementById('modalLegLandedBatch');
-        const modalLegFreightBatch = document.getElementById('modalLegFreightBatch');
-        const modalLegAdsBatch = document.getElementById('modalLegAdsBatch');
-        const modalLegProfitBatch = document.getElementById('modalLegProfitBatch');
-
-        if (modalLegLandedBatch) modalLegLandedBatch.textContent = `Lote: ${formatMoney(landedBatch, itemCurr)}`;
-        if (modalLegFreightBatch) modalLegFreightBatch.textContent = `Lote: ${formatMoney(freightBatch, itemCurr)}`;
-        if (modalLegAdsBatch) modalLegAdsBatch.textContent = `Lote: ${formatMoney(adsBatch, itemCurr)}`;
-        if (modalLegProfitBatch) modalLegProfitBatch.textContent = `Lote: ${formatMoney(profitBatch, itemCurr)}`;
+        renderPriceBreakdown('modalBreakdownBar', 'modalBreakdownLegend', modalBreakdown, salePrice, batchUnits, itemCurr);
 
         const modalLegBatchBadge = document.getElementById('modalLegBatchBadge');
         if (modalLegBatchBadge) modalLegBatchBadge.textContent = `Lote: ${batchUnits} unid.`;
+
 
         // Comparativa Instantánea de Canales (Imagen 3)
         const colCod = document.getElementById('modalColCod');
