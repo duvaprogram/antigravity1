@@ -4687,6 +4687,7 @@ const IncomeStatementModule = {
             ['report', 'start'],
             ['date', 'start'],
             ['fecha', 'inicio'],
+            ['desde'],
             ['day'],
             ['fecha'],
             ['date'],
@@ -4697,6 +4698,13 @@ const IncomeStatementModule = {
             ['report', 'end'],
             ['date', 'end'],
             ['fecha', 'fin'],
+            ['hasta'],
+        ],
+        country: [
+            ['pais'],
+            ['country'],
+            ['ubicacion'],
+            ['location'],
         ],
         frequency: [
             ['frequency'],
@@ -4823,23 +4831,34 @@ const IncomeStatementModule = {
                     data = data.slice(3);
                 }
 
-                const workbook = XLSX.read(data, { type: 'array', codepage: 65001 });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                let jsonData = [];
 
-                // Try raw=false first for proper type conversion
-                let jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false });
-
-                // If no data, try with raw=true
-                if (jsonData.length === 0) {
-                    jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+                // Plain text exports (CSV/TSV) are read directly. The spreadsheet engine
+                // guesses the separator and re-interprets dates like "01/08/2026" as
+                // month-first, which corrupts the Spanish exports of Meta.
+                if (/\.(csv|tsv|txt)$/i.test(file.name || '')) {
+                    jsonData = this.parseDelimitedText(this.decodeFileBytes(new Uint8Array(e.target.result)));
                 }
 
-                // If still empty, check if there are multiple sheets
-                if (jsonData.length === 0 && workbook.SheetNames.length > 1) {
-                    for (let i = 1; i < workbook.SheetNames.length; i++) {
-                        const altSheet = workbook.Sheets[workbook.SheetNames[i]];
-                        jsonData = XLSX.utils.sheet_to_json(altSheet, { defval: '', raw: false });
-                        if (jsonData.length > 0) break;
+                if (jsonData.length === 0) {
+                    const workbook = XLSX.read(data, { type: 'array', codepage: 65001 });
+                    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+
+                    // Try raw=false first for proper type conversion
+                    jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '', raw: false });
+
+                    // If no data, try with raw=true
+                    if (jsonData.length === 0) {
+                        jsonData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+                    }
+
+                    // If still empty, check if there are multiple sheets
+                    if (jsonData.length === 0 && workbook.SheetNames.length > 1) {
+                        for (let i = 1; i < workbook.SheetNames.length; i++) {
+                            const altSheet = workbook.Sheets[workbook.SheetNames[i]];
+                            jsonData = XLSX.utils.sheet_to_json(altSheet, { defval: '', raw: false });
+                            if (jsonData.length > 0) break;
+                        }
                     }
                 }
 
@@ -4943,6 +4962,128 @@ const IncomeStatementModule = {
     },
 
     /**
+     * Decode raw file bytes honoring the BOM. Meta exports CSV as UTF-8 or UTF-16.
+     */
+    decodeFileBytes(bytes) {
+        if (bytes[0] === 0xFF && bytes[1] === 0xFE) return new TextDecoder('utf-16le').decode(bytes.slice(2));
+        if (bytes[0] === 0xFE && bytes[1] === 0xFF) return new TextDecoder('utf-16be').decode(bytes.slice(2));
+        if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) return new TextDecoder('utf-8').decode(bytes.slice(3));
+        return new TextDecoder('utf-8').decode(bytes);
+    },
+
+    /**
+     * Parse delimited text (CSV/TSV) into rows of plain strings, without any type
+     * coercion: a date like "01/08/2026" stays as written and parseDate() decides.
+     * Detects ";", ",", tab or "|" from the header line and drops empty filler rows.
+     */
+    parseDelimitedText(text) {
+        if (!text) return [];
+
+        const clean = text.replace(/^﻿/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const headerLine = clean.split('\n').find(l => l.trim() !== '') || '';
+
+        let separator = ',';
+        let bestCount = -1;
+        for (const candidate of [';', ',', '\t', '|']) {
+            const count = headerLine.split(candidate).length - 1;
+            if (count > bestCount) {
+                bestCount = count;
+                separator = candidate;
+            }
+        }
+        if (bestCount <= 0) return [];
+
+        const rows = this.splitDelimitedRows(clean, separator);
+        if (rows.length < 2) return [];
+
+        const headers = rows[0].map((h, i) => (h || '').trim() || `col_${i + 1}`);
+        const result = [];
+        for (let r = 1; r < rows.length; r++) {
+            const cells = rows[r];
+            // Meta pads its exports with hundreds of empty rows
+            if (cells.every(c => (c || '').trim() === '')) continue;
+            const row = {};
+            headers.forEach((header, i) => {
+                row[header] = cells[i] === undefined ? '' : String(cells[i]).trim();
+            });
+            result.push(row);
+        }
+        return result;
+    },
+
+    /**
+     * Split delimited text into cells, honoring quoted fields that contain
+     * separators or line breaks.
+     */
+    splitDelimitedRows(text, separator) {
+        const rows = [];
+        let row = [];
+        let field = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (inQuotes) {
+                if (ch !== '"') {
+                    field += ch;
+                } else if (text[i + 1] === '"') {
+                    field += '"';
+                    i++;
+                } else {
+                    inQuotes = false;
+                }
+            } else if (ch === '"' && field === '') {
+                inQuotes = true;
+            } else if (ch === separator) {
+                row.push(field);
+                field = '';
+            } else if (ch === '\n') {
+                row.push(field);
+                field = '';
+                rows.push(row);
+                row = [];
+            } else {
+                field += ch;
+            }
+        }
+
+        row.push(field);
+        if (row.length > 1 || field !== '') rows.push(row);
+        return rows;
+    },
+
+    /**
+     * Normalize a country from the report to the name the app uses.
+     * Returns null when it cannot be recognized, so the caller keeps its fallback.
+     */
+    normalizeCountryName(val) {
+        const raw = this.cleanText(val);
+        if (!raw) return null;
+
+        const names = {
+            'mexico': 'Mexico', 'mx': 'Mexico', 'mex': 'Mexico',
+            'colombia': 'Colombia', 'co': 'Colombia', 'col': 'Colombia',
+            'ecuador': 'Ecuador', 'ec': 'Ecuador', 'ecu': 'Ecuador',
+            'venezuela': 'Venezuela', 've': 'Venezuela', 'ven': 'Venezuela',
+            'guatemala': 'Guatemala', 'gt': 'Guatemala', 'gua': 'Guatemala',
+            'peru': 'Peru', 'chile': 'Chile', 'panama': 'Panama',
+            'bolivia': 'Bolivia', 'paraguay': 'Paraguay', 'uruguay': 'Uruguay',
+            'argentina': 'Argentina', 'brasil': 'Brasil', 'brazil': 'Brasil',
+            'costa rica': 'Costa Rica', 'republica dominicana': 'Republica Dominicana',
+            'honduras': 'Honduras', 'el salvador': 'El Salvador', 'nicaragua': 'Nicaragua',
+            'espana': 'Espana', 'spain': 'Espana',
+            'estados unidos': 'Estados Unidos', 'united states': 'Estados Unidos',
+        };
+
+        const key = raw.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+        if (names[key]) return names[key];
+
+        // Rows targeting several countries ("Colombia, Ecuador") take the first one
+        const first = key.split(/[,/|]/)[0].trim();
+        return names[first] || null;
+    },
+
+    /**
      * Smart column matching using keyword groups.
      * A column matches a field if it contains ALL keywords from any keyword group.
      * Uses priority ordering (first keyword group = highest priority).
@@ -4957,6 +5098,7 @@ const IncomeStatementModule = {
             'cost_per_purchase', 'cpc', 'cpm', 'ctr',  // specific metrics first
             'amount_spent',                              // spending
             'campaign_name', 'ad_set_name', 'ad_name',  // names
+            'country',                                   // country / location
             'impressions', 'clicks', 'reach', 'purchases', // performance
             'month',                                     // month (fallback for dates)
             'date_start', 'date_end',                    // dates
@@ -5175,12 +5317,18 @@ const IncomeStatementModule = {
                 costPerPurchase = costPerPurchase / trmRate;
             }
 
-            // Auto-detect country based on campaign name
-            let rowCountry = country;
-            const campNameUpper = (this.cleanText(mapped.campaign_name) || '').toUpperCase();
-            if (campNameUpper.includes('ECU')) rowCountry = 'Ecuador';
-            else if (campNameUpper.includes('COL')) rowCountry = 'Colombia';
-            else if (campNameUpper.includes('VEN')) rowCountry = 'Venezuela';
+            // Country: the column of the report wins, then the prefix of the campaign,
+            // and only then the country chosen in the import form.
+            let rowCountry = this.normalizeCountryName(mapped.country);
+            if (!rowCountry) {
+                const campNameUpper = (this.cleanText(mapped.campaign_name) || '').toUpperCase();
+                if (campNameUpper.includes('ECU')) rowCountry = 'Ecuador';
+                else if (campNameUpper.includes('COL')) rowCountry = 'Colombia';
+                else if (campNameUpper.includes('VEN')) rowCountry = 'Venezuela';
+                else if (campNameUpper.startsWith('MEX') || campNameUpper.startsWith('MX')) rowCountry = 'Mexico';
+                else if (campNameUpper.startsWith('GT') || campNameUpper.startsWith('GUA')) rowCountry = 'Guatemala';
+                else rowCountry = country;
+            }
 
             results.push({
                 country: rowCountry,
