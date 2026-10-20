@@ -105,6 +105,7 @@ const AuthModule = {
                 multimedia: { can_access: true, can_edit: true },
                 images: { can_access: true, can_edit: true },
                 journal: { can_access: true, can_edit: true },
+                'mutual-tasks': { can_access: true, can_edit: true },
                 users: { can_access: true, can_edit: true }
             };
             return;

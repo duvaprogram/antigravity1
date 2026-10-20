@@ -36,6 +36,9 @@ const App = {
             AccountsModule.init();
             UsersModule.init();
             CampaignsModule.init();
+            if (typeof MetaAdsModule !== 'undefined') {
+                MetaAdsModule.init();
+            }
             IncomeStatementModule.init();
             CalculatorModule.init();
             MaterialsCalculatorModule.init();
@@ -43,6 +46,9 @@ const App = {
             JournalModule.init();
             if (typeof MultimediaModule !== 'undefined') {
                 MultimediaModule.init();
+            }
+            if (typeof MutualTasksModule !== 'undefined') {
+                MutualTasksModule.init();
             }
 
             // Bind navigation events
@@ -160,6 +166,7 @@ const App = {
             'accounts': 'Cuentas y Flujo de Efectivo',
             'users': 'Administración de Usuarios',
             'campaigns': 'Creación de Campañas',
+            'meta-ads': 'Meta Ads',
             'income-statement': 'Estado de Resultados',
             'calculator': 'Calculadora de Utilidad',
             'materials-calculator': 'Calculadora de Materiales',
@@ -167,7 +174,8 @@ const App = {
             'expenses': 'Gastos Mensuales y Presupuesto',
             'multimedia': 'Multimedia (Imágenes y Videos)',
             'images': 'Multimedia (Imágenes y Videos)',
-            'journal': 'Diario y Metas'
+            'journal': 'Diario y Metas',
+            'mutual-tasks': 'Sincronizador de Pendientes Mutuos'
         };
 
         document.getElementById('pageTitle').textContent = titles[normalizedSection] || titles[section] || 'Dashboard';
@@ -242,6 +250,12 @@ const App = {
                     await CampaignsModule.loadProducts();
                 }
                 break;
+            case 'meta-ads':
+                if (typeof MetaAdsModule !== 'undefined') {
+                    MetaAdsModule.init();
+                    MetaAdsModule.render();
+                }
+                break;
             case 'income-statement':
                 await IncomeStatementModule.render();
                 break;
@@ -274,6 +288,11 @@ const App = {
                     await JournalModule.render();
                 } else {
                     JournalModule.init();
+                }
+                break;
+            case 'mutual-tasks':
+                if (typeof MutualTasksModule !== 'undefined') {
+                    MutualTasksModule.render();
                 }
                 break;
 
