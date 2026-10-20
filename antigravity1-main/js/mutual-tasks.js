@@ -1,9 +1,16 @@
 // ==============================================================================
 // MÓDULO: Sincronizador de Pendientes Mutuos (Dirección vs Trabajadora)
-// Soporte completo para Supabase (con sincronización en tiempo real) y LocalStorage fallback
+// Soporte para Nombres Personalizados (ej: Duvan & Monica),
+// Supabase (sincronización en tiempo real) y LocalStorage fallback
 // ==============================================================================
 
 const MutualTasksModule = (() => {
+    // --- NOMBRES PERSONALIZABLES DE LAS PARTES ---
+    let roleNames = {
+        admin: 'Duvan',
+        worker: 'Monica'
+    };
+
     // --- DATOS SEMILLA DE EJEMPLO ---
     const INITIAL_ITEMS = [
         {
@@ -98,7 +105,8 @@ const MutualTasksModule = (() => {
             'send': `<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>`,
             'message-square': `<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>`,
             'rotate-ccw': `<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>`,
-            'x': `<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>`
+            'x': `<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>`,
+            'settings': `<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>`
         };
         const content = icons[name] || '';
         return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">${content}</svg>`;
@@ -115,8 +123,12 @@ const MutualTasksModule = (() => {
         return now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
     }
 
-    function roleName(role) {
-        return role === 'admin' ? 'Dirección (Yo)' : 'Trabajadora';
+    function roleName(role, isMe = false) {
+        const base = role === 'admin' ? roleNames.admin : roleNames.worker;
+        if (isMe) {
+            return `${base} (Yo)`;
+        }
+        return base;
     }
 
     function escapeHtml(str) {
@@ -133,6 +145,18 @@ const MutualTasksModule = (() => {
     async function init() {
         if (isInitialized) return;
         isInitialized = true;
+
+        // Cargar nombres personalizados desde LocalStorage
+        try {
+            const savedNames = localStorage.getItem('mutual_tasks_names_v1');
+            if (savedNames) {
+                const parsed = JSON.parse(savedNames);
+                if (parsed.admin) roleNames.admin = parsed.admin;
+                if (parsed.worker) roleNames.worker = parsed.worker;
+            }
+        } catch(e) {
+            console.warn('Error reading saved names:', e);
+        }
 
         // Auto-seleccionar perspectiva según el usuario logueado en el sistema
         if (typeof AuthModule !== 'undefined' && AuthModule.currentUser) {
@@ -171,7 +195,6 @@ const MutualTasksModule = (() => {
                 .order('created_at', { ascending: false });
 
             if (error) {
-                // Si la tabla no existe aún, se mantendrá en localStorage
                 console.warn('Supabase mutual_tasks not ready, using local data:', error.message);
                 isSupabaseConnected = false;
                 return;
@@ -179,9 +202,23 @@ const MutualTasksModule = (() => {
 
             if (data && Array.isArray(data)) {
                 isSupabaseConnected = true;
-                if (data.length > 0) {
-                    // Mapear campos de Supabase a formato del módulo
-                    items = data.map(row => ({
+
+                // 1. Detectar si existe configuración de nombres guardada en la base de datos
+                const configRow = data.find(row => row.id === '__config_names__');
+                if (configRow && configRow.description) {
+                    try {
+                        const parsed = JSON.parse(configRow.description);
+                        if (parsed.admin) roleNames.admin = parsed.admin;
+                        if (parsed.worker) roleNames.worker = parsed.worker;
+                        localStorage.setItem('mutual_tasks_names_v1', JSON.stringify(roleNames));
+                    } catch(e) {}
+                }
+
+                // 2. Filtrar items normales (excluyendo registros de configuración)
+                const taskRows = data.filter(row => row.id !== '__config_names__');
+
+                if (taskRows.length > 0) {
+                    items = taskRows.map(row => ({
                         id: String(row.id),
                         title: row.title,
                         description: row.description || '',
@@ -197,7 +234,7 @@ const MutualTasksModule = (() => {
                     }));
                     localStorage.setItem('modulo_pendientes_v1', JSON.stringify(items));
                 } else if (items.length > 0) {
-                    // Si la tabla está vacía, sembrar los registros iniciales en Supabase
+                    // Sembrar datos iniciales si está vacía
                     seedInitialDataToSupabase();
                 }
             }
@@ -272,7 +309,6 @@ const MutualTasksModule = (() => {
                     { event: '*', schema: 'public', table: 'mutual_tasks' },
                     async () => {
                         await loadFromSupabase();
-                        // Solo re-renderizar si la sección de pendientes está activa
                         if (App && App.currentSection === 'mutual-tasks') {
                             render();
                         }
@@ -290,6 +326,67 @@ const MutualTasksModule = (() => {
 
     function persistState() {
         localStorage.setItem('modulo_pendientes_v1', JSON.stringify(items));
+    }
+
+    // --- GESTIÓN DE NOMBRES PERSONALIZADOS ---
+    function openNamesModal() {
+        const modal = document.getElementById('mtNamesModal');
+        if (modal) {
+            modal.style.display = 'flex';
+            const adminInput = document.getElementById('mtInputAdminName');
+            const workerInput = document.getElementById('mtInputWorkerName');
+            if (adminInput) adminInput.value = roleNames.admin;
+            if (workerInput) workerInput.value = roleNames.worker;
+            if (adminInput) setTimeout(() => adminInput.focus(), 100);
+        }
+    }
+
+    function closeNamesModal() {
+        const modal = document.getElementById('mtNamesModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function handleSaveNames(e) {
+        if (e && e.preventDefault) e.preventDefault();
+        const adminInput = document.getElementById('mtInputAdminName');
+        const workerInput = document.getElementById('mtInputWorkerName');
+
+        const newAdmin = adminInput ? adminInput.value.trim() : '';
+        const newWorker = workerInput ? workerInput.value.trim() : '';
+
+        if (!newAdmin || !newWorker) {
+            if (typeof Utils !== 'undefined') Utils.showToast('Ambos nombres son obligatorios', 'warning');
+            return;
+        }
+
+        roleNames.admin = newAdmin;
+        roleNames.worker = newWorker;
+        localStorage.setItem('mutual_tasks_names_v1', JSON.stringify(roleNames));
+
+        // Sincronizar configuración de nombres en Supabase
+        if (window.supabaseClient) {
+            try {
+                await window.supabaseClient
+                    .from('mutual_tasks')
+                    .upsert({
+                        id: '__config_names__',
+                        title: 'CONFIG_NAMES',
+                        description: JSON.stringify(roleNames),
+                        category: 'general',
+                        priority: 'low',
+                        turn: 'admin',
+                        created_by: 'admin',
+                        status: 'completed',
+                        updated_at: new Date().toISOString()
+                    });
+            } catch(err) {
+                console.warn('Could not sync custom names to Supabase:', err);
+            }
+        }
+
+        closeNamesModal();
+        render();
+        if (typeof Utils !== 'undefined') Utils.showToast(`Nombres configurados: ${roleNames.admin} y ${roleNames.worker}`, 'success');
     }
 
     // --- ACCIONES Y OPERACIONES ---
@@ -433,7 +530,7 @@ const MutualTasksModule = (() => {
         await saveItemToSupabase(updated);
 
         render();
-        if (typeof Utils !== 'undefined') Utils.showToast(`Enviado a revisión de ${roleName(reviewer)}`, 'success');
+        if (typeof Utils !== 'undefined') Utils.showToast(`Enviado a validación de ${roleName(reviewer)}`, 'success');
     }
 
     async function handleConfirmClose(itemId) {
@@ -534,7 +631,6 @@ const MutualTasksModule = (() => {
         const modal = document.getElementById('mtCreateModal');
         if (modal) {
             modal.style.display = 'flex';
-            // Pre-asignar a la contraparte
             const assignEl = document.getElementById('mtModalAssign');
             if (assignEl) {
                 assignEl.value = currentUser === 'admin' ? 'worker' : 'admin';
@@ -589,7 +685,7 @@ const MutualTasksModule = (() => {
             if (activeTab === 'their_turn') return item.status === 'active' && item.turn === otherRole;
             if (activeTab === 'review') return item.status === 'in_review';
             if (activeTab === 'completed') return item.status === 'completed';
-            return item.status !== 'completed'; // 'all' muestra todos los activos y en revisión
+            return item.status !== 'completed';
         });
 
         // --- CONSTRUCCIÓN DEL HTML ---
@@ -604,7 +700,7 @@ const MutualTasksModule = (() => {
                     </div>
                     <div>
                         <h1>Sincronizador de Pendientes Mutuos</h1>
-                        <p>Sistema de responsabilidad cruzada: nada se pierde, todo tiene un turno claro.</p>
+                        <p>Gestión transparente de tareas y acuerdos entre <strong>${escapeHtml(roleNames.admin)}</strong> y <strong>${escapeHtml(roleNames.worker)}</strong>.</p>
                     </div>
                 </div>
 
@@ -618,19 +714,26 @@ const MutualTasksModule = (() => {
                     <!-- Selector interactivo de vista -->
                     <div class="mt-user-switcher">
                         <span class="mt-switch-label">
-                            ${getSvg('eye', 13)} Vista como:
+                            ${getSvg('eye', 13)} Vista:
                         </span>
                         <button type="button" 
                             onclick="MutualTasksModule.switchRole('admin')" 
-                            class="mt-switch-btn ${currentUser === 'admin' ? 'active-admin' : ''}">
-                            Dirección (Yo)
+                            class="mt-switch-btn ${currentUser === 'admin' ? 'active-admin' : ''}"
+                            title="Cambiar perspectiva a ${escapeHtml(roleNames.admin)}">
+                            ${escapeHtml(roleNames.admin)} ${currentUser === 'admin' ? '(Yo)' : ''}
                         </button>
                         <button type="button" 
                             onclick="MutualTasksModule.switchRole('worker')" 
-                            class="mt-switch-btn ${currentUser === 'worker' ? 'active-worker' : ''}">
-                            Trabajadora
+                            class="mt-switch-btn ${currentUser === 'worker' ? 'active-worker' : ''}"
+                            title="Cambiar perspectiva a ${escapeHtml(roleNames.worker)}">
+                            ${escapeHtml(roleNames.worker)} ${currentUser === 'worker' ? '(Yo)' : ''}
                         </button>
                     </div>
+
+                    <!-- Botón Personalizar Nombres -->
+                    <button type="button" onclick="MutualTasksModule.openNamesModal()" class="mt-btn-settings" title="Editar los nombres de los participantes (ej: Duvan y Monica)">
+                        ${getSvg('settings', 14)} ⚙️ Nombres
+                    </button>
 
                     <!-- Botón Crear Nuevo Pendiente -->
                     <button type="button" onclick="MutualTasksModule.openModal()" class="mt-btn-primary">
@@ -648,7 +751,7 @@ const MutualTasksModule = (() => {
                             <span class="mt-kpi-badge">Pelota en mi cancha</span>
                             <div class="mt-kpi-number">${myTurnCount}</div>
                             <p class="mt-kpi-desc">
-                                Cosas que <strong>${roleName(currentUser)}</strong> debe responder o gestionar ahora.
+                                Cosas que <strong>${roleName(currentUser, true)}</strong> debe responder o gestionar ahora.
                             </p>
                         </div>
                         <div class="mt-kpi-icon">
@@ -836,7 +939,7 @@ const MutualTasksModule = (() => {
                                     <div class="mt-action-buttons">
                                         ${item.status === 'active' ? `
                                             <button type="button" class="mt-action-btn mt-btn-pass" onclick="MutualTasksModule.handlePassTurn('${item.id}')">
-                                                ${getSvg('arrow-left-right', 13)} Pasar pelota a ${item.turn === 'admin' ? 'Trabajadora' : 'Dirección'}
+                                                ${getSvg('arrow-left-right', 13)} Pasar pelota a ${roleName(item.turn === 'admin' ? 'worker' : 'admin')}
                                             </button>
                                             <button type="button" class="mt-action-btn mt-btn-resolve" onclick="MutualTasksModule.handleRequestReview('${item.id}')">
                                                 ${getSvg('check-circle-2', 13)} Ya lo resolví (Enviar a Revisión)
@@ -871,7 +974,7 @@ const MutualTasksModule = (() => {
                                     ${item.notes.map(note => `
                                         <div class="mt-log-item">
                                             <span class="mt-log-author ${note.author === 'admin' ? 'admin' : 'worker'}">
-                                                ${note.author === 'admin' ? 'Dirección' : 'Trabajadora'}
+                                                ${note.author === 'admin' ? escapeHtml(roleNames.admin) : escapeHtml(roleNames.worker)}
                                             </span>
                                             <span class="mt-log-text">${escapeHtml(note.text)}</span>
                                             <span class="mt-log-time">${escapeHtml(note.timestamp)}</span>
@@ -888,7 +991,40 @@ const MutualTasksModule = (() => {
         html += `
             </section>
 
-            <!-- MODAL DE CREACIÓN -->
+            <!-- MODAL DE CONFIGURACIÓN DE NOMBRES -->
+            <div id="mtNamesModal" class="mt-modal-backdrop" style="display: none;" onclick="if(event.target === this) MutualTasksModule.closeNamesModal()">
+                <div class="mt-modal-box" style="max-width: 440px;">
+                    <div class="mt-modal-head">
+                        <h3>⚙️ Personalizar Nombres de las Partes</h3>
+                        <button type="button" class="mt-modal-close" onclick="MutualTasksModule.closeNamesModal()">
+                            ${getSvg('x', 18)}
+                        </button>
+                    </div>
+
+                    <form onsubmit="MutualTasksModule.handleSaveNames(event)">
+                        <p style="font-size: 0.82rem; color: var(--text-muted, #94a3b8); margin: 0 0 1rem 0; line-height: 1.4;">
+                            Define los nombres que aparecerán en todas las tarjetas, turnos y bitácora del sincronizador:
+                        </p>
+
+                        <div class="mt-form-group">
+                            <label>Nombre Dirección / Admin (Tú)</label>
+                            <input type="text" id="mtInputAdminName" class="mt-input" required value="${escapeHtml(roleNames.admin)}" placeholder="Ej: Duvan" />
+                        </div>
+
+                        <div class="mt-form-group" style="margin-top: 0.85rem;">
+                            <label>Nombre Trabajadora / Colaboradora</label>
+                            <input type="text" id="mtInputWorkerName" class="mt-input" required value="${escapeHtml(roleNames.worker)}" placeholder="Ej: Monica" />
+                        </div>
+
+                        <div class="mt-modal-actions" style="margin-top: 1.25rem;">
+                            <button type="button" class="mt-btn-cancel" onclick="MutualTasksModule.closeNamesModal()">Cancelar</button>
+                            <button type="submit" class="mt-btn-primary">Guardar Nombres</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- MODAL DE CREACIÓN DE PENDIENTE -->
             <div id="mtCreateModal" class="mt-modal-backdrop" style="display: none;" onclick="if(event.target === this) MutualTasksModule.closeModal()">
                 <div class="mt-modal-box">
                     <div class="mt-modal-head">
@@ -935,8 +1071,8 @@ const MutualTasksModule = (() => {
                             <div class="mt-form-group">
                                 <label>¿En cancha de quién empieza?</label>
                                 <select id="mtModalAssign" class="mt-select" style="font-weight: 700; color: #818cf8;">
-                                    <option value="worker">En cancha de mi Trabajadora</option>
-                                    <option value="admin">En mi cancha (Dirección)</option>
+                                    <option value="worker">En cancha de ${escapeHtml(roleNames.worker)}</option>
+                                    <option value="admin">En mi cancha (${escapeHtml(roleNames.admin)})</option>
                                 </select>
                             </div>
 
@@ -983,7 +1119,10 @@ const MutualTasksModule = (() => {
         handleDelete,
         openModal,
         closeModal,
-        onCategoryChange
+        onCategoryChange,
+        openNamesModal,
+        closeNamesModal,
+        handleSaveNames
     };
 })();
 
