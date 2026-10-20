@@ -106,7 +106,7 @@ const UsersModule = {
                 'dashboard', 'products', 'inventory', 'clients', 'guides', 
                 'confirmation', 'purchases', 'analytics', 'freights', 
                 'payments', 'accounts', 'campaigns', 'income-statement', 
-                'calculator', 'materials-calculator', 'finance', 'expenses', 'multimedia', 'journal', 'users'
+                'calculator', 'materials-calculator', 'finance', 'expenses', 'multimedia', 'journal', 'mutual-tasks', 'users'
             ];
 
             modules.forEach(module => {
@@ -146,6 +146,7 @@ const UsersModule = {
             expenses: { name: 'Gastos Mensuales', icon: '🧾' },
             multimedia: { name: 'Multimedia (Imágenes y Videos)', icon: '🎬' },
             journal: { name: 'Diario y Metas', icon: '📔' },
+            'mutual-tasks': { name: 'Pendientes Mutuos', icon: '🔄' },
             users: { name: 'Usuarios y Permisos', icon: '🛡️' }
         };
 

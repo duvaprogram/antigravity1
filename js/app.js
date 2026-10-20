@@ -47,6 +47,9 @@ const App = {
             if (typeof MultimediaModule !== 'undefined') {
                 MultimediaModule.init();
             }
+            if (typeof MutualTasksModule !== 'undefined') {
+                MutualTasksModule.init();
+            }
 
             // Bind navigation events
             this.bindNavigation();
@@ -171,7 +174,8 @@ const App = {
             'expenses': 'Gastos Mensuales y Presupuesto',
             'multimedia': 'Multimedia (Imágenes y Videos)',
             'images': 'Multimedia (Imágenes y Videos)',
-            'journal': 'Diario y Metas'
+            'journal': 'Diario y Metas',
+            'mutual-tasks': 'Sincronizador de Pendientes Mutuos'
         };
 
         document.getElementById('pageTitle').textContent = titles[normalizedSection] || titles[section] || 'Dashboard';
@@ -284,6 +288,11 @@ const App = {
                     await JournalModule.render();
                 } else {
                     JournalModule.init();
+                }
+                break;
+            case 'mutual-tasks':
+                if (typeof MutualTasksModule !== 'undefined') {
+                    MutualTasksModule.render();
                 }
                 break;
 
