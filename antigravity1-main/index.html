@@ -8,7 +8,7 @@
     <meta name="description" content="Sistema de gestión de domicilios para Quito y Guayaquil">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="css/styles.css?v=2.9.1">
+    <link rel="stylesheet" href="css/styles.css?v=2.9.2">
     <link rel="stylesheet" href="css/mutual-tasks.css?v=2.9.0">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -7857,6 +7857,32 @@
                         <label for="paymentNotes">Notas (Opcional)</label>
                         <input type="text" id="paymentNotes" placeholder="Información adicional...">
                     </div>
+                    <div class="form-group full-width" id="paymentVeGroup" style="display: none; background: rgba(167, 139, 250, 0.06); border: 1px solid rgba(167, 139, 250, 0.25); border-radius: var(--radius-md); padding: 0.9rem 1rem;">
+                        <label style="display: block; margin-bottom: 0.6rem;">🇻🇪 Cambio de Bolívares y Caja en Dólares</label>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 0.75rem;">
+                            <div>
+                                <label for="paymentBsAmount" style="font-size: 0.75rem; color: var(--text-muted);">Bolívares cambiados</label>
+                                <input type="number" id="paymentBsAmount" step="0.01" min="0" placeholder="Auto: suma de las guías">
+                            </div>
+                            <div>
+                                <label for="paymentChargeRate" style="font-size: 0.75rem; color: var(--text-muted);">Tasa de cobro (Bs/$)</label>
+                                <input type="number" id="paymentChargeRate" step="0.01" min="0" placeholder="Auto: mediana de guías">
+                            </div>
+                            <div>
+                                <label for="paymentExchangeRate" style="font-size: 0.75rem; color: var(--text-muted);">Tasa del cambio (Bs/$)</label>
+                                <input type="number" id="paymentExchangeRate" step="0.01" min="0" placeholder="Auto: Bs / monto recibido">
+                            </div>
+                            <div>
+                                <label for="paymentCashServices" style="font-size: 0.75rem; color: var(--text-muted);">Servicios pagados con caja ($)</label>
+                                <input type="number" id="paymentCashServices" step="0.01" min="0" placeholder="Auto: fletes de las guías">
+                            </div>
+                        </div>
+                        <label style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; font-size: 0.82rem; font-weight: 500;">
+                            <input type="checkbox" id="paymentIsCashSettlement" style="width: auto;">
+                            Este pago es liquidación de la caja en dólares (no pagó comisión)
+                        </label>
+                        <div id="paymentVeHint" style="margin-top: 0.7rem; font-size: 0.78rem; color: var(--text-muted); line-height: 1.5;"></div>
+                    </div>
                 </div>
 
                 <hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border);">
@@ -8589,7 +8615,8 @@
     <script src="js/confirmation.js?v=2.7.0"></script>
     <script src="js/purchases.js?v=2.7.0"></script>
     <script src="js/freights.js?v=2.7.0"></script>
-    <script src="js/payments.js?v=2.7.0"></script>
+    <script src="js/venezuela-fx.js?v=2.9.2"></script>
+    <script src="js/payments.js?v=2.9.2"></script>
     <script src="js/accounts.js?v=2.7.0"></script>
     <script src="js/users.js?v=2.7.0"></script>
     <script src="js/campaigns.js?v=2.7.0"></script>
@@ -8598,7 +8625,7 @@
     <script src="js/multimedia.js?v=2.8.2"></script>
     <script src="js/finance.js?v=2.7.0"></script>
     <script src="js/expenses.js?v=2.7.0"></script>
-    <script src="js/income-statement.js?v=2.9.1"></script>
+    <script src="js/income-statement.js?v=2.9.2"></script>
     <script src="js/materials-calculator.js?v=2.8.0"></script>
     <script src="js/journal-data.js?v=2.7.0"></script>
     <script src="js/journal.js?v=2.7.0"></script>

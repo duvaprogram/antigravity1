@@ -10,6 +10,7 @@ const IncomeStatementModule = {
     operationalExpenses: [],
     externalSales: [],
     freights: [],
+    payments: [],
     products: [],
     productMappings: {},
     visualMergedGroups: [],
@@ -789,6 +790,21 @@ const IncomeStatementModule = {
             } catch (e) {
                 console.log('Freights table not available:', e);
                 this.freights = [];
+            }
+
+            // Load payments (para la comisión cambiaria y la caja de Venezuela)
+            try {
+                const { data: paymentsData, error: paymentsError } = await supabaseClient
+                    .from('payments')
+                    .select('*, payment_guides(guide_id)')
+                    .order('created_at', { ascending: true });
+
+                if (!paymentsError) {
+                    this.payments = paymentsData || [];
+                }
+            } catch (e) {
+                console.log('Payments table not available:', e);
+                this.payments = [];
             }
 
             // Populate product multi-select list
@@ -4268,7 +4284,8 @@ const IncomeStatementModule = {
         const grossProfit = totalRevenue - totalCOGS - totalShipping;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
-        const totalExpenses = totalAdSpend + totalOpExp;
+        const veCommission = (this.getVenezuelaAnalysis().totals || {}).commission || 0;
+        const totalExpenses = totalAdSpend + totalOpExp + veCommission;
         const netProfit = grossProfit - totalExpenses;
         const netSettlement = totalRevenue - totalShipping;
 
@@ -4292,6 +4309,7 @@ const IncomeStatementModule = {
         text += `────────────────────────────────────\n`;
         text += `📢 Inversión Publicitaria (Ads): -${fmt(totalAdSpend)} (${pct(totalAdSpend)})\n`;
         text += `👥 Gastos Operativos: -${fmt(totalOpExp)} (${pct(totalOpExp)})\n`;
+        if (veCommission !== 0) text += `🇻🇪 Comisión cambiaria Venezuela: -${fmt(veCommission)} (${pct(veCommission)})\n`;
         text += `────────────────────────────────────\n`;
         text += `🏆 UTILIDAD NETA: ${fmt(netProfit)} (${netMargin}%)\n`;
         text += `════════════════════════════════════\n`;
@@ -4399,6 +4417,53 @@ const IncomeStatementModule = {
         return list;
     },
 
+    // ========================================
+    // VENEZUELA: COMISIÓN CAMBIARIA Y CAJA EN DÓLARES
+    // ========================================
+    getVenezuelaGuideIndex() {
+        const guides = this.guides || [];
+        if (!this._veGuideIndex || this._veGuideIndexSize !== guides.length) {
+            const index = {};
+            guides.forEach(g => { if (g && g.id) index[g.id] = g; });
+            this._veGuideIndex = index;
+            this._veGuideIndexSize = guides.length;
+        }
+        return this._veGuideIndex;
+    },
+
+    // Los pagos se filtran por su propia fecha (cuándo entró la plata), no por
+    // la fecha de entrega de las guías.
+    getVenezuelaAnalysis() {
+        const empty = { rows: [], totals: null };
+        if (!window.VenezuelaFX) return empty;
+        if (!this.matchesCountryFilter('Venezuela')) return empty;
+
+        const all = window.VenezuelaFX.analyze(this.payments || [], this.getVenezuelaGuideIndex());
+        const rows = all.filter(row => {
+            if (!row.date) return false;
+            let day;
+            try {
+                day = new Date(row.date).toISOString().split('T')[0];
+            } catch (e) {
+                return false;
+            }
+            if (this.filters.dateFrom && day < this.filters.dateFrom) return false;
+            if (this.filters.dateTo && day > this.filters.dateTo) return false;
+            return true;
+        });
+
+        if (rows.length === 0) return empty;
+        return { rows, totals: window.VenezuelaFX.summarize(rows) };
+    },
+
+    saveVenezuelaOpeningBalance() {
+        const input = document.getElementById('isVeOpeningBalance');
+        if (!input || !window.VenezuelaFX) return;
+        window.VenezuelaFX.setOpeningBalance(input.value);
+        this.renderPLStatement();
+        Utils.showToast('Saldo inicial de la caja actualizado', 'success');
+    },
+
     renderPLStatement() {
         const container = document.getElementById('isPLStatement');
         if (!container) return;
@@ -4407,13 +4472,18 @@ const IncomeStatementModule = {
         const adExpData = this.getAdExpensesByCountry();
         const opExpData = this.getOpExpensesByCountry();
 
+        // Venezuela: lo que se pierde al cambiar los bolívares a dólares
+        const veAnalysis = this.getVenezuelaAnalysis();
+        const veTotals = veAnalysis.totals;
+        const veCommission = veTotals ? veTotals.commission : 0;
+
         const totalRevenue = salesData.reduce((s, c) => s + c.totalRevenue, 0);
         const totalCOGS = salesData.reduce((s, c) => s + c.totalCost, 0);
         const totalShipping = salesData.reduce((s, c) => s + c.totalShipping, 0);
         const grossProfit = totalRevenue - totalCOGS - totalShipping;
         const totalAdSpend = adExpData.reduce((s, c) => s + c.totalSpent, 0);
         const totalOpExp = opExpData.reduce((s, c) => s + c.total, 0);
-        const totalExpenses = totalAdSpend + totalOpExp;
+        const totalExpenses = totalAdSpend + totalOpExp + veCommission;
         const netProfit = grossProfit - totalExpenses;
         const grossMargin = totalRevenue > 0 ? ((grossProfit / totalRevenue) * 100).toFixed(1) : '0.0';
         const netMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0.0';
@@ -4554,6 +4624,139 @@ const IncomeStatementModule = {
             </div>
 `;
 
+        // Tarjeta de Venezuela: comisión del cambio de bolívares y caja en dólares
+        let veCardHTML = '';
+        if (veTotals && veAnalysis.rows.length > 0) {
+            const fmtBs = (n) => Math.round(n || 0).toLocaleString('es-VE') + ' Bs';
+            const rate = (n) => n > 0 ? Math.round(n).toLocaleString('es-VE') + ' Bs/$' : '-';
+
+            let vePayRows = '';
+            let veCashRows = '';
+            veAnalysis.rows.forEach(row => {
+                const day = (row.date || '').split('T')[0];
+                const tag = row.isSettlement
+                    ? '<span class="is-pl-src-chip is-own">Caja</span>'
+                    : (row.fxInferred ? '<span class="is-pl-src-chip is-warn">Tasa inferida</span>' : '');
+
+                vePayRows += `
+                    <div class="is-pl-ve-row">
+                        <div class="is-pl-src-name">${this.formatDate(day)} · ${row.code}${tag}</div>
+                        <div class="is-pl-src-num">${row.isSettlement ? '-' : fmtBs(row.bs)}</div>
+                        <div class="is-pl-src-num">${rate(row.chargeRate)}</div>
+                        <div class="is-pl-src-num">${rate(row.fxRate)}</div>
+                        <div class="is-pl-src-num">${row.isSettlement ? '-' : fmt(row.usdCharged)}</div>
+                        <div class="is-pl-src-num is-success">${fmt(row.received)}</div>
+                        <div class="is-pl-src-num is-neg">${row.isSettlement ? '-' : fmt(row.commission)}</div>
+                        <div class="is-pl-src-num">${row.isSettlement ? '-' : row.commissionPct.toFixed(1) + '%'}</div>
+                    </div>`;
+
+                veCashRows += `
+                    <div class="is-pl-ve-cash-row">
+                        <div class="is-pl-src-name">${this.formatDate(day)} · ${row.code}</div>
+                        <div class="is-pl-src-num is-success">${row.cashIn > 0 ? fmt(row.cashIn) : '-'}</div>
+                        <div class="is-pl-src-num is-neg">${row.cashServices > 0 ? fmt(row.cashServices) + (row.cashServicesInferred ? ' *' : '') : '-'}</div>
+                        <div class="is-pl-src-num is-neg">${row.settlementOut > 0 ? fmt(row.settlementOut) : '-'}</div>
+                        <div class="is-pl-src-num is-settlement">${fmt(row.cashBalance)}</div>
+                    </div>`;
+            });
+
+            const openingBalance = window.VenezuelaFX.getOpeningBalance();
+            const avisos = [];
+            if (veTotals.inferredCount > 0) {
+                avisos.push(`${veTotals.inferredCount} pago(s) sin tasa registrada: se infirió dividiendo los bolívares entre lo recibido. Edita el pago para escribir la tasa real.`);
+            }
+            if (veTotals.mixedCount > 0) {
+                avisos.push(`${veTotals.mixedCount} guía(s) con tasa fuera del patrón: suelen ser pagos mixtos (parte en bolívares, parte en efectivo) o un error al digitar los bolívares.`);
+            }
+            if (veTotals.unclassifiedCount > 0) {
+                avisos.push(`${veTotals.unclassifiedCount} pago(s) sin guías vinculadas quedaron fuera del cálculo.`);
+            }
+
+            veCardHTML = `
+                <div class="is-pl-sources">
+                    <div class="is-pl-sources-head">
+                        <div class="is-pl-sources-title">🇻🇪 Comisión Cambiaria y Caja en Dólares (Venezuela)</div>
+                        <div class="is-pl-sources-sub">Las guías se cobran en bolívares a una tasa y esos bolívares se cambian a dólares a otra más alta. Esa diferencia es la comisión. Las guías cobradas en efectivo no se cambian: quedan en la caja.</div>
+                    </div>
+
+                    <div class="is-pl-footer-group" style="border-top: none;">
+                        <div class="is-pl-footer">
+                            <div class="is-pl-kpi-tile" title="Bolívares cambiados a dólares en el período.">
+                                <div class="is-pl-kpi-tile-val" style="color: #a78bfa;">${fmtBs(veTotals.bs)}</div>
+                                <div class="is-pl-kpi-tile-lbl">Bolívares Cambiados</div>
+                            </div>
+                            <div class="is-pl-kpi-tile" title="Tasa promedio a la que se le cobró al cliente.">
+                                <div class="is-pl-kpi-tile-val">${rate(veTotals.chargeRate)}</div>
+                                <div class="is-pl-kpi-tile-lbl">Tasa de Cobro</div>
+                            </div>
+                            <div class="is-pl-kpi-tile" title="Tasa promedio a la que se cambiaron esos bolívares.">
+                                <div class="is-pl-kpi-tile-val is-warning">${rate(veTotals.fxRate)}</div>
+                                <div class="is-pl-kpi-tile-lbl">Tasa del Cambio</div>
+                            </div>
+                            <div class="is-pl-kpi-tile" title="Lo que se perdió entre una tasa y la otra.">
+                                <div class="is-pl-kpi-tile-val is-danger">${fmt(veTotals.commission)}</div>
+                                <div class="is-pl-kpi-tile-lbl">Comisión (${veTotals.commissionPct.toFixed(1)}%)</div>
+                            </div>
+                            <div class="is-pl-kpi-tile" title="Dólares en efectivo que quedan en Venezuela al cierre del período.">
+                                <div class="is-pl-kpi-tile-val is-settlement">${fmt(veTotals.cashBalance)}</div>
+                                <div class="is-pl-kpi-tile-lbl">Saldo de Caja</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="is-pl-src-table-wrap">
+                        <div class="is-pl-ve-table">
+                            <div class="is-pl-ve-row is-pl-src-head">
+                                <div>Pago</div>
+                                <div class="is-align-right">Bolívares</div>
+                                <div class="is-align-right">Tasa de Cobro</div>
+                                <div class="is-align-right">Tasa del Cambio</div>
+                                <div class="is-align-right">Debías Recibir</div>
+                                <div class="is-align-right">Recibido</div>
+                                <div class="is-align-right">Comisión</div>
+                                <div class="is-align-right">%</div>
+                            </div>
+                            ${vePayRows}
+                            <div class="is-pl-ve-row is-pl-src-group">
+                                <div class="is-pl-src-name">Total del período</div>
+                                <div class="is-pl-src-num">${fmtBs(veTotals.bs)}</div>
+                                <div class="is-pl-src-num">${rate(veTotals.chargeRate)}</div>
+                                <div class="is-pl-src-num">${rate(veTotals.fxRate)}</div>
+                                <div class="is-pl-src-num">${fmt(veTotals.usdCharged)}</div>
+                                <div class="is-pl-src-num is-success">${fmt(veTotals.received)}</div>
+                                <div class="is-pl-src-num is-neg">${fmt(veTotals.commission)}</div>
+                                <div class="is-pl-src-num">${veTotals.commissionPct.toFixed(1)}%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="is-pl-sources-head" style="padding-top: 1rem;">
+                        <div class="is-pl-sources-title" style="font-size: 0.85rem;">💵 Caja en Dólares</div>
+                        <div class="is-pl-sources-sub">Entra el efectivo que pagan los clientes en dólares, salen los servicios y fletes de allá, y el saldo se descarga cuando se liquida.</div>
+                    </div>
+                    <div class="is-pl-src-table-wrap">
+                        <div class="is-pl-ve-cash-table">
+                            <div class="is-pl-ve-cash-row is-pl-src-head">
+                                <div>Movimiento</div>
+                                <div class="is-align-right">Entra en Efectivo</div>
+                                <div class="is-align-right">Servicios y Fletes</div>
+                                <div class="is-align-right">Liquidado</div>
+                                <div class="is-align-right">Saldo</div>
+                            </div>
+                            ${veCashRows}
+                        </div>
+                    </div>
+
+                    <div class="is-pl-ve-foot">
+                        <label for="isVeOpeningBalance">Saldo inicial de la caja ($)</label>
+                        <input type="number" id="isVeOpeningBalance" step="0.01" value="${openingBalance}" title="Saldo que ya existía en la caja antes de empezar a registrarla">
+                        <button class="btn btn-secondary btn-sm" onclick="IncomeStatementModule.saveVenezuelaOpeningBalance()">Guardar</button>
+                        ${veTotals.cashServices > 0 ? '<span class="is-pl-ve-note">* Servicios estimados con los fletes de las guías cuando el pago no trae el dato.</span>' : ''}
+                    </div>
+                    ${avisos.length > 0 ? `<div class="is-pl-ve-avisos">${avisos.map(a => '⚠ ' + a).join('<br>')}</div>` : ''}
+                </div>`;
+        }
+
         const netClass = netProfit >= 0 ? 'is-profit' : 'is-loss';
 
         container.innerHTML = `
@@ -4635,6 +4838,12 @@ const IncomeStatementModule = {
                         <div class="is-pl-pct">${renderPctCell(totalAdSpend, 'var(--warning)')}</div>
                     </div>
                     ${opCategoriesHTML}
+                    ${veCommission !== 0 ? `
+                    <div class="is-pl-line is-pl-sub">
+                        <div class="is-pl-concept is-pl-sub-concept">🇻🇪 Comisión cambiaria Venezuela (Bs → USD)</div>
+                        <div class="is-pl-amount is-neg">${fmt(veCommission)}</div>
+                        <div class="is-pl-pct">${renderPctCell(veCommission, 'var(--danger)')}</div>
+                    </div>` : ''}
                     <div class="is-pl-line is-pl-subtotal is-highlight-danger">
                         <div class="is-pl-concept">Total Gastos Operativos</div>
                         <div class="is-pl-amount is-neg">${fmt(totalExpenses)}</div>
@@ -4671,6 +4880,8 @@ const IncomeStatementModule = {
             </div>
 
             ${sourcesCardHTML}
+
+            ${veCardHTML}
 
             <!-- E-commerce KPI Footer (grouped by category) -->
             <div class="is-pl-footer-group">

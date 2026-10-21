@@ -74,7 +74,15 @@ const PaymentsModule = {
                     this.filterModalGuides();
                 }
             }
+
+            this.toggleVenezuelaFields(val);
         });
+
+        // Venezuela: recalcular la tasa y la comisión mientras se escribe
+        ['paymentAmount', 'paymentBsAmount', 'paymentChargeRate', 'paymentExchangeRate', 'paymentCashServices'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', () => this.updateVenezuelaHint());
+        });
+        document.getElementById('paymentIsCashSettlement')?.addEventListener('change', () => this.updateVenezuelaHint());
 
         // Search & Filters in Main Payments Section
         document.getElementById('payFilterSearch')?.addEventListener('input', (e) => {
@@ -669,6 +677,9 @@ const PaymentsModule = {
         document.getElementById('paymentId').value = '';
         document.getElementById('paymentOriginCustomGroup').style.display = 'none';
         document.getElementById('paymentDate').valueAsDate = new Date();
+        this.toggleVenezuelaFields('');
+        const veHintEl = document.getElementById('paymentVeHint');
+        if (veHintEl) veHintEl.innerHTML = '';
 
         document.getElementById('filterPaymentGuideDateStart').value = '';
         document.getElementById('filterPaymentGuideDateEnd').value = '';
@@ -714,6 +725,18 @@ const PaymentsModule = {
         document.getElementById('paymentCurrency').value = payment.currency || 'USD';
         document.getElementById('paymentDate').value = payment.created_at ? new Date(payment.created_at).toISOString().split('T')[0] : '';
         document.getElementById('paymentNotes').value = payment.notes || '';
+
+        const setVe = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.value = (value === null || value === undefined) ? '' : value;
+        };
+        setVe('paymentBsAmount', payment.bs_amount);
+        setVe('paymentChargeRate', payment.charge_rate);
+        setVe('paymentExchangeRate', payment.exchange_rate);
+        setVe('paymentCashServices', payment.cash_services);
+        const settlementEl = document.getElementById('paymentIsCashSettlement');
+        if (settlementEl) settlementEl.checked = payment.is_cash_settlement === true;
+        this.toggleVenezuelaFields(payment.origin);
 
         this.selectedGuideIds.clear();
         document.getElementById('selectAllPaymentGuides').checked = false;
@@ -996,6 +1019,36 @@ const PaymentsModule = {
             </div>
         `;
 
+        let veHtml = '';
+        if (window.VenezuelaFX && window.VenezuelaFX.isVenezuelaPayment(payment)) {
+            const fx = window.VenezuelaFX.analyzePayment({ ...payment, payment_guides: guides.map(g => ({ guides: g })) });
+            const cell = (label, value, color) => `
+                <div>
+                    <div style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">${label}</div>
+                    <div style="font-size: 1.05rem; font-weight: 700; color: ${color || 'var(--text-primary)'};">${value}</div>
+                </div>`;
+
+            veHtml = `
+                <div style="margin-top: 1rem; padding: 1rem 1.25rem; background: rgba(167, 139, 250, 0.07); border: 1px solid rgba(167, 139, 250, 0.25); border-radius: var(--radius-md);">
+                    <div style="font-weight: 700; margin-bottom: 0.75rem;">🇻🇪 Cambio de Bolívares y Caja${fx.fxInferred && !fx.isSettlement ? ' <span class="badge" style="background: rgba(251,191,36,0.15); color: #fbbf24; font-size: 0.65rem;">tasa inferida</span>' : ''}</div>
+                    ${fx.isSettlement
+                        ? `<p style="margin: 0; color: var(--text-muted);">Liquidación de la caja en dólares: salen ${formatUsd(fx.received)} de la caja. No pagó comisión cambiaria.</p>`
+                        : `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.9rem;">
+                            ${cell('Bolívares cambiados', formatBs(fx.bs), '#a78bfa')}
+                            ${cell('Tasa de cobro', fx.chargeRate.toFixed(0) + ' Bs/$')}
+                            ${cell('Tasa del cambio', fx.fxRate.toFixed(0) + ' Bs/$')}
+                            ${cell('Debías recibir', formatUsd(fx.usdCharged), 'var(--success)')}
+                            ${cell('Recibido', formatUsd(fx.received), 'var(--success)')}
+                            ${cell('Comisión cambiaria', formatUsd(fx.commission) + ' (' + fx.commissionPct.toFixed(1) + '%)', 'var(--danger)')}
+                            ${cell('Entra a caja ($)', formatUsd(fx.cashIn), '#38bdf8')}
+                            ${cell('Servicios con caja', formatUsd(fx.cashServices) + (fx.cashServicesInferred ? ' *' : ''), 'var(--warning)')}
+                        </div>
+                        ${fx.mixedGuides.length > 0 ? `<div style="margin-top: 0.75rem; font-size: 0.78rem; color: var(--warning);">⚠ Guías con tasa fuera del patrón (pago mixto o error de digitación): ${fx.mixedGuides.map(g => g.guide_number).join(', ')}</div>` : ''}
+                        ${fx.cashServicesInferred ? '<div style="margin-top: 0.5rem; font-size: 0.72rem; color: var(--text-muted);">* Servicios estimados con los fletes de las guías. Edita el pago para registrar el valor real.</div>' : ''}`
+                    }
+                </div>`;
+        }
+
         let modalEl = document.getElementById('dynamicDetailModal');
         if (!modalEl) {
             modalEl = document.createElement('div');
@@ -1033,6 +1086,7 @@ const PaymentsModule = {
                         <span>Guías Vinculadas (${guides.length})</span>
                     </h3>
                     ${guidesHtml}
+                    ${veHtml}
                 </div>
             </div>
         `;
@@ -1053,6 +1107,109 @@ const PaymentsModule = {
 
         const randomNum = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
         return `${prefix}${randomNum}`;
+    },
+
+    // ========================================
+    // VENEZUELA: CAMBIO DE BOLÍVARES Y CAJA
+    // ========================================
+    isVenezuelaOrigin(origin) {
+        return /venezuela/i.test(origin || '');
+    },
+
+    toggleVenezuelaFields(origin) {
+        const box = document.getElementById('paymentVeGroup');
+        if (!box) return;
+        const show = this.isVenezuelaOrigin(origin);
+        box.style.display = show ? 'block' : 'none';
+        if (show) this.updateVenezuelaHint();
+    },
+
+    // Arma un pago "de mentira" con las guías marcadas para poder mostrar la
+    // tasa y la comisión antes de guardar.
+    buildDraftVenezuelaPayment() {
+        const guides = Array.from(this.selectedGuideIds)
+            .map(id => (this.availableGuides || []).find(g => g.id === id))
+            .filter(Boolean)
+            .map(g => ({
+                id: g.id,
+                guide_number: g.guide_number,
+                total_amount: g.total_amount,
+                amount_usd: g.amount_usd,
+                payment_bs: g.payment_bs !== undefined ? g.payment_bs : g.paymentBs,
+                shipping_cost: g.shipping_cost,
+                guide_statuses: { name: g.status || g.status_name || g.guide_statuses?.name || '' }
+            }));
+
+        const val = (id) => {
+            const el = document.getElementById(id);
+            const raw = el ? el.value : '';
+            return raw === '' ? null : parseFloat(raw);
+        };
+
+        return {
+            origin: 'Venezuela',
+            amount: parseFloat(document.getElementById('paymentAmount')?.value || 0) || 0,
+            bs_amount: val('paymentBsAmount'),
+            charge_rate: val('paymentChargeRate'),
+            exchange_rate: val('paymentExchangeRate'),
+            cash_services: val('paymentCashServices'),
+            is_cash_settlement: document.getElementById('paymentIsCashSettlement')?.checked || false,
+            payment_guides: guides.map(g => ({ guides: g }))
+        };
+    },
+
+    updateVenezuelaHint() {
+        const hint = document.getElementById('paymentVeHint');
+        if (!hint || !window.VenezuelaFX) return;
+
+        const draft = this.buildDraftVenezuelaPayment();
+        const r = window.VenezuelaFX.analyzePayment(draft);
+
+        if (r.isSettlement) {
+            hint.innerHTML = '<strong>Liquidación de caja:</strong> estos $' + r.received.toFixed(2) + ' salen de la caja en dólares, no pagan comisión.';
+            return;
+        }
+        if (r.bs <= 0) {
+            hint.innerHTML = 'Marca las guías cobradas en bolívares (o escribe el monto) para calcular la tasa y la comisión.';
+            return;
+        }
+
+        const fmt = (n) => '$' + Number(n || 0).toFixed(2);
+        hint.innerHTML = `
+            <strong>${Math.round(r.bs).toLocaleString('es-VE')} Bs</strong> cambiados ·
+            cobrados a <strong>${r.chargeRate.toFixed(0)} Bs/$</strong> (= ${fmt(r.usdCharged)}) ·
+            cambiados a <strong>${r.fxRate.toFixed(0)} Bs/$</strong> (= ${fmt(r.received)}) ·
+            comisión <strong style="color: var(--danger);">${fmt(r.commission)} (${r.commissionPct.toFixed(1)}%)</strong>
+            ${r.cashIn > 0 ? ` · entran ${fmt(r.cashIn)} a la caja` : ''}
+            ${r.mixedGuides.length > 0 ? `<br><span style="color: var(--warning);">⚠ ${r.mixedGuides.length} guía(s) con tasa fuera del patrón: ${r.mixedGuides.map(g => g.guide_number).join(', ')}</span>` : ''}`;
+    },
+
+    getVenezuelaPayload(origin) {
+        if (!this.isVenezuelaOrigin(origin)) {
+            return { bs_amount: null, charge_rate: null, exchange_rate: null, cash_services: null, is_cash_settlement: false };
+        }
+        const val = (id) => {
+            const el = document.getElementById(id);
+            if (!el || el.value === '') return null;
+            const n = parseFloat(el.value);
+            return isNaN(n) ? null : n;
+        };
+        return {
+            bs_amount: val('paymentBsAmount'),
+            charge_rate: val('paymentChargeRate'),
+            exchange_rate: val('paymentExchangeRate'),
+            cash_services: val('paymentCashServices'),
+            is_cash_settlement: document.getElementById('paymentIsCashSettlement')?.checked || false
+        };
+    },
+
+    isMissingColumnError(error) {
+        const msg = ((error?.message || '') + ' ' + (error?.details || '')).toLowerCase();
+        return error?.code === '42703' || error?.code === 'PGRST204' || msg.includes('column') && msg.includes('does not exist');
+    },
+
+    warnMissingVenezuelaColumns() {
+        Utils.showToast('El pago se guardó, pero faltan las columnas de Venezuela. Corre supabase_venezuela_fx.sql en Supabase.', 'warning');
     },
 
     async handlePaymentSubmit(e) {
@@ -1076,18 +1233,29 @@ const PaymentsModule = {
 
             let currentPaymentId = paymentId;
 
+            const basePayload = {
+                amount: parseFloat(amount),
+                currency: currency,
+                origin: origin,
+                notes: notes,
+                created_at: createdAtTarget.toISOString()
+            };
+            const fullPayload = { ...basePayload, ...this.getVenezuelaPayload(origin) };
+
             if (currentPaymentId) {
                 // UPDATE EXISTING
-                const { error: payErr } = await window.supabaseClient
+                let { error: payErr } = await window.supabaseClient
                     .from('payments')
-                    .update({
-                        amount: parseFloat(amount),
-                        currency: currency,
-                        origin: origin,
-                        notes: notes,
-                        created_at: createdAtTarget.toISOString()
-                    })
+                    .update(fullPayload)
                     .eq('id', currentPaymentId);
+
+                if (payErr && this.isMissingColumnError(payErr)) {
+                    this.warnMissingVenezuelaColumns();
+                    ({ error: payErr } = await window.supabaseClient
+                        .from('payments')
+                        .update(basePayload)
+                        .eq('id', currentPaymentId));
+                }
 
                 if (payErr) throw payErr;
 
@@ -1097,18 +1265,20 @@ const PaymentsModule = {
             } else {
                 // INSERT NEW
                 const paymentCode = this.generatePaymentCode(origin);
-                const { data: newPayment, error: payErr } = await window.supabaseClient
+                let { data: newPayment, error: payErr } = await window.supabaseClient
                     .from('payments')
-                    .insert({
-                        code: paymentCode,
-                        amount: parseFloat(amount),
-                        currency: currency,
-                        origin: origin,
-                        notes: notes,
-                        created_at: createdAtTarget.toISOString()
-                    })
+                    .insert({ code: paymentCode, ...fullPayload })
                     .select()
                     .single();
+
+                if (payErr && this.isMissingColumnError(payErr)) {
+                    this.warnMissingVenezuelaColumns();
+                    ({ data: newPayment, error: payErr } = await window.supabaseClient
+                        .from('payments')
+                        .insert({ code: paymentCode, ...basePayload })
+                        .select()
+                        .single());
+                }
 
                 if (payErr) throw payErr;
                 currentPaymentId = newPayment.id;

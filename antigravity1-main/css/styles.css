@@ -3572,6 +3572,67 @@ body.dark-mode .is-pl-src-num.is-settlement { color: #38bdf8; }
     color: var(--text-muted);
 }
 
+/* Venezuela: comisión cambiaria y caja en dólares */
+.is-pl-ve-table { min-width: 980px; }
+.is-pl-ve-cash-table { min-width: 760px; }
+
+.is-pl-ve-row,
+.is-pl-ve-cash-row {
+    display: grid;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.5rem;
+    font-size: 0.85rem;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    transition: background 0.15s ease;
+}
+.is-pl-ve-row {
+    grid-template-columns: minmax(230px, 1.5fr) 130px 120px 120px 120px 110px 110px 70px;
+}
+.is-pl-ve-cash-row {
+    grid-template-columns: minmax(230px, 1.5fr) 130px 140px 120px 130px;
+}
+.is-pl-ve-row:hover,
+.is-pl-ve-cash-row:hover { background: rgba(255,255,255,0.02); }
+.is-pl-ve-row.is-pl-src-head:hover,
+.is-pl-ve-cash-row.is-pl-src-head:hover,
+.is-pl-ve-row.is-pl-src-group:hover { background: var(--bg-secondary); }
+
+.is-pl-src-chip.is-warn {
+    background: rgba(251, 191, 36, 0.14);
+    border-color: rgba(251, 191, 36, 0.32);
+    color: #f59e0b;
+}
+
+.is-pl-ve-foot {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    padding: 0.9rem 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+.is-pl-ve-foot input {
+    width: 130px;
+    padding: 0.35rem 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+}
+.is-pl-ve-note { font-size: 0.72rem; opacity: 0.85; }
+
+.is-pl-ve-avisos {
+    padding: 0.75rem 1.5rem 1rem;
+    font-size: 0.75rem;
+    line-height: 1.6;
+    color: var(--warning);
+    border-top: 1px solid var(--border);
+}
+
 /* Legacy P&L layout classes (kept for compatibility) */
 
 .is-pl-section {
