@@ -4299,6 +4299,22 @@ const IncomeStatementModule = {
         text += `   (Ventas cobradas menos fletes de transportadora)\n`;
         text += `════════════════════════════════════\n`;
 
+        const revenueSources = this.getRevenueBySource();
+        if (revenueSources.length > 0) {
+            text += `💰 DINERO RECIBIDO POR FUENTE\n`;
+            revenueSources.forEach(group => {
+                if (group.sources.length > 1) {
+                    text += `${group.flag} ${group.country}: ${fmt(group.revenue)} (${pct(group.revenue)})\n`;
+                    group.sources.forEach(src => {
+                        text += `   • ${src.platform}: ${fmt(src.revenue)} (${pct(src.revenue)})\n`;
+                    });
+                } else if (group.sources.length === 1) {
+                    text += `${group.flag} ${group.country} · ${group.sources[0].platform}: ${fmt(group.revenue)} (${pct(group.revenue)})\n`;
+                }
+            });
+            text += `════════════════════════════════════\n`;
+        }
+
         if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(text).then(() => {
                 Utils.showToast('¡Resumen financiero copiado al portapapeles!', 'success');
@@ -4308,6 +4324,79 @@ const IncomeStatementModule = {
         } else {
             Utils.showToast('Portapapeles no soportado en este navegador.', 'info');
         }
+    },
+
+    // ========================================
+    // DINERO RECIBIDO POR FUENTE DE VENTA
+    // (Hoko, domicilios del sistema, etc. separados por país)
+    // ========================================
+    getSourceDisplayName(platform) {
+        const p = (platform || '').trim();
+        if (!p) return 'Otras Fuentes';
+        if (/^domi/i.test(p)) return 'Domicilios (Sistema)';
+        return p;
+    },
+
+    getRevenueBySource() {
+        const salesData = this.getSalesByCountry();
+        const groups = {};
+
+        salesData.forEach(row => {
+            const baseCountry = row.baseCountry || (row.country || '').replace(' Domi', '').trim() || 'Otros';
+
+            if (!groups[baseCountry]) {
+                groups[baseCountry] = {
+                    country: baseCountry,
+                    flag: this.getCountryFlag(baseCountry),
+                    revenue: 0,
+                    cost: 0,
+                    shipping: 0,
+                    settlement: 0,
+                    deliveredOrders: 0,
+                    returnedOrders: 0,
+                    units: 0,
+                    sources: []
+                };
+            }
+
+            const group = groups[baseCountry];
+            const revenue = parseFloat(row.totalRevenue || 0);
+            const cost = parseFloat(row.totalCost || 0);
+            const shipping = parseFloat(row.totalShipping || 0);
+            const delivered = parseInt(row.deliveredOrders || 0);
+            const returned = parseInt(row.returnedOrders || 0);
+            const units = parseInt(row.unitsSold || 0);
+
+            group.revenue += revenue;
+            group.cost += cost;
+            group.shipping += shipping;
+            group.deliveredOrders += delivered;
+            group.returnedOrders += returned;
+            group.units += units;
+
+            group.sources.push({
+                key: row.country,
+                country: baseCountry,
+                platform: this.getSourceDisplayName(row.platform),
+                isExternal: !!row.isExternal,
+                revenue,
+                cost,
+                shipping,
+                settlement: revenue - shipping,
+                deliveredOrders: delivered,
+                returnedOrders: returned,
+                units
+            });
+        });
+
+        const list = Object.values(groups);
+        list.forEach(group => {
+            group.settlement = group.revenue - group.shipping;
+            group.sources.sort((a, b) => b.revenue - a.revenue);
+        });
+        list.sort((a, b) => b.revenue - a.revenue);
+
+        return list;
     },
 
     renderPLStatement() {
@@ -4399,6 +4488,72 @@ const IncomeStatementModule = {
                 </div>`;
         }
 
+        // Desglose del dinero recibido por cada fuente de venta (Hoko, domicilios, etc.)
+        const revenueSources = this.getRevenueBySource();
+
+        let sourceLinesHTML = '';
+        let sourcesRowsHTML = '';
+
+        revenueSources.forEach(group => {
+            const hasMultiple = group.sources.length > 1;
+
+            if (hasMultiple) {
+                sourcesRowsHTML += `
+                    <div class="is-pl-src-row is-pl-src-group">
+                        <div class="is-pl-src-name">${group.flag} ${group.country}<span class="is-pl-src-chip">Total país</span></div>
+                        <div class="is-pl-src-num">${group.deliveredOrders.toLocaleString('es-CO')}</div>
+                        <div class="is-pl-src-num is-success">${fmt(group.revenue)}</div>
+                        <div class="is-pl-src-num">${pct(group.revenue)}</div>
+                        <div class="is-pl-src-num is-neg">${fmt(group.shipping)}</div>
+                        <div class="is-pl-src-num is-settlement">${fmt(group.settlement)}</div>
+                    </div>`;
+            }
+
+            group.sources.forEach(src => {
+                sourceLinesHTML += `
+                    <div class="is-pl-line is-pl-sub">
+                        <div class="is-pl-concept is-pl-sub-concept">${group.flag} ${group.country} · ${src.platform}</div>
+                        <div class="is-pl-amount is-success">${fmt(src.revenue)}</div>
+                        <div class="is-pl-pct">${renderPctCell(src.revenue, 'var(--success)')}</div>
+                    </div>`;
+
+                sourcesRowsHTML += `
+                    <div class="is-pl-src-row${hasMultiple ? ' is-pl-src-child' : ''}">
+                        <div class="is-pl-src-name">
+                            <span>${group.flag} ${group.country} · ${src.platform}</span>
+                            <span class="is-pl-src-chip ${src.isExternal ? 'is-ext' : 'is-own'}">${src.isExternal ? 'Externa' : 'Propia'}</span>
+                        </div>
+                        <div class="is-pl-src-num">${src.deliveredOrders.toLocaleString('es-CO')}</div>
+                        <div class="is-pl-src-num is-success">${fmt(src.revenue)}</div>
+                        <div class="is-pl-src-num">${pct(src.revenue)}</div>
+                        <div class="is-pl-src-num is-neg">${fmt(src.shipping)}</div>
+                        <div class="is-pl-src-num is-settlement">${fmt(src.settlement)}</div>
+                    </div>`;
+            });
+        });
+
+        const sourcesCardHTML = `
+            <div class="is-pl-sources">
+                <div class="is-pl-sources-head">
+                    <div class="is-pl-sources-title">💰 Dinero Recibido por Fuente de Venta</div>
+                    <div class="is-pl-sources-sub">Ventas cobradas y liquidación neta de cada canal (Hoko, domicilios del sistema, etc.), separados por país.</div>
+                </div>
+                <div class="is-pl-src-table-wrap">
+                    <div class="is-pl-src-table">
+                        <div class="is-pl-src-row is-pl-src-head">
+                            <div>Fuente de Venta</div>
+                            <div class="is-align-right">Pedidos Entregados</div>
+                            <div class="is-align-right">Dinero Recibido (Ventas)</div>
+                            <div class="is-align-right">% del Total</div>
+                            <div class="is-align-right">Fletes y Devoluciones</div>
+                            <div class="is-align-right">Liquidación Neta</div>
+                        </div>
+                        ${sourcesRowsHTML || '<div class="is-pl-src-empty">No hay ventas registradas en el período seleccionado.</div>'}
+                    </div>
+                </div>
+            </div>
+`;
+
         const netClass = netProfit >= 0 ? 'is-profit' : 'is-loss';
 
         container.innerHTML = `
@@ -4447,6 +4602,7 @@ const IncomeStatementModule = {
                         <div class="is-pl-amount is-success">${fmt(totalRevenue)}</div>
                         <div class="is-pl-pct">${renderPctCell(totalRevenue, 'var(--success)', true)}</div>
                     </div>
+                    ${sourceLinesHTML}
                     <div class="is-pl-line is-pl-subtotal">
                         <div class="is-pl-concept">Total Ingresos</div>
                         <div class="is-pl-amount is-success">${fmt(totalRevenue)}</div>
@@ -4513,6 +4669,8 @@ const IncomeStatementModule = {
                     </div>
                 </div>
             </div>
+
+            ${sourcesCardHTML}
 
             <!-- E-commerce KPI Footer (grouped by category) -->
             <div class="is-pl-footer-group">
@@ -6219,6 +6377,29 @@ const IncomeStatementModule = {
                 ['Pedidos Entregados Totales', totalOrdersDelivered],
                 ['Unidades Vendidas Totales', totalUnitsSold]
             ];
+
+
+            // Desglose del dinero recibido por cada fuente de venta
+            const revenueSources = this.getRevenueBySource();
+            if (revenueSources.length > 0) {
+                const srcTotal = revenueSources.reduce((s, g) => s + g.revenue, 0);
+                const srcPct = (val) => srcTotal > 0 ? ((val / srcTotal) * 100).toFixed(2) + '%' : '0%';
+                plAoa.push(['']);
+                plAoa.push(['DINERO RECIBIDO POR FUENTE DE VENTA', '', '']);
+                plAoa.push(['Fuente', 'Ventas ($ USD)', '% del Total']);
+                revenueSources.forEach(group => {
+                    const hasMultiple = group.sources.length > 1;
+                    if (hasMultiple) {
+                        plAoa.push([`${group.country} (Total país)`, group.revenue, srcPct(group.revenue)]);
+                    }
+                    group.sources.forEach(src => {
+                        const label = hasMultiple
+                            ? `   - ${group.country} · ${src.platform}`
+                            : `${group.country} · ${src.platform}`;
+                        plAoa.push([label, src.revenue, srcPct(src.revenue)]);
+                    });
+                });
+            }
 
             const wsPL = XLSX.utils.aoa_to_sheet(plAoa);
             wsPL['!cols'] = [

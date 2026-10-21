@@ -3476,6 +3476,102 @@ body.dark-mode .is-settlement-chip {
     font-weight: 500;
 }
 
+/* Dinero recibido por fuente de venta (Hoko, Domicilios, etc.) */
+.is-pl-sources {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+}
+.is-pl-sources-head {
+    padding: 0.9rem 1.5rem 0.65rem;
+}
+.is-pl-sources-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.is-pl-sources-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+}
+.is-pl-src-table-wrap {
+    overflow-x: auto;
+}
+.is-pl-src-table {
+    min-width: 860px;
+}
+.is-pl-src-row {
+    display: grid;
+    grid-template-columns: minmax(200px, 1.5fr) 100px 140px 95px 140px 140px;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.5rem;
+    font-size: 0.85rem;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    transition: background 0.15s ease;
+}
+.is-pl-src-row:hover { background: rgba(255,255,255,0.02); }
+.is-pl-src-head {
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+.is-pl-src-head:hover { background: var(--bg-secondary); }
+.is-pl-src-group {
+    background: var(--bg-secondary);
+    font-weight: 700;
+}
+.is-pl-src-child .is-pl-src-name { padding-left: 1.5rem; }
+.is-pl-src-name {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-wrap: wrap;
+    color: var(--text-primary);
+}
+.is-pl-src-num {
+    text-align: right;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+}
+.is-pl-src-num.is-neg { color: var(--danger); }
+.is-pl-src-num.is-success { color: var(--success); }
+.is-pl-src-num.is-settlement { color: #0284c7; }
+[data-theme="dark"] .is-pl-src-num.is-settlement,
+body.dark-mode .is-pl-src-num.is-settlement { color: #38bdf8; }
+.is-pl-src-chip {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+}
+.is-pl-src-chip.is-ext {
+    background: rgba(168, 85, 247, 0.12);
+    border-color: rgba(168, 85, 247, 0.3);
+    color: #a855f7;
+}
+.is-pl-src-chip.is-own {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+}
+.is-pl-src-empty {
+    padding: 1.25rem 1.5rem;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
 /* Legacy P&L layout classes (kept for compatibility) */
 
 .is-pl-section {
