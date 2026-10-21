@@ -479,7 +479,7 @@ const InventoryModule = {
             App.updateDashboard();
         } catch (error) {
             console.error('Error updating stock:', error);
-            Utils.showToast('Error al actualizar el stock', 'error');
+            Utils.showToast(String(error.message || '').startsWith('City not found') ? 'La ciudad no existe en la base de datos. Ejecuta supabase_cities_mexico.sql en Supabase.' : 'Error al actualizar el stock', 'error');
         }
     },
 

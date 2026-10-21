@@ -56,7 +56,7 @@ const Database = {
     },
 
     // Helper: Get city ID by name
-    getCityId(cityName) {
+    getCityId(cityName, strict = false) {
         if (!this._cache.cities || !Array.isArray(this._cache.cities) || this._cache.cities.length === 0) return null;
         if (!cityName) return this._cache.cities[0].id;
         const exact = this._cache.cities.find(c => c.name === cityName);
@@ -66,7 +66,8 @@ const Database = {
         const matched = this._cache.cities.find(c =>
             (c.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") === normSearch
         );
-        return matched ? matched.id : this._cache.cities[0].id;
+        if (matched) return matched.id;
+        return strict ? null : this._cache.cities[0].id;
     },
 
     // Helper: Get city name by ID
@@ -294,7 +295,7 @@ const Database = {
 
     async getInventoryByProduct(productId, city) {
         try {
-            const cityId = this.getCityId(city);
+            const cityId = this.getCityId(city, true);
             const { data, error } = await supabaseClient
                 .from('inventory')
                 .select('*')
@@ -320,7 +321,7 @@ const Database = {
 
     async updateInventory(productId, city, quantity, minStock = 5, isAdjustment = false) {
         try {
-            const cityId = this.getCityId(city);
+            const cityId = this.getCityId(city, true);
             if (!cityId) throw new Error('City not found: ' + city);
 
             // Check if inventory record exists
@@ -368,7 +369,7 @@ const Database = {
 
     async deleteInventory(productId, city) {
         try {
-            const cityId = this.getCityId(city);
+            const cityId = this.getCityId(city, true);
             if (!cityId) throw new Error('City not found: ' + city);
 
             const { error } = await supabaseClient
@@ -456,7 +457,7 @@ const Database = {
 
     async registerInventoryMovement(movement) {
         try {
-            const cityId = this.getCityId(movement.city);
+            const cityId = this.getCityId(movement.city, true);
             if (!cityId) throw new Error('City not found: ' + movement.city);
 
             const { data, error } = await supabaseClient
@@ -495,7 +496,7 @@ const Database = {
                 .limit(100);
 
             if (filters.city) {
-                const cityId = this.getCityId(filters.city);
+                const cityId = this.getCityId(filters.city, true);
                 if (cityId) {
                     query = query.eq('city_id', cityId);
                 }
