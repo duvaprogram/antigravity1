@@ -209,6 +209,15 @@ const CalculatorModule = (() => {
             }
         });
 
+        // País / tipo de comisión COD (Estándar vs Venezuela)
+        const codCountry = document.getElementById('calcCodCountry');
+        if (codCountry) {
+            codCountry.addEventListener('change', () => {
+                updateCodCountryUI(true);
+                calculate();
+            });
+        }
+
         // Sincronizar unidades del lote entre quickbar y tarjeta de proyección
         const inputBatchQuick = document.getElementById('calcBatchUnits');
         const inputBatchResult = document.getElementById('calcBatchUnitsResult');
@@ -596,7 +605,7 @@ const CalculatorModule = (() => {
 
         // Costos que no se repiten aunque el pedido lleve 2 o 3 unidades
         const fixedPerOrder = ctx.channel === 'cod'
-            ? (ctx.realCpa + ctx.realFreight + ctx.adminCost)
+            ? (ctx.realCpa + ctx.realFreight + ctx.adminCost + (ctx.recaudoFixed || 0))
             : (ctx.mpFixedFee + ctx.mpShipping);
         const variableRate = ctx.channel === 'cod' ? ctx.recaudoRate : ctx.mpPercentTotal;
 
@@ -614,7 +623,7 @@ const CalculatorModule = (() => {
 
         // CPA máximo que soporta el combo (un solo CPA por pedido)
         const maxCpa = ctx.channel === 'cod'
-            ? Math.max(0, ((price * (1 - variableRate)) - goodsCost - ctx.realFreight - ctx.adminCost) * (1 - ctx.ineffectiveness))
+            ? Math.max(0, ((price * (1 - variableRate)) - goodsCost - ctx.realFreight - ctx.adminCost - (ctx.recaudoFixed || 0)) * (1 - ctx.ineffectiveness))
             : 0;
         const roas = (ctx.channel === 'cod' && ctx.realCpa > 0) ? price / ctx.realCpa : 0;
 
@@ -934,6 +943,33 @@ const CalculatorModule = (() => {
     }
 
     /**
+     * Ajusta la etiqueta y el valor por defecto de la comisión según el país elegido.
+     * Venezuela: 15% sobre lo que liquidan (ventas - flete).
+     */
+    function updateCodCountryUI(applyDefault) {
+        const isVenezuela = getText('calcCodCountry', 'standard') === 'venezuela';
+        const label = document.getElementById('labelRecaudoPercent');
+        const input = document.getElementById('calcRecaudoPercent');
+        if (label) {
+            label.textContent = isVenezuela ? '% Comisión Venezuela (sobre ventas - flete)' : '% Comisión Recaudo COD';
+        }
+        if (input) {
+            input.title = isVenezuela
+                ? 'Comisión sobre lo que te liquidan: (ventas - flete de entrega)'
+                : 'Comisión que cobra la transportadora por recaudar el dinero';
+        }
+        if (applyDefault) setVal('calcRecaudoPercent', isVenezuela ? 15 : 3.5);
+    }
+
+    /**
+     * Parte fija de la comisión de una liquidación guardada (Venezuela: -%·flete).
+     */
+    function itemRecaudoFixed(item) {
+        if (item.cod_fee_mode !== 'venezuela') return 0;
+        return -(((item.cod_fee_percent || 0) / 100) * (item.freight_out || 0));
+    }
+
+    /**
      * Cambia el canal de venta activo (COD vs Marketplace)
      */
     function switchChannel(channel) {
@@ -1136,7 +1172,11 @@ const CalculatorModule = (() => {
         const ineffectiveness = Math.min(0.92, pCancel + pReturn);
         const realCpa = ineffectiveness < 1 ? cpa / (1 - ineffectiveness) : cpa;
         const realFreight = pReturn < 1 ? (fleteOut + (pReturn * fleteRet)) / (1 - pReturn) : fleteOut;
-        const codFixedCosts = landedCost + realCpa + realFreight + adminCost;
+        // Venezuela: la comisión es un % de lo liquidado (ventas - flete) = %·precio - %·flete,
+        // es decir, la parte fija es un crédito (negativo) de %·flete por pedido entregado.
+        const isVenezuela = getText('calcCodCountry', 'standard') === 'venezuela';
+        const recaudoFixed = isVenezuela ? -(recaudoRate * fleteOut) : 0;
+        const codFixedCosts = landedCost + realCpa + realFreight + adminCost + recaudoFixed;
 
         // --- Marketplace ---
         const mpFeeRate = Math.min(50, Math.max(0, getNum('calcMpFeePercent', 0))) / 100;
@@ -1182,13 +1222,13 @@ const CalculatorModule = (() => {
             finalSalePrice = pricingMode === 'target_margin' ? recommendedPrice : proposedPrice;
 
             const codRecaudoCost = finalSalePrice * recaudoRate;
-            channelOperationalCost = realCpa + realFreight + adminCost + codRecaudoCost;
+            channelOperationalCost = realCpa + realFreight + adminCost + codRecaudoCost + recaudoFixed;
             netProfit = finalSalePrice - codRecaudoCost - codFixedCosts;
             netMarginPercent = finalSalePrice > 0 ? (netProfit / finalSalePrice) * 100 : 0;
             roiPercent = landedCost > 0 ? (netProfit / landedCost) * 100 : 0;
 
             breakEvenPrice = (1 - recaudoRate) > 0 ? codFixedCosts / (1 - recaudoRate) : codFixedCosts;
-            const remainingForAds = (finalSalePrice * (1 - recaudoRate)) - landedCost - realFreight - adminCost;
+            const remainingForAds = (finalSalePrice * (1 - recaudoRate)) - landedCost - realFreight - adminCost - recaudoFixed;
             breakEvenCpa = Math.max(0, remainingForAds * (1 - ineffectiveness));
             minRoas = realCpa > 0 && finalSalePrice > 0 ? (finalSalePrice / realCpa) : 0;
 
@@ -1245,6 +1285,7 @@ const CalculatorModule = (() => {
             realFreight,
             adminCost,
             recaudoRate,
+            recaudoFixed,
             ineffectiveness,
             mpPercentTotal,
             mpFixedFee,
@@ -1268,6 +1309,8 @@ const CalculatorModule = (() => {
             ineffectiveness,
             cpa,
             recaudoRate,
+            recaudoFixed,
+            isVenezuela,
             adminCost,
             mpShipping,
             mpFixedFee,
@@ -1337,7 +1380,9 @@ const CalculatorModule = (() => {
                 { label: 'Flete de Envío', color: '#f59e0b', unit: freightOutUnit, hint: `Flete base ${fmt(fleteOut)} repartido entre los pedidos entregados (${(pReturn * 100).toFixed(0)}% devolución)` },
                 { label: 'Flete Devolución', color: '#fbbf24', unit: freightReturnUnit, hint: `${(pReturn * 100).toFixed(0)}% de los pedidos regresa a ${fmt(fleteRet)} de flete de retorno` },
                 { label: 'Publicidad (CPA)', color: '#ec4899', unit: realCpaUnit, hint: `CPA ${fmt(cpa)} ajustado por ${(ineff * 100).toFixed(0)}% de pedidos cancelados/devueltos` },
-                { label: 'Comisión Recaudo', color: '#a855f7', unit: price * recaudoRate, hint: `${(recaudoRate * 100).toFixed(1)}% sobre el precio de venta` },
+                p.isVenezuela
+                    ? { label: 'Comisión Venezuela', color: '#a855f7', unit: (price * recaudoRate) + (p.recaudoFixed || 0), hint: `${(recaudoRate * 100).toFixed(1)}% sobre lo liquidado (venta ${fmt(price)} - flete ${fmt(fleteOut)})` }
+                    : { label: 'Comisión Recaudo', color: '#a855f7', unit: price * recaudoRate, hint: `${(recaudoRate * 100).toFixed(1)}% sobre el precio de venta` },
                 { label: 'Costo Administrativo', color: '#94a3b8', unit: p.adminCost || 0, hint: 'Costo fijo administrativo por pedido' },
                 { label: 'Utilidad Neta', color: '#10b981', unit: p.netProfit || 0, always: true }
             ];
@@ -1548,6 +1593,8 @@ const CalculatorModule = (() => {
         setVal('calcDevolucion', 20);
         setVal('calcFlete', isUsd ? 4.00 : 16500);
         setVal('calcFleteRetorno', isUsd ? 2.50 : 10000);
+        setVal('calcCodCountry', 'standard');
+        updateCodCountryUI(false);
         setVal('calcRecaudoPercent', 3.5);
         setVal('calcAdmin', isUsd ? 0.50 : 2000);
 
@@ -1652,6 +1699,7 @@ const CalculatorModule = (() => {
             freight_out: getNum('calcFlete', 0),
             freight_return: getNum('calcFleteRetorno', 0),
             cod_fee_percent: getNum('calcRecaudoPercent', 0),
+            cod_fee_mode: getText('calcCodCountry', 'standard'),
             cost_admin: getNum('calcAdmin', 0),
 
             // Parámetros Canal 2: Marketplace
@@ -2046,7 +2094,7 @@ const CalculatorModule = (() => {
             const ineff = Math.min(0.92, pCancel + pReturn);
             const realCpa = ineff < 1 ? (item.sale_cpa || 0) / (1 - ineff) : (item.sale_cpa || 0);
             const realFreight = pReturn < 1 ? ((item.freight_out || 0) + (pReturn * (item.freight_return || item.freight_out || 0))) / (1 - pReturn) : (item.freight_out || 0);
-            const recaudo = salePrice * ((item.cod_fee_percent || 0) / 100);
+            const recaudo = (salePrice * ((item.cod_fee_percent || 0) / 100)) + itemRecaudoFixed(item);
             operCost = realCpa + realFreight + (item.cost_admin || 0) + recaudo;
         } else {
             const mpFee = salePrice * ((item.marketplace_fee_percent || 0) / 100);
@@ -2091,6 +2139,8 @@ const CalculatorModule = (() => {
             ineffectiveness: Math.min(0.92, ((item.cancel_rate || 0) + (item.return_rate || 0)) / 100),
             cpa: item.sale_cpa || 0,
             recaudoRate: (item.cod_fee_percent || 0) / 100,
+            recaudoFixed: itemRecaudoFixed(item),
+            isVenezuela: item.cod_fee_mode === 'venezuela',
             adminCost: item.cost_admin || 0,
             mpShipping: item.marketplace_shipping_cost || 0,
             mpFixedFee: item.marketplace_fixed_fee || 0,
@@ -2289,6 +2339,8 @@ const CalculatorModule = (() => {
         setVal('calcDevolucion', item.return_rate != null ? item.return_rate : 0);
         setVal('calcFlete', item.freight_out != null ? item.freight_out : 0);
         setVal('calcFleteRetorno', item.freight_return != null ? item.freight_return : 0);
+        setVal('calcCodCountry', item.cod_fee_mode === 'venezuela' ? 'venezuela' : 'standard');
+        updateCodCountryUI(false);
         setVal('calcRecaudoPercent', item.cod_fee_percent != null ? item.cod_fee_percent : 0);
         setVal('calcAdmin', item.cost_admin != null ? item.cost_admin : 0);
 
@@ -2475,7 +2527,7 @@ const CalculatorModule = (() => {
             ['Publicidad CPA (Meta / TikTok)', formatMoney(item.sale_cpa || 0, itemCurr)],
             ['Tasa Cancelación / Devolución', `${item.cancel_rate || 0}% canc. / ${item.return_rate || 0}% dev.`],
             ['Fletes (Entrega / Retorno)', `${formatMoney(item.freight_out || 0, itemCurr)} / ${formatMoney(item.freight_return || 0, itemCurr)}`],
-            ['Comisión Recaudo + Costo Operativo', `${item.cod_fee_percent || 0}% + ${formatMoney(item.cost_admin || 0, itemCurr)}`],
+            [item.cod_fee_mode === 'venezuela' ? 'Comisión Venezuela (ventas - flete) + Costo Operativo' : 'Comisión Recaudo + Costo Operativo', `${item.cod_fee_percent || 0}% + ${formatMoney(item.cost_admin || 0, itemCurr)}`],
             ['Utilidad Neta Unitaria COD', `${formatMoney(codProfit, itemCurr)} (${codMargin.toFixed(1)}% margen)`],
             ['Ganancia Total Lote COD (' + batchUnitsForPdf + ' unid.)', formatMoney(codBatchProfit, itemCurr)]
         ];
