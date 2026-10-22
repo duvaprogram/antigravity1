@@ -88,6 +88,9 @@ ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS cost_hidden_fie
 ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS offer_items JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS offers_pack_once BOOLEAN DEFAULT TRUE;
 
+-- País / tipo de comisión COD: 'standard' o 'venezuela' (15% sobre ventas - flete)
+ALTER TABLE public.product_liquidations ADD COLUMN IF NOT EXISTS cod_fee_mode TEXT DEFAULT 'standard';
+
 -- Índices para optimizar búsquedas frecuentes
 CREATE INDEX IF NOT EXISTS idx_liquidations_name ON public.product_liquidations(name);
 CREATE INDEX IF NOT EXISTS idx_liquidations_channel ON public.product_liquidations(channel);

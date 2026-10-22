@@ -8,8 +8,8 @@
     <meta name="description" content="Sistema de gestión de domicilios para Quito y Guayaquil">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="css/styles.css?v=3.0.0">
-    <link rel="stylesheet" href="css/mutual-tasks.css?v=3.0.0">
+    <link rel="stylesheet" href="css/styles.css?v=3.1.0">
+    <link rel="stylesheet" href="css/mutual-tasks.css?v=3.1.0">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
@@ -117,7 +117,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v3.0.0</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v3.1.0</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -1852,6 +1852,13 @@
                                     <!-- PANEL A: CONTRA ENTREGA (COD) -->
                                     <div class="calc-channel-panel active" id="panelChannelCod">
                                         <div class="form-grid calculator-form">
+                                            <div class="form-group" style="grid-column: 1 / -1;">
+                                                <label for="calcCodCountry">País / Tipo de Comisión</label>
+                                                <select id="calcCodCountry">
+                                                    <option value="standard">Estándar (% de comisión sobre el precio de venta)</option>
+                                                    <option value="venezuela">🇻🇪 Venezuela (15% sobre lo que te liquidan = ventas − flete)</option>
+                                                </select>
+                                            </div>
                                             <div class="form-group">
                                                 <label for="calcCpa">Publicidad CPA Meta/TikTok ($)</label>
                                                 <input type="number" id="calcCpa" value="15000" step="0.01" min="0" title="Costo por compra generado en campañas publicitarias">
@@ -1873,8 +1880,8 @@
                                                 <input type="number" id="calcFleteRetorno" value="10000" step="0.01" min="0" title="Costo cobrado por la transportadora al retornar paquete no entregado">
                                             </div>
                                             <div class="form-group">
-                                                <label for="calcRecaudoPercent">% Comisión Recaudo COD</label>
-                                                <input type="number" id="calcRecaudoPercent" value="3.5" step="0.1" min="0" max="20" title="Comisión que cobra la transportadora por recaudar el dinero">
+                                                <label for="calcRecaudoPercent" id="labelRecaudoPercent">% Comisión Recaudo COD</label>
+                                                <input type="number" id="calcRecaudoPercent" value="3.5" step="0.1" min="0" max="25" title="Comisión que cobra la transportadora por recaudar el dinero">
                                             </div>
                                             <div class="form-group">
                                                 <label for="calcAdmin">Confirmación / Call Center ($)</label>
@@ -5572,7 +5579,7 @@
                     <div>
                         <h2 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                             💳 Gastos Mensuales y Presupuestación
-                            <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v3.0.0</span>
+                            <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v3.1.0</span>
                         </h2>
                         <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--text-muted);">
                             Planificación mensual estimada, registro de consumos y control de presupuesto independiente.
@@ -8604,34 +8611,34 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase-config.js?v=3.0.0"></script>
-    <script src="js/utils.js?v=3.0.0"></script>
-    <script src="js/database.js?v=3.0.0"></script>
-    <script src="js/products.js?v=3.0.0"></script>
-    <script src="js/inventory.js?v=3.0.0"></script>
-    <script src="js/clients.js?v=3.0.0"></script>
-    <script src="js/guides.js?v=3.0.0"></script>
-    <script src="js/analytics.js?v=3.0.0"></script>
-    <script src="js/confirmation.js?v=3.0.0"></script>
-    <script src="js/purchases.js?v=3.0.0"></script>
-    <script src="js/freights.js?v=3.0.0"></script>
-    <script src="js/venezuela-fx.js?v=3.0.0"></script>
-    <script src="js/payments.js?v=3.0.0"></script>
-    <script src="js/accounts.js?v=3.0.0"></script>
-    <script src="js/users.js?v=3.0.0"></script>
-    <script src="js/campaigns.js?v=3.0.0"></script>
-    <script src="js/meta-ads.js?v=3.0.0"></script>
-    <script src="js/calculator.js?v=3.0.0"></script>
-    <script src="js/multimedia.js?v=3.0.0"></script>
-    <script src="js/finance.js?v=3.0.0"></script>
-    <script src="js/expenses.js?v=3.0.0"></script>
-    <script src="js/income-statement.js?v=3.0.0"></script>
-    <script src="js/materials-calculator.js?v=3.0.0"></script>
-    <script src="js/journal-data.js?v=3.0.0"></script>
-    <script src="js/journal.js?v=3.0.0"></script>
-    <script src="js/mutual-tasks.js?v=3.0.0"></script>
-    <script src="js/app.js?v=3.0.0"></script>
-    <script src="js/auth.js?v=3.0.0"></script>
+    <script src="js/supabase-config.js?v=3.1.0"></script>
+    <script src="js/utils.js?v=3.1.0"></script>
+    <script src="js/database.js?v=3.1.0"></script>
+    <script src="js/products.js?v=3.1.0"></script>
+    <script src="js/inventory.js?v=3.1.0"></script>
+    <script src="js/clients.js?v=3.1.0"></script>
+    <script src="js/guides.js?v=3.1.0"></script>
+    <script src="js/analytics.js?v=3.1.0"></script>
+    <script src="js/confirmation.js?v=3.1.0"></script>
+    <script src="js/purchases.js?v=3.1.0"></script>
+    <script src="js/freights.js?v=3.1.0"></script>
+    <script src="js/venezuela-fx.js?v=3.1.0"></script>
+    <script src="js/payments.js?v=3.1.0"></script>
+    <script src="js/accounts.js?v=3.1.0"></script>
+    <script src="js/users.js?v=3.1.0"></script>
+    <script src="js/campaigns.js?v=3.1.0"></script>
+    <script src="js/meta-ads.js?v=3.1.0"></script>
+    <script src="js/calculator.js?v=3.1.0"></script>
+    <script src="js/multimedia.js?v=3.1.0"></script>
+    <script src="js/finance.js?v=3.1.0"></script>
+    <script src="js/expenses.js?v=3.1.0"></script>
+    <script src="js/income-statement.js?v=3.1.0"></script>
+    <script src="js/materials-calculator.js?v=3.1.0"></script>
+    <script src="js/journal-data.js?v=3.1.0"></script>
+    <script src="js/journal.js?v=3.1.0"></script>
+    <script src="js/mutual-tasks.js?v=3.1.0"></script>
+    <script src="js/app.js?v=3.1.0"></script>
+    <script src="js/auth.js?v=3.1.0"></script>
 </body>
 
 </html>

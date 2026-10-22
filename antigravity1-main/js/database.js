@@ -2396,6 +2396,7 @@ const Database = {
                     delete supaPayload.cost_extra_items;
                     delete supaPayload.cost_extra_total;
                     delete supaPayload.cost_hidden_fields;
+                    delete supaPayload.cod_fee_mode;
                     delete supaPayload.recommended_price;
                     delete supaPayload.roi_percent;
                     delete supaPayload.break_even_price;
