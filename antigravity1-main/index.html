@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="css/styles.css?v=3.1.0">
+    <link rel="stylesheet" href="css/hoko-inventory.css?v=1.0.0">
     <link rel="stylesheet" href="css/mutual-tasks.css?v=3.1.0">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -635,131 +636,371 @@
 
             <!-- Inventory Section -->
             <section class="content-section" id="section-inventory">
-                <div class="section-header">
-                    <div class="city-tabs">
-                        <button class="city-tab active" data-city="all">Todos</button>
-                        <button class="city-tab" data-city="Quito">Quito</button>
-                        <button class="city-tab" data-city="Guayaquil">Guayaquil</button>
-                        <button class="city-tab" data-city="Caracas">Caracas</button>
-                        <button class="city-tab" data-city="Medellin">Medellín</button>
-                        <button class="city-tab" data-city="Bogota">Bogotá</button>
-                        <button class="city-tab" data-city="CDMX">CDMX</button>
-                        <button class="city-tab" data-city="Guadalajara">Guadalajara</button>
-                        <button class="city-tab" data-city="Monterrey">Monterrey</button>
-                    </div>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn btn-secondary" id="btnInventoryHistory">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <polyline points="12 6 12 12 16 14"></polyline>
-                            </svg>
-                            Historial
-                        </button>
-                        <button class="btn btn-primary" id="btnUpdateStock">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <polyline points="1 4 1 10 7 10"></polyline>
-                                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
-                            </svg>
-                            Actualizar Stock
-                        </button>
-                    </div>
-                </div>
 
-                <!-- Web Application Statistics Grid  -->
-                <div class="stats-grid" style="margin-top: 1.5rem; margin-bottom: 0.5rem;" id="inventoryStatsGrid">
-                    <div class="stat-card">
-                        <div class="stat-icon products">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                            </svg>
-                        </div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="invStatTotalItems">0</span>
-                            <span class="stat-label">Artículos Distintos</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon inventory">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-                            </svg>
-                        </div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="invStatTotalUnits">0</span>
-                            <span class="stat-label">Unidades Totales</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(239, 68, 68, 0.1); color: var(--danger);">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                                <line x1="12" y1="9" x2="12" y2="13"></line>
-                                <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                            </svg>
-                        </div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="invStatLowStock">0</span>
-                            <span class="stat-label">Prod. Bajo Stock</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon" style="background: rgba(34, 197, 94, 0.1); color: #22c55e;">
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="12" y1="1" x2="12" y2="23"></line>
-                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                            </svg>
-                        </div>
-                        <div class="stat-info">
-                            <span class="stat-value" id="invStatTotalCost">$0.00</span>
-                            <span class="stat-label">Costo Total</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Inventory Filters Bar -->
-                <div class="inventory-filters-bar">
-                    <div class="inv-search-bar">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <circle cx="11" cy="11" r="8"></circle>
-                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                        </svg>
-                        <input type="text" id="invSearchInput" placeholder="Buscar por nombre o SKU...">
-                    </div>
-                    <select id="invSortSelect">
-                        <option value="default">Ordenar Stock/Nombre...</option>
-                        <option value="stock-desc">Mayor a menor stock</option>
-                        <option value="stock-asc">Menor a mayor stock</option>
-                        <option value="name-asc">Nombre A → Z</option>
-                        <option value="name-desc">Nombre Z → A</option>
-                    </select>
-                    <select id="invSortCostSelect">
-                        <option value="default">Ordenar por Costo...</option>
-                        <option value="cost-desc">Mayor a menor costo unitario</option>
-                        <option value="cost-asc">Menor a mayor costo unitario</option>
-                        <option value="val-desc">Mayor a menor costo total stock</option>
-                    </select>
-                    <select id="invCategorySelect">
-                        <option value="">Todas las categorías</option>
-                    </select>
-                    <button class="btn btn-secondary btn-sm" id="btnClearInvFilters" title="Limpiar filtros">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
-                        </svg>
-                        Limpiar
+                <!-- ====================== TOGGLE SWITCHER ====================== -->
+                <div class="hoko-section-switcher">
+                    <button id="btnSimpleInv" class="hoko-switch-btn hoko-switch-active" onclick="hokoSwitchView('simple')">
+                        📦 Inventario Simple
+                    </button>
+                    <button id="btnHokoInv" class="hoko-switch-btn" onclick="hokoSwitchView('hoko')">
+                        🏭 Inventario Hoko Avanzado
                     </button>
                 </div>
 
-                <!-- Results counter -->
-                <div class="inventory-count" id="inventoryCount"></div>
+                <!-- ====================== INVENTARIO SIMPLE (existente) ====================== -->
+                <div id="simpleInventoryWrapper">
+                    <div class="section-header">
+                        <div class="city-tabs">
+                            <button class="city-tab active" data-city="all">Todos</button>
+                            <button class="city-tab" data-city="Quito">Quito</button>
+                            <button class="city-tab" data-city="Guayaquil">Guayaquil</button>
+                            <button class="city-tab" data-city="Caracas">Caracas</button>
+                            <button class="city-tab" data-city="Medellin">Medellín</button>
+                            <button class="city-tab" data-city="Bogota">Bogotá</button>
+                            <button class="city-tab" data-city="CDMX">CDMX</button>
+                            <button class="city-tab" data-city="Guadalajara">Guadalajara</button>
+                            <button class="city-tab" data-city="Monterrey">Monterrey</button>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary" id="btnInventoryHistory">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                                Historial
+                            </button>
+                            <button class="btn btn-primary" id="btnUpdateStock">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                                Actualizar Stock
+                            </button>
+                        </div>
+                    </div>
 
-                <div class="inventory-grid" id="inventoryGrid">
-                    <!-- Dynamic content -->
+                    <div class="stats-grid" style="margin-top: 1.5rem; margin-bottom: 0.5rem;" id="inventoryStatsGrid">
+                        <div class="stat-card"><div class="stat-icon products"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></div><div class="stat-info"><span class="stat-value" id="invStatTotalItems">0</span><span class="stat-label">Artículos Distintos</span></div></div>
+                        <div class="stat-card"><div class="stat-icon inventory"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg></div><div class="stat-info"><span class="stat-value" id="invStatTotalUnits">0</span><span class="stat-label">Unidades Totales</span></div></div>
+                        <div class="stat-card"><div class="stat-icon" style="background: rgba(239,68,68,.1); color: var(--danger);"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></div><div class="stat-info"><span class="stat-value" id="invStatLowStock">0</span><span class="stat-label">Prod. Bajo Stock</span></div></div>
+                        <div class="stat-card"><div class="stat-icon" style="background: rgba(34,197,94,.1); color: #22c55e;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg></div><div class="stat-info"><span class="stat-value" id="invStatTotalCost">$0.00</span><span class="stat-label">Costo Total</span></div></div>
+                    </div>
+
+                    <div class="inventory-filters-bar">
+                        <div class="inv-search-bar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><input type="text" id="invSearchInput" placeholder="Buscar por nombre o SKU..."></div>
+                        <select id="invSortSelect"><option value="default">Ordenar Stock/Nombre...</option><option value="stock-desc">Mayor a menor stock</option><option value="stock-asc">Menor a mayor stock</option><option value="name-asc">Nombre A → Z</option><option value="name-desc">Nombre Z → A</option></select>
+                        <select id="invSortCostSelect"><option value="default">Ordenar por Costo...</option><option value="cost-desc">Mayor a menor costo unitario</option><option value="cost-asc">Menor a mayor costo unitario</option><option value="val-desc">Mayor a menor costo total stock</option></select>
+                        <select id="invCategorySelect"><option value="">Todas las categorías</option></select>
+                        <button class="btn btn-secondary btn-sm" id="btnClearInvFilters" title="Limpiar filtros"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg> Limpiar</button>
+                    </div>
+                    <div class="inventory-count" id="inventoryCount"></div>
+                    <div class="inventory-grid" id="inventoryGrid"></div>
                 </div>
+
+                <!-- ====================== MÓDULO INVENTARIO HOKO AVANZADO ====================== -->
+                <div id="hoko_moduleWrapper">
+
+                    <!-- Header del módulo -->
+                    <div class="hoko-module-header">
+                        <div class="hoko-module-brand">
+                            <div class="hoko-module-icon">📦</div>
+                            <div>
+                                <div class="hoko-module-title">Inventario <span style="color:#818cf8">Hoko</span></div>
+                                <div class="hoko-module-sub">Centro de Clasificación, Valorización y Control de Stock Multibodega</div>
+                            </div>
+                            <span id="hoko_dataSourceBadge" class="hoko-badge hoko-badge-demo"><span class="hoko-dot hoko-dot-pulse hoko-dot-indigo"></span> Datos Demo</span>
+                        </div>
+                        <div class="hoko-actions">
+                            <button onclick="HokoInventory.toggleUploadZone()" class="hoko-btn">☁️ Subir Reporte Hoko</button>
+                            <button onclick="HokoInventory.openColumnMapperModal()" class="hoko-btn" title="Mapear columnas del Excel">⚙️ Mapear Columnas</button>
+                            <button onclick="HokoInventory.downloadTemplateExcel()" class="hoko-btn" title="Descargar plantilla Excel">📥 Plantilla</button>
+                            <button onclick="HokoInventory.restoreDemoData()" class="hoko-btn" title="Restaurar demo">↩ Demo</button>
+                            <button onclick="HokoInventory.exportFilteredToExcel()" class="hoko-btn hoko-btn-success">📊 Exportar .xlsx</button>
+                        </div>
+                    </div>
+
+                    <!-- Zona de carga (upload) -->
+                    <div id="hoko_uploadSection" class="hoko-upload-section hidden">
+                        <div class="hoko-upload-header">
+                            <div>
+                                <div class="hoko-upload-title">📂 Importar Reporte de Inventario Hoko</div>
+                                <div class="hoko-upload-sub">Sube tu archivo <code>.xlsx</code>, <code>.xls</code> o <code>.csv</code>. El sistema detecta y clasifica automáticamente las columnas.</div>
+                            </div>
+                            <div style="display:flex;gap:.5rem;align-items:center;">
+                                <span id="hoko_fileInfoText" class="hidden" style="font-size:.72rem;color:var(--text-secondary,#94a3b8);"></span>
+                                <button onclick="HokoInventory.clearAllInventory()" class="hoko-btn" style="color:#f87171;">🗑 Vaciar tabla</button>
+                                <button onclick="HokoInventory.toggleUploadZone()" class="hoko-btn">✕ Ocultar</button>
+                            </div>
+                        </div>
+                        <div id="hoko_dropZone" class="hoko-dropzone" onclick="document.getElementById('hoko_fileInput').click()">
+                            <input type="file" id="hoko_fileInput" accept=".xlsx,.xls,.csv" class="hidden" style="display:none" onchange="HokoInventory.handleFileSelect(event)">
+                            <div class="hoko-dropzone-icon">☁️</div>
+                            <p class="hoko-dropzone-text">Arrastra y suelta tu archivo, o <span class="hoko-dropzone-link">haz clic para explorar</span></p>
+                            <p class="hoko-dropzone-sub">Detecta: ID Hoko, SKU, Producto, Categoría, Bodega, Stock, Tránsito, Costo, Precio Venta, Estado</p>
+                            <div id="hoko_sheetSelectorContainer" class="hoko-sheet-selector hidden" onclick="event.stopPropagation()">
+                                <label>Hoja:</label>
+                                <select id="hoko_sheetSelector" onchange="HokoInventory.handleSheetChange(this.value)"></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- KPI Dashboard -->
+                    <div class="hoko-kpi-grid">
+                        <div class="hoko-kpi-card">
+                            <div class="hoko-kpi-header">
+                                <div><span class="hoko-kpi-label">Referencias / SKUs</span><div id="hoko_kpiTotalSkus" class="hoko-kpi-val">0</div></div>
+                                <div class="hoko-kpi-icon hoko-kpi-icon-indigo">🏷️</div>
+                            </div>
+                            <div class="hoko-kpi-footer">
+                                <span>🏭 Bodegas: <strong id="hoko_kpiTotalWarehouses">0</strong></span>
+                                <span>🗂️ Categorías: <strong id="hoko_kpiTotalCategories">0</strong></span>
+                            </div>
+                        </div>
+                        <div class="hoko-kpi-card">
+                            <div class="hoko-kpi-header">
+                                <div><span class="hoko-kpi-label">Unidades Disponibles</span><div id="hoko_kpiTotalUnits" class="hoko-kpi-val">0</div></div>
+                                <div class="hoko-kpi-icon hoko-kpi-icon-blue">📦</div>
+                            </div>
+                            <div class="hoko-kpi-footer">
+                                <span class="hoko-transit-badge-kpi">🚚 En Tránsito: <strong id="hoko_kpiTotalTransit">0</strong></span>
+                                <span>Prom: <strong id="hoko_kpiAvgStock">0</strong> u/SKU</span>
+                            </div>
+                        </div>
+                        <div class="hoko-kpi-card">
+                            <div class="hoko-kpi-header">
+                                <div><span class="hoko-kpi-label">Costo Total en Bodega</span><div id="hoko_kpiTotalCost" class="hoko-kpi-val" style="font-size:1.3rem">$0</div></div>
+                                <div class="hoko-kpi-icon hoko-kpi-icon-green">💰</div>
+                            </div>
+                            <div class="hoko-kpi-footer">
+                                <span>Venta Proy.: <strong id="hoko_kpiTotalRevenue" style="color:#34d399">$0</strong></span>
+                                <span class="hoko-margin-badge" id="hoko_kpiMarginBadge">Margen: 0%</span>
+                            </div>
+                        </div>
+                        <!-- Semáforo de salud -->
+                        <div class="hoko-semaphore-card">
+                            <div class="hoko-sem-header">
+                                <span>🚦 Semáforo de Salud</span>
+                                <button onclick="HokoInventory.setHealthFilter('ALL')" id="hoko_btnResetHealth" class="hidden" style="background:none;border:none;color:#818cf8;cursor:pointer;font-size:.72rem;font-weight:700;">Ver todos</button>
+                            </div>
+                            <div class="hoko-sem-grid">
+                                <button onclick="HokoInventory.setHealthFilter('OPTIMAL')" id="hoko_semCardOptimal" class="hoko-sem-btn hoko-sem-ok">
+                                    <div style="display:flex;justify-content:space-between;"><span class="hoko-dot hoko-dot-ok"></span><span style="font-size:.62rem;font-weight:700;color:#34d399;">&gt;10</span></div>
+                                    <div id="hoko_semCountOptimal" class="hoko-sem-count hoko-sem-count-ok">0</div>
+                                    <div class="hoko-sem-sublabel" style="color:#34d399;">Óptimo</div>
+                                </button>
+                                <button onclick="HokoInventory.setHealthFilter('LOW')" id="hoko_semCardLow" class="hoko-sem-btn hoko-sem-low">
+                                    <div style="display:flex;justify-content:space-between;"><span class="hoko-dot hoko-dot-low"></span><span style="font-size:.62rem;font-weight:700;color:#fbbf24;">1-10</span></div>
+                                    <div id="hoko_semCountLow" class="hoko-sem-count hoko-sem-count-low">0</div>
+                                    <div class="hoko-sem-sublabel" style="color:#fbbf24;">Stock Bajo</div>
+                                </button>
+                                <button onclick="HokoInventory.setHealthFilter('OUT')" id="hoko_semCardOut" class="hoko-sem-btn hoko-sem-out">
+                                    <div style="display:flex;justify-content:space-between;"><span class="hoko-dot hoko-dot-out hoko-dot-pulse"></span><span style="font-size:.62rem;font-weight:700;color:#f87171;">0 und</span></div>
+                                    <div id="hoko_semCountOut" class="hoko-sem-count hoko-sem-count-out">0</div>
+                                    <div class="hoko-sem-sublabel" style="color:#f87171;">Agotado</div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros avanzados -->
+                    <div class="hoko-filters-section">
+                        <div class="hoko-filters-header">
+                            <div class="hoko-filters-title">
+                                🔍 Filtros Avanzados
+                                <span id="hoko_activeFiltersCountBadge" class="hoko-active-filters-badge hidden">0 filtros</span>
+                            </div>
+                            <div style="display:flex;align-items:center;gap:.75rem;">
+                                <span class="hoko-count-text">Mostrando <strong id="hoko_filteredCountText">0</strong> de <strong id="hoko_totalCountText">0</strong> registros</span>
+                                <button onclick="HokoInventory.resetAllFilters()" class="hoko-btn">✕ Limpiar Filtros</button>
+                            </div>
+                        </div>
+                        <div class="hoko-filters-grid">
+                            <div class="hoko-filter-group">
+                                <label class="hoko-filter-label">Buscar Producto / SKU / ID Hoko</label>
+                                <div class="hoko-search-wrap">
+                                    <span class="hoko-search-icon">🔍</span>
+                                    <input type="text" id="hoko_filterSearch" oninput="HokoInventory.applyFilters()" placeholder="Ej. HK-104, Auriculares, Reloj..." class="hoko-filter-input hoko-with-icon">
+                                    <button id="hoko_btnClearSearch" onclick="document.getElementById('hoko_filterSearch').value=''; HokoInventory.applyFilters();" class="hoko-clear-search hidden">✕</button>
+                                </div>
+                            </div>
+                            <div class="hoko-filter-group">
+                                <label class="hoko-filter-label">Bodega / Ciudad</label>
+                                <select id="hoko_filterWarehouse" onchange="HokoInventory.applyFilters()" class="hoko-filter-select"><option value="ALL">Todas las Bodegas</option></select>
+                            </div>
+                            <div class="hoko-filter-group">
+                                <label class="hoko-filter-label">Categoría</label>
+                                <select id="hoko_filterCategory" onchange="HokoInventory.applyFilters()" class="hoko-filter-select"><option value="ALL">Todas las Categorías</option></select>
+                            </div>
+                            <div class="hoko-filter-group">
+                                <label class="hoko-filter-label">Nivel de Stock</label>
+                                <select id="hoko_filterHealth" onchange="HokoInventory.applyFilters()" class="hoko-filter-select">
+                                    <option value="ALL">Todos los niveles</option>
+                                    <option value="OPTIMAL">🟢 Óptimo (&gt;10)</option>
+                                    <option value="LOW">🟡 Stock Bajo (1-10)</option>
+                                    <option value="OUT">🔴 Agotados (0)</option>
+                                    <option value="TRANSIT">🚚 Con Stock en Tránsito</option>
+                                </select>
+                            </div>
+                            <div class="hoko-filter-group">
+                                <label class="hoko-filter-label">Ordenar Por</label>
+                                <select id="hoko_filterSort" onchange="HokoInventory.applyFilters()" class="hoko-filter-select">
+                                    <option value="STOCK_DESC">Mayor Stock Disponible</option>
+                                    <option value="STOCK_ASC">Menor Stock Disponible</option>
+                                    <option value="VALUE_DESC">Mayor Valor Total en Bodega</option>
+                                    <option value="MARGIN_DESC">Mayor Margen de Ganancia</option>
+                                    <option value="TRANSIT_DESC">Mayor Stock en Tránsito</option>
+                                    <option value="NAME_ASC">Alfabético (A - Z)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="hoko-filters-row2">
+                            <div class="hoko-row2-left">
+                                <div class="hoko-range-wrap">
+                                    <span class="hoko-range-label">📊 Rango Stock:</span>
+                                    <input type="number" id="hoko_filterMinStock" oninput="HokoInventory.applyFilters()" placeholder="Mín" min="0" class="hoko-range-input">
+                                    <span class="hoko-range-sep">—</span>
+                                    <input type="number" id="hoko_filterMaxStock" oninput="HokoInventory.applyFilters()" placeholder="Máx" min="0" class="hoko-range-input">
+                                </div>
+                                <div class="hoko-status-wrap">
+                                    <span class="hoko-status-label">Estado:</span>
+                                    <select id="hoko_filterStatus" onchange="HokoInventory.applyFilters()" class="hoko-status-select"><option value="ALL">Todos</option></select>
+                                </div>
+                            </div>
+                            <div id="hoko_activeFilterPills" style="display:flex;flex-wrap:wrap;gap:.4rem;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tabs de visualización -->
+                    <div class="hoko-tabs-section">
+                        <div class="hoko-tabs-header">
+                            <nav class="hoko-tabs-nav">
+                                <button onclick="HokoInventory.switchTab('hoko_tab-table')" id="hoko_btn-hoko_tab-table" class="hoko-tab-btn hoko-tab-active">
+                                    📋 1. Tabla Detallada <span id="hoko_badgeTabTable" class="hoko-tab-badge">0</span>
+                                </button>
+                                <button onclick="HokoInventory.switchTab('hoko_tab-warehouses')" id="hoko_btn-hoko_tab-warehouses" class="hoko-tab-btn">
+                                    🏭 2. Por Bodegas <span id="hoko_badgeTabWarehouses" class="hoko-tab-badge">0</span>
+                                </button>
+                                <button onclick="HokoInventory.switchTab('hoko_tab-categories')" id="hoko_btn-hoko_tab-categories" class="hoko-tab-btn">
+                                    🏷️ 3. Por Categorías <span id="hoko_badgeTabCategories" class="hoko-tab-badge">0</span>
+                                </button>
+                                <button onclick="HokoInventory.switchTab('hoko_tab-alerts')" id="hoko_btn-hoko_tab-alerts" class="hoko-tab-btn">
+                                    ⚠️ 4. Alertas de Reposición <span id="hoko_badgeTabAlerts" class="hoko-tab-badge hoko-tab-badge-alert">0</span>
+                                </button>
+                                <button onclick="HokoInventory.switchTab('hoko_tab-raw')" id="hoko_btn-hoko_tab-raw" class="hoko-tab-btn">
+                                    🔬 5. Explorador Columnas
+                                </button>
+                            </nav>
+                            <button onclick="HokoInventory.openNewProductModal()" class="hoko-btn hoko-btn-primary" style="margin-bottom:.5rem;">+ Nuevo Ítem</button>
+                        </div>
+
+                        <!-- PESTAÑA 1: TABLA DETALLADA -->
+                        <div id="hoko_tab-table" class="hoko-tab-pane">
+                            <div class="hoko-table-wrap">
+                                <table class="hoko-table">
+                                    <thead class="hoko-thead">
+                                        <tr>
+                                            <th>ID / SKU</th>
+                                            <th>Producto &amp; Categoría</th>
+                                            <th>Bodega / Ciudad</th>
+                                            <th class="hoko-center">Estado Salud</th>
+                                            <th class="hoko-right">Stock Disp.</th>
+                                            <th class="hoko-right">En Tránsito</th>
+                                            <th class="hoko-right">Costo Unit.</th>
+                                            <th class="hoko-right">Precio Venta</th>
+                                            <th class="hoko-right">Margen</th>
+                                            <th class="hoko-right">Valor Total Bodega</th>
+                                            <th class="hoko-center">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="hoko_inventoryTableBody"></tbody>
+                                </table>
+                            </div>
+                            <div class="hoko-table-footer">
+                                <div class="hoko-page-size-row">
+                                    Filas por página:
+                                    <select id="hoko_pageSizeSelect" onchange="HokoInventory.changePageSize(this.value)" class="hoko-page-size-sel">
+                                        <option value="15">15</option>
+                                        <option value="30">30</option>
+                                        <option value="50">50</option>
+                                        <option value="999999">Todas</option>
+                                    </select>
+                                    <span id="hoko_paginationRangeText" style="margin-left:.5rem;"></span>
+                                </div>
+                                <div id="hoko_paginationControls" class="hoko-pg-wrap"></div>
+                            </div>
+                        </div>
+
+                        <!-- PESTAÑA 2: BODEGAS -->
+                        <div id="hoko_tab-warehouses" class="hoko-tab-pane hidden">
+                            <div class="hoko-tab-info">
+                                <div class="hoko-tab-info-title">Distribución y Valorización por Bodega / Ciudad</div>
+                                <div class="hoko-tab-info-sub">Haz clic en "Ver en tabla" para filtrar las referencias de esa bodega.</div>
+                            </div>
+                            <div id="hoko_warehousesGrid" class="hoko-wh-grid"></div>
+                        </div>
+
+                        <!-- PESTAÑA 3: CATEGORÍAS -->
+                        <div id="hoko_tab-categories" class="hoko-tab-pane hidden">
+                            <div class="hoko-tab-info">
+                                <div class="hoko-tab-info-title">Análisis de Capital y Stock por Categoría de Producto</div>
+                                <div class="hoko-tab-info-sub">Métricas de unidades, inversión, venta proyectada y rentabilidad promedio por línea.</div>
+                            </div>
+                            <div id="hoko_categoriesGrid" class="hoko-cat-grid"></div>
+                        </div>
+
+                        <!-- PESTAÑA 4: ALERTAS -->
+                        <div id="hoko_tab-alerts" class="hoko-tab-pane hidden">
+                            <div class="hoko-alerts-header">
+                                <div style="display:flex;align-items:flex-start;gap:.85rem;">
+                                    <div class="hoko-alerts-icon">🔔</div>
+                                    <div>
+                                        <div class="hoko-alerts-title">Centro Prioritario de Reabastecimiento</div>
+                                        <div class="hoko-alerts-sub">Stock Bajo y Agotados — calcula cuántas unidades pedir según tu meta de stock.</div>
+                                    </div>
+                                </div>
+                                <div style="display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;">
+                                    <div class="hoko-target-wrap">
+                                        <span class="hoko-target-label">Meta Stock por SKU:</span>
+                                        <input type="number" id="hoko_targetStockInput" value="25" min="5" max="1000" onchange="HokoInventory.renderAlertsTab()" class="hoko-target-input">
+                                        <span class="hoko-target-unit">und.</span>
+                                    </div>
+                                    <button onclick="HokoInventory.exportRestockOrderToExcel()" class="hoko-btn hoko-btn-danger">🛒 Exportar Orden de Compra</button>
+                                </div>
+                            </div>
+                            <div class="hoko-alerts-kpi-grid">
+                                <div class="hoko-alert-kpi-card"><div><span class="hoko-alert-kpi-label">Referencias Críticas (≤10 und)</span><div id="hoko_alertTotalSkus" class="hoko-alert-kpi-val hoko-text-danger">0 SKUs</div></div><span style="font-size:1.5rem;">⚠️</span></div>
+                                <div class="hoko-alert-kpi-card"><div><span class="hoko-alert-kpi-label">Unidades Totales a Pedir</span><div id="hoko_alertSuggestedUnits" class="hoko-alert-kpi-val">0 und</div></div><span style="font-size:1.5rem;">📦</span></div>
+                                <div class="hoko-alert-kpi-card"><div><span class="hoko-alert-kpi-label">Inversión Estimada Reposición</span><div id="hoko_alertEstimatedBudget" class="hoko-alert-kpi-val" style="color:#818cf8;">$0</div></div><span style="font-size:1.5rem;">💳</span></div>
+                            </div>
+                            <div style="margin:0 1rem 1rem;border:1px solid var(--border,#334155);border-radius:10px;overflow:hidden;">
+                                <div class="hoko-table-wrap">
+                                    <table class="hoko-table">
+                                        <thead class="hoko-thead"><tr><th>Prioridad</th><th>SKU / ID</th><th>Producto &amp; Categoría</th><th>Bodega</th><th class="hoko-right">Stock Actual</th><th class="hoko-right">En Tránsito</th><th class="hoko-right">A Pedir</th><th class="hoko-right">Costo Unit.</th><th class="hoko-right">Costo Reposición</th></tr></thead>
+                                        <tbody id="hoko_alertsTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- PESTAÑA 5: EXPLORADOR RAW -->
+                        <div id="hoko_tab-raw" class="hoko-tab-pane hidden">
+                            <div class="hoko-raw-section">
+                                <div class="hoko-raw-header">
+                                    <div><div class="hoko-raw-title">Explorador de Columnas Originales del Archivo</div><div class="hoko-raw-sub">Visualiza todas las columnas nativas del Excel/CSV subido.</div></div>
+                                    <div style="display:flex;gap:.5rem;align-items:center;">
+                                        <select id="hoko_rawColumnFilterSelect" onchange="HokoInventory.renderRawExplorerTab()" class="hoko-filter-select" style="width:auto;"><option value="ALL">Buscar en todas las columnas</option></select>
+                                        <input type="text" id="hoko_rawSearchInput" oninput="HokoInventory.renderRawExplorerTab()" placeholder="Filtrar valor..." class="hoko-filter-input" style="width:160px;">
+                                    </div>
+                                </div>
+                                <div id="hoko_rawColumnsToggleList" class="hoko-raw-cols-list"></div>
+                                <div class="hoko-raw-table-wrap" style="margin-top:.65rem;">
+                                    <table class="hoko-table">
+                                        <thead id="hoko_rawTableHead"></thead>
+                                        <tbody id="hoko_rawTableBody"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div><!-- /hoko_moduleWrapper -->
+
+                <!-- Toast fallback para el módulo Hoko -->
+                <div id="hoko_toastContainer"></div>
+
             </section>
 
             <!-- Clients Section -->
@@ -8604,6 +8845,57 @@
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <!-- ======================== MODALES HOKO INVENTARIO ======================== -->
+
+    <!-- Modal: Mapeo de columnas -->
+    <div id="hoko_columnMapperModal" class="hoko-modal-overlay hidden">
+        <div class="hoko-modal-box" style="max-width:640px;">
+            <div class="hoko-modal-header">
+                <div><div class="hoko-modal-title">✨ Mapeo Inteligente de Columnas Hoko</div><div class="hoko-modal-subtitle">Asocia las columnas de tu archivo con los campos del sistema</div></div>
+                <button onclick="HokoInventory.closeColumnMapperModal()" class="hoko-modal-close">✕</button>
+            </div>
+            <div class="hoko-modal-body">
+                <div class="hoko-info-box">ℹ️ Hemos detectado las cabeceras de tu archivo. Si tu reporte usa nombres distintos (ej: <strong>"Existencias"</strong> en lugar de <strong>"Stock"</strong>), selecciónalo abajo y aplica el mapeo.</div>
+                <div id="hoko_mapperFieldsContainer" class="hoko-mapper-grid"></div>
+            </div>
+            <div class="hoko-modal-footer">
+                <button onclick="HokoInventory.closeColumnMapperModal()" class="hoko-btn">Cancelar</button>
+                <button onclick="HokoInventory.applyCustomColumnMapping()" class="hoko-btn hoko-btn-primary">✓ Aplicar Mapeo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Editar / Crear producto -->
+    <div id="hoko_productModal" class="hoko-modal-overlay hidden">
+        <div class="hoko-modal-box">
+            <div class="hoko-modal-header">
+                <div><div id="hoko_productModalTitle" class="hoko-modal-title">Agregar Nueva Referencia</div></div>
+                <button onclick="HokoInventory.closeProductModal()" class="hoko-modal-close">✕</button>
+            </div>
+            <form onsubmit="HokoInventory.saveProductForm(event)">
+                <div class="hoko-modal-body">
+                    <input type="hidden" id="hoko_editRowIndex" value="-1">
+                    <div class="hoko-form-grid-2">
+                        <div class="hoko-form-group"><label class="hoko-form-label">ID Hoko / Referencia</label><input type="text" id="hoko_formHokoId" class="hoko-form-input" required></div>
+                        <div class="hoko-form-group"><label class="hoko-form-label">SKU / Código</label><input type="text" id="hoko_formSku" class="hoko-form-input" required></div>
+                        <div class="hoko-form-group" style="grid-column:1/-1;"><label class="hoko-form-label">Nombre del Producto</label><input type="text" id="hoko_formName" class="hoko-form-input" required></div>
+                        <div class="hoko-form-group"><label class="hoko-form-label">Categoría</label><input type="text" id="hoko_formCategory" class="hoko-form-input" required></div>
+                        <div class="hoko-form-group"><label class="hoko-form-label">Bodega / Ciudad</label><input type="text" id="hoko_formWarehouse" class="hoko-form-input" required></div>
+                        <div class="hoko-form-group"><label class="hoko-form-label">Stock Disponible</label><input type="number" id="hoko_formStock" class="hoko-form-input" min="0" required></div>
+                        <div class="hoko-form-group"><label class="hoko-form-label">En Tránsito / Reservado</label><input type="number" id="hoko_formTransit" class="hoko-form-input" min="0" required></div>
+                        <div class="hoko-form-group"><label class="hoko-form-label">Costo Unitario (COP)</label><input type="number" id="hoko_formCost" class="hoko-form-input" min="0" step="100" required></div>
+                        <div class="hoko-form-group"><label class="hoko-form-label">Precio de Venta (COP)</label><input type="number" id="hoko_formPrice" class="hoko-form-input" min="0" step="100" required></div>
+                        <div class="hoko-form-group"><label class="hoko-form-label">Estado</label><select id="hoko_formStatus" class="hoko-form-select"><option value="Activo">Activo</option><option value="Inactivo">Inactivo</option><option value="Agotado">Agotado</option><option value="Descontinuado">Descontinuado</option></select></div>
+                    </div>
+                </div>
+                <div class="hoko-modal-footer">
+                    <button type="button" onclick="HokoInventory.closeProductModal()" class="hoko-btn">Cancelar</button>
+                    <button type="submit" class="hoko-btn hoko-btn-primary">💾 Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -8639,6 +8931,37 @@
     <script src="js/mutual-tasks.js?v=3.1.0"></script>
     <script src="js/app.js?v=3.1.0"></script>
     <script src="js/auth.js?v=3.1.0"></script>
+    <!-- Módulo Inventario Hoko -->
+    <script src="js/hoko-inventory.js?v=1.0.0"></script>
+    <script>
+        // ---- Toggle entre Inventario Simple y Hoko ----
+        function hokoSwitchView(view) {
+            const simple = document.getElementById('simpleInventoryWrapper');
+            const hoko   = document.getElementById('hoko_moduleWrapper');
+            const btnS   = document.getElementById('btnSimpleInv');
+            const btnH   = document.getElementById('btnHokoInv');
+            if (view === 'hoko') {
+                simple.style.display = 'none';
+                hoko.style.display   = 'block';
+                btnS.classList.remove('hoko-switch-active');
+                btnH.classList.add('hoko-switch-active');
+                // Inicializar Hoko la primera vez
+                if (!window._hokoInitialized) {
+                    HokoInventory.init();
+                    window._hokoInitialized = true;
+                }
+            } else {
+                simple.style.display = 'block';
+                hoko.style.display   = 'none';
+                btnH.classList.remove('hoko-switch-active');
+                btnS.classList.add('hoko-switch-active');
+            }
+        }
+        // Iniciar con inventario simple visible
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('hoko_moduleWrapper').style.display = 'none';
+        });
+    </script>
 </body>
 
 </html>
