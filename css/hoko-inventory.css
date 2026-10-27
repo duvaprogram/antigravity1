@@ -1,6 +1,6 @@
 /* ============================================================
    INVENTARIO HOKO  –  CSS del módulo
-   Integrado al Panel Domicilios v3.2.0
+   Integrado al Panel Domicilios v3.2.1
    Todos los clases usan prefijo .hoko- para evitar conflictos
    ============================================================ */
 
@@ -256,7 +256,7 @@
 .hoko-count-text strong { color: #818cf8; font-weight: 800; }
 .hoko-filters-grid {
     display: grid;
-    grid-template-columns: 2fr repeat(4, 1fr);
+    grid-template-columns: 1.5fr 1.5fr repeat(4, 1fr);
     gap: 0.65rem;
     margin-bottom: 0.75rem;
 }

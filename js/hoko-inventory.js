@@ -2,7 +2,7 @@
  * ============================================================
  *  MÓDULO INVENTARIO HOKO  –  v1.0
  *  Sistema de Gestión y Clasificación Inteligente de Inventario
- *  Integrado al Panel Domicilios v3.2.0
+ *  Integrado al Panel Domicilios v3.2.1
  * ============================================================
  *  Todos los IDs del DOM usan el prefijo "hoko_" para evitar
  *  conflictos con el inventario simple existente.
@@ -109,7 +109,15 @@ const HokoInventory = (() => {
         reader.onload = e => {
             try {
                 const data = new Uint8Array(e.target.result);
-                currentWorkbook = XLSX.read(data, { type: 'array' });
+                if (ext === 'csv') {
+                    // SheetJS asume Windows-1252 en CSV: decodificamos nosotros (UTF-8, con respaldo 1252)
+                    let text;
+                    try { text = new TextDecoder('utf-8', { fatal: true }).decode(data); }
+                    catch (_) { text = new TextDecoder('windows-1252').decode(data); }
+                    currentWorkbook = XLSX.read(text.replace(/^﻿/, ''), { type: 'string' });
+                } else {
+                    currentWorkbook = XLSX.read(data, { type: 'array' });
+                }
                 const sheetNames = currentWorkbook.SheetNames;
                 if (!sheetNames || sheetNames.length === 0) {
                     showToast('El archivo no contiene hojas válidas.', 'error');
@@ -249,9 +257,18 @@ const HokoInventory = (() => {
         const categories = [...new Set(normalizedInventory.map(i => i.category))].sort();
         const statuses   = [...new Set(normalizedInventory.map(i => i.status))].sort();
 
+        const products   = [...new Set(normalizedInventory.map(i => i.name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+
         const whSel  = document.getElementById('hoko_filterWarehouse');
         const catSel = document.getElementById('hoko_filterCategory');
         const stSel  = document.getElementById('hoko_filterStatus');
+        const prodList = document.getElementById('hoko_productList');
+
+        if (prodList) {
+            prodList.innerHTML = products.map(p => `<option value="${escapeHtml(p)}"></option>`).join('');
+        }
+        const prodLabel = document.getElementById('hoko_productCountLabel');
+        if (prodLabel) prodLabel.textContent = `(${products.length})`;
 
         if (whSel) {
             const cur = whSel.value;
@@ -280,7 +297,10 @@ const HokoInventory = (() => {
     }
 
     function applyFilters() {
-        const search    = (document.getElementById('hoko_filterSearch')?.value || '').trim().toLowerCase();
+        const search    = (document.getElementById('hoko_filterSearch')?.value || '').trim();
+        const searchTokens = normalizeString(search).split(' ').filter(Boolean);
+        const product   = normalizeString(document.getElementById('hoko_filterProduct')?.value || '');
+        const productIsExact = product !== '' && normalizedInventory.some(i => normalizeString(i.name) === product);
         const warehouse = document.getElementById('hoko_filterWarehouse')?.value || 'ALL';
         const category  = document.getElementById('hoko_filterCategory')?.value  || 'ALL';
         const health    = document.getElementById('hoko_filterHealth')?.value    || 'ALL';
@@ -295,13 +315,15 @@ const HokoInventory = (() => {
         if (clearBtn) clearBtn.classList.toggle('hidden', search.length === 0);
 
         filteredInventory = normalizedInventory.filter(item => {
-            if (search) {
-                const match = item.name.toLowerCase().includes(search) ||
-                    item.sku.toLowerCase().includes(search) ||
-                    item.id.toLowerCase().includes(search) ||
-                    item.category.toLowerCase().includes(search) ||
-                    item.warehouse.toLowerCase().includes(search);
-                if (!match) return false;
+            // La búsqueda solo mira producto / SKU / ID: bodega y categoría tienen su propio filtro
+            // (si no, "reloj" traería todo lo de una bodega llamada "Relojería").
+            if (searchTokens.length) {
+                const haystack = normalizeString(`${item.name} ${item.sku} ${item.id}`);
+                if (!searchTokens.every(t => haystack.includes(t))) return false;
+            }
+            if (product) {
+                const itemName = normalizeString(item.name);
+                if (productIsExact ? itemName !== product : !itemName.includes(product)) return false;
             }
             if (warehouse !== 'ALL' && item.warehouse !== warehouse) return false;
             if (category  !== 'ALL' && item.category  !== category)  return false;
@@ -369,7 +391,7 @@ const HokoInventory = (() => {
     }
 
     function resetAllFilters() {
-        ['hoko_filterSearch', 'hoko_filterMinStock', 'hoko_filterMaxStock'].forEach(id => {
+        ['hoko_filterSearch', 'hoko_filterProduct', 'hoko_filterMinStock', 'hoko_filterMaxStock'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.value = '';
         });
@@ -389,6 +411,7 @@ const HokoInventory = (() => {
         if (!container || !badge) return;
 
         const search = (document.getElementById('hoko_filterSearch')?.value || '').trim();
+        const prod   = (document.getElementById('hoko_filterProduct')?.value || '').trim();
         const wh     = document.getElementById('hoko_filterWarehouse')?.value || 'ALL';
         const cat    = document.getElementById('hoko_filterCategory')?.value  || 'ALL';
         const health = document.getElementById('hoko_filterHealth')?.value    || 'ALL';
@@ -398,6 +421,7 @@ const HokoInventory = (() => {
 
         const pills = [];
         if (search) pills.push({ label: `Búsqueda: "${search}"`, clear: () => { document.getElementById('hoko_filterSearch').value = ''; applyFilters(); } });
+        if (prod) pills.push({ label: `Producto: ${prod}`, clear: () => { document.getElementById('hoko_filterProduct').value = ''; applyFilters(); } });
         if (wh !== 'ALL') pills.push({ label: `Bodega: ${wh}`, clear: () => { document.getElementById('hoko_filterWarehouse').value = 'ALL'; applyFilters(); } });
         if (cat !== 'ALL') pills.push({ label: `Categoría: ${cat}`, clear: () => { document.getElementById('hoko_filterCategory').value = 'ALL'; applyFilters(); } });
         if (health !== 'ALL') {
