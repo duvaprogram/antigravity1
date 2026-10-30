@@ -936,14 +936,15 @@ const Database = {
         }
     },
 
-    async updateGuideStatus(guideId, newStatus) {
+    // deliveredAt (opcional): fecha real de entrega cuando se concilia con un Excel; por defecto, ahora
+    async updateGuideStatus(guideId, newStatus, deliveredAt = null) {
         try {
             const statusId = this.getStatusId(newStatus);
             if (!statusId) throw new Error('Status not found: ' + newStatus);
 
             const updateData = { status_id: statusId };
             if (newStatus === 'Entregado') {
-                updateData.delivered_at = new Date().toISOString();
+                updateData.delivered_at = deliveredAt || new Date().toISOString();
             }
 
             const { error } = await supabaseClient
@@ -954,6 +955,26 @@ const Database = {
             if (error) throw error;
         } catch (error) {
             console.error('Error updating guide status:', error);
+            throw error;
+        }
+    },
+
+    // Solo los campos de pago que se pasen (undefined = no tocar, null = vaciar)
+    async updateGuidePayment(guideId, { amountUsd, paymentBs }) {
+        try {
+            const updateData = {};
+            if (amountUsd !== undefined) updateData.amount_usd = amountUsd;
+            if (paymentBs !== undefined) updateData.payment_bs = paymentBs;
+            if (Object.keys(updateData).length === 0) return;
+
+            const { error } = await supabaseClient
+                .from('guides')
+                .update(updateData)
+                .eq('id', guideId);
+
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error updating guide payment:', error);
             throw error;
         }
     },

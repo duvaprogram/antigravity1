@@ -6846,3 +6846,17 @@ body.dark-mode .is-pl-src-num.is-settlement { color: #38bdf8; }
         grid-column: span 2;
     }
 }
+
+/* ===== Conciliar guias con Excel (modal) ===== */
+#modalGuideReconcile select,
+#modalGuideReconcile input[type="file"] {
+    padding: 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+}
+#modalGuideReconcile .table td { vertical-align: middle; }
+#modalGuideReconcile .status-badge { white-space: nowrap; }
+#modalGuideReconcile td select[data-action] { min-width: 190px; max-width: 280px; }
+#modalGuideReconcile .table td:nth-child(4) { white-space: nowrap; }

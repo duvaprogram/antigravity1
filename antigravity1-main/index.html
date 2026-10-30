@@ -8,9 +8,9 @@
     <meta name="description" content="Sistema de gestión de domicilios para Quito y Guayaquil">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="stylesheet" href="css/styles.css?v=3.3.0">
-    <link rel="stylesheet" href="css/hoko-inventory.css?v=3.3.0">
-    <link rel="stylesheet" href="css/mutual-tasks.css?v=3.3.0">
+    <link rel="stylesheet" href="css/styles.css?v=3.4.0">
+    <link rel="stylesheet" href="css/hoko-inventory.css?v=3.4.0">
+    <link rel="stylesheet" href="css/mutual-tasks.css?v=3.4.0">
     <!-- SheetJS for Excel file reading -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
@@ -118,7 +118,7 @@
                     <span class="logo-icon">📦</span>
                     <span class="logo-text" style="display: flex; align-items: baseline; gap: 6px;">
                         Domicilios
-                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v3.3.0</span>
+                        <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v3.4.0</span>
                     </span>
                 </div>
                 <button class="sidebar-toggle" id="sidebarToggle">
@@ -1054,6 +1054,15 @@
                         <input type="text" id="searchGuides" placeholder="Buscar guías...">
                     </div>
                     <div class="header-buttons">
+                        <button class="btn btn-secondary" id="btnReconcileExcel" title="Actualizar estados y pagos de Venezuela desde el Excel de inventario">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                <polyline points="17 8 12 3 7 8"></polyline>
+                                <line x1="12" y1="3" x2="12" y2="15"></line>
+                            </svg>
+                            Conciliar con Excel
+                        </button>
                         <button class="btn btn-primary" id="btnNewGuide">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                                 stroke-width="2">
@@ -5834,7 +5843,7 @@
                     <div>
                         <h2 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
                             💳 Gastos Mensuales y Presupuestación
-                            <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v3.3.0</span>
+                            <span style="font-size: 0.65rem; padding: 2px 6px; background: rgba(139, 92, 246, 0.15); color: #a78bfa; border-radius: 12px; font-weight: 600; letter-spacing: 0.5px; border: 1px solid rgba(139, 92, 246, 0.3);">v3.4.0</span>
                         </h2>
                         <p style="margin: 0.2rem 0 0 0; font-size: 0.82rem; color: var(--text-muted);">
                             Planificación mensual estimada, registro de consumos y control de presupuesto independiente.
@@ -7381,6 +7390,40 @@
     </div>
 
     <!-- Modal: Inventory History -->
+    <!-- Conciliar guías de Venezuela con el Excel de inventario -->
+    <div class="modal modal-large" id="modalGuideReconcile">
+        <div class="modal-content" style="max-width: 1150px; width: 96%;">
+            <div class="modal-header">
+                <h2>Conciliar guías con Excel</h2>
+                <button class="modal-close" data-close="modalGuideReconcile">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 72vh; overflow-y: auto;">
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Los clientes de la hoja se marcan como <strong>Entregado</strong> (los que dicen "fallido" no se entregaron)
+                    y el pago de cada guía se corrige con las columnas <strong>INGRESO $</strong> y <strong>BS</strong>.
+                    Revisa la vista previa: no se guarda nada hasta que pulses "Aplicar".
+                </p>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 0.75rem;">
+                    <input type="file" id="reconcileFile" accept=".xlsx,.xls">
+                    <select id="reconcileCity" title="Ciudad de las guías a comparar">
+                        <option value="Caracas" selected>Caracas (Venezuela)</option>
+                    </select>
+                </div>
+                <div id="reconcileSheetRow" style="display: none; gap: 0.75rem; align-items: center; margin-bottom: 0.75rem;">
+                    <label for="reconcileSheet">Hoja:</label>
+                    <select id="reconcileSheet"></select>
+                    <button class="btn btn-primary" id="btnReconcileAnalyze">Analizar</button>
+                </div>
+                <div id="reconcileStatus" style="color: var(--text-muted); margin-bottom: 1rem;"></div>
+                <div id="reconcileResults"></div>
+            </div>
+            <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; padding: 1rem 1.5rem;">
+                <button class="btn btn-secondary" data-close="modalGuideReconcile">Cerrar</button>
+                <button class="btn btn-primary" id="btnReconcileApply" disabled>Aplicar cambios</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal modal-large" id="modalInventoryHistory">
         <div class="modal-content">
             <div class="modal-header">
@@ -8917,36 +8960,37 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase-config.js?v=3.3.0"></script>
-    <script src="js/utils.js?v=3.3.0"></script>
-    <script src="js/database.js?v=3.3.0"></script>
-    <script src="js/products.js?v=3.3.0"></script>
-    <script src="js/inventory.js?v=3.3.0"></script>
-    <script src="js/clients.js?v=3.3.0"></script>
-    <script src="js/guides.js?v=3.3.0"></script>
-    <script src="js/analytics.js?v=3.3.0"></script>
-    <script src="js/confirmation.js?v=3.3.0"></script>
-    <script src="js/purchases.js?v=3.3.0"></script>
-    <script src="js/freights.js?v=3.3.0"></script>
-    <script src="js/venezuela-fx.js?v=3.3.0"></script>
-    <script src="js/payments.js?v=3.3.0"></script>
-    <script src="js/accounts.js?v=3.3.0"></script>
-    <script src="js/users.js?v=3.3.0"></script>
-    <script src="js/campaigns.js?v=3.3.0"></script>
-    <script src="js/meta-ads.js?v=3.3.0"></script>
-    <script src="js/calculator.js?v=3.3.0"></script>
-    <script src="js/multimedia.js?v=3.3.0"></script>
-    <script src="js/finance.js?v=3.3.0"></script>
-    <script src="js/expenses.js?v=3.3.0"></script>
-    <script src="js/income-statement.js?v=3.3.0"></script>
-    <script src="js/materials-calculator.js?v=3.3.0"></script>
-    <script src="js/journal-data.js?v=3.3.0"></script>
-    <script src="js/journal.js?v=3.3.0"></script>
-    <script src="js/mutual-tasks.js?v=3.3.0"></script>
-    <script src="js/app.js?v=3.3.0"></script>
-    <script src="js/auth.js?v=3.3.0"></script>
+    <script src="js/supabase-config.js?v=3.4.0"></script>
+    <script src="js/utils.js?v=3.4.0"></script>
+    <script src="js/database.js?v=3.4.0"></script>
+    <script src="js/products.js?v=3.4.0"></script>
+    <script src="js/inventory.js?v=3.4.0"></script>
+    <script src="js/clients.js?v=3.4.0"></script>
+    <script src="js/guides.js?v=3.4.0"></script>
+    <script src="js/guides-reconcile.js?v=3.4.0"></script>
+    <script src="js/analytics.js?v=3.4.0"></script>
+    <script src="js/confirmation.js?v=3.4.0"></script>
+    <script src="js/purchases.js?v=3.4.0"></script>
+    <script src="js/freights.js?v=3.4.0"></script>
+    <script src="js/venezuela-fx.js?v=3.4.0"></script>
+    <script src="js/payments.js?v=3.4.0"></script>
+    <script src="js/accounts.js?v=3.4.0"></script>
+    <script src="js/users.js?v=3.4.0"></script>
+    <script src="js/campaigns.js?v=3.4.0"></script>
+    <script src="js/meta-ads.js?v=3.4.0"></script>
+    <script src="js/calculator.js?v=3.4.0"></script>
+    <script src="js/multimedia.js?v=3.4.0"></script>
+    <script src="js/finance.js?v=3.4.0"></script>
+    <script src="js/expenses.js?v=3.4.0"></script>
+    <script src="js/income-statement.js?v=3.4.0"></script>
+    <script src="js/materials-calculator.js?v=3.4.0"></script>
+    <script src="js/journal-data.js?v=3.4.0"></script>
+    <script src="js/journal.js?v=3.4.0"></script>
+    <script src="js/mutual-tasks.js?v=3.4.0"></script>
+    <script src="js/app.js?v=3.4.0"></script>
+    <script src="js/auth.js?v=3.4.0"></script>
     <!-- Módulo Inventario Hoko -->
-    <script src="js/hoko-inventory.js?v=3.3.0"></script>
+    <script src="js/hoko-inventory.js?v=3.4.0"></script>
     <script>
         // ---- Toggle entre Inventario Simple y Hoko ----
         function hokoSwitchView(view) {
