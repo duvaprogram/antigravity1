@@ -2,7 +2,7 @@
  * ============================================================
  *  MÓDULO INVENTARIO HOKO  –  v1.0
  *  Sistema de Gestión y Clasificación Inteligente de Inventario
- *  Integrado al Panel Domicilios v3.2.1
+ *  Integrado al Panel Domicilios v3.3.0
  * ============================================================
  *  Todos los IDs del DOM usan el prefijo "hoko_" para evitar
  *  conflictos con el inventario simple existente.

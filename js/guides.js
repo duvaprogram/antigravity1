@@ -205,10 +205,19 @@ const GuidesModule = {
             });
         }
 
+        // Quick filter by client channel (WhatsApp / Página Web / Otro)
+        document.querySelectorAll('#guideOriginTabs .city-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                this.setOriginFilter(tab.dataset.origin || '');
+                this.filterGuides();
+            });
+        });
+
         // Clear all filters
         const btnClearFilters = document.getElementById('btnClearFilters');
         if (btnClearFilters) {
             btnClearFilters.addEventListener('click', () => {
+                this.setOriginFilter('');
                 if (searchGuidesEl) searchGuidesEl.value = '';
                 if (filterStatusEl) filterStatusEl.value = '';
                 if (filterCountryEl) filterCountryEl.value = '';
@@ -636,8 +645,19 @@ const GuidesModule = {
         await this.loadNovedadesPanel();
     },
 
+    getOriginFilter() {
+        return document.querySelector('#guideOriginTabs .city-tab.active')?.dataset.origin || '';
+    },
+
+    setOriginFilter(origin) {
+        document.querySelectorAll('#guideOriginTabs .city-tab').forEach(tab => {
+            tab.classList.toggle('active', (tab.dataset.origin || '') === origin);
+        });
+    },
+
     async filterGuides() {
         const searchQuery = document.getElementById('searchGuides').value.toLowerCase();
+        const originFilter = this.getOriginFilter();
         const statusFilter = document.getElementById('filterGuideStatus').value;
         const countryFilter = document.getElementById('filterGuideCountry') ? document.getElementById('filterGuideCountry').value : '';
         const cityFilter = document.getElementById('filterGuideCity').value;
@@ -661,6 +681,17 @@ const GuidesModule = {
             guides = guides.filter(g => {
                 return g.guideNumber.toLowerCase().includes(searchQuery) ||
                     (g.clientName && g.clientName.toLowerCase().includes(searchQuery));
+            });
+        }
+
+        // Apply client channel filter (the guide only stores clientId, so cross it with the clients list)
+        if (originFilter) {
+            const clients = await Database.getClients();
+            const originById = new Map(clients.map(c => [c.id, c.origin || '']));
+            guides = guides.filter(g => {
+                // Web-store orders are auto-classified as "Página Web" even if the client note isn't saved yet
+                const origin = originById.get(g.clientId) || (g.source === 'Tienda Web' ? 'Página Web' : '');
+                return ClientsModule.matchesOrigin(origin, originFilter);
             });
         }
 

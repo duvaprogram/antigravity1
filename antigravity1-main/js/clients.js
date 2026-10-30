@@ -76,6 +76,20 @@ const ClientsModule = {
         return `<span class="origin-badge otro" title="Canal: ${Utils.escapeHtml(cleanOrigin || 'Otro')}">📝 ${Utils.escapeHtml(cleanOrigin || 'Otro')}</span>`;
     },
 
+    // Compartido con Guías: ¿el canal del cliente cae en WhatsApp / Página Web / Otro / Sin canal?
+    matchesOrigin(origin, filter) {
+        if (!filter) return true;
+        if (filter === 'Sin canal') return !origin;
+        if (!origin) return false;
+        const lower = origin.toLowerCase();
+        const isWhatsapp = lower.includes('whatsapp') || lower.includes('wpp');
+        const isWeb = lower.includes('página') || lower.includes('pagina') || lower.includes('web');
+        if (filter === 'WhatsApp') return isWhatsapp;
+        if (filter === 'Página Web') return isWeb;
+        if (filter === 'Otro') return !isWhatsapp && !isWeb;
+        return true;
+    },
+
     async filterClients(query = '') {
         let clients = await Database.getClients();
         const originFilter = document.getElementById('filterClientOrigin')?.value || '';
@@ -92,21 +106,7 @@ const ClientsModule = {
         }
 
         if (originFilter) {
-            clients = clients.filter(c => {
-                if (!c.origin) return false;
-                const lower = c.origin.toLowerCase();
-                if (originFilter === 'WhatsApp') {
-                    return lower.includes('whatsapp') || lower.includes('wpp');
-                }
-                if (originFilter === 'Página Web') {
-                    return lower.includes('página') || lower.includes('pagina') || lower.includes('web');
-                }
-                if (originFilter === 'Otro') {
-                    return !lower.includes('whatsapp') && !lower.includes('wpp') &&
-                           !lower.includes('página') && !lower.includes('pagina') && !lower.includes('web');
-                }
-                return true;
-            });
+            clients = clients.filter(c => this.matchesOrigin(c.origin, originFilter));
         }
 
         this.renderGrid(clients);
