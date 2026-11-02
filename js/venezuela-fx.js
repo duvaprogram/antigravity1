@@ -219,9 +219,9 @@ const VenezuelaFX = {
     // La caja quedó en 0 al cierre del día anterior al corte, así que cuentan
     // los movimientos desde ese día en adelante.
     CAJA_CORTE: '2026-10-13',
-    // Códigos de pagos que son el reinicio de la caja (el pago de 657 USD); no
-    // se restan porque el saldo ya quedó en 0 después de ese pago.
-    CAJA_PAGOS_EXCLUIDOS: [],
+    // Pagos que vaciaron la caja (PAY-VE-541507, 13 oct, 657 USD). No se restan
+    // ni sus guías entran como ingreso: ya salieron con ese pago.
+    CAJA_PAGOS_EXCLUIDOS: ['PAY-VE-541507'],
     CAJA_METODO: 'Caja de Venezuela',
     CAJA_ESTADOS: ['Pagado', 'Entregado'],
     VENEZUELA_CITIES: ['caracas', 'maracaibo', 'valencia', 'barquisimeto', 'maracay', 'ciudad guayana', 'maturin', 'barcelona', 'san cristobal', 'turmero', 'ciudad bolivar', 'barinas', 'los teques', 'cumana', 'san fernando de apure', 'puerto la cruz', 'merida', 'cabimas'],
@@ -257,8 +257,13 @@ const VenezuelaFX = {
 
     // Calcula la caja a partir de guías, pagos y compras ya cargados
     cajaUsd({ guides = [], payments = [], purchases = [] }) {
+        const guidesEnReinicio = payments
+            .filter(p => this.CAJA_PAGOS_EXCLUIDOS.includes(p.code))
+            .flatMap(p => (p.payment_guides || []).map(pg => pg.guides?.guide_number))
+            .filter(Boolean);
+
         const entradas = guides
-            .filter(g => this.isCajaGuide(g))
+            .filter(g => this.isCajaGuide(g) && !guidesEnReinicio.includes(g.guide_number))
             .map(g => ({
                 label: g.guide_number,
                 date: this.localDay(g.delivered_at || g.created_at),
