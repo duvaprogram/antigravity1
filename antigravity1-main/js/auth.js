@@ -93,6 +93,7 @@ const AuthModule = {
                 analytics: { can_access: true, can_edit: true },
                 confirmation: { can_access: true, can_edit: true },
                 purchases: { can_access: true, can_edit: true },
+                'monica-purchases': { can_access: true, can_edit: true },
                 freights: { can_access: true, can_edit: true },
                 payments: { can_access: true, can_edit: true },
                 accounts: { can_access: true, can_edit: true },
@@ -242,6 +243,7 @@ const AuthModule = {
         AnalyticsModule._initialized = false;
         ConfirmationModule._initialized = false;
         PurchasesModule._initialized = false;
+        MonicaPurchasesModule._initialized = false;
         FreightsModule._initialized = false;
         PaymentsModule._initialized = false;
         AccountsModule._initialized = false;

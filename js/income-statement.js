@@ -36,10 +36,44 @@ const IncomeStatementModule = {
         search: ''
     },
 
-    // Monthly Exchange Rates (TRM Colombia COP -> USD)
+    // Monthly Exchange Rates (moneda local -> USD)
+    // Colombia (COP) y México (MXN) funcionan igual: la venta se cobra en la
+    // moneda local y los informes la dividen por la tasa de su mes.
     monthlyRates: {},
+    monthlyRatesMXN: {},
+    rateCurrency: 'COP',
     selectedRatesYear: '2026',
     exchangeRatesExpanded: true,
+    RATE_CURRENCIES: {
+        COP: {
+            code: 'COP',
+            country: 'Colombia',
+            flag: '🇨🇴',
+            title: 'Dólar Promedio Colombia (TRM)',
+            rateName: 'TRM',
+            note: 'Convierte ventas y fletes de Colombia a USD para sumar cantidades',
+            storageKey: 'is_monthly_exchange_rates',
+            locale: 'es-CO',
+            min: 100,
+            step: 10,
+            decimals: 0,
+            fallback: 4100
+        },
+        MXN: {
+            code: 'MXN',
+            country: 'México',
+            flag: '🇲🇽',
+            title: 'Dólar Promedio México',
+            rateName: 'Tasa',
+            note: 'Convierte ventas y fletes de México a USD para sumar cantidades',
+            storageKey: 'is_monthly_exchange_rates_mxn',
+            locale: 'es-MX',
+            min: 1,
+            step: 0.1,
+            decimals: 2,
+            fallback: 18
+        }
+    },
     defaultMonthlyRates: {
         '2025': {
             '01': 4300, '02': 4250, '03': 4200, '04': 4150, '05': 4100, '06': 4100,
@@ -52,6 +86,20 @@ const IncomeStatementModule = {
         '2027': {
             '01': 4200, '02': 4200, '03': 4200, '04': 4200, '05': 4200, '06': 4200,
             '07': 4200, '08': 4200, '09': 4200, '10': 4200, '11': 4200, '12': 4200
+        }
+    },
+    defaultMonthlyRatesMXN: {
+        '2025': {
+            '01': 20.5, '02': 20.4, '03': 20.2, '04': 19.8, '05': 19.4, '06': 19.0,
+            '07': 18.7, '08': 18.6, '09': 18.5, '10': 18.4, '11': 18.3, '12': 18.2
+        },
+        '2026': {
+            '01': 18.2, '02': 18.3, '03': 18.4, '04': 18.4, '05': 18.5, '06': 18.5,
+            '07': 18.6, '08': 18.6, '09': 18.5, '10': 18.5, '11': 18.5, '12': 18.5
+        },
+        '2027': {
+            '01': 18.5, '02': 18.5, '03': 18.5, '04': 18.5, '05': 18.5, '06': 18.5,
+            '07': 18.5, '08': 18.5, '09': 18.5, '10': 18.5, '11': 18.5, '12': 18.5
         }
     },
 
@@ -70,28 +118,103 @@ const IncomeStatementModule = {
         this.setDefaultFilters();
     },
 
-    initExchangeRates() {
-        try {
-            const saved = localStorage.getItem('is_monthly_exchange_rates');
-            if (saved) {
-                this.monthlyRates = JSON.parse(saved);
-            }
-        } catch (e) {
-            console.warn('Error loading is_monthly_exchange_rates:', e);
-            this.monthlyRates = {};
-        }
+    // Configuración de la moneda cuyas tasas se están viendo o editando
+    rateConfig(currency) {
+        return this.RATE_CURRENCIES[currency || this.rateCurrency] || this.RATE_CURRENCIES.COP;
+    },
 
-        // Merge defaults for missing years
-        ['2025', '2026', '2027'].forEach(yr => {
-            if (!this.monthlyRates[yr]) {
-                this.monthlyRates[yr] = { ...this.defaultMonthlyRates[yr] };
-            } else {
-                this.monthlyRates[yr] = { ...this.defaultMonthlyRates[yr], ...this.monthlyRates[yr] };
+    // Tasas guardadas de una moneda (COP o MXN)
+    ratesFor(currency) {
+        return (currency || this.rateCurrency) === 'MXN' ? this.monthlyRatesMXN : this.monthlyRates;
+    },
+
+    defaultRatesFor(currency) {
+        return (currency || this.rateCurrency) === 'MXN' ? this.defaultMonthlyRatesMXN : this.defaultMonthlyRates;
+    },
+
+    // Redondea respetando los decimales de cada moneda (COP entero, MXN 2 decimales)
+    roundRate(value, currency) {
+        const cfg = this.rateConfig(currency);
+        const factor = Math.pow(10, cfg.decimals);
+        return Math.round(parseFloat(value) * factor) / factor;
+    },
+
+    formatRate(value, currency) {
+        const cfg = this.rateConfig(currency);
+        return Number(value).toLocaleString(cfg.locale, {
+            minimumFractionDigits: cfg.decimals,
+            maximumFractionDigits: cfg.decimals
+        });
+    },
+
+    persistRates(currency) {
+        const cfg = this.rateConfig(currency);
+        try {
+            localStorage.setItem(cfg.storageKey, JSON.stringify(this.ratesFor(currency)));
+            return true;
+        } catch (e) {
+            console.warn('Error guardando en localStorage:', e);
+            return false;
+        }
+    },
+
+    initExchangeRates() {
+        Object.keys(this.RATE_CURRENCIES).forEach(code => {
+            const cfg = this.RATE_CURRENCIES[code];
+            const defaults = this.defaultRatesFor(code);
+            let loaded = {};
+
+            try {
+                const saved = localStorage.getItem(cfg.storageKey);
+                if (saved) loaded = JSON.parse(saved) || {};
+            } catch (e) {
+                console.warn(`Error loading ${cfg.storageKey}:`, e);
+                loaded = {};
             }
+
+            // Merge defaults for missing years
+            ['2025', '2026', '2027'].forEach(yr => {
+                loaded[yr] = { ...defaults[yr], ...(loaded[yr] || {}) };
+            });
+
+            if (code === 'MXN') this.monthlyRatesMXN = loaded;
+            else this.monthlyRates = loaded;
         });
 
         // Inicializar dropdown con el mes actual o mes del filtro
         this.populateRateMonthDropdown();
+    },
+
+    // Cambia entre las tasas de Colombia y las de México
+    onRateCurrencyChange(currency) {
+        if (!this.RATE_CURRENCIES[currency]) return;
+        this.rateCurrency = currency;
+
+        const cfg = this.rateConfig();
+        // Mantiene el selector en sincronía cuando se llama por código
+        const select = document.getElementById('isRateCurrencySelect');
+        if (select && select.value !== currency) select.value = currency;
+
+        const setText = (id, text) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        };
+        setText('isRateCurrencyFlag', cfg.flag);
+        setText('isRateCurrencyTitle', cfg.title);
+        setText('isRateCurrencyUnit', cfg.code);
+
+        const noteEl = document.getElementById('isExchangeRateImpactText');
+        if (noteEl) noteEl.textContent = cfg.note;
+
+        const input = document.getElementById('isSingleTrmInput');
+        if (input) {
+            input.min = cfg.min;
+            input.step = cfg.step;
+            input.placeholder = cfg.fallback;
+        }
+
+        this.populateRateMonthDropdown();
+        this.updateExchangeRateNotice();
     },
 
     populateRateMonthDropdown(targetYm) {
@@ -115,18 +238,21 @@ const IncomeStatementModule = {
         }
 
         const years = ['2026', '2025', '2027'];
+        const cfg = this.rateConfig();
+        const saved = this.ratesFor();
+        const defaults = this.defaultRatesFor();
         let optionsHtml = '';
 
         years.forEach(yr => {
-            const yearRates = this.monthlyRates[yr] || this.defaultMonthlyRates[yr] || {};
+            const yearRates = saved[yr] || defaults[yr] || {};
             optionsHtml += `<optgroup label="Año ${yr}">`;
             for (let i = 1; i <= 12; i++) {
                 const moStr = String(i).padStart(2, '0');
                 const ym = `${yr}-${moStr}`;
-                const rate = yearRates[moStr] || 4100;
-                const rateFormatted = Number(rate).toLocaleString('es-CO');
+                const rate = yearRates[moStr] || cfg.fallback;
+                const rateFormatted = this.formatRate(rate);
                 const isSel = ym === activeYm ? 'selected' : '';
-                optionsHtml += `<option value="${ym}" ${isSel}>${monthNames[i - 1]} ${yr} (TRM: $${rateFormatted})</option>`;
+                optionsHtml += `<option value="${ym}" ${isSel}>${monthNames[i - 1]} ${yr} (${cfg.rateName}: $${rateFormatted})</option>`;
             }
             optionsHtml += `</optgroup>`;
         });
@@ -140,8 +266,9 @@ const IncomeStatementModule = {
         const parts = ym.split('-');
         const yr = parts[0];
         const mo = parts[1];
-        const yearRates = this.monthlyRates[yr] || this.defaultMonthlyRates[yr] || {};
-        const rate = yearRates[mo] || 4100;
+        const cfg = this.rateConfig();
+        const yearRates = this.ratesFor()[yr] || this.defaultRatesFor()[yr] || {};
+        const rate = yearRates[mo] || cfg.fallback;
 
         const input = document.getElementById('isSingleTrmInput');
         if (input) {
@@ -150,7 +277,7 @@ const IncomeStatementModule = {
 
         const badge = document.getElementById('isExchangeRateActiveBadge');
         if (badge) {
-            badge.textContent = `TRM: $${Number(rate).toLocaleString('es-CO')} COP`;
+            badge.textContent = `${cfg.rateName}: $${this.formatRate(rate)} ${cfg.code}`;
         }
     },
 
@@ -163,21 +290,21 @@ const IncomeStatementModule = {
         if (!ym) return;
         const [yr, mo] = ym.split('-');
         const val = parseFloat(input.value);
+        const cfg = this.rateConfig();
 
         if (isNaN(val) || val <= 0) {
-            Utils.showToast('Por favor ingrese un valor de TRM válido', 'warning');
+            Utils.showToast(`Por favor ingrese un valor de ${cfg.rateName} válido`, 'warning');
             return;
         }
 
-        if (!this.monthlyRates[yr]) this.monthlyRates[yr] = {};
-        this.monthlyRates[yr][mo] = Math.round(val);
+        const rates = this.ratesFor();
+        if (!rates[yr]) rates[yr] = {};
+        rates[yr][mo] = this.roundRate(val);
 
-        try {
-            localStorage.setItem('is_monthly_exchange_rates', JSON.stringify(this.monthlyRates));
+        if (this.persistRates()) {
             const selectedText = select.options[select.selectedIndex]?.text.split(' (')[0] || `${mo}/${yr}`;
-            Utils.showToast(`TRM guardada para ${selectedText}: $${Math.round(val).toLocaleString('es-CO')} COP`, 'success');
-        } catch (e) {
-            console.warn('Error guardando en localStorage:', e);
+            Utils.showToast(`${cfg.rateName} guardada para ${selectedText}: $${this.formatRate(rates[yr][mo])} ${cfg.code}`, 'success');
+        } else {
             Utils.showToast('Error al guardar tasa', 'error');
         }
 
@@ -194,6 +321,12 @@ const IncomeStatementModule = {
         }
         const modalYearSelect = document.getElementById('isModalRateYear');
         if (modalYearSelect) modalYearSelect.value = currentYear;
+
+        const cfg = this.rateConfig();
+        const flagEl = document.getElementById('isModalRateFlag');
+        if (flagEl) flagEl.textContent = cfg.flag;
+        const titleEl = document.getElementById('isModalRateTitle');
+        if (titleEl) titleEl.textContent = `Tasas de Cambio Promedio (${cfg.rateName} ${cfg.country})`;
 
         this.renderModalRatesGrid(currentYear);
         const modal = document.getElementById('modalAllExchangeRates');
@@ -214,7 +347,8 @@ const IncomeStatementModule = {
         if (!grid) return;
 
         const yr = year || '2026';
-        const yearRates = this.monthlyRates[yr] || this.defaultMonthlyRates[yr] || {};
+        const cfg = this.rateConfig();
+        const yearRates = this.ratesFor()[yr] || this.defaultRatesFor()[yr] || {};
 
         const months = [
             { num: '01', name: 'Enero' },
@@ -239,7 +373,7 @@ const IncomeStatementModule = {
         }
 
         grid.innerHTML = months.map(m => {
-            const val = yearRates[m.num] || 4100;
+            const val = yearRates[m.num] || cfg.fallback;
             const isActive = activeMonthStr === m.num;
             return `
                 <div style="background: ${isActive ? 'rgba(99, 102, 241, 0.12)' : 'var(--surface-hover)'}; border: 1px solid ${isActive ? '#6366f1' : 'var(--border)'}; border-radius: var(--radius-md); padding: 0.6rem 0.75rem; transition: all 0.2s;">
@@ -255,13 +389,13 @@ const IncomeStatementModule = {
                                id="isModalTrm_${yr}_${m.num}" 
                                data-year="${yr}" 
                                data-month="${m.num}" 
-                               class="is-modal-trm-input" 
-                               value="${val}" 
-                               min="100" 
-                               step="10" 
+                               class="is-modal-trm-input"
+                               value="${val}"
+                               min="${cfg.min}"
+                               step="${cfg.step}"
                                style="background: transparent; color: var(--text-primary); border: none; outline: none; font-size: 0.85rem; font-weight: 600; width: 100%; text-align: right;"
-                               placeholder="4100">
-                        <span style="font-size: 0.7rem; color: var(--text-muted);">COP</span>
+                               placeholder="${cfg.fallback}">
+                        <span style="font-size: 0.7rem; color: var(--text-muted);">${cfg.code}</span>
                     </div>
                 </div>
             `;
@@ -271,22 +405,22 @@ const IncomeStatementModule = {
     saveAllModalRates() {
         const modalYearSelect = document.getElementById('isModalRateYear');
         const yr = modalYearSelect ? modalYearSelect.value : '2026';
-        if (!this.monthlyRates[yr]) this.monthlyRates[yr] = {};
+        const cfg = this.rateConfig();
+        const rates = this.ratesFor();
+        if (!rates[yr]) rates[yr] = {};
 
         const inputs = document.querySelectorAll(`.is-modal-trm-input[data-year="${yr}"]`);
         inputs.forEach(inp => {
             const m = inp.dataset.month;
             const val = parseFloat(inp.value);
             if (m && !isNaN(val) && val > 0) {
-                this.monthlyRates[yr][m] = Math.round(val);
+                rates[yr][m] = this.roundRate(val);
             }
         });
 
-        try {
-            localStorage.setItem('is_monthly_exchange_rates', JSON.stringify(this.monthlyRates));
-            Utils.showToast(`Todas las tasas de ${yr} se han guardado exitosamente`, 'success');
-        } catch (e) {
-            console.warn('Error guardando en localStorage:', e);
+        if (this.persistRates()) {
+            Utils.showToast(`Todas las tasas de ${cfg.country} para ${yr} se han guardado exitosamente`, 'success');
+        } else {
             Utils.showToast('Error al guardar tasas', 'error');
         }
 
@@ -302,13 +436,13 @@ const IncomeStatementModule = {
     resetModalRates() {
         const modalYearSelect = document.getElementById('isModalRateYear');
         const yr = modalYearSelect ? modalYearSelect.value : '2026';
-        if (!confirm(`¿Restablecer las tasas del año ${yr} a los valores promedio por defecto?`)) return;
+        const cfg = this.rateConfig();
+        if (!confirm(`¿Restablecer las tasas de ${cfg.country} del año ${yr} a los valores promedio por defecto?`)) return;
 
-        this.monthlyRates[yr] = { ...this.defaultMonthlyRates[yr] };
-        try {
-            localStorage.setItem('is_monthly_exchange_rates', JSON.stringify(this.monthlyRates));
-            Utils.showToast(`Tasas del año ${yr} restablecidas a valores por defecto`, 'info');
-        } catch (e) {}
+        this.ratesFor()[yr] = { ...this.defaultRatesFor()[yr] };
+        if (this.persistRates()) {
+            Utils.showToast(`Tasas de ${cfg.country} del año ${yr} restablecidas a valores por defecto`, 'info');
+        }
 
         this.renderModalRatesGrid(yr);
         this.populateRateMonthDropdown();
@@ -321,21 +455,60 @@ const IncomeStatementModule = {
         this.updateExchangeRateNotice();
     },
 
-    getExchangeRateForDate(dateStr) {
-        if (!dateStr) return 4100;
+    // Tasa del mes de la fecha para la moneda indicada (COP por defecto)
+    getExchangeRateForDate(dateStr, currency = 'COP') {
+        const cfg = this.rateConfig(currency);
+        if (!dateStr) return cfg.fallback;
         const cleanStr = String(dateStr).trim();
         const year = cleanStr.substring(0, 4);
         const month = cleanStr.substring(5, 7);
 
-        if (this.monthlyRates[year] && this.monthlyRates[year][month]) {
-            return parseFloat(this.monthlyRates[year][month]) || 4100;
+        const saved = this.ratesFor(currency);
+        if (saved[year] && saved[year][month]) {
+            return parseFloat(saved[year][month]) || cfg.fallback;
         }
 
-        if (this.defaultMonthlyRates[year] && this.defaultMonthlyRates[year][month]) {
-            return parseFloat(this.defaultMonthlyRates[year][month]) || 4100;
+        const defaults = this.defaultRatesFor(currency);
+        if (defaults[year] && defaults[year][month]) {
+            return parseFloat(defaults[year][month]) || cfg.fallback;
         }
 
-        return 4100;
+        return cfg.fallback;
+    },
+
+    isMexicoOrder(guide) {
+        if (!guide) return false;
+
+        // First prioritize city-based detection
+        const cityCountry = this.getCountryFromCity(guide.cities, guide.city);
+        if (cityCountry && cityCountry !== 'Desconocido') {
+            return cityCountry === 'Mexico';
+        }
+
+        const guideCountry = (guide.country || '').toLowerCase();
+        if (guideCountry.includes('mexico') || guideCountry.includes('méxico')) return true;
+        if ((guide.currency || '').toUpperCase() === 'MXN') return true;
+
+        // Also inspect city name if available
+        const cityName = (guide.cities?.name || guide.city || '').toLowerCase();
+        const mexicoCities = [
+            'cdmx', 'ciudad de mexico', 'ciudad de méxico', 'guadalajara', 'monterrey',
+            'puebla', 'toluca', 'tijuana', 'leon', 'león', 'juarez', 'juárez',
+            'torreon', 'torreón', 'queretaro', 'querétaro', 'san luis potosi',
+            'san luis potosí', 'mexicali', 'aguascalientes', 'cuernavaca',
+            'acapulco', 'tampico', 'chihuahua', 'morelia', 'veracruz',
+            'cancun', 'cancún', 'saltillo'
+        ];
+        return mexicoCities.some(c => cityName.includes(c));
+    },
+
+    // Moneda en la que se cobró la guía. 'USD' = no necesita conversión.
+    // Mérida existe en México y en Venezuela, así que esa ciudad la resuelve
+    // getCountryFromCity y no la lista de arriba.
+    getGuideLocalCurrency(guide) {
+        if (this.isColombiaOrder(guide)) return 'COP';
+        if (this.isMexicoOrder(guide)) return 'MXN';
+        return 'USD';
     },
 
     isColombiaOrder(guide) {
@@ -373,13 +546,14 @@ const IncomeStatementModule = {
             amountStr = amountStr.replace(/[$\s]/g, '').replace(',', '.');
         }
         const rawAmount = parseFloat(amountStr) || 0;
-        
-        if (this.isColombiaOrder(guide)) {
+
+        const localCurrency = this.getGuideLocalCurrency(guide);
+        if (localCurrency !== 'USD') {
             // If amount_usd is populated, positive and < 1000 while total_amount is > 1000, it's already USD
             if (guide.amount_usd && parseFloat(guide.amount_usd) > 0 && parseFloat(guide.amount_usd) < 1000 && parseFloat(guide.total_amount || 0) > 1000) {
                 return parseFloat(guide.amount_usd);
             }
-            const rate = this.getExchangeRateForDate(guide.created_at || guide.date || guide.sale_date);
+            const rate = this.getExchangeRateForDate(guide.created_at || guide.date || guide.sale_date, localCurrency);
             return rawAmount / rate;
         }
         return rawAmount;
@@ -391,10 +565,12 @@ const IncomeStatementModule = {
             shippingStr = shippingStr.replace(/[$\s]/g, '').replace(',', '.');
         }
         const rawShipping = parseFloat(shippingStr) || 0;
-        
-        if (this.isColombiaOrder(guide)) {
-            // Typical shipping in Colombia is 10,000 - 30,000 COP
-            const rate = this.getExchangeRateForDate(guide.created_at || guide.date || guide.sale_date);
+
+        // Los fletes se pagan en la moneda local (Colombia 10.000-30.000 COP,
+        // México 100-250 MXN), así que se convierten con la tasa del mes.
+        const localCurrency = this.getGuideLocalCurrency(guide);
+        if (localCurrency !== 'USD') {
+            const rate = this.getExchangeRateForDate(guide.created_at || guide.date || guide.sale_date, localCurrency);
             return rawShipping / rate;
         }
         return rawShipping;
@@ -406,10 +582,11 @@ const IncomeStatementModule = {
         if (!noticeEl) return;
 
         const badgeEl = document.getElementById('isExchangeRateActiveBadge');
+        const cfg = this.rateConfig();
 
         const colombiaGuides = (this.guides || []).filter(g => {
             if (this.isCancelado(g)) return false;
-            if (!this.isColombiaOrder(g)) return false;
+            if (this.getGuideLocalCurrency(g) !== cfg.code) return false;
             const dates = [g.delivered_at, g.created_at, g.date, g.createdAt];
             let validDate = '';
             for (let d of dates) {
@@ -424,31 +601,31 @@ const IncomeStatementModule = {
         });
 
         if (colombiaGuides.length === 0) {
-            noticeEl.innerHTML = 'No hay pedidos de Colombia en el período seleccionado. Las tasas configuradas se aplicarán automáticamente a cada venta según su mes.';
+            noticeEl.innerHTML = `No hay pedidos de ${cfg.country} en el período seleccionado. Las tasas configuradas se aplicarán automáticamente a cada venta según su mes.`;
             if (summaryEl) summaryEl.textContent = '';
             if (badgeEl) {
-                const defaultRate = this.getExchangeRateForDate(this.filters.dateFrom || new Date().toISOString().split('T')[0]);
-                badgeEl.textContent = `TRM: $${Number(defaultRate).toLocaleString('es-CO')} COP/USD`;
+                const defaultRate = this.getExchangeRateForDate(this.filters.dateFrom || new Date().toISOString().split('T')[0], cfg.code);
+                badgeEl.textContent = `${cfg.rateName}: $${this.formatRate(defaultRate)} ${cfg.code}/USD`;
             }
             return;
         }
 
-        let totalCop = 0;
+        let totalLocal = 0;
         let totalUsd = 0;
         colombiaGuides.forEach(g => {
             if (!this.isExcludedFromSales(g)) {
-                totalCop += parseFloat(g.total_amount || 0);
+                totalLocal += parseFloat(g.total_amount || 0);
                 totalUsd += this.getGuideRevenueUSD(g);
             }
         });
 
-        const effectiveRate = totalUsd > 0 ? (totalCop / totalUsd).toFixed(0) : '4,100';
-        noticeEl.innerHTML = `Ventas del período en Colombia: <strong>COP $${Math.round(totalCop).toLocaleString('es-CO')}</strong> convertidas a <strong>${Utils.formatCurrency(totalUsd)}</strong> (${colombiaGuides.length} guías).`;
+        const effectiveRate = totalUsd > 0 ? totalLocal / totalUsd : cfg.fallback;
+        noticeEl.innerHTML = `Ventas del período en ${cfg.country}: <strong>${cfg.code} $${Math.round(totalLocal).toLocaleString(cfg.locale)}</strong> convertidas a <strong>${Utils.formatCurrency(totalUsd)}</strong> (${colombiaGuides.length} guías).`;
         if (summaryEl) {
-            summaryEl.textContent = `TRM Promedio Ponderada: ~$${Number(effectiveRate).toLocaleString('es-CO')} COP/USD`;
+            summaryEl.textContent = `${cfg.rateName} Promedio Ponderada: ~$${this.formatRate(effectiveRate)} ${cfg.code}/USD`;
         }
         if (badgeEl) {
-            badgeEl.textContent = `TRM: ~$${Number(effectiveRate).toLocaleString('es-CO')} COP/USD`;
+            badgeEl.textContent = `${cfg.rateName}: ~$${this.formatRate(effectiveRate)} ${cfg.code}/USD`;
         }
     },
 
@@ -925,11 +1102,15 @@ const IncomeStatementModule = {
         }
 
         // Mexico detection
+        // 'merida' no está en la lista: Mérida existe en México y en Venezuela,
+        // y Venezuela se evalúa antes, así que se deja resolver por ahí.
         const mexicoCities = [
             'cdmx', 'ciudad de mexico', 'ciudad de méxico', 'guadalajara', 'monterrey',
             'puebla', 'toluca', 'tijuana', 'leon', 'león', 'juarez', 'juárez',
             'torreon', 'torreón', 'queretaro', 'querétaro', 'san luis potosi',
-            'san luis potosí', 'merida', 'mérida', 'mexicali', 'aguascalientes'
+            'san luis potosí', 'mexicali', 'aguascalientes', 'cuernavaca',
+            'acapulco', 'tampico', 'chihuahua', 'morelia', 'veracruz',
+            'cancun', 'cancún', 'saltillo'
         ];
         if (mexicoCities.some(c => city.includes(c)) || country.includes('mexico') || country.includes('méxico')) {
             return 'Mexico';
@@ -1053,10 +1234,11 @@ const IncomeStatementModule = {
                     platform: 'Domi',
                     isExternal: false,
                     totalRevenue: 0,
-                    totalRevenueCOP: 0,
+                    totalRevenueLocal: 0,
+                    localCurrency: '',
                     totalCost: 0,
                     totalShipping: 0,
-                    totalShippingCOP: 0,
+                    totalShippingLocal: 0,
                     orderCount: 0,
                     deliveredOrders: 0,
                     returnedOrders: 0,
@@ -1073,8 +1255,13 @@ const IncomeStatementModule = {
             const shippingUSD = this.getGuideShippingCostUSD(guide);
             byCountry[country].totalShipping += shippingUSD;
             if (shippingUSD > 0) byCountry[country].shippedOrders++;
-            if (this.isColombiaOrder(guide)) {
-                byCountry[country].totalShippingCOP = (byCountry[country].totalShippingCOP || 0) + parseFloat(guide.shipping_cost || 0);
+
+            // Guarda también el monto en la moneda local (COP o MXN) para
+            // mostrarlo debajo del valor en dólares
+            const localCurrency = this.getGuideLocalCurrency(guide);
+            if (localCurrency !== 'USD') {
+                byCountry[country].localCurrency = localCurrency;
+                byCountry[country].totalShippingLocal = (byCountry[country].totalShippingLocal || 0) + parseFloat(guide.shipping_cost || 0);
             }
 
             // Count units for this guide
@@ -1092,8 +1279,8 @@ const IncomeStatementModule = {
                 // Solo pedidos entregados/efectivos suman ventas y costo de producto
                 const revUSD = this.getGuideRevenueUSD(guide);
                 byCountry[country].totalRevenue += revUSD;
-                if (this.isColombiaOrder(guide)) {
-                    byCountry[country].totalRevenueCOP = (byCountry[country].totalRevenueCOP || 0) + parseFloat(guide.total_amount || 0);
+                if (localCurrency !== 'USD') {
+                    byCountry[country].totalRevenueLocal = (byCountry[country].totalRevenueLocal || 0) + parseFloat(guide.total_amount || 0);
                 }
                 byCountry[country].orderCount++;
                 byCountry[country].deliveredOrders++;
@@ -1129,6 +1316,7 @@ const IncomeStatementModule = {
             if (cLower.includes('ecuador')) baseCountry = 'Ecuador';
             else if (cLower.includes('colombia')) baseCountry = 'Colombia';
             else if (cLower.includes('venezuela')) baseCountry = 'Venezuela';
+            else if (cLower.includes('mexico') || cLower.includes('méxico')) baseCountry = 'Mexico';
             else if (cLower.includes('chile')) baseCountry = 'Chile';
             else if (cLower.includes('panama') || cLower.includes('panamá')) baseCountry = 'Panamá';
             else baseCountry = countryName;
@@ -1140,10 +1328,11 @@ const IncomeStatementModule = {
                     platform: countryName.replace(baseCountry, '').trim() || 'Otras',
                     isExternal: true,
                     totalRevenue: 0,
-                    totalRevenueCOP: 0,
+                    totalRevenueLocal: 0,
+                    localCurrency: '',
                     totalCost: 0,
                     totalShipping: 0,
-                    totalShippingCOP: 0,
+                    totalShippingLocal: 0,
                     orderCount: 0,
                     deliveredOrders: 0,
                     returnedOrders: 0,
@@ -1188,9 +1377,13 @@ const IncomeStatementModule = {
         if (r.includes('tulcán') || r.includes('tulcan') || r.includes('ipiales') || r.includes('quito') || r.includes('guayaquil') || r.includes('cuenca') || r.includes('ambato') || r.includes('manta') || r.includes('machala') || r.includes('santo domingo') || r.includes('loja')) {
             return 'Ecuador';
         }
+        if (r.includes('cdmx') || r.includes('guadalajara') || r.includes('monterrey')) {
+            return 'Mexico';
+        }
         if (r.includes('ecuador')) return 'Ecuador';
         if (r.includes('venezuela')) return 'Venezuela';
         if (r.includes('colombia')) return 'Colombia';
+        if (r.includes('mexico') || r.includes('méxico')) return 'Mexico';
         return null;
     },
 
@@ -1527,15 +1720,17 @@ const IncomeStatementModule = {
             const costPct = row.totalRevenue > 0 ? ((row.totalCost / row.totalRevenue) * 100).toFixed(1) : '0.0';
             const shippingPct = row.totalRevenue > 0 ? ((row.totalShipping / row.totalRevenue) * 100).toFixed(1) : '0.0';
 
-            // Subtitle for Colombia to show original COP amount & average rate
+            // Subtítulo con el monto original en la moneda local (COP o MXN)
+            // y la tasa promedio aplicada
             let revenueSubtitle = '';
             let shippingSubtitle = '';
-            if (baseCountry === 'Colombia' && row.totalRevenueCOP > 0) {
-                const avgRate = (row.totalRevenueCOP / (row.totalRevenue || 1)).toFixed(0);
-                revenueSubtitle = `<div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 500;" title="Monto original en Pesos Colombianos y tasa aplicada">≈ COP $${Math.round(row.totalRevenueCOP).toLocaleString('es-CO')} <span style="font-size: 0.66rem; opacity: 0.85;">(TRM ~$${Number(avgRate).toLocaleString('es-CO')})</span></div>`;
+            const rowCfg = row.localCurrency ? this.rateConfig(row.localCurrency) : null;
+            if (rowCfg && row.totalRevenueLocal > 0) {
+                const avgRate = row.totalRevenueLocal / (row.totalRevenue || 1);
+                revenueSubtitle = `<div style="font-size: 0.72rem; color: var(--text-muted); font-weight: 500;" title="Monto original en la moneda de ${rowCfg.country} y tasa aplicada">≈ ${rowCfg.code} $${Math.round(row.totalRevenueLocal).toLocaleString(rowCfg.locale)} <span style="font-size: 0.66rem; opacity: 0.85;">(${rowCfg.rateName} ~$${this.formatRate(avgRate, rowCfg.code)})</span></div>`;
             }
-            if (baseCountry === 'Colombia' && row.totalShippingCOP > 0) {
-                shippingSubtitle = `<div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;" title="Flete en Pesos Colombianos">≈ COP $${Math.round(row.totalShippingCOP).toLocaleString('es-CO')}</div>`;
+            if (rowCfg && row.totalShippingLocal > 0) {
+                shippingSubtitle = `<div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;" title="Flete en la moneda de ${rowCfg.country}">≈ ${rowCfg.code} $${Math.round(row.totalShippingLocal).toLocaleString(rowCfg.locale)}</div>`;
             }
 
             return `
@@ -2559,32 +2754,68 @@ const IncomeStatementModule = {
     },
 
     // --- CONVERSIÓN DE MONEDA (COP -> USD CON TRM) PARA REPORTES EXTERNOS ---
+    // Las monedas locales (COP y MXN) necesitan tasa; USD no
+    needsRate(currency) {
+        return currency === 'COP' || currency === 'MXN';
+    },
+
     onExtCurrencyChange() {
         const sel = document.getElementById('extImportCurrency');
         const trmBox = document.getElementById('extTrmInputContainer');
         const info = document.getElementById('extConversionInfo');
-        const isCop = sel && sel.value === 'COP';
-        if (trmBox) trmBox.style.display = isCop ? 'inline-flex' : 'none';
-        if (info) info.style.display = isCop ? 'block' : 'none';
+        const currency = sel ? sel.value : 'USD';
+        const needsRate = this.needsRate(currency);
+        if (trmBox) trmBox.style.display = needsRate ? 'inline-flex' : 'none';
+        if (info) info.style.display = needsRate ? 'block' : 'none';
+        if (!needsRate) return;
+
+        const cfg = this.rateConfig(currency);
+        const unit = document.getElementById('extTrmUnit');
+        if (unit) unit.textContent = cfg.code;
+        const input = document.getElementById('extTrmRate');
+        if (input) {
+            input.value = this.getExchangeRateForDate(
+                this.filters.dateFrom || new Date().toISOString().split('T')[0],
+                currency
+            );
+            input.step = cfg.step;
+            input.placeholder = cfg.fallback;
+        }
     },
 
     onModalPreviewCurrencyChange() {
         const curr = document.getElementById('modalPreviewCurrency')?.value;
-        const isCop = curr === 'COP';
+        const needsRate = this.needsRate(curr);
         const box = document.getElementById('modalPreviewTrmBox');
         const badge = document.getElementById('modalPreviewTrmBadge');
-        if (box) box.style.display = isCop ? 'inline-flex' : 'none';
-        if (badge) badge.style.display = isCop ? 'block' : 'none';
+        if (box) box.style.display = needsRate ? 'inline-flex' : 'none';
+        if (badge) badge.style.display = needsRate ? 'block' : 'none';
+
+        if (needsRate) {
+            const cfg = this.rateConfig(curr);
+            const unit = document.getElementById('modalPreviewTrmUnit');
+            if (unit) unit.textContent = cfg.code;
+            const input = document.getElementById('modalPreviewTrmRate');
+            if (input) {
+                input.value = this.getExchangeRateForDate(
+                    this.filters.dateFrom || new Date().toISOString().split('T')[0],
+                    curr
+                );
+                input.step = cfg.step;
+            }
+        }
+
         this.onModalPreviewTrmChange();
     },
 
     onModalPreviewTrmChange() {
         if (!this.pendingImportRecords || this.pendingImportRecords.length === 0) return;
         const curr = document.getElementById('modalPreviewCurrency')?.value || 'USD';
-        const isCop = curr === 'COP';
-        let trm = parseFloat(document.getElementById('modalPreviewTrmRate')?.value) || 4100;
-        if (trm <= 0) trm = 4100;
-        const divisor = isCop ? trm : 1;
+        const needsRate = this.needsRate(curr);
+        const fallback = this.rateConfig(curr).fallback;
+        let trm = parseFloat(document.getElementById('modalPreviewTrmRate')?.value) || fallback;
+        if (trm <= 0) trm = fallback;
+        const divisor = needsRate ? trm : 1;
 
         this.pendingImportRecords.forEach(r => {
             const rawRev = r.raw_revenue !== undefined ? r.raw_revenue : r.revenue;
@@ -2614,7 +2845,8 @@ const IncomeStatementModule = {
 
         const cardsEl = document.getElementById('importPreviewSummaryCards');
         if (cardsEl) {
-            const currencySubtitle = isCop ? `<div style="font-size: 0.72rem; opacity: 0.85; margin-top: 2px; color: var(--primary);">Convertido a TRM: ${Math.round(trm).toLocaleString('es-CO')} COP</div>` : '';
+            const trmCfg = this.rateConfig(curr);
+            const currencySubtitle = needsRate ? `<div style="font-size: 0.72rem; opacity: 0.85; margin-top: 2px; color: var(--primary);">Convertido a ${trmCfg.rateName}: ${this.formatRate(trm, curr)} ${trmCfg.code}</div>` : '';
             cardsEl.innerHTML = `
                 <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
                     <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total Facturado (USD)</div>
@@ -3457,21 +3689,29 @@ const IncomeStatementModule = {
                 if (dIdx !== -1) dateIdx = dIdx;
             }
 
-            // Currency & TRM Detection
+            // Currency & rate detection (por nombre de archivo, luego el selector)
             const fLower = (file.name || '').toLowerCase();
-            let isCop = fLower.includes('colombia') || fLower.includes('col') || fLower.includes('cop') || fLower.includes('effi');
+            let importCurrency = 'USD';
+            if (fLower.includes('mexico') || fLower.includes('méxico') || fLower.includes('mxn') || fLower.includes('mex')) {
+                importCurrency = 'MXN';
+            } else if (fLower.includes('colombia') || fLower.includes('col') || fLower.includes('cop') || fLower.includes('effi')) {
+                importCurrency = 'COP';
+            }
+
             const extCurrencyEl = document.getElementById('extImportCurrency');
             if (extCurrencyEl) {
-                if (isCop) {
-                    extCurrencyEl.value = 'COP';
+                if (importCurrency !== 'USD') {
+                    extCurrencyEl.value = importCurrency;
                     this.onExtCurrencyChange();
-                } else if (extCurrencyEl.value === 'COP') {
-                    isCop = true;
+                } else if (this.needsRate(extCurrencyEl.value)) {
+                    // El archivo no dice el país, así que manda lo elegido a mano
+                    importCurrency = extCurrencyEl.value;
                 }
             }
 
-            let trmRate = parseFloat(document.getElementById('extTrmRate')?.value) || 4100;
-            if (trmRate <= 0) trmRate = 4100;
+            const extFallback = this.rateConfig(importCurrency).fallback;
+            let trmRate = parseFloat(document.getElementById('extTrmRate')?.value) || extFallback;
+            if (trmRate <= 0) trmRate = extFallback;
 
             this.updateImportProgress(35, 'Columnas identificadas. Cargando productos del catálogo...');
             await new Promise(r => setTimeout(r, 30));
@@ -3555,7 +3795,9 @@ const IncomeStatementModule = {
 
                 if (!productGroupMap[groupKey]) {
                     productGroupMap[groupKey] = {
-                        country: isCop ? 'Colombia Hoko' : 'Ecuador Hoko',
+                        country: importCurrency === 'COP' ? 'Colombia Hoko'
+                            : importCurrency === 'MXN' ? 'Mexico Hoko'
+                            : 'Ecuador Hoko',
                         sale_date: rowDate || this.filters.dateFrom || new Date().toISOString().split('T')[0],
                         description: finalProductName,
                         stock_id: stockId,
@@ -3605,8 +3847,8 @@ const IncomeStatementModule = {
             this.updateImportProgress(92, 'Finalizando agrupación y conversión...');
             await new Promise(r => setTimeout(r, 50));
 
-            // Apply TRM conversion to USD
-            const divisor = isCop ? trmRate : 1;
+            // Apply rate conversion to USD
+            const divisor = this.needsRate(importCurrency) ? trmRate : 1;
             Object.values(productGroupMap).forEach(grp => {
                 grp.revenue = grp.raw_revenue / divisor;
                 grp.product_cost = grp.raw_product_cost / divisor;
@@ -3630,7 +3872,7 @@ const IncomeStatementModule = {
             recordsToInsert.totalScannedGuides = totalScannedGuides;
             recordsToInsert.totalDeliveredGuides = totalDeliveredGuides;
             recordsToInsert.totalReturnedGuides = totalReturnedGuides;
-            recordsToInsert.currency = isCop ? 'COP' : 'USD';
+            recordsToInsert.currency = importCurrency;
             recordsToInsert.trmRate = trmRate;
 
             this.updateImportProgress(100, `¡Listo! ${recordsToInsert.length} referencias agrupadas.`);
@@ -3673,20 +3915,33 @@ const IncomeStatementModule = {
         const modalTrmInput = document.getElementById('modalPreviewTrmRate');
         const modalTrmBadge = document.getElementById('modalPreviewTrmBadge');
 
-        const isCop = (records.currency === 'COP') || (fileName && (fileName.toLowerCase().includes('colombia') || fileName.toLowerCase().includes('cop')));
+        const fName = (fileName || '').toLowerCase();
+        let previewCurrency = records.currency;
+        if (!previewCurrency || previewCurrency === 'USD') {
+            if (fName.includes('mexico') || fName.includes('méxico') || fName.includes('mxn')) previewCurrency = 'MXN';
+            else if (fName.includes('colombia') || fName.includes('cop')) previewCurrency = 'COP';
+            else previewCurrency = 'USD';
+        }
+
+        const previewCfg = this.rateConfig(previewCurrency);
+        const previewNeedsRate = this.needsRate(previewCurrency);
+
         if (modalCurr) {
-            modalCurr.value = isCop ? 'COP' : 'USD';
+            modalCurr.value = previewCurrency;
         }
         if (modalTrmInput) {
-            modalTrmInput.value = records.trmRate || parseFloat(document.getElementById('extTrmRate')?.value) || 4100;
+            modalTrmInput.value = records.trmRate || parseFloat(document.getElementById('extTrmRate')?.value) || previewCfg.fallback;
+            modalTrmInput.step = previewCfg.step;
         }
-        if (modalTrmBox) modalTrmBox.style.display = isCop ? 'inline-flex' : 'none';
-        if (modalTrmBadge) modalTrmBadge.style.display = isCop ? 'block' : 'none';
+        const modalTrmUnit = document.getElementById('modalPreviewTrmUnit');
+        if (modalTrmUnit) modalTrmUnit.textContent = previewCfg.code;
+        if (modalTrmBox) modalTrmBox.style.display = previewNeedsRate ? 'inline-flex' : 'none';
+        if (modalTrmBadge) modalTrmBadge.style.display = previewNeedsRate ? 'block' : 'none';
 
-        const trmRate = parseFloat(modalTrmInput?.value) || 4100;
+        const trmRate = parseFloat(modalTrmInput?.value) || previewCfg.fallback;
         const cardsEl = document.getElementById('importPreviewSummaryCards');
         if (cardsEl) {
-            const currencySubtitle = isCop ? `<div style="font-size: 0.72rem; opacity: 0.85; margin-top: 2px; color: var(--primary);">Convertido a TRM: $${Math.round(trmRate).toLocaleString('es-CO')} COP</div>` : '';
+            const currencySubtitle = previewNeedsRate ? `<div style="font-size: 0.72rem; opacity: 0.85; margin-top: 2px; color: var(--primary);">Convertido a ${previewCfg.rateName}: $${this.formatRate(trmRate, previewCurrency)} ${previewCfg.code}</div>` : '';
             cardsEl.innerHTML = `
                 <div style="background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 0.85rem 1rem;">
                     <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total Facturado (USD)</div>
@@ -3749,11 +4004,16 @@ const IncomeStatementModule = {
     renderImportPreviewTable(records) {
         const tableBody = document.getElementById('importPreviewTableBody');
         if (!tableBody) return;
-        const isCop = records.currency === 'COP' || document.getElementById('modalPreviewCurrency')?.value === 'COP';
+        const previewCurr = document.getElementById('modalPreviewCurrency')?.value || records.currency || 'USD';
+        const showLocal = this.needsRate(previewCurr);
+        const localCfg = this.rateConfig(previewCurr);
+        const localSub = (amount) => (showLocal && amount)
+            ? `<div style="font-size: 0.68rem; color: var(--text-muted);">${localCfg.code} $${Math.round(amount).toLocaleString(localCfg.locale)}</div>`
+            : '';
 
         tableBody.innerHTML = records.map((r, idx) => {
-            const rawRevSubtitle = (isCop && r.raw_revenue) ? `<div style="font-size: 0.68rem; color: var(--text-muted);">COP $${Math.round(r.raw_revenue).toLocaleString('es-CO')}</div>` : '';
-            const rawShipSubtitle = (isCop && r.raw_shipping_cost) ? `<div style="font-size: 0.68rem; color: var(--text-muted);">COP $${Math.round(r.raw_shipping_cost).toLocaleString('es-CO')}</div>` : '';
+            const rawRevSubtitle = localSub(r.raw_revenue);
+            const rawShipSubtitle = localSub(r.raw_shipping_cost);
 
             return `
             <tr data-import-idx="${idx}" style="cursor: pointer;" onclick="IncomeStatementModule.toggleImportRowCheck(${idx}, event)">
@@ -5082,18 +5342,35 @@ const IncomeStatementModule = {
     },
 
     /**
-     * Show/hide TRM input based on currency selection
+     * Show/hide the rate input based on currency selection (COP o MXN)
      */
     onCurrencyChange() {
         const currency = document.getElementById('fbImportCurrency')?.value || 'USD';
         const trmContainer = document.getElementById('trmInputContainer');
         const conversionInfo = document.getElementById('conversionInfo');
-        if (currency === 'COP') {
-            if (trmContainer) trmContainer.style.display = 'flex';
-            if (conversionInfo) conversionInfo.style.display = 'block';
-        } else {
-            if (trmContainer) trmContainer.style.display = 'none';
-            if (conversionInfo) conversionInfo.style.display = 'none';
+        const needsRate = currency === 'COP' || currency === 'MXN';
+
+        if (trmContainer) trmContainer.style.display = needsRate ? 'flex' : 'none';
+        if (conversionInfo) conversionInfo.style.display = needsRate ? 'block' : 'none';
+        if (!needsRate) return;
+
+        const cfg = this.rateConfig(currency);
+        const monthRate = this.getExchangeRateForDate(
+            this.filters.dateFrom || new Date().toISOString().split('T')[0],
+            currency
+        );
+
+        const label = document.getElementById('fbTrmLabel');
+        if (label) label.textContent = `${cfg.rateName} (1 USD =):`;
+
+        const unit = document.getElementById('fbTrmUnit');
+        if (unit) unit.textContent = cfg.code;
+
+        const input = document.getElementById('fbTrmRate');
+        if (input) {
+            input.value = monthRate;
+            input.step = cfg.step;
+            input.placeholder = cfg.fallback;
         }
     },
 
@@ -5601,8 +5878,10 @@ const IncomeStatementModule = {
 
         // Get currency settings
         const importCurrency = document.getElementById('fbImportCurrency')?.value || 'USD';
-        const trmRate = parseFloat(document.getElementById('fbTrmRate')?.value) || 4200;
-        const needsConversion = importCurrency === 'COP' && trmRate > 0;
+        const isLocalCurrency = importCurrency === 'COP' || importCurrency === 'MXN';
+        const rateCfg = this.rateConfig(importCurrency);
+        const trmRate = parseFloat(document.getElementById('fbTrmRate')?.value) || rateCfg.fallback;
+        const needsConversion = isLocalCurrency && trmRate > 0;
 
         if (jsonData.length === 0) return { data: results, diagnostics: 'Sin datos' };
 
@@ -5632,7 +5911,7 @@ const IncomeStatementModule = {
 
         // Currency diagnostics
         if (needsConversion) {
-            diagnostics += `<br>💱 Conversión: COP → USD (TRM: $${trmRate.toLocaleString()} COP = 1 USD)`;
+            diagnostics += `<br>💱 Conversión: ${importCurrency} → USD (${rateCfg.rateName}: $${trmRate.toLocaleString()} ${importCurrency} = 1 USD)`;
         }
 
         console.log('📊 FB Import - Final mapping:', finalMapping);
@@ -6392,19 +6671,6 @@ const IncomeStatementModule = {
         if (modal) {
             modal.classList.add('active');
             Utils.showToast('Revisa los datos y confirma el gasto', 'info');
-        }
-    },
-
-    onCurrencyChange() {
-        const currency = document.getElementById('fbImportCurrency')?.value;
-        const trmContainer = document.getElementById('trmInputContainer');
-        const conversionInfo = document.getElementById('conversionInfo');
-        if (currency === 'COP') {
-            if (trmContainer) trmContainer.style.display = 'flex';
-            if (conversionInfo) conversionInfo.style.display = 'block';
-        } else {
-            if (trmContainer) trmContainer.style.display = 'none';
-            if (conversionInfo) conversionInfo.style.display = 'none';
         }
     },
 
@@ -7720,15 +7986,22 @@ const IncomeStatementModule = {
                 }
 
                 const rowBg = isDevol ? 'background: rgba(249, 115, 22, 0.05);' : '';
-                const isCol = this.isColombiaOrder(guide);
-                const copRev = parseFloat(guide.total_amount || 0);
-                const copShip = parseFloat(guide.shipping_cost || 0);
+                const localCurr = this.getGuideLocalCurrency(guide);
+                const localCfg = localCurr !== 'USD' ? this.rateConfig(localCurr) : null;
+                const localRev = parseFloat(guide.total_amount || 0);
+                const localShip = parseFloat(guide.shipping_cost || 0);
+                const localText = (amount) => localCfg
+                    ? `${localCfg.code} $${Math.round(amount).toLocaleString(localCfg.locale)}`
+                    : this.formatCurrency(amount);
+                const localSub = (amount) => localCfg
+                    ? `<div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">${localText(amount)}</div>`
+                    : '';
 
-                const revDisplay = isExcluded 
-                    ? `<span style="text-decoration: line-through; opacity: 0.6; font-size: 0.78rem;">${isCol ? 'COP $' + Math.round(copRev).toLocaleString('es-CO') : this.formatCurrency(copRev)}</span> <div style="font-size: 0.72rem; color: #f97316; font-weight: 600;">$0.00</div>` 
-                    : `<div>${this.formatCurrency(revenue)}</div>${isCol ? '<div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">COP $' + Math.round(copRev).toLocaleString('es-CO') + '</div>' : ''}`;
+                const revDisplay = isExcluded
+                    ? `<span style="text-decoration: line-through; opacity: 0.6; font-size: 0.78rem;">${localText(localRev)}</span> <div style="font-size: 0.72rem; color: #f97316; font-weight: 600;">$0.00</div>`
+                    : `<div>${this.formatCurrency(revenue)}</div>${localSub(localRev)}`;
 
-                const shipDisplay = `<div>${this.formatCurrency(shipping)}</div>${isCol ? '<div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">COP $' + Math.round(copShip).toLocaleString('es-CO') + '</div>' : ''}`;
+                const shipDisplay = `<div>${this.formatCurrency(shipping)}</div>${localSub(localShip)}`;
 
                 return `
                     <tr style="${rowBg}">
@@ -8195,12 +8468,16 @@ const IncomeStatementModule = {
                     ? '<span class="badge" style="background: rgba(249, 115, 22, 0.15); color: #f97316;">Devolución</span>'
                     : `<span class="badge ${o.status === 'DELIVERED' || o.guide_statuses?.name === 'Pagado' ? 'bg-success' : 'bg-secondary'}">${o.guide_statuses?.name || o.status}</span>`;
 
-                const isCol = this.isColombiaOrder(o);
-                const copRev = parseFloat(o.total_amount || 0);
-                const copShip = parseFloat(o.shipping_cost || 0);
+                const oLocalCurr = this.getGuideLocalCurrency(o);
+                const oLocalCfg = oLocalCurr !== 'USD' ? this.rateConfig(oLocalCurr) : null;
+                const oLocalRev = parseFloat(o.total_amount || 0);
+                const oLocalShip = parseFloat(o.shipping_cost || 0);
+                const oLocalText = oLocalCfg
+                    ? `${oLocalCfg.code} $${Math.round(oLocalRev).toLocaleString(oLocalCfg.locale)}`
+                    : this.formatCurrency(oLocalRev);
                 const revText = isExcluded
-                    ? `<span style="text-decoration: line-through; opacity: 0.6;">${isCol ? 'COP $' + Math.round(copRev).toLocaleString('es-CO') : this.formatCurrency(copRev)}</span> <span style="color: #f97316; font-size: 0.75rem;">$0.00</span>`
-                    : `<div>${this.formatCurrency(rev)}</div>${isCol ? '<div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">COP $' + Math.round(copRev).toLocaleString('es-CO') + '</div>' : ''}`;
+                    ? `<span style="text-decoration: line-through; opacity: 0.6;">${oLocalText}</span> <span style="color: #f97316; font-size: 0.75rem;">$0.00</span>`
+                    : `<div>${this.formatCurrency(rev)}</div>${oLocalCfg ? `<div style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">${oLocalText}</div>` : ''}`;
 
                 const shortId = String(o.id || o.guide_number || 'N/A').slice(0, 8);
                 const fullId = String(o.id || o.guide_number || 'N/A');
@@ -8223,7 +8500,7 @@ const IncomeStatementModule = {
                         <td style="padding: 0.5rem 0.75rem; text-align: right; white-space: nowrap;">${this.formatCurrency(cost)}</td>
                         <td style="padding: 0.5rem 0.75rem; text-align: right; white-space: nowrap;">
                             <div>${this.formatCurrency(ship)}</div>
-                            ${isCol ? '<div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 500;">COP $' + Math.round(copShip).toLocaleString('es-CO') + '</div>' : ''}
+                            ${oLocalCfg ? `<div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 500;">${oLocalCfg.code} $${Math.round(oLocalShip).toLocaleString(oLocalCfg.locale)}</div>` : ''}
                         </td>
                     </tr>`;
             } else if (o.__source === 'Excel') {

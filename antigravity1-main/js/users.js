@@ -104,7 +104,7 @@ const UsersModule = {
             this.pendingPermissions = {};
             const modules = [
                 'dashboard', 'products', 'inventory', 'clients', 'guides', 
-                'confirmation', 'purchases', 'analytics', 'freights', 
+                'confirmation', 'purchases', 'monica-purchases', 'analytics', 'freights',
                 'payments', 'accounts', 'campaigns', 'income-statement', 
                 'calculator', 'materials-calculator', 'finance', 'expenses', 'multimedia', 'journal', 'mutual-tasks', 'users'
             ];
@@ -134,6 +134,7 @@ const UsersModule = {
             guides: { name: 'Guías de Despacho', icon: '📄' },
             confirmation: { name: 'Confirmación', icon: '✅' },
             purchases: { name: 'Compras', icon: '🛒' },
+            'monica-purchases': { name: 'Compras Mónica', icon: '🛍️' },
             analytics: { name: 'Análisis de Datos', icon: '📉' },
             freights: { name: 'Fletes / Movilización', icon: '🚚' },
             payments: { name: 'Gestión de Pagos', icon: '💳' },

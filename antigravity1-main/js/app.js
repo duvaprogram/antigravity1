@@ -31,6 +31,7 @@ const App = {
             AnalyticsModule.init();
             ConfirmationModule.init();
             PurchasesModule.init();
+            MonicaPurchasesModule.init();
             FreightsModule.init();
             PaymentsModule.init();
             AccountsModule.init();
@@ -161,6 +162,7 @@ const App = {
             'analytics': 'Análisis de Datos',
             'confirmation': 'Confirmación de Pedidos',
             'purchases': 'Compras a Proveedores',
+            'monica-purchases': 'Compras Mónica',
             'freights': 'Fletes - Pagos de Movilización',
             'payments': 'Gestión de Pagos',
             'accounts': 'Cuentas y Flujo de Efectivo',
@@ -229,6 +231,9 @@ const App = {
                 break;
             case 'purchases':
                 await PurchasesModule.render();
+                break;
+            case 'monica-purchases':
+                await MonicaPurchasesModule.render();
                 break;
             case 'freights':
                 await FreightsModule.render();

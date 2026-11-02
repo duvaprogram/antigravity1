@@ -296,11 +296,34 @@ const PaymentsModule = {
         try {
             await this.loadPayments();
             this.applyFilters();
+            await this.updateCajaCard();
         } catch (error) {
             console.error('Error rendering payments:', error);
             Utils.showToast('Error al cargar pagos', 'error');
         } finally {
             App.showLoading(false);
+        }
+    },
+
+    // Caja en dólares de Venezuela: guías en dólares pagadas/entregadas menos
+    // liquidaciones, servicios y compras de Mónica pagadas con la caja
+    async updateCajaCard() {
+        const saldoEl = document.getElementById('payCajaSaldo');
+        const detailEl = document.getElementById('payCajaDetail');
+        if (!saldoEl || !detailEl || !window.VenezuelaFX) return;
+
+        const money = (n) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        try {
+            const caja = await window.VenezuelaFX.loadCaja();
+            saldoEl.textContent = money(caja.saldo);
+            saldoEl.style.color = caja.saldo < 0 ? 'var(--danger)' : '#38bdf8';
+            detailEl.textContent = `Entró ${money(caja.totalEntradas)} · salió ${money(caja.totalSalidas)} (desde el 13 oct)`;
+            detailEl.title = `Liquidaciones ${money(caja.totalLiquidaciones)} · Servicios con caja ${money(caja.totalServicios)} · Compras Mónica ${money(caja.totalCompras)}`;
+        } catch (error) {
+            console.error('Error calculating Venezuela cash box:', error);
+            saldoEl.textContent = '—';
+            detailEl.textContent = 'No se pudo calcular la caja';
         }
     },
 
@@ -399,15 +422,18 @@ const PaymentsModule = {
         let countUsd = 0;
         let totalCop = 0;
         let countCop = 0;
+        let totalMxn = 0;
+        let countMxn = 0;
         let totalGuides = 0;
 
+        const newCountryEntry = (flag) => ({ count: 0, usd: 0, cop: 0, mxn: 0, flag });
         const countryMap = {
-            'Colombia': { count: 0, usd: 0, cop: 0, flag: '🇨🇴' },
-            'Ecuador': { count: 0, usd: 0, cop: 0, flag: '🇪🇨' },
-            'Venezuela': { count: 0, usd: 0, cop: 0, flag: '🇻🇪' },
-            'México': { count: 0, usd: 0, cop: 0, flag: '🇲🇽' },
-            'Mexico': { count: 0, usd: 0, cop: 0, flag: '🇲🇽' },
-            'Otro': { count: 0, usd: 0, cop: 0, flag: '🌐' }
+            'Colombia': newCountryEntry('🇨🇴'),
+            'Ecuador': newCountryEntry('🇪🇨'),
+            'Venezuela': newCountryEntry('🇻🇪'),
+            'México': newCountryEntry('🇲🇽'),
+            'Mexico': newCountryEntry('🇲🇽'),
+            'Otro': newCountryEntry('🌐')
         };
 
         paymentsList.forEach(payment => {
@@ -421,10 +447,16 @@ const PaymentsModule = {
 
             countryMap[countryKey].count++;
 
+            // Cada moneda se suma por separado: mezclar pesos con dólares da
+            // un total que no significa nada
             if (currency === 'COP') {
                 totalCop += amount;
                 countCop++;
                 countryMap[countryKey].cop += amount;
+            } else if (currency === 'MXN') {
+                totalMxn += amount;
+                countMxn++;
+                countryMap[countryKey].mxn += amount;
             } else {
                 totalUsd += amount;
                 countUsd++;
@@ -452,6 +484,16 @@ const PaymentsModule = {
             elCountCop.textContent = `${countCop} pago${countCop === 1 ? '' : 's'} en COP`;
         }
 
+        // 2b. Total MXN Card
+        const elMxn = document.getElementById('payStatTotalMxn');
+        if (elMxn) {
+            elMxn.textContent = `MXN $${Math.round(totalMxn).toLocaleString('es-MX')}`;
+        }
+        const elCountMxn = document.getElementById('payStatCountMxn');
+        if (elCountMxn) {
+            elCountMxn.textContent = `${countMxn} pago${countMxn === 1 ? '' : 's'} en MXN`;
+        }
+
         // 3. Total Guides Card
         const elGuides = document.getElementById('payStatTotalGuides');
         if (elGuides) {
@@ -470,14 +512,16 @@ const PaymentsModule = {
                 elBreakdown.innerHTML = `<span style="color: var(--text-muted);">Sin pagos en el filtro</span>`;
             } else {
                 elBreakdown.innerHTML = activeCountries.map(([name, data]) => {
-                    let amountText = '';
-                    if (data.usd > 0 && data.cop > 0) {
-                        amountText = `$${data.usd.toFixed(0)} + COP $${(data.cop / 1000000).toFixed(1)}M`;
-                    } else if (data.cop > 0) {
-                        amountText = `COP $${Math.round(data.cop).toLocaleString('es-CO')}`;
-                    } else {
-                        amountText = `$${data.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                    // Un país puede tener pagos en varias monedas: se listan todas
+                    const parts = [];
+                    if (data.usd > 0) parts.push(`$${data.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                    if (data.cop > 0) {
+                        parts.push(data.usd > 0
+                            ? `COP $${(data.cop / 1000000).toFixed(1)}M`
+                            : `COP $${Math.round(data.cop).toLocaleString('es-CO')}`);
                     }
+                    if (data.mxn > 0) parts.push(`MXN $${Math.round(data.mxn).toLocaleString('es-MX')}`);
+                    const amountText = parts.length ? parts.join(' + ') : '$0.00';
 
                     return `
                         <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -488,6 +532,23 @@ const PaymentsModule = {
                 }).join('');
             }
         }
+    },
+
+    // Formato del monto según su moneda. Los pesos (COP/MXN) van sin decimales
+    // y con su etiqueta, para no confundirlos con dólares.
+    formatAmount(amount, currency) {
+        const n = parseFloat(amount || 0);
+        const curr = (currency || 'USD').toUpperCase();
+        if (curr === 'COP') return `COP $${Math.round(n).toLocaleString('es-CO')}`;
+        if (curr === 'MXN') return `MXN $${Math.round(n).toLocaleString('es-MX')}`;
+        return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    },
+
+    amountColor(currency) {
+        const curr = (currency || 'USD').toUpperCase();
+        if (curr === 'COP') return '#60a5fa';
+        if (curr === 'MXN') return '#34d399';
+        return 'var(--success, #10b981)';
     },
 
     /**
@@ -520,7 +581,6 @@ const PaymentsModule = {
             const date = payment.created_at ? new Date(payment.created_at).toLocaleDateString('es-EC') : 'N/A';
             const amountNum = parseFloat(payment.amount || 0);
             const currency = (payment.currency || 'USD').toUpperCase();
-            const isCop = currency === 'COP';
             const guidesCount = payment.payment_guides ? payment.payment_guides.length : 0;
             const originText = payment.origin || 'N/A';
 
@@ -536,9 +596,7 @@ const PaymentsModule = {
                 guidesPreview = `<strong>${guidesCount}</strong> guías <small style="color: var(--text-muted);">(${guideNos}${guidesCount > 3 ? '...' : ''})</small>`;
             }
 
-            const formattedAmount = isCop
-                ? `COP $${Math.round(amountNum).toLocaleString('es-CO')}`
-                : `$${amountNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const formattedAmount = this.formatAmount(amountNum, currency);
 
             return `
                 <tr class="payment-table-row ${isSelected ? 'is-selected' : ''}" data-payment-id="${payment.id}">
@@ -558,7 +616,7 @@ const PaymentsModule = {
                         </div>
                     </td>
                     <td>
-                        <span style="font-weight: 700; font-size: 1rem; color: ${isCop ? '#60a5fa' : 'var(--success, #10b981)'};">
+                        <span style="font-weight: 700; font-size: 1rem; color: ${this.amountColor(currency)};">
                             ${formattedAmount}
                         </span>
                         <span class="badge" style="font-size: 0.68rem; margin-left: 4px; background: rgba(255,255,255,0.06); color: var(--text-muted);">${currency}</span>
@@ -641,6 +699,7 @@ const PaymentsModule = {
 
         let sumUsd = 0;
         let sumCop = 0;
+        let sumMxn = 0;
 
         this.selectedPaymentIds.forEach(id => {
             const payment = this.payments.find(p => p.id === id);
@@ -649,6 +708,8 @@ const PaymentsModule = {
                 const curr = (payment.currency || 'USD').toUpperCase();
                 if (curr === 'COP') {
                     sumCop += amount;
+                } else if (curr === 'MXN') {
+                    sumMxn += amount;
                 } else {
                     sumUsd += amount;
                 }
@@ -669,6 +730,14 @@ const PaymentsModule = {
         if (sumCopEl) {
             sumCopEl.textContent = `COP $${Math.round(sumCop).toLocaleString('es-CO')}`;
         }
+
+        // La fila de MXN solo aparece si hay pagos mexicanos seleccionados
+        const sumMxnEl = document.getElementById('calcSumMxn');
+        if (sumMxnEl) {
+            sumMxnEl.textContent = `MXN $${Math.round(sumMxn).toLocaleString('es-MX')}`;
+        }
+        const mxnRow = document.getElementById('calcSumMxnRow');
+        if (mxnRow) mxnRow.style.display = sumMxn > 0 ? 'block' : 'none';
     },
 
     async showPaymentModal() {
@@ -1057,10 +1126,8 @@ const PaymentsModule = {
             document.body.appendChild(modalEl);
         }
 
-        const isCop = (payment.currency || 'USD').toUpperCase() === 'COP';
-        const formattedPayAmount = isCop
-            ? `COP $${Math.round(parseFloat(payment.amount || 0)).toLocaleString('es-CO')}`
-            : `$${parseFloat(payment.amount || 0).toFixed(2)}`;
+        const payCurrency = (payment.currency || 'USD').toUpperCase();
+        const formattedPayAmount = this.formatAmount(payment.amount, payCurrency);
 
         modalEl.innerHTML = `
             <div class="modal-content" style="max-width: 700px;">
@@ -1077,7 +1144,7 @@ const PaymentsModule = {
                             </span>
                             ${payment.origin ? ` - ${payment.origin}` : ''}
                         </p>
-                        <p style="margin: 0;"><strong>Monto Recibido:</strong> <span style="color: ${isCop ? '#60a5fa' : 'var(--success)'}; font-weight: 600;">${formattedPayAmount}</span></p>
+                        <p style="margin: 0;"><strong>Monto Recibido:</strong> <span style="color: ${this.amountColor(payCurrency)}; font-weight: 600;">${formattedPayAmount}</span></p>
                         <p style="margin: 0;"><strong>Fecha:</strong> ${new Date(payment.created_at).toLocaleString()}</p>
                     </div>
                     <p style="margin-bottom: 1.25rem;"><strong>Notas:</strong> ${Utils.escapeHtml(payment.notes || 'Ninguna')}</p>
