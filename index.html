@@ -220,6 +220,14 @@
                     </svg>
                     <span>Compras</span>
                 </a>
+                <a href="#monica-purchases" class="nav-item" data-section="monica-purchases">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <path d="M16 10a4 4 0 0 1-8 0"></path>
+                    </svg>
+                    <span>Compras Mónica</span>
+                </a>
                 <a href="#freights" class="nav-item" data-section="freights">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M5 18H3a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h3"></path>
@@ -1243,6 +1251,16 @@
                                 <div id="payStatCountryBreakdown" style="font-size: 0.8rem; margin-top: 4px; display: flex; flex-direction: column; gap: 3px;">
                                     <span style="color: var(--text-muted);">Sin datos</span>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(2, 132, 199, 0.04)); border: 1px solid rgba(14, 165, 233, 0.25); padding: 1.1rem; border-radius: var(--radius-lg);">
+                        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                            <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(14, 165, 233, 0.2); color: #0ea5e9; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0;">🇻🇪</div>
+                            <div style="flex: 1; min-width: 0;">
+                                <span class="stat-label" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; display: block;">Caja en Dólares (Venezuela)</span>
+                                <span class="stat-value" id="payCajaSaldo" style="color: #38bdf8; font-size: 1.4rem; font-weight: 700; display: block; margin-top: 2px;">$0.00</span>
+                                <small class="text-muted" id="payCajaDetail" style="font-size: 0.75rem;">Calculando...</small>
                             </div>
                         </div>
                     </div>
@@ -3511,6 +3529,117 @@
                                     </tr>
                                 </thead>
                                 <tbody id="purchasesTable">
+                                    <!-- Dynamic content -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Compras Mónica Section -->
+            <section class="content-section" id="section-monica-purchases">
+                <div class="section-header">
+                    <h2>Compras Mónica</h2>
+                    <button class="btn btn-primary" onclick="MonicaPurchasesModule.openModal()">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Nueva Compra
+                    </button>
+                </div>
+
+                <!-- Summary Stats -->
+                <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-value" id="monicaStatCount">0</span>
+                            <span class="stat-label">Compras</span>
+                            <small id="monicaStatCountSub" class="text-muted"></small>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <span class="stat-value" id="monicaStatTotal" style="font-size: 1.1rem;">$0.00</span>
+                            <span class="stat-label">Total Comprado (según filtros)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border: 1px solid rgba(14, 165, 233, 0.35);">
+                        <div class="stat-info">
+                            <span class="stat-value" id="monicaCajaSaldo" style="color: #38bdf8;">$0.00</span>
+                            <span class="stat-label">🇻🇪 Caja en Dólares Venezuela</span>
+                            <small id="monicaCajaDetail" class="text-muted">Calculando...</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filter Section -->
+                <div class="card" style="margin-bottom: 1.5rem;">
+                    <div class="card-header">
+                        <h3>Filtros</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="filter-row"
+                            style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-end;">
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="monicaFilterCountry">País</label>
+                                <select id="monicaFilterCountry" class="form-control">
+                                    <option value="">Todos</option>
+                                    <option value="Colombia">🇨🇴 Colombia</option>
+                                    <option value="Ecuador">🇪🇨 Ecuador</option>
+                                    <option value="Venezuela">🇻🇪 Venezuela</option>
+                                    <option value="México">🇲🇽 México</option>
+                                    <option value="Otro">🌐 Otro</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="monicaFilterMethod">Método de pago</label>
+                                <select id="monicaFilterMethod" class="form-control">
+                                    <option value="">Todos</option>
+                                    <option value="Caja de Venezuela">Caja de Venezuela</option>
+                                    <option value="Efectivo">Efectivo</option>
+                                    <option value="Transferencia">Transferencia</option>
+                                    <option value="Binance">Binance</option>
+                                    <option value="Tarjeta">Tarjeta</option>
+                                    <option value="Otro">Otro</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="monicaFilterDateFrom">Desde</label>
+                                <input type="date" id="monicaFilterDateFrom" class="form-control">
+                            </div>
+                            <div class="form-group" style="flex: 1; min-width: 150px;">
+                                <label for="monicaFilterDateTo">Hasta</label>
+                                <input type="date" id="monicaFilterDateTo" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Purchases Table -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Historial de Compras</h3>
+                        <span id="monicaRecordCount" style="font-size: 0.875rem; color: var(--text-muted);"></span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-container">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>País</th>
+                                        <th>Tienda</th>
+                                        <th>Descripción</th>
+                                        <th>Monto</th>
+                                        <th>Método Pago</th>
+                                        <th>Notas</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="monicaPurchasesTable">
                                     <!-- Dynamic content -->
                                 </tbody>
                             </table>
@@ -7205,6 +7334,82 @@
         </div>
     </div>
 
+    <!-- Modal: Compras Mónica -->
+    <div class="modal" id="modalMonicaPurchase">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalMonicaPurchaseTitle">Nueva Compra</h2>
+                <button class="modal-close" data-close="modalMonicaPurchase">&times;</button>
+            </div>
+            <form id="formMonicaPurchase">
+                <input type="hidden" id="monicaPurchaseId">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="monicaPurchaseDate">Fecha *</label>
+                        <input type="date" id="monicaPurchaseDate" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="monicaPurchaseCountry">País *</label>
+                        <select id="monicaPurchaseCountry" required>
+                            <option value="Colombia">🇨🇴 Colombia</option>
+                            <option value="Ecuador">🇪🇨 Ecuador</option>
+                            <option value="Venezuela">🇻🇪 Venezuela</option>
+                            <option value="México">🇲🇽 México</option>
+                            <option value="Otro">🌐 Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="monicaPurchaseStore">Tienda / lugar</label>
+                        <input type="text" id="monicaPurchaseStore" placeholder="Dónde compró">
+                    </div>
+                    <div class="form-group">
+                        <label for="monicaPurchaseDescription">Descripción *</label>
+                        <input type="text" id="monicaPurchaseDescription" required placeholder="Qué compró">
+                    </div>
+                    <div class="form-group">
+                        <label for="monicaPurchaseQuantity">Cantidad</label>
+                        <input type="number" id="monicaPurchaseQuantity" min="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="monicaPurchaseAmount">Monto *</label>
+                        <input type="number" id="monicaPurchaseAmount" required min="0" step="0.01" placeholder="0.00">
+                    </div>
+                    <div class="form-group">
+                        <label for="monicaPurchaseCurrency">Moneda</label>
+                        <select id="monicaPurchaseCurrency">
+                            <option value="COP">COP</option>
+                            <option value="USD">USD</option>
+                            <option value="MXN">MXN</option>
+                            <option value="VES">Bs (VES)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="monicaPurchaseMethod">Pagó con</label>
+                        <select id="monicaPurchaseMethod">
+                            <option value="Caja de Venezuela">Caja de Venezuela</option>
+                            <option value="Efectivo">Efectivo</option>
+                            <option value="Transferencia">Transferencia</option>
+                            <option value="Binance">Binance</option>
+                            <option value="Tarjeta">Tarjeta</option>
+                            <option value="Otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <div id="monicaPurchaseHint" style="font-size: 0.8rem; color: var(--text-muted);"></div>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="monicaPurchaseNotes">Notas</label>
+                        <textarea id="monicaPurchaseNotes" rows="2" placeholder="Observaciones..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" data-close="modalMonicaPurchase">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Compra</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal: Purchase Form -->
     <div class="modal" id="modalPurchase">
         <div class="modal-content">
@@ -8974,6 +9179,7 @@
     <script src="js/freights.js?v=3.4.0"></script>
     <script src="js/venezuela-fx.js?v=3.4.0"></script>
     <script src="js/payments.js?v=3.4.0"></script>
+    <script src="js/monica-purchases.js?v=3.4.0"></script>
     <script src="js/accounts.js?v=3.4.0"></script>
     <script src="js/users.js?v=3.4.0"></script>
     <script src="js/campaigns.js?v=3.4.0"></script>

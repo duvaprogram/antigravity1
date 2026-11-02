@@ -207,6 +207,132 @@ const VenezuelaFX = {
         totals.fxRate = totals.received > 0 ? totals.bs / totals.received : 0;
 
         return totals;
+    },
+
+    // ========================================
+    // CAJA EN DÓLARES DE VENEZUELA (dashboard de Pagos y Compras Mónica)
+    // ========================================
+    // Entra: guías de Venezuela cobradas en dólares (sin bolívares) que ya están
+    // Pagadas o Entregadas.
+    // Sale: liquidaciones de la caja (pagos de origen Venezuela), servicios y
+    // fletes pagados con la caja, y compras de Mónica pagadas con la caja.
+    // La caja quedó en 0 al cierre del día anterior al corte, así que cuentan
+    // los movimientos desde ese día en adelante.
+    CAJA_CORTE: '2026-10-13',
+    // Códigos de pagos que son el reinicio de la caja (el pago de 657 USD); no
+    // se restan porque el saldo ya quedó en 0 después de ese pago.
+    CAJA_PAGOS_EXCLUIDOS: [],
+    CAJA_METODO: 'Caja de Venezuela',
+    CAJA_ESTADOS: ['Pagado', 'Entregado'],
+    VENEZUELA_CITIES: ['caracas', 'maracaibo', 'valencia', 'barquisimeto', 'maracay', 'ciudad guayana', 'maturin', 'barcelona', 'san cristobal', 'turmero', 'ciudad bolivar', 'barinas', 'los teques', 'cumana', 'san fernando de apure', 'puerto la cruz', 'merida', 'cabimas'],
+
+    normalizeText(text) {
+        return String(text || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+    },
+
+    isVenezuelaCity(city) {
+        const name = this.normalizeText(city);
+        return !!name && this.VENEZUELA_CITIES.some(c => name.includes(c));
+    },
+
+    // Día local (AAAA-MM-DD) de una fecha con hora
+    localDay(timestamp) {
+        if (!timestamp) return '';
+        const d = new Date(timestamp);
+        if (isNaN(d)) return '';
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    },
+
+    isDesdeCorte(day) {
+        return !!day && day >= this.CAJA_CORTE;
+    },
+
+    isCajaGuide(guide) {
+        const status = guide.status_name || guide.guide_statuses?.name || '';
+        return this.CAJA_ESTADOS.includes(status)
+            && this.isVenezuelaCity(guide.city_name || guide.city)
+            && !(this.num(guide.payment_bs) > 0);
+    },
+
+    // Calcula la caja a partir de guías, pagos y compras ya cargados
+    cajaUsd({ guides = [], payments = [], purchases = [] }) {
+        const entradas = guides
+            .filter(g => this.isCajaGuide(g))
+            .map(g => ({
+                label: g.guide_number,
+                date: this.localDay(g.delivered_at || g.created_at),
+                amount: this.num(g.total_amount) || this.num(g.amount_usd)
+            }))
+            .filter(row => this.isDesdeCorte(row.date));
+
+        const pagos = payments
+            .filter(p => this.isVenezuelaPayment(p)
+                && this.isDesdeCorte(this.localDay(p.created_at))
+                && !this.CAJA_PAGOS_EXCLUIDOS.includes(p.code))
+            .map(p => ({ payment: p, row: this.analyzePayment(p) }))
+            .filter(x => !x.row.unclassified);
+
+        const liquidaciones = pagos
+            .filter(x => x.row.isSettlement)
+            .map(x => ({ label: x.payment.code || 'Liquidación', date: this.localDay(x.payment.created_at), amount: x.row.received }));
+
+        const servicios = pagos
+            .filter(x => x.row.cashServices > 0)
+            .map(x => ({ label: x.payment.code || 'Servicios', date: this.localDay(x.payment.created_at), amount: x.row.cashServices }));
+
+        const compras = purchases
+            .filter(p => p.country === 'Venezuela' && p.payment_method === this.CAJA_METODO && this.isDesdeCorte(p.date))
+            .map(p => ({ label: p.description, date: p.date, amount: this.num(p.amount) }));
+
+        const sum = rows => rows.reduce((total, row) => total + row.amount, 0);
+        const totalEntradas = sum(entradas);
+        const totalLiquidaciones = sum(liquidaciones);
+        const totalServicios = sum(servicios);
+        const totalCompras = sum(compras);
+        const totalSalidas = totalLiquidaciones + totalServicios + totalCompras;
+
+        return {
+            entradas,
+            liquidaciones,
+            servicios,
+            compras,
+            totalEntradas,
+            totalLiquidaciones,
+            totalServicios,
+            totalCompras,
+            totalSalidas,
+            saldo: totalEntradas - totalSalidas
+        };
+    },
+
+    // Lee de Supabase lo necesario y devuelve la caja en dólares
+    async loadCaja() {
+        const client = window.supabaseClient;
+        if (!client) throw new Error('Sin conexión a la base de datos');
+
+        const [guides, payments, purchases] = await Promise.all([
+            client.from('v_guides_complete')
+                .select('id, guide_number, city_name, status_name, total_amount, amount_usd, payment_bs, delivered_at, created_at')
+                .in('status_name', this.CAJA_ESTADOS),
+            client.from('payments')
+                .select('*, payment_guides ( guides ( id, guide_number, total_amount, shipping_cost, payment_bs, amount_usd, guide_statuses ( name ) ) )')
+                .order('created_at', { ascending: true }),
+            client.from('monica_purchases')
+                .select('id, date, country, description, amount, payment_method')
+                .eq('country', 'Venezuela')
+                .eq('payment_method', this.CAJA_METODO)
+                .gte('date', this.CAJA_CORTE)
+        ]);
+
+        const failed = [guides, payments, purchases].find(r => r.error);
+        if (failed) throw failed.error;
+
+        return this.cajaUsd({
+            guides: guides.data || [],
+            payments: payments.data || [],
+            purchases: purchases.data || []
+        });
     }
 };
 

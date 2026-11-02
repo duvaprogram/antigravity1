@@ -296,11 +296,34 @@ const PaymentsModule = {
         try {
             await this.loadPayments();
             this.applyFilters();
+            await this.updateCajaCard();
         } catch (error) {
             console.error('Error rendering payments:', error);
             Utils.showToast('Error al cargar pagos', 'error');
         } finally {
             App.showLoading(false);
+        }
+    },
+
+    // Caja en dólares de Venezuela: guías en dólares pagadas/entregadas menos
+    // liquidaciones, servicios y compras de Mónica pagadas con la caja
+    async updateCajaCard() {
+        const saldoEl = document.getElementById('payCajaSaldo');
+        const detailEl = document.getElementById('payCajaDetail');
+        if (!saldoEl || !detailEl || !window.VenezuelaFX) return;
+
+        const money = (n) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+        try {
+            const caja = await window.VenezuelaFX.loadCaja();
+            saldoEl.textContent = money(caja.saldo);
+            saldoEl.style.color = caja.saldo < 0 ? 'var(--danger)' : '#38bdf8';
+            detailEl.textContent = `Entró ${money(caja.totalEntradas)} · salió ${money(caja.totalSalidas)} (desde el 13 oct)`;
+            detailEl.title = `Liquidaciones ${money(caja.totalLiquidaciones)} · Servicios con caja ${money(caja.totalServicios)} · Compras Mónica ${money(caja.totalCompras)}`;
+        } catch (error) {
+            console.error('Error calculating Venezuela cash box:', error);
+            saldoEl.textContent = '—';
+            detailEl.textContent = 'No se pudo calcular la caja';
         }
     },
 
