@@ -19,11 +19,29 @@ const Utils = {
     },
 
     // Format currency
-    formatCurrency(amount) {
+    formatCurrency(amount, currency = 'USD') {
+        if (currency === 'MXN') {
+            // Se muestra con el codigo (MXN) para no confundirlo con dolares
+            return new Intl.NumberFormat('es-MX', {
+                style: 'currency',
+                currency: 'MXN',
+                currencyDisplay: 'code'
+            }).format(amount || 0);
+        }
         return new Intl.NumberFormat('es-EC', {
             style: 'currency',
             currency: 'USD'
         }).format(amount);
+    },
+
+    // Ciudades de Mexico (las guias de estas ciudades se cobran en pesos mexicanos)
+    MEXICO_CITIES: ['cdmx', 'ciudad de mexico', 'ciudad de méxico', 'guadalajara', 'monterrey', 'puebla', 'toluca', 'tijuana', 'leon', 'león', 'juarez', 'juárez', 'torreon', 'torreón', 'queretaro', 'querétaro', 'san luis potosi', 'san luis potosí', 'merida', 'mérida', 'mexicali', 'aguascalientes', 'cuernavaca', 'acapulco', 'tampico', 'chihuahua', 'morelia', 'veracruz', 'cancun', 'cancún', 'saltillo'],
+
+    // Moneda en la que se cobra una guia segun su ciudad
+    currencyForCity(city) {
+        const c = (city || '').toString().toLowerCase().trim();
+        if (c && this.MEXICO_CITIES.some(m => c.includes(m))) return 'MXN';
+        return 'USD';
     },
 
     // Format date

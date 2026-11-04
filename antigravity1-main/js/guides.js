@@ -401,6 +401,7 @@ const GuidesModule = {
 
         // Store selected city for product filtering
         this.selectedCity = client.city;
+        this.refreshFormCurrency();
 
         // Show client info
         await this.onClientSelect(clientId);
@@ -425,6 +426,7 @@ const GuidesModule = {
         const caracasFields = document.getElementById('caracasFields');
         if (caracasFields) caracasFields.style.display = 'none';
         this.selectedCity = null;
+        this.refreshFormCurrency();
 
         // Clear product selection too since it depends on city
         this.clearProductSelection();
@@ -511,7 +513,7 @@ const GuidesModule = {
                     <div class="autocomplete-item" data-id="${product.id}">
                         <div class="item-main">${queryNormalized.length >= 1 ? this.highlightMatch(name, query) : Utils.escapeHtml(name)}</div>
                         <div class="item-secondary">
-                            <span>💵 ${Utils.formatCurrency(priceVal)}</span>
+                            <span>💵 ${Utils.formatCurrency(priceVal, Utils.currencyForCity(targetCity))}</span>
                             <span class="item-badge ${stockClass}">${stockLabel}</span>
                             ${product.sku ? `<span style="color: var(--text-muted);">SKU: ${Utils.escapeHtml(product.sku)}</span>` : ''}
                         </div>
@@ -783,7 +785,7 @@ const GuidesModule = {
             const cityClass = guide.city.toLowerCase();
             const statusClass = Utils.getStatusClass(guide.status);
 
-            let paymentInfo = Utils.formatCurrency(guide.totalAmount);
+            let paymentInfo = Utils.formatCurrency(guide.totalAmount, Utils.currencyForCity(guide.city));
             if (guide.city === 'Caracas') {
                 let details = [];
                 if (guide.amountUsd) details.push(`<span style="color: var(--success); font-weight: 500;">$${guide.amountUsd} USD</span>`);
@@ -1244,16 +1246,17 @@ const GuidesModule = {
                     </td>
                 </tr>
             `;
-            totalEl.textContent = Utils.formatCurrency(0);
+            totalEl.textContent = Utils.formatCurrency(0, this.getFormCurrency());
             return;
         }
 
+        const cur = this.getFormCurrency();
         tbody.innerHTML = this.currentGuideItems.map((item, index) => `
             <tr>
                 <td>${Utils.escapeHtml(item.productName)}</td>
                 <td>${item.quantity}</td>
-                <td>${Utils.formatCurrency(item.unitPrice)}</td>
-                <td>${Utils.formatCurrency(item.subtotal)}</td>
+                <td>${Utils.formatCurrency(item.unitPrice, cur)}</td>
+                <td>${Utils.formatCurrency(item.subtotal, cur)}</td>
                 <td>
                     <button type="button" class="btn btn-icon btn-secondary" onclick="GuidesModule.removeProductFromGuide(${index})">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1266,7 +1269,26 @@ const GuidesModule = {
         `).join('');
 
         const total = this.currentGuideItems.reduce((sum, item) => sum + item.subtotal, 0);
-        totalEl.textContent = Utils.formatCurrency(total);
+        totalEl.textContent = Utils.formatCurrency(total, cur);
+    },
+
+    // Moneda del formulario de guia: pesos mexicanos si la ciudad del cliente es de Mexico
+    getFormCurrency() {
+        return Utils.currencyForCity(this.selectedCity);
+    },
+
+    // Ajusta etiquetas del formulario a la moneda de la ciudad seleccionada
+    refreshFormCurrency() {
+        const cur = this.getFormCurrency();
+        const priceEl = document.getElementById('guideProductPrice');
+        if (priceEl) priceEl.placeholder = cur === 'MXN' ? 'Precio MXN' : 'Precio';
+        const shipEl = document.getElementById('guideShippingCost');
+        if (shipEl) shipEl.placeholder = cur === 'MXN' ? '0.00 MXN' : '0.00';
+        const lbl = document.getElementById('guideShippingCurrencyLabel');
+        if (lbl) lbl.textContent = cur === 'MXN' ? ' (MXN)' : '';
+        const th = document.getElementById('guidePriceCurrencyNote');
+        if (th) th.textContent = cur === 'MXN' ? ' (MXN)' : '';
+        this.updateGuideProductsTable();
     },
 
     async saveGuide() {
@@ -1354,6 +1376,7 @@ const GuidesModule = {
         const client = await Database.getClient(guide.clientId);
         const items = await Database.getGuideItems(guideId);
         const total = items.reduce((sum, item) => sum + item.subtotal, 0);
+        const cur = Utils.currencyForCity(guide.city);
 
         document.getElementById('detailGuideNumber').textContent = guide.guideNumber;
 
@@ -1400,24 +1423,24 @@ const GuidesModule = {
                             <tr>
                                 <td>${Utils.escapeHtml(item.productName || 'Producto')}</td>
                                 <td>${item.quantity}</td>
-                                <td>${Utils.formatCurrency(item.unitPrice)}</td>
-                                <td>${Utils.formatCurrency(item.subtotal)}</td>
+                                <td>${Utils.formatCurrency(item.unitPrice, cur)}</td>
+                                <td>${Utils.formatCurrency(item.subtotal, cur)}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                     <tfoot>
                         <tr>
                             <td colspan="3"><strong>Subtotal Productos</strong></td>
-                            <td><strong>${Utils.formatCurrency(total)}</strong></td>
+                            <td><strong>${Utils.formatCurrency(total, cur)}</strong></td>
                         </tr>
                         ${guide.shippingCost ? `
                         <tr>
                             <td colspan="3"><strong>🚚 Valor de Flete</strong></td>
-                            <td><strong>${Utils.formatCurrency(guide.shippingCost)}</strong></td>
+                            <td><strong>${Utils.formatCurrency(guide.shippingCost, cur)}</strong></td>
                         </tr>
                         <tr style="background: var(--primary-light);">
                             <td colspan="3"><strong>TOTAL</strong></td>
-                            <td><strong>${Utils.formatCurrency(total + guide.shippingCost)}</strong></td>
+                            <td><strong>${Utils.formatCurrency(total + guide.shippingCost, cur)}</strong></td>
                         </tr>
                         ` : ''}
                     </tfoot>
@@ -1434,7 +1457,7 @@ const GuidesModule = {
                                 <circle cx="5.5" cy="18.5" r="2.5"></circle>
                                 <circle cx="18.5" cy="18.5" r="2.5"></circle>
                             </svg>
-                            <span style="font-weight: 600; color: var(--text-primary);">Flete: ${Utils.formatCurrency(guide.shippingCost)}</span>
+                            <span style="font-weight: 600; color: var(--text-primary);">Flete: ${Utils.formatCurrency(guide.shippingCost, cur)}</span>
                             ${guide.shippingAdjustedAt ? `<span style="font-size: 0.8rem; color: var(--success); font-weight: 500;">✅ Ajustado</span>` : ''}
                         </div>
                         <button type="button" class="btn btn-sm btn-secondary" onclick="GuidesModule.openAdjustShippingModal('${guide.id}')" style="white-space: nowrap;">
@@ -1448,7 +1471,7 @@ const GuidesModule = {
                     ${guide.shippingCostOriginal && guide.shippingAdjustedAt ? `
                         <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(99, 102, 241, 0.2); font-size: 0.85rem;">
                             <div style="display: flex; flex-wrap: wrap; gap: 1rem; color: var(--text-muted);">
-                                <span>📋 Flete Original: <strong style="color: var(--text-secondary);">${Utils.formatCurrency(guide.shippingCostOriginal)}</strong></span>
+                                <span>📋 Flete Original: <strong style="color: var(--text-secondary);">${Utils.formatCurrency(guide.shippingCostOriginal, cur)}</strong></span>
                                 <span>📅 Ajustado: <strong style="color: var(--text-secondary);">${Utils.formatDate(guide.shippingAdjustedAt, true)}</strong></span>
                             </div>
                             ${guide.shippingAdjustmentNote ? `<div style="margin-top: 0.5rem; color: var(--text-muted);">💬 ${Utils.escapeHtml(guide.shippingAdjustmentNote)}</div>` : ''}
@@ -1644,7 +1667,7 @@ const GuidesModule = {
 
         // Set current values in the modal
         document.getElementById('adjustShippingGuideNumber').textContent = guide.guideNumber;
-        document.getElementById('adjustShippingCurrentCost').textContent = guide.shippingCost ? Utils.formatCurrency(guide.shippingCost) : 'No asignado';
+        document.getElementById('adjustShippingCurrentCost').textContent = guide.shippingCost ? Utils.formatCurrency(guide.shippingCost, Utils.currencyForCity(guide.city)) : 'No asignado';
         document.getElementById('adjustShippingNewCost').value = guide.shippingCost || '';
         document.getElementById('adjustShippingNote').value = '';
 
@@ -1652,7 +1675,7 @@ const GuidesModule = {
         const originalInfo = document.getElementById('adjustShippingOriginalInfo');
         if (guide.shippingCostOriginal) {
             originalInfo.style.display = 'block';
-            document.getElementById('adjustShippingOriginalCost').textContent = Utils.formatCurrency(guide.shippingCostOriginal);
+            document.getElementById('adjustShippingOriginalCost').textContent = Utils.formatCurrency(guide.shippingCostOriginal, Utils.currencyForCity(guide.city));
         } else {
             originalInfo.style.display = 'none';
         }
@@ -1691,7 +1714,7 @@ const GuidesModule = {
                 </div>
                 <div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Total</div>
-                    <div style="font-weight: 600;">${Utils.formatCurrency(guide.totalAmount)}</div>
+                    <div style="font-weight: 600;">${Utils.formatCurrency(guide.totalAmount, Utils.currencyForCity(guide.city))}</div>
                 </div>
                 <div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase;">Fecha</div>
@@ -1832,7 +1855,7 @@ const GuidesModule = {
                     👤 ${n.clientName} — ${n.city}
                 </div>
                 <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-primary);">
-                    ${Utils.formatCurrency(n.totalAmount)}
+                    ${Utils.formatCurrency(n.totalAmount, Utils.currencyForCity(n.city))}
                 </div>
                 <div class="novedad-card-gestiones">
                     <span class="gestion-count">${n.incidentCount} gestión(es)</span>
