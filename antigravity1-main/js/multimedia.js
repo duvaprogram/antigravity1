@@ -5,7 +5,7 @@
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.8.3',
+    version: '2.8.4',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -42,11 +42,15 @@ const MultimediaModule = {
             this.switchTab('videos');
 
             const cf = this.getCloudflareConfig();
-            
+
             const mainAcc = document.getElementById('cfAccountIdInputMain');
             const mainTok = document.getElementById('cfApiTokenInputMain');
             if (mainAcc) mainAcc.value = cf.accountId || '';
             if (mainTok) mainTok.value = cf.apiToken || '';
+
+            // Rellenar también los campos del modal con lo guardado: antes salían
+            // vacíos al reabrirlo y parecía que las credenciales no se guardaban.
+            this.fillCloudflareModalInputs(true);
 
             const mainCard = document.getElementById('cfMainConfigCard');
             if (mainCard) {
@@ -152,6 +156,21 @@ const MultimediaModule = {
         }
     },
 
+    // Copia al modal las credenciales guardadas en este navegador.
+    // overwrite=false solo rellena los campos vacíos (no pisa lo que se está escribiendo).
+    fillCloudflareModalInputs(overwrite) {
+        const cf = this.getCloudflareConfig();
+        const pares = [
+            ['cfAccountIdInput', cf.accountId],
+            ['cfApiTokenInput', cf.apiToken],
+            ['cfDeliveryDomainInput', cf.deliveryDomain]
+        ];
+        pares.forEach(([id, valor]) => {
+            const el = document.getElementById(id);
+            if (el && (overwrite || !el.value)) el.value = valor || '';
+        });
+    },
+
     updateCloudflareUI() {
         const cf = this.getCloudflareConfig();
         const isConfigured = Boolean(cf.accountId && cf.apiToken);
@@ -160,11 +179,16 @@ const MultimediaModule = {
         const mainTok = document.getElementById('cfApiTokenInputMain');
         if (mainAcc && !mainAcc.value) mainAcc.value = cf.accountId || '';
         if (mainTok && !mainTok.value) mainTok.value = cf.apiToken || '';
+        this.fillCloudflareModalInputs(false);
 
         const badge = document.getElementById('cfConnectionStatusBadge');
         if (badge) {
             if (isConfigured) {
-                badge.innerHTML = '✅ Conectado a Cloudflare';
+                // Mostrar qué cuenta está guardada, para distinguir la vieja de la nueva
+                const cuenta = cf.accountId.length > 10
+                    ? cf.accountId.slice(0, 4) + '…' + cf.accountId.slice(-4)
+                    : cf.accountId;
+                badge.innerHTML = '✅ Conectado a Cloudflare (cuenta ' + this.escapeHtml(cuenta) + ')';
                 badge.style.background = 'rgba(16, 185, 129, 0.15)';
                 badge.style.color = '#34d399';
                 badge.style.borderColor = 'rgba(16, 185, 129, 0.3)';

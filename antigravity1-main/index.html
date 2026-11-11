@@ -6227,7 +6227,7 @@
                                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                                 </svg>
                                 Multimedia
-                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.8.3</span>
+                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.8.4</span>
                             </h2>
                             <p style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
                                 Biblioteca centralizada de imágenes y videos (Cloudflare & CDN) para anuncios y creativos
@@ -8993,7 +8993,7 @@
                         <span>Configuración de Cloudflare</span>
                     </h2>
                     <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem; color: var(--text-muted);">
-                        Sube tus videos directamente a Cloudflare Stream para obtener enlaces online automáticos como en las imágenes.
+                        Credenciales para subir imágenes (Cloudflare Images) y videos (Cloudflare Stream). Se guardan solo en este navegador.
                     </p>
                 </div>
                 <button type="button" class="modal-close" data-close="modalCloudflareConfig" onclick="Utils.closeModal('modalCloudflareConfig')">&times;</button>
@@ -9005,9 +9005,9 @@
                     <small style="color: var(--text-muted); font-size: 0.75rem;">Encuéntralo en tu dashboard de Cloudflare -> Stream o Images -> Overview.</small>
                 </div>
                 <div class="form-group" style="margin-bottom: 1rem;">
-                    <label for="cfApiTokenInput" style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Cloudflare API Token (Permisos Stream):</label>
+                    <label for="cfApiTokenInput" style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Cloudflare API Token (Permisos Images y Stream):</label>
                     <input type="password" id="cfApiTokenInput" class="form-control" placeholder="Ej: xxxx-xxxx-xxxx..." style="font-family: monospace;">
-                    <small style="color: var(--text-muted); font-size: 0.75rem;">Token de API de Cloudflare con permisos de <code>Stream:Edit</code>.</small>
+                    <small style="color: var(--text-muted); font-size: 0.75rem;">Token de la misma cuenta, con permisos <code>Cloudflare Images: Edit</code> (fotos) y <code>Stream: Edit</code> (videos).</small>
                 </div>
                 <div class="form-group" style="margin-bottom: 1rem;">
                     <label for="cfDeliveryDomainInput" style="font-weight: 600; display: block; margin-bottom: 0.4rem;">Dominio de entrega / CDN (Opcional):</label>
@@ -9212,7 +9212,7 @@
     <script src="js/campaigns.js?v=3.6.0"></script>
     <script src="js/meta-ads.js?v=3.6.0"></script>
     <script src="js/calculator.js?v=3.6.0"></script>
-    <script src="js/multimedia.js?v=3.6.0"></script>
+    <script src="js/multimedia.js?v=2.8.4"></script>
     <script src="js/finance.js?v=3.6.0"></script>
     <script src="js/expenses.js?v=3.6.0"></script>
     <script src="js/income-statement.js?v=3.6.0"></script>
