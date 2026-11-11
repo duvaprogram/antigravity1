@@ -5,7 +5,7 @@
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.8.2',
+    version: '2.8.3',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -1291,13 +1291,20 @@ const MultimediaModule = {
     // Sube un archivo a Cloudflare Images (URL directa vía gateway). Devuelve null si falla.
     async uploadImageToCloudflare(file, category) {
         const cf = this.getCloudflareConfig();
-        if (!cf.accountId || !cf.apiToken) return null;
+        if (!cf.accountId || !cf.apiToken) {
+            return { error: 'Falta el Account ID o el Token de Cloudflare en este navegador. Configúralos en la tarjeta de Cloudflare.' };
+        }
         try {
             const gw = await fetch(`/api/cloudflare-images?action=get_upload_url&folder=${encodeURIComponent(category)}&name=${encodeURIComponent(file.name)}`, {
                 headers: { 'x-account-id': cf.accountId, 'x-api-token': cf.apiToken }
             });
             const info = await gw.json().catch(() => ({}));
-            if (!gw.ok || !info.success) throw new Error(info.error || `Gateway HTTP ${gw.status}`);
+            if (!gw.ok || !info.success) {
+                const detalle = info.error || `HTTP ${gw.status}`;
+                throw new Error(gw.status === 404
+                    ? 'El servidor /api no responde. Abre la app desde su URL de Vercel, no desde un servidor local.'
+                    : detalle);
+            }
 
             const fd = new FormData();
             fd.append('file', file);
@@ -1311,8 +1318,11 @@ const MultimediaModule = {
                 url: (variants && variants[0]) || `https://imagedelivery.net/${cf.accountId}/${data.result.id}/public`
             };
         } catch (e) {
-            console.warn('[Multimedia] Subida a Cloudflare Images falló, se guardará localmente:', e.message);
-            return null;
+            const motivo = e.message === 'Failed to fetch'
+                ? 'No hay conexión con el servidor de Cloudflare (/api).'
+                : e.message;
+            console.error('[Multimedia] Subida a Cloudflare Images falló, se guardará localmente:', motivo);
+            return { error: motivo };
         }
     },
 
@@ -1701,7 +1711,10 @@ const MultimediaModule = {
                 '', // variante
                 '', // precio
                 img.description || `Imagen del catálogo (${img.category || 'General'})`,
-                'mmimg:' + (img.id || Math.random().toString(36).substr(2, 8))
+                // Las fotos migradas a otra cuenta llevan el prefijo "mig/" en el ID.
+                // Se quita aquí para que el external_id siga siendo el de siempre y el
+                // CRM actualice los ítems existentes en vez de duplicarlos al reimportar.
+                'mmimg:' + (img.id ? String(img.id).replace(/^mig\//, '') : Math.random().toString(36).substr(2, 8))
             ]);
 
             const lineas = [columnas].concat(filas)
@@ -1980,12 +1993,14 @@ const MultimediaModule = {
                 });
             }
 
+            const erroresCloudflare = [];
             if (files && files.length > 0) {
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
                     const id = 'img_file_' + Date.now() + '_' + i;
                     const remota = await this.uploadImageToCloudflare(file, category);
-                    if (remota) {
+                    if (remota && remota.error) erroresCloudflare.push(`${file.name}: ${remota.error}`);
+                    if (remota && !remota.error) {
                         nuevas.push({
                             id: remota.id,
                             title: file.name.replace(/\.[^/.]+$/, ''),
@@ -2036,6 +2051,12 @@ const MultimediaModule = {
 
             if (typeof Utils !== 'undefined' && Utils.showToast) {
                 Utils.showToast(`¡Se subieron ${nuevas.length} ${nuevas.length === 1 ? 'imagen' : 'imágenes'} a "${category}" con éxito!`, 'success');
+            }
+
+            if (erroresCloudflare.length > 0) {
+                const detalle = erroresCloudflare.slice(0, 3).join('\n');
+                const extra = erroresCloudflare.length > 3 ? `\n...y ${erroresCloudflare.length - 3} más` : '';
+                alert(`⚠️ ${erroresCloudflare.length} imagen(es) NO se subieron a Cloudflare. Quedaron solo en este equipo ("Archivo local").\n\nMotivo:\n${detalle}${extra}`);
             }
         } catch(err) {
             console.error('[Multimedia] Error al guardar imágenes:', err);
