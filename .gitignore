@@ -2,3 +2,6 @@
 ~$*
 .wrangler
 .dev.vars
+
+# salida de la migracion de Cloudflare Images
+migracion-out/
