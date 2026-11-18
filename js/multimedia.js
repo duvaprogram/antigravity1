@@ -5,7 +5,7 @@
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.8.5',
+    version: '2.8.6',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -1656,6 +1656,11 @@ const MultimediaModule = {
 
         const btnClear = document.getElementById('btnClearImageSelection');
         if (btnClear) btnClear.style.display = marcadas > 0 ? 'inline-flex' : 'none';
+        const btnDelSel = document.getElementById('btnDeleteSelectedImages');
+        if (btnDelSel) {
+            btnDelSel.style.display = marcadas > 0 ? 'inline-flex' : 'none';
+            btnDelSel.textContent = `🗑️ Quitar seleccionadas (${marcadas})`;
+        }
 
         const n = aExportar.length;
         const labelCsv = document.getElementById('btnExportImagesCrmLabel');
@@ -1694,6 +1699,59 @@ const MultimediaModule = {
             try { document.execCommand('copy'); ok(); } catch(e){}
             document.body.removeChild(ta);
         }
+    },
+
+    // Clave para detectar repetidas: carpeta + nombre sin extensión.
+    claveImagenDuplicada(img) {
+        const nombre = (img.file_name || img.title || '').toLowerCase().replace(/\.[^/.]+$/, '').trim();
+        return (img.category || 'General').toLowerCase() + '|' + nombre;
+    },
+
+    // Marca las repetidas (todas menos la primera de cada grupo) para poder quitarlas.
+    selectDuplicateImages() {
+        const vistas = new Set();
+        const repetidas = [];
+        (this.images || []).forEach(img => {
+            const k = this.claveImagenDuplicada(img);
+            if (vistas.has(k)) repetidas.push(img.id); else vistas.add(k);
+        });
+        if (repetidas.length === 0) {
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('No hay imágenes duplicadas (mismo nombre y carpeta).', 'success');
+            return;
+        }
+        this.selectedImageCategory = 'Todos';
+        const sel = document.getElementById('imageCategorySelect');
+        if (sel) sel.value = 'Todos';
+        this.imageSearchQuery = '';
+        const q = document.getElementById('imageSearchInput');
+        if (q) q.value = '';
+        this.selectedImageIds = repetidas;
+        this.renderImagesGallery();
+        this.updateImageBadgeCount();
+        if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(`Se marcaron ${repetidas.length} imágenes repetidas. Pulsa "Quitar seleccionadas" para eliminarlas.`, 'warning');
+    },
+
+    async deleteSelectedImages() {
+        const ids = new Set(this.selectedImageIds || []);
+        const aQuitar = (this.images || []).filter(i => ids.has(i.id));
+        if (aQuitar.length === 0) return;
+        const hayNube = aQuitar.some(i => i.source_type === 'cloudflare');
+        let msg = `¿Quitar ${aQuitar.length} ${aQuitar.length === 1 ? 'imagen' : 'imágenes'} del catálogo?`;
+        if (hayNube) msg += '\n\nLas de Cloudflare solo se quitan de este catálogo; el archivo sigue en tu cuenta de Cloudflare.';
+        if (!confirm(msg)) return;
+
+        for (const img of aQuitar) {
+            if (img.source_type === 'local') await this.deleteImageBlob(img.id);
+            if (img.url && img.url.startsWith('blob:')) { try { URL.revokeObjectURL(img.url); } catch(e){} }
+        }
+        this.images = this.images.filter(i => !ids.has(i.id));
+        this.selectedImageIds = [];
+
+        this.saveLocalImagesMeta();
+        this.renderImageCategoryOptions();
+        this.renderImagesGallery();
+        this.updateImageBadgeCount();
+        if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(`${aQuitar.length} ${aQuitar.length === 1 ? 'imagen quitada' : 'imágenes quitadas'} del catálogo.`, 'success');
     },
 
     async deleteImage(id) {
@@ -2044,12 +2102,20 @@ const MultimediaModule = {
 
             const erroresCloudflare = [];
             const carpetasNuevas = new Set();
+            let omitidas = 0;
             if (files && files.length > 0) {
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
                     const id = 'img_file_' + Date.now() + '_' + i;
                     // Si viene de una carpeta, su subcarpeta pasa a ser la carpeta destino
                     const categoryFile = this.categoriaDesdeRuta(file) || category;
+                    // Evitar subir dos veces la misma imagen (mismo nombre y carpeta)
+                    const claveNueva = this.claveImagenDuplicada({ file_name: file.name, category: categoryFile });
+                    if (this.images.some(im => this.claveImagenDuplicada(im) === claveNueva) ||
+                        nuevas.some(im => this.claveImagenDuplicada(im) === claveNueva)) {
+                        omitidas++;
+                        continue;
+                    }
                     carpetasNuevas.add(categoryFile);
                     const remota = await this.uploadImageToCloudflare(file, categoryFile);
                     if (remota && remota.error) erroresCloudflare.push(`${file.name}: ${remota.error}`);
@@ -2085,7 +2151,9 @@ const MultimediaModule = {
             }
 
             if (nuevas.length === 0) {
-                const msg = 'No se agregaron imágenes nuevas. Verifica los enlaces o los archivos seleccionados.';
+                const msg = omitidas > 0
+                    ? `Las ${omitidas} imágenes ya estaban en el catálogo (mismo nombre y carpeta); no se subió nada.`
+                    : 'No se agregaron imágenes nuevas. Verifica los enlaces o los archivos seleccionados.';
                 if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(msg, 'warning');
                 else alert(msg);
                 return;
@@ -2108,6 +2176,10 @@ const MultimediaModule = {
 
             if (typeof Utils !== 'undefined' && Utils.showToast) {
                 Utils.showToast(`¡Se subieron ${nuevas.length} ${nuevas.length === 1 ? 'imagen' : 'imágenes'} ${carpetasNuevas.size > 1 ? `a ${carpetasNuevas.size} carpetas` : `a "${Array.from(carpetasNuevas)[0] || category}"`} con éxito!`, 'success');
+            }
+
+            if (omitidas > 0 && typeof Utils !== 'undefined' && Utils.showToast) {
+                Utils.showToast(`${omitidas} ${omitidas === 1 ? 'imagen repetida omitida' : 'imágenes repetidas omitidas'} (ya estaban en el catálogo).`, 'info');
             }
 
             if (erroresCloudflare.length > 0) {

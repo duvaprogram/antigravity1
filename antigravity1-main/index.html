@@ -6227,7 +6227,7 @@
                                     <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
                                 </svg>
                                 Multimedia
-                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.8.5</span>
+                                <span style="font-size: 0.72rem; background: rgba(99, 102, 241, 0.15); color: #818cf8; padding: 2px 8px; border-radius: 4px; font-weight: 500;">v2.8.6</span>
                             </h2>
                             <p style="margin: 0.2rem 0 0 0; font-size: 0.85rem; color: var(--text-muted);">
                                 Biblioteca centralizada de imágenes y videos (Cloudflare & CDN) para anuncios y creativos
@@ -6324,6 +6324,12 @@
                                 </span>
                                 <button type="button" id="btnClearImageSelection" onclick="MultimediaModule.clearImageSelection()" class="btn btn-sm btn-secondary" style="display: none; align-items: center; gap: 0.3rem; font-size: 0.75rem; padding: 0.25rem 0.6rem;">
                                     ✕ Limpiar selección
+                                </button>
+                                <button type="button" id="btnDeleteSelectedImages" onclick="MultimediaModule.deleteSelectedImages()" class="btn btn-sm btn-secondary" style="display: none; align-items: center; gap: 0.3rem; font-size: 0.75rem; padding: 0.25rem 0.6rem; color: #f87171; border-color: rgba(248,113,113,0.5);">
+                                    🗑️ Quitar seleccionadas
+                                </button>
+                                <button type="button" onclick="MultimediaModule.selectDuplicateImages()" class="btn btn-sm btn-secondary" title="Marca las imágenes repetidas (mismo nombre y carpeta) y deja sin marcar la primera de cada grupo" style="display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.75rem; padding: 0.25rem 0.6rem;">
+                                    🔍 Buscar duplicadas
                                 </button>
                             </div>
                         </div>
@@ -9217,7 +9223,7 @@
     <script src="js/campaigns.js?v=3.6.0"></script>
     <script src="js/meta-ads.js?v=3.6.0"></script>
     <script src="js/calculator.js?v=3.6.0"></script>
-    <script src="js/multimedia.js?v=2.8.5"></script>
+    <script src="js/multimedia.js?v=2.8.6"></script>
     <script src="js/finance.js?v=3.6.0"></script>
     <script src="js/expenses.js?v=3.6.0"></script>
     <script src="js/income-statement.js?v=3.6.0"></script>
