@@ -5,7 +5,7 @@
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.8.6',
+    version: '2.8.8',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -1818,6 +1818,133 @@ const MultimediaModule = {
         } catch(e) {
             console.error('[Multimedia] Error exportando CSV de imágenes:', e);
             if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Error al exportar CSV: ' + e.message, 'error');
+        }
+    },
+
+    // Ventana para elegir una o varias carpetas antes de exportar a Excel.
+    abrirExportarExcel() {
+        const conteo = {};
+        (this.images || []).forEach(img => {
+            const c = img.category || 'General';
+            conteo[c] = (conteo[c] || 0) + 1;
+        });
+        const nombres = Object.keys(conteo).sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+        if (nombres.length === 0) {
+            this.avisarCatalogoVacio('exportar a Excel');
+            return;
+        }
+        const previa = document.getElementById('mmExcelFoldersOverlay');
+        if (previa) previa.remove();
+
+        const actual = (this.selectedImageCategory && this.selectedImageCategory !== 'Todos') ? this.selectedImageCategory : null;
+        const overlay = document.createElement('div');
+        overlay.id = 'mmExcelFoldersOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10010;display:flex;align-items:center;justify-content:center;padding:1rem;';
+        overlay.innerHTML = `
+            <div style="background:#0e0e22;border:1px solid var(--border);border-radius:12px;max-width:520px;width:100%;max-height:85vh;display:flex;flex-direction:column;padding:1.1rem;gap:0.7rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h3 style="margin:0;font-size:1.05rem;">📊 Exportar a Excel: elige carpetas</h3>
+                    <button type="button" id="mmExcelClose" style="background:none;border:none;color:var(--text-muted);font-size:1.4rem;cursor:pointer;">&times;</button>
+                </div>
+                <input type="search" id="mmExcelFilter" placeholder="🔍 Filtrar carpetas..." style="background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);padding:0.4rem 0.7rem;border-radius:8px;">
+                <label style="display:flex;gap:0.5rem;align-items:center;font-weight:600;cursor:pointer;"><input type="checkbox" id="mmExcelAll"> Todas las carpetas visibles</label>
+                <div id="mmExcelList" style="overflow-y:auto;border:1px solid var(--border);border-radius:8px;padding:0.4rem;flex:1;min-height:80px;">
+                    ${nombres.map(n => `<label class="mm-excel-row" data-name="${this.escapeHtml(n.toLowerCase())}" style="display:flex;gap:0.5rem;align-items:center;padding:0.3rem 0.4rem;cursor:pointer;">
+                        <input type="checkbox" class="mm-excel-cb" value="${this.escapeHtml(n)}" ${n === actual ? 'checked' : ''}>
+                        <span style="flex:1;">${this.escapeHtml(n)}</span>
+                        <span style="color:var(--text-muted);font-size:0.78rem;">${conteo[n]}</span></label>`).join('')}
+                </div>
+                <div id="mmExcelSummary" style="font-size:0.8rem;color:var(--text-muted);"></div>
+                <div style="display:flex;justify-content:flex-end;gap:0.5rem;">
+                    <button type="button" class="btn btn-secondary" id="mmExcelCancel">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="mmExcelGo">Descargar Excel</button>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+
+        const cerrar = () => overlay.remove();
+        const cbs = () => Array.from(overlay.querySelectorAll('.mm-excel-cb'));
+        const visibles = () => cbs().filter(cb => cb.closest('.mm-excel-row').style.display !== 'none');
+        const resumen = () => {
+            const marc = cbs().filter(cb => cb.checked);
+            const total = marc.reduce((t, cb) => t + (conteo[cb.value] || 0), 0);
+            overlay.querySelector('#mmExcelSummary').textContent = marc.length
+                ? `${marc.length} ${marc.length === 1 ? 'carpeta' : 'carpetas'} · ${total} imágenes`
+                : 'Marca al menos una carpeta.';
+            overlay.querySelector('#mmExcelGo').disabled = marc.length === 0;
+        };
+        overlay.querySelector('#mmExcelClose').onclick = cerrar;
+        overlay.querySelector('#mmExcelCancel').onclick = cerrar;
+        overlay.addEventListener('mousedown', e => { if (e.target === overlay) cerrar(); });
+        overlay.querySelector('#mmExcelList').addEventListener('change', resumen);
+        overlay.querySelector('#mmExcelAll').addEventListener('change', e => {
+            visibles().forEach(cb => { cb.checked = e.target.checked; });
+            resumen();
+        });
+        overlay.querySelector('#mmExcelFilter').addEventListener('input', e => {
+            const q = e.target.value.trim().toLowerCase();
+            overlay.querySelectorAll('.mm-excel-row').forEach(r => {
+                r.style.display = !q || r.dataset.name.includes(q) ? 'flex' : 'none';
+            });
+        });
+        overlay.querySelector('#mmExcelGo').onclick = () => {
+            const elegidas = cbs().filter(cb => cb.checked).map(cb => cb.value);
+            if (elegidas.length === 0) return;
+            cerrar();
+            this.exportarImagenesExcel(elegidas);
+        };
+        resumen();
+    },
+
+    // Excel con Carpeta | Referencia | Link. La referencia es el nombre de la
+    // imagen sin extensión. Exporta lo seleccionado o, si no hay selección,
+    // lo que se ve en pantalla (elige la carpeta arriba para una sola).
+    exportarImagenesExcel(carpetas) {
+        try {
+            if (typeof XLSX === 'undefined') {
+                if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('La librería de Excel no cargó. Recarga la página e inténtalo de nuevo.', 'error');
+                return;
+            }
+            const imagenes = Array.isArray(carpetas)
+                ? (this.images || []).filter(img => carpetas.includes(img.category || 'General'))
+                : this.getImagesParaExportar();
+            if (imagenes.length === 0) {
+                this.avisarCatalogoVacio('exportar a Excel');
+                return;
+            }
+
+            const filas = imagenes.map(img => {
+                const nombre = (img.file_name || img.title || '').replace(/\.[^/.]+$/, '').trim();
+                const u = img.url || img.thumbnail_url || '';
+                return {
+                    'Carpeta': img.category || 'General',
+                    'Referencia': nombre,
+                    'Link': u.startsWith('blob:') ? '' : u
+                };
+            }).sort((a, b) =>
+                a['Carpeta'].localeCompare(b['Carpeta'], 'es', { numeric: true }) ||
+                a['Referencia'].localeCompare(b['Referencia'], 'es', { numeric: true }));
+
+            const ws = XLSX.utils.json_to_sheet(filas, { header: ['Carpeta', 'Referencia', 'Link'] });
+            ws['!cols'] = [{ wch: 28 }, { wch: 30 }, { wch: 80 }];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Imágenes');
+
+            const etiqueta = Array.isArray(carpetas)
+                ? (carpetas.length === 1 ? carpetas[0].toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : carpetas.length + '-carpetas')
+                : ((this.selectedImageCategory && this.selectedImageCategory !== 'Todos')
+                    ? this.selectedImageCategory.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+                    : 'todas');
+            const fecha = new Date().toISOString().slice(0, 10);
+            XLSX.writeFile(wb, `referencias-imagenes-${etiqueta}-${fecha}.xlsx`);
+
+            const sinLink = filas.filter(f => !f['Link']).length;
+            let mensaje = `Excel listo con ${filas.length} ${filas.length === 1 ? 'imagen' : 'imágenes'}.`;
+            if (sinLink > 0) mensaje += ` (${sinLink} sin enlace público: son archivos locales.)`;
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast(mensaje, sinLink > 0 ? 'warning' : 'success');
+        } catch (e) {
+            console.error('[Multimedia] Error exportando Excel de imágenes:', e);
+            if (typeof Utils !== 'undefined' && Utils.showToast) Utils.showToast('Error al exportar Excel: ' + e.message, 'error');
         }
     },
 
