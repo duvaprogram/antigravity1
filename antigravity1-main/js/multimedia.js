@@ -5,7 +5,7 @@
 // ==============================================================================
 
 const MultimediaModule = {
-    version: '2.8.4',
+    version: '2.8.5',
     initialized: false,
     activeTab: 'images', // 'images' | 'videos'
     videos: [],
@@ -1928,6 +1928,8 @@ const MultimediaModule = {
             const fileInput = document.getElementById('modalImageFileInput');
             if (text) text.value = '';
             if (fileInput) fileInput.value = '';
+            const folderInput = document.getElementById('modalImageFolderInput');
+            if (folderInput) folderInput.value = '';
 
             const preview = document.getElementById('modalImageFilesPreview');
             if (preview) preview.innerHTML = '';
@@ -1957,19 +1959,43 @@ const MultimediaModule = {
         }
     },
 
+    // Imágenes elegidas en el modal: archivos sueltos + carpeta completa.
+    // De una carpeta solo se toman imágenes (se ignoran .DS_Store, .txt, etc.).
+    getModalImageFiles() {
+        const sueltos = document.getElementById('modalImageFileInput');
+        const carpeta = document.getElementById('modalImageFolderInput');
+        const lista = sueltos && sueltos.files ? Array.from(sueltos.files) : [];
+        if (carpeta && carpeta.files) {
+            Array.from(carpeta.files).forEach(f => {
+                if ((f.type && f.type.startsWith('image/')) || /.(jpe?g|png|gif|webp|avif|bmp|svg|heic)$/i.test(f.name)) lista.push(f);
+            });
+        }
+        return lista;
+    },
+
+    // "Mi carpeta/Verano/Playa/foto.jpg" -> "Mi carpeta / Verano / Playa".
+    // Devuelve null si el archivo no viene de una carpeta.
+    categoriaDesdeRuta(file) {
+        const ruta = file && file.webkitRelativePath;
+        if (!ruta || ruta.indexOf('/') === -1) return null;
+        const dirs = ruta.split('/').slice(0, -1).map(d => d.trim().replace(/s+/g, ' ')).filter(Boolean);
+        return dirs.length ? dirs.join(' / ').slice(0, 120) : null;
+    },
+
     onModalImageFilesChange(input) {
         const preview = document.getElementById('modalImageFilesPreview');
         if (!preview) return;
-        const files = input ? input.files : [];
-        if (!files || files.length === 0) {
+        const files = this.getModalImageFiles();
+        if (files.length === 0) {
             preview.innerHTML = '';
             return;
         }
-        const nombres = Array.from(files).map(f => this.escapeHtml(f.name)).join(', ');
+        const carpetas = new Set(files.map(f => this.categoriaDesdeRuta(f)).filter(Boolean));
+        const nombres = files.map(f => this.escapeHtml(f.name)).join(', ');
         preview.innerHTML = `
             <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 6px; padding: 0.5rem 0.75rem; margin-top: 0.4rem; font-size: 0.8rem; color: #34d399;">
-                ✅ <strong>${files.length} ${files.length === 1 ? 'archivo seleccionado' : 'archivos seleccionados'}:</strong>
-                <div style="max-height: 60px; overflow-y: auto; color: var(--text-secondary); margin-top: 0.2rem; font-size: 0.75rem;">${nombres}</div>
+                ✅ <strong>${files.length} ${files.length === 1 ? 'imagen seleccionada' : 'imágenes seleccionadas'}${carpetas.size ? ` en ${carpetas.size} ${carpetas.size === 1 ? 'carpeta' : 'carpetas'}` : ''}:</strong>
+                <div style="max-height: 60px; overflow-y: auto; color: var(--text-secondary); margin-top: 0.2rem; font-size: 0.75rem;">${carpetas.size ? Array.from(carpetas).map(c => this.escapeHtml(c)).join(' · ') : nombres}</div>
             </div>
         `;
     },
@@ -1982,8 +2008,7 @@ const MultimediaModule = {
             const category = categorySelect ? categorySelect.value : 'General';
             const textEl = document.getElementById('modalImageUrlTextArea');
             const textVal = textEl ? textEl.value.trim() : '';
-            const fileInput = document.getElementById('modalImageFileInput');
-            const files = fileInput ? fileInput.files : [];
+            const files = this.getModalImageFiles();
 
             if (!textVal && (!files || files.length === 0)) {
                 const msg = 'Por favor selecciona archivos de imagen desde tu equipo o pega al menos un enlace URL.';
@@ -2018,17 +2043,21 @@ const MultimediaModule = {
             }
 
             const erroresCloudflare = [];
+            const carpetasNuevas = new Set();
             if (files && files.length > 0) {
                 for (let i = 0; i < files.length; i++) {
                     const file = files[i];
                     const id = 'img_file_' + Date.now() + '_' + i;
-                    const remota = await this.uploadImageToCloudflare(file, category);
+                    // Si viene de una carpeta, su subcarpeta pasa a ser la carpeta destino
+                    const categoryFile = this.categoriaDesdeRuta(file) || category;
+                    carpetasNuevas.add(categoryFile);
+                    const remota = await this.uploadImageToCloudflare(file, categoryFile);
                     if (remota && remota.error) erroresCloudflare.push(`${file.name}: ${remota.error}`);
                     if (remota && !remota.error) {
                         nuevas.push({
                             id: remota.id,
                             title: file.name.replace(/\.[^/.]+$/, ''),
-                            category: category,
+                            category: categoryFile,
                             url: remota.url,
                             thumbnail_url: remota.url,
                             size_bytes: file.size,
@@ -2044,7 +2073,7 @@ const MultimediaModule = {
                     nuevas.push({
                         id: id,
                         title: file.name.replace(/\.[^/.]+$/, ''),
-                        category: category,
+                        category: categoryFile,
                         url: objUrl,
                         thumbnail_url: objUrl,
                         size_bytes: file.size,
@@ -2063,6 +2092,10 @@ const MultimediaModule = {
             }
 
             this.images = this.images.concat(nuevas);
+            carpetasNuevas.forEach(c => {
+                const lista = this.getCustomImageFolders();
+                if (!lista.includes(c)) { lista.push(c); try { localStorage.setItem('multimedia_image_folders', JSON.stringify(lista)); } catch (e) {} }
+            });
             // Las recién registradas quedan marcadas para exportarlas de inmediato
             this.selectedImageIds = (this.selectedImageIds || []).concat(nuevas.map(n => n.id));
 
@@ -2074,7 +2107,7 @@ const MultimediaModule = {
             this.closeUploadImageModal();
 
             if (typeof Utils !== 'undefined' && Utils.showToast) {
-                Utils.showToast(`¡Se subieron ${nuevas.length} ${nuevas.length === 1 ? 'imagen' : 'imágenes'} a "${category}" con éxito!`, 'success');
+                Utils.showToast(`¡Se subieron ${nuevas.length} ${nuevas.length === 1 ? 'imagen' : 'imágenes'} ${carpetasNuevas.size > 1 ? `a ${carpetasNuevas.size} carpetas` : `a "${Array.from(carpetasNuevas)[0] || category}"`} con éxito!`, 'success');
             }
 
             if (erroresCloudflare.length > 0) {

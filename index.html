@@ -9059,6 +9059,11 @@
                         📁 Opción 1: Seleccionar archivos de imagen de tu equipo (fotos, banners, etc.):
                     </label>
                     <input type="file" id="modalImageFileInput" accept="image/*" class="form-control" multiple onchange="MultimediaModule.onModalImageFilesChange(this)" style="cursor: pointer;">
+                    <div style="margin-top: 0.6rem;">
+                        <input type="file" id="modalImageFolderInput" webkitdirectory directory multiple style="display: none;" onchange="MultimediaModule.onModalImageFilesChange(this)">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalImageFolderInput').click()" style="font-weight: 600;">📂 Seleccionar carpeta completa (con subcarpetas)</button>
+                        <small style="display: block; color: var(--text-muted); font-size: 0.75rem; margin-top: 0.3rem;">Cada subcarpeta se crea como carpeta propia (ej. "Verano / Playa") y solo se suben las imágenes.</small>
+                    </div>
                     <div id="modalImageFilesPreview"></div>
                 </div>
 
