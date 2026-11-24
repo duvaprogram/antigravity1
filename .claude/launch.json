@@ -6,6 +6,12 @@
       "runtimeExecutable": "npx",
       "runtimeArgs": ["--yes", "http-server", "-p", "4173", "-c-1"],
       "port": 4173
+    },
+    {
+      "name": "domicilios-vercel",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "http-server", "antigravity1-main", "-p", "4174", "-c-1"],
+      "port": 4174
     }
   ]
 }

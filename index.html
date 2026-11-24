@@ -7175,6 +7175,35 @@
         </div>
     </div>
 
+    <!-- Modal: Editar valor/moneda de guia Venezuela -->
+    <div class="modal" id="modalEditVePayment">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Editar valor — <span id="editVePaymentGuideNumber" style="color: var(--primary);"></span></h2>
+                <button class="modal-close" data-close="modalEditVePayment">&times;</button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+                    Para cambiar la moneda, llene el monto en la que se va a cobrar y deje vacío el otro.
+                </p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="editVePaymentUsd">Monto a cancelar ($ USD)</label>
+                        <input type="number" id="editVePaymentUsd" min="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="editVePaymentBs">Pago móvil (Bs)</label>
+                        <input type="number" id="editVePaymentBs" min="0" step="0.01">
+                    </div>
+                </div>
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" data-close="modalEditVePayment">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="GuidesModule.saveVePayment()">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal: Adjust Shipping Cost -->
     <div class="modal" id="modalAdjustShipping">
         <div class="modal-content">
