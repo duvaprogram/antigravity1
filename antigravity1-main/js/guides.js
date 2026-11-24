@@ -239,6 +239,9 @@ const GuidesModule = {
             btn.addEventListener('click', () => Utils.closeModal('modalGuideDetails'));
         });
 
+        document.querySelectorAll('[data-close="modalEditVePayment"]').forEach(btn => {
+            btn.addEventListener('click', () => Utils.closeModal('modalEditVePayment'));
+        });
         document.querySelectorAll('[data-close="modalAdjustShipping"]').forEach(btn => {
             btn.addEventListener('click', () => Utils.closeModal('modalAdjustShipping'));
         });
@@ -1507,10 +1510,14 @@ const GuidesModule = {
 
             ${guide.city === 'Caracas' ? `
                 <div class="guide-details-section">
-                    <h3>Datos Caracas</h3>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
+                        <h3 style="margin: 0;">Datos Caracas</h3>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="GuidesModule.openEditVePaymentModal('${guide.id}')" style="white-space: nowrap;">✏️ Editar valor / moneda</button>
+                    </div>
                     <div class="client-info">
                         ${guide.amountUsd ? `<p><strong>Monto a Cancelar:</strong> $${guide.amountUsd} USD</p>` : ''}
                         ${guide.paymentBs ? `<p><strong>Pago Móvil:</strong> ${guide.paymentBs} Bs</p>` : ''}
+                        ${!guide.amountUsd && !guide.paymentBs ? `<p style="color: var(--text-muted);">Sin monto registrado</p>` : ''}
                         ${guide.deliveryTime ? `<p><strong>Hora Entrega:</strong> ${guide.deliveryTime}</p>` : ''}
                     </div>
                 </div>
@@ -1863,6 +1870,49 @@ const GuidesModule = {
                 </div>
             </div>
         `).join('');
+    },
+
+    // Editar el valor/moneda de una guia de Venezuela sin tener que borrarla y rehacerla
+    async openEditVePaymentModal(guideId) {
+        const guide = await Database.getGuide(guideId);
+        if (!guide) return;
+
+        this.editingVePaymentGuideId = guideId;
+        document.getElementById('editVePaymentGuideNumber').textContent = guide.guideNumber;
+        document.getElementById('editVePaymentUsd').value = guide.amountUsd || '';
+        document.getElementById('editVePaymentBs').value = guide.paymentBs || '';
+        Utils.openModal('modalEditVePayment');
+    },
+
+    async saveVePayment() {
+        if (!this.editingVePaymentGuideId) return;
+
+        const usdRaw = document.getElementById('editVePaymentUsd').value.trim();
+        const bsRaw = document.getElementById('editVePaymentBs').value.trim();
+        const amountUsd = usdRaw === '' ? null : parseFloat(usdRaw);
+        const paymentBs = bsRaw === '' ? null : parseFloat(bsRaw);
+
+        if ((amountUsd !== null && (isNaN(amountUsd) || amountUsd < 0)) ||
+            (paymentBs !== null && (isNaN(paymentBs) || paymentBs < 0))) {
+            Utils.showToast('Ingrese valores válidos', 'warning');
+            return;
+        }
+
+        try {
+            await Database.updateGuidePayment(this.editingVePaymentGuideId, { amountUsd, paymentBs });
+
+            Utils.closeModal('modalEditVePayment');
+            Utils.showToast('Valor de la guía actualizado', 'success');
+
+            if (document.getElementById('modalGuideDetails').classList.contains('active')) {
+                await this.viewGuide(this.editingVePaymentGuideId);
+            }
+            await this.render();
+            this.editingVePaymentGuideId = null;
+        } catch (error) {
+            console.error('Error updating Venezuela payment:', error);
+            Utils.showToast('Error al actualizar el valor de la guía', 'error');
+        }
     },
 
     async saveShippingAdjustment() {
